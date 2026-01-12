@@ -123,17 +123,17 @@ krkn-operator-console/
 
 ```bash
 # Build image (Podman - default)
-podman build -t quay.io/krkn-chaos/krkn-operator-console:latest .
+podman build -t quay.io/krkn-chaos/krkn-operator:console .
 
 # Push to registry
-podman push quay.io/krkn-chaos/krkn-operator-console:latest
+podman push quay.io/krkn-chaos/krkn-operator:console
 
 # Run locally for testing
-podman run -p 8080:8080 quay.io/krkn-chaos/krkn-operator-console:latest
+podman run -p 8080:8080 quay.io/krkn-chaos/krkn-operator:console
 
 # Or use Docker
-docker build -t quay.io/krkn-chaos/krkn-operator-console:latest .
-docker push quay.io/krkn-chaos/krkn-operator-console:latest
+docker build -t quay.io/krkn-chaos/krkn-operator:console .
+docker push quay.io/krkn-chaos/krkn-operator:console
 ```
 
 ### Kubernetes / OpenShift

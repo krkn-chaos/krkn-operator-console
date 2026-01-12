@@ -22,7 +22,7 @@ Build container image and push to container registry.
 
 **Usage:**
 ```bash
-# Use defaults (podman + quay.io/krkn-chaos/krkn-operator-console:latest)
+# Use defaults (podman + quay.io/krkn-chaos/krkn-operator:console)
 ./scripts/build-and-push.sh
 
 # Use Docker instead of Podman
@@ -35,7 +35,7 @@ IMAGE_REGISTRY=docker.io IMAGE_REPO=myorg/console IMAGE_TAG=v1.0.0 ./scripts/bui
 **Environment Variables:**
 - `CONTAINER_TOOL` - Container tool to use: `podman` or `docker` (default: `podman`)
 - `IMAGE_REGISTRY` - Container registry (default: `quay.io`)
-- `IMAGE_REPO` - Repository path (default: `krkn-chaos/krkn-operator-console`)
+- `IMAGE_REPO` - Repository path (default: `krkn-chaos/krkn-operator:console`)
 - `IMAGE_TAG` - Image tag (default: `latest`)
 
 #### `test-local-docker.sh`
@@ -72,6 +72,9 @@ Deploy console to Kubernetes/OpenShift cluster.
 # Deploy to OpenShift (default namespace: krkn-operator-system)
 ./scripts/deploy-k8s.sh
 
+# Deploy with custom image
+IMG=quay.io/myorg/console:v1.0.0 ./scripts/deploy-k8s.sh
+
 # Deploy to specific namespace
 NAMESPACE=my-namespace ./scripts/deploy-k8s.sh
 
@@ -80,15 +83,17 @@ PLATFORM=kubernetes ./scripts/deploy-k8s.sh
 ```
 
 **Environment Variables:**
+- `IMG` - Container image to deploy (default: `quay.io/krkn-chaos/krkn-operator:console`)
 - `NAMESPACE` - Target namespace (default: `krkn-operator-system`)
 - `PLATFORM` - Platform type: `openshift` or `kubernetes` (default: `openshift`)
 
 **What it does:**
 1. Creates namespace if it doesn't exist
 2. Applies Deployment manifest
-3. Applies Service manifest
-4. Applies Route (OpenShift) or Ingress (Kubernetes)
-5. Shows deployment status
+3. Updates deployment image to specified `IMG`
+4. Applies Service manifest
+5. Applies Route (OpenShift) or Ingress (Kubernetes)
+6. Shows deployment status
 
 #### `undeploy-k8s.sh`
 Remove console from cluster.

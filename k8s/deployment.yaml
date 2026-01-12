@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: console
-        image: quay.io/krkn-chaos/krkn-operator-console:latest
+        image: quay.io/krkn-chaos/krkn-operator:console
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

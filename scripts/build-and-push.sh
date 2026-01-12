@@ -5,8 +5,8 @@ set -e
 
 # Configuration
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
-IMAGE_REPO="${IMAGE_REPO:-krkn-chaos/krkn-operator-console}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
+IMAGE_REPO="${IMAGE_REPO:-krkn-chaos/krkn-operator}"
+IMAGE_TAG="${IMAGE_TAG:-console}"
 IMAGE_FULL="${IMAGE_REGISTRY}/${IMAGE_REPO}:${IMAGE_TAG}"
 CONTAINER_TOOL="${CONTAINER_TOOL:-podman}"  # podman or docker
 

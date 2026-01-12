@@ -1,5 +1,5 @@
 # Stage 1: Build React app
-FROM node:18-alpine AS builder
+FROM docker.io/library/node:18-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve with nginx
-FROM nginx:alpine
+FROM docker.io/library/nginx:alpine
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

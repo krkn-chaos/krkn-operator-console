@@ -5,11 +5,13 @@ set -e
 
 NAMESPACE="${NAMESPACE:-krkn-operator-system}"
 PLATFORM="${PLATFORM:-openshift}"  # openshift or kubernetes
+IMG="${IMG:-quay.io/krkn-chaos/krkn-operator:console}"
 
 echo "🚀 Deploying Krkn Operator Console"
 echo "===================================="
 echo "Namespace: ${NAMESPACE}"
 echo "Platform: ${PLATFORM}"
+echo "Image: ${IMG}"
 echo ""
 
 # Check if kubectl is available
@@ -31,6 +33,18 @@ fi
 echo ""
 echo "📦 Deploying Deployment..."
 kubectl apply -f k8s/deployment.yaml -n "${NAMESPACE}"
+
+# Update image if specified
+echo "🔄 Setting image to: ${IMG}..."
+kubectl set image deployment/krkn-operator-console console="${IMG}" -n "${NAMESPACE}"
+
+# Wait for deployment to be created
+sleep 2
+
+# Verify image was set
+CURRENT_IMAGE=$(kubectl get deployment krkn-operator-console -n "${NAMESPACE}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "unknown")
+echo "✅ Image verified: ${CURRENT_IMAGE}"
+
 
 echo ""
 echo "🌐 Deploying Service..."
