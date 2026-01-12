@@ -1,7 +1,7 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand } from '@patternfly/react-core';
 import { useAppContext } from './context/AppContext';
 import { useTargetPoller } from './hooks/useTargetPoller';
-import { LoadingScreen, ErrorDisplay, ClusterSelector } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterSelector, RegistrySelector, ScenariosList } from './components';
 import { NodesDisplay } from './components/NodesDisplay';
 
 function App() {
@@ -43,6 +43,23 @@ function App() {
             {state.selectedCluster && (
               <NodesDisplay selectedCluster={state.selectedCluster} nodes={state.nodes} />
             )}
+          </PageSection>
+        );
+
+      case 'configuring_registry':
+        return (
+          <PageSection>
+            <RegistrySelector />
+          </PageSection>
+        );
+
+      case 'loading_scenarios':
+        return <LoadingScreen phase="loading_scenarios" />;
+
+      case 'selecting_scenarios':
+        return (
+          <PageSection>
+            <ScenariosList />
           </PageSection>
         );
 

@@ -9,6 +9,10 @@ const initialState: AppState = {
   clusters: null,
   selectedCluster: null,
   nodes: null,
+  registryType: null,
+  registryConfig: null,
+  scenarios: null,
+  selectedScenarios: null,
   error: null,
 };
 
@@ -98,6 +102,48 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         phase: 'error',
         error: action.payload,
+      };
+
+    case 'CONFIGURE_REGISTRY':
+      return {
+        ...state,
+        phase: 'configuring_registry',
+        error: null,
+      };
+
+    case 'REGISTRY_CONFIGURED':
+      return {
+        ...state,
+        registryType: action.payload.registryType,
+        registryConfig: action.payload.registryConfig,
+      };
+
+    case 'SCENARIOS_LOADING':
+      return {
+        ...state,
+        phase: 'loading_scenarios',
+        error: null,
+      };
+
+    case 'SCENARIOS_SUCCESS':
+      return {
+        ...state,
+        phase: 'selecting_scenarios',
+        scenarios: action.payload.scenarios,
+        error: null,
+      };
+
+    case 'SCENARIOS_ERROR':
+      return {
+        ...state,
+        phase: 'error',
+        error: action.payload,
+      };
+
+    case 'SELECT_SCENARIOS':
+      return {
+        ...state,
+        selectedScenarios: action.payload.scenarios,
       };
 
     case 'RETRY':

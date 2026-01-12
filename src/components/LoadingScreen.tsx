@@ -7,7 +7,7 @@ import {
 } from '@patternfly/react-core';
 
 interface LoadingScreenProps {
-  phase: 'initializing' | 'polling' | 'loading_nodes';
+  phase: 'initializing' | 'polling' | 'loading_nodes' | 'loading_scenarios';
   pollAttempts?: number;
 }
 
@@ -19,12 +19,16 @@ export function LoadingScreen({ phase, pollAttempts = 0 }: LoadingScreenProps) {
     if (phase === 'loading_nodes') {
       return 'Loading cluster nodes...';
     }
+    if (phase === 'loading_scenarios') {
+      return 'Loading chaos scenarios from registry...';
+    }
     return `Waiting for target data... (attempt ${pollAttempts})`;
   };
 
   const getTitle = () => {
     if (phase === 'initializing') return 'Initializing';
     if (phase === 'loading_nodes') return 'Loading Nodes';
+    if (phase === 'loading_scenarios') return 'Loading Scenarios';
     return 'Loading';
   };
 

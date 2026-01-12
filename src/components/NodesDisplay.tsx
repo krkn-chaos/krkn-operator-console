@@ -9,8 +9,10 @@ import {
   EmptyState,
   EmptyStateBody,
   EmptyStateIcon,
+  Button,
 } from '@patternfly/react-core';
 import { ServerIcon } from '@patternfly/react-icons';
+import { useAppContext } from '../context/AppContext';
 import type { SelectedCluster } from '../types/api';
 
 interface NodesDisplayProps {
@@ -19,6 +21,12 @@ interface NodesDisplayProps {
 }
 
 export function NodesDisplay({ selectedCluster, nodes }: NodesDisplayProps) {
+  const { dispatch } = useAppContext();
+
+  const handleSelectScenarios = () => {
+    dispatch({ type: 'CONFIGURE_REGISTRY' });
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       {/* Cluster Info Header */}
@@ -75,15 +83,18 @@ export function NodesDisplay({ selectedCluster, nodes }: NodesDisplayProps) {
         </CardBody>
       </Card>
 
-      {/* Placeholder for future chaos scenario selection */}
+      {/* Select Scenarios Card */}
       <Card style={{ marginTop: '1.5rem' }}>
-        <CardBody style={{ textAlign: 'center', padding: '2rem', color: 'var(--pf-v5-global--Color--200)' }}>
+        <CardBody style={{ textAlign: 'center', padding: '2rem' }}>
           <Title headingLevel="h3" size="md">
             Chaos Scenario Selection
           </Title>
-          <div style={{ marginTop: '0.5rem' }}>
-            Coming soon: Select and configure chaos scenarios to run on this cluster
+          <div style={{ marginTop: '0.5rem', marginBottom: '1.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
+            Select chaos scenarios from a container registry to run on this cluster
           </div>
+          <Button variant="primary" size="lg" onClick={handleSelectScenarios}>
+            Select Chaos Scenarios
+          </Button>
         </CardBody>
       </Card>
     </div>

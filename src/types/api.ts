@@ -20,6 +20,27 @@ export interface NodesResponse {
   nodes: string[];
 }
 
+export interface ScenariosRequest {
+  username?: string;
+  password?: string;
+  token?: string;
+  registryUrl?: string;
+  scenarioRepository?: string;
+  skipTls?: boolean;
+  insecure?: boolean;
+}
+
+export interface ScenarioTag {
+  name: string;
+  digest?: string;
+  size?: number;
+  lastModified?: string;
+}
+
+export interface ScenariosResponse {
+  scenarios: ScenarioTag[];
+}
+
 export interface ErrorResponse {
   error: string;
   message: string;
@@ -27,7 +48,7 @@ export interface ErrorResponse {
 
 // App State Types
 
-export type AppPhase = 'initializing' | 'polling' | 'selecting_cluster' | 'loading_nodes' | 'ready' | 'error';
+export type AppPhase = 'initializing' | 'polling' | 'selecting_cluster' | 'loading_nodes' | 'ready' | 'configuring_registry' | 'loading_scenarios' | 'selecting_scenarios' | 'error';
 
 export type ErrorType = 'network' | 'timeout' | 'api_error' | 'not_found';
 
@@ -49,6 +70,10 @@ export interface AppState {
   clusters: ClustersResponse['targetData'] | null;
   selectedCluster: SelectedCluster | null;
   nodes: string[] | null;
+  registryType: 'public' | 'private' | null;
+  registryConfig: ScenariosRequest | null;
+  scenarios: ScenarioTag[] | null;
+  selectedScenarios: string[] | null;
   error: AppError | null;
 }
 
@@ -67,4 +92,10 @@ export type AppAction =
   | { type: 'NODES_LOADING' }
   | { type: 'NODES_SUCCESS'; payload: { nodes: string[] } }
   | { type: 'NODES_ERROR'; payload: AppError }
+  | { type: 'CONFIGURE_REGISTRY' }
+  | { type: 'REGISTRY_CONFIGURED'; payload: { registryType: 'public' | 'private'; registryConfig: ScenariosRequest } }
+  | { type: 'SCENARIOS_LOADING' }
+  | { type: 'SCENARIOS_SUCCESS'; payload: { scenarios: ScenarioTag[] } }
+  | { type: 'SCENARIOS_ERROR'; payload: AppError }
+  | { type: 'SELECT_SCENARIOS'; payload: { scenarios: string[] } }
   | { type: 'RETRY' };

@@ -1,5 +1,5 @@
 import { config } from '../config';
-import type { CreateTargetResponse, ClustersResponse, NodesResponse } from '../types/api';
+import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse } from '../types/api';
 
 class OperatorApiClient {
   private baseUrl: string;
@@ -86,6 +86,30 @@ class OperatorApiClient {
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
       const errorMessage = errorData?.message || `Failed to fetch nodes: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * POST /scenarios
+   * Get available chaos scenarios from registry
+   * @param request - Scenarios request with optional registry authentication
+   * @returns Promise with scenarios data
+   */
+  async getScenarios(request: ScenariosRequest): Promise<ScenariosResponse> {
+    const response = await fetch(`${this.baseUrl}/scenarios`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to fetch scenarios: ${response.status}`;
       throw new Error(errorMessage);
     }
 

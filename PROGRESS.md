@@ -1,9 +1,9 @@
 # Krkn Operator Console - Development Progress
 
-## Status: MVP Complete ✅
+## Status: MVP Complete + Scenarios Selection ✅
 
 **Date**: 2026-01-12
-**Version**: 0.1.0
+**Version**: 0.3.0
 
 ## Completed Tasks
 
@@ -16,20 +16,25 @@
 
 ### Phase 2: Type Definitions & API Client ✅
 - [x] Created comprehensive TypeScript types ([src/types/api.ts](src/types/api.ts))
-  - Request/Response types (CreateTargetResponse, ClustersResponse)
+  - Request/Response types (CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse) ✅
   - App state types (AppState, AppPhase, AppError)
   - Action types for reducer (AppAction)
+  - Added nodes and scenarios fields to AppState ✅
+  - ScenarioTag type for scenario metadata ✅
 - [x] Implemented API client service ([src/services/operatorApi.ts](src/services/operatorApi.ts))
   - `createTargetRequest()` - POST /targets
   - `getTargetStatus(uuid)` - GET /targets/{uuid}
   - `getClusters(uuid)` - GET /clusters?id={uuid}
-  - `getNodes()` - Future implementation
+  - `getNodes(uuid, clusterName)` - GET /nodes?id={uuid}&cluster-name={clusterName}
+  - `getScenarios(request)` - POST /scenarios ✅ NEW
 
 ### Phase 3: State Management ✅
 - [x] Created AppContext with React Context API ([src/context/AppContext.tsx](src/context/AppContext.tsx))
 - [x] Implemented reducer with state machine logic
-- [x] State phases: initializing → polling → selecting_cluster → error
+- [x] State phases: initializing → polling → selecting_cluster → loading_nodes → ready → configuring_registry → loading_scenarios → selecting_scenarios → error ✅
 - [x] Custom hook `useAppContext()` for consuming context
+- [x] Actions for node loading workflow (NODES_LOADING, NODES_SUCCESS, NODES_ERROR)
+- [x] Actions for scenarios workflow (CONFIGURE_REGISTRY, REGISTRY_CONFIGURED, SCENARIOS_LOADING, SCENARIOS_SUCCESS, SCENARIOS_ERROR, SELECT_SCENARIOS) ✅ NEW
 
 ### Phase 4: Custom Hooks ✅
 - [x] Implemented `useTargetPoller` hook ([src/hooks/useTargetPoller.ts](src/hooks/useTargetPoller.ts))
@@ -38,12 +43,14 @@
   - Timeout handling (60s)
   - Error handling for network, timeout, 404, API errors
   - Automatic transition to cluster fetching
+  - Automatic nodes fetching after cluster selection ✅
 
 ### Phase 5: UI Components (PatternFly) ✅
 - [x] **LoadingScreen** ([src/components/LoadingScreen.tsx](src/components/LoadingScreen.tsx))
-  - Displays spinner during initialization and polling
+  - Displays spinner during initialization, polling, node loading, and scenario loading ✅
   - Shows poll attempt count
   - Uses PatternFly EmptyState and Spinner
+  - Support for 'loading_nodes' and 'loading_scenarios' phases ✅
 
 - [x] **ErrorDisplay** ([src/components/ErrorDisplay.tsx](src/components/ErrorDisplay.tsx))
   - Shows error messages with appropriate icons
@@ -57,12 +64,40 @@
   - Proceed button with selected cluster name
   - Empty state for no clusters
 
+- [x] **NodesDisplay** ([src/components/NodesDisplay.tsx](src/components/NodesDisplay.tsx))
+  - Prominent display of selected cluster information (name, operator, API URL)
+  - Cluster info card with blue background for visibility
+  - List of cluster nodes in bordered list format
+  - Node count badge
+  - Monospace font for node names
+  - Empty state when no nodes found
+  - "Select Chaos Scenarios" button to proceed to registry configuration ✅
+
+- [x] **RegistrySelector** ([src/components/RegistrySelector.tsx](src/components/RegistrySelector.tsx)) ✅ NEW
+  - Public/private registry selection with radio buttons
+  - Private registry authentication form (username/password or token)
+  - Registry URL and scenario repository fields
+  - TLS options (skipTls, insecure) with checkboxes
+  - Form validation before submission
+  - Integration with POST /scenarios API
+
+- [x] **ScenariosList** ([src/components/ScenariosList.tsx](src/components/ScenariosList.tsx)) ✅ NEW
+  - Table display of available scenarios with selection checkboxes
+  - Shows scenario name, digest, size, and last modified date
+  - Select All / Deselect All functionality
+  - Selected scenarios counter badge
+  - Proceed button with selected count
+  - Empty state when no scenarios found
+
 ### Phase 6: Main Application ✅
 - [x] **App Component** ([src/App.tsx](src/App.tsx))
   - PatternFly Page layout with Masthead
   - Workflow orchestration based on state phase
-  - Handles cluster selection
-  - Placeholder for future chaos orchestration UI
+  - Handles cluster selection and triggers node loading
+  - Shows NodesDisplay component in 'ready' phase
+  - Shows RegistrySelector in 'configuring_registry' phase ✅
+  - Shows ScenariosList in 'selecting_scenarios' phase ✅
+  - Full workflow support: initializing → polling → cluster selection → loading nodes → ready → registry config → loading scenarios → scenario selection ✅
 
 - [x] **Entry Point** ([src/main.tsx](src/main.tsx))
   - React 18 StrictMode
@@ -75,12 +110,18 @@
   - Alpine-based for small image size
   - Health check configured
   - Port 8080 exposed
+  - Non-root user configuration (nginx user) ✅
+  - Proper permissions for /tmp directories ✅
+  - FQDN image references for Podman compatibility ✅
 
 - [x] **Nginx Configuration** ([nginx.conf](nginx.conf))
   - Serves static React build
   - API proxy: `/api/*` → operator service
   - SPA routing (fallback to index.html)
   - Timeout settings (60s)
+  - Non-root compatible configuration ✅
+  - Log and PID files in /tmp ✅
+  - Writable cache directories in /tmp ✅
 
 ### Phase 8: Kubernetes Manifests ✅
 - [x] **Deployment** ([k8s/deployment.yaml](k8s/deployment.yaml))
@@ -88,6 +129,8 @@
   - Resource limits (CPU: 100m-200m, Memory: 128Mi-256Mi)
   - Liveness and readiness probes
   - Security context (non-root, no privilege escalation)
+  - imagePullPolicy: Always ✅
+  - Default image: quay.io/krkn-chaos/krkn-operator:console ✅
 
 - [x] **Service** ([k8s/service.yaml](k8s/service.yaml))
   - ClusterIP type
@@ -102,16 +145,39 @@
   - Template with annotations
   - TLS configuration
 
-### Phase 9: Documentation ✅
+### Phase 9: Deployment Scripts ✅
+- [x] **build-and-push.sh** ([scripts/build-and-push.sh](scripts/build-and-push.sh))
+  - Podman as default container tool ✅
+  - Docker support via CONTAINER_TOOL variable ✅
+  - Configurable image registry, repo, and tag ✅
+  - Default image: quay.io/krkn-chaos/krkn-operator:console ✅
+  - Interactive confirmation before push
+
+- [x] **deploy-k8s.sh** ([scripts/deploy-k8s.sh](scripts/deploy-k8s.sh))
+  - Deploy to OpenShift or Kubernetes ✅
+  - Default namespace: krkn-operator-system ✅
+  - IMG variable for custom image specification ✅
+  - Image verification after deployment ✅
+  - Automatic Route (OpenShift) or Ingress (Kubernetes) setup
+
+- [x] **test-local-docker.sh** ([scripts/test-local-docker.sh](scripts/test-local-docker.sh))
+  - Local container testing ✅
+  - Podman/Docker support ✅
+
+- [x] **logs.sh**, **undeploy-k8s.sh**, **dev-setup.sh**
+  - Complete deployment lifecycle management ✅
+
+### Phase 10: Documentation ✅
 - [x] Updated [README.md](README.md) with:
   - Complete setup instructions
   - Development workflow
-  - Docker build commands
+  - Docker build commands (Podman default) ✅
   - Kubernetes deployment steps
   - Project structure overview
-- [x] Created [PROGRESS.md](PROGRESS.md) (this file)
+  - Updated with nodes display workflow ✅
+- [x] Updated [PROGRESS.md](PROGRESS.md) (this file) ✅
 - [x] Maintained [REQUIREMENTS.md](REQUIREMENTS.md)
-- [x] Kept [ARCHITECTURE.md](ARCHITECTURE.md)
+- [x] [scripts/README.md](scripts/README.md) with detailed script documentation ✅
 
 ## Architecture Summary
 
@@ -128,7 +194,8 @@
 - **POST /targets** - Initialize target request
 - **GET /targets/{uuid}** - Poll until ready (status 200)
 - **GET /clusters?id={uuid}** - Fetch cluster list
-- Future: **GET /nodes** - Get nodes (not implemented yet)
+- **GET /nodes?id={uuid}&cluster-name={clusterName}** - Get cluster nodes
+- **POST /scenarios** - Get available chaos scenarios from registry ✅ NEW
 
 ### Workflow
 ```
@@ -144,7 +211,19 @@ Display ClusterSelector
   ↓
 User selects cluster
   ↓
-(Future: Chaos orchestration)
+GET /nodes?id={uuid}&cluster-name={clusterName}
+  ↓
+Display NodesDisplay (cluster info + node list)
+  ↓
+User clicks "Select Chaos Scenarios" ✅
+  ↓
+Display RegistrySelector (public/private registry) ✅
+  ↓
+POST /scenarios (with optional auth credentials) ✅
+  ↓
+Display ScenariosList (select scenarios) ✅
+  ↓
+(Future: Chaos scenario execution)
 ```
 
 ## Success Criteria (from REQUIREMENTS.md)
@@ -155,30 +234,38 @@ User selects cluster
 4. ✅ Application displays loading state during polling
 5. ✅ Application fetches and displays clusters after polling completes
 6. ✅ User can select a cluster from the list
-7. ✅ Errors are handled gracefully with retry options
-8. ✅ Application is deployable as Docker container
-9. ✅ Kubernetes manifests deploy successfully
-10. ✅ PatternFly components are used throughout
+7. ✅ Application fetches and displays cluster nodes
+8. ✅ Selected cluster name is prominently displayed
+9. ✅ User can configure registry (public/private) ✅ NEW
+10. ✅ Application fetches and displays chaos scenarios ✅ NEW
+11. ✅ User can select multiple scenarios from the list ✅ NEW
+12. ✅ Errors are handled gracefully with retry options
+13. ✅ Application is deployable as Docker container (Podman + Docker support)
+14. ✅ Kubernetes manifests deploy successfully
+15. ✅ PatternFly components are used throughout
+16. ✅ Non-root container security compliance
 
 ## Next Steps (Future Enhancements)
 
 ### Not in Current MVP
-- [ ] Chaos scenario configuration UI
-- [ ] GET /nodes integration
+- [ ] Chaos scenario execution (submit selected scenarios to operator)
 - [ ] Real-time status updates (WebSocket)
 - [ ] Multiple target request management
-- [ ] Chaos scenario history
+- [ ] Chaos scenario execution history
 - [ ] Authentication/Authorization (OAuth, RBAC)
 - [ ] Unit tests (Jest + React Testing Library)
 - [ ] E2E tests (Playwright or Cypress)
 - [ ] CI/CD pipeline (GitHub Actions)
 - [ ] Multi-language support (i18n)
+- [ ] Node filtering and search functionality
+- [ ] Bulk node selection for chaos targets
+- [ ] Scenario filtering and search
 
 ### Immediate Next Actions
-1. **Install dependencies**: Run `npm install`
-2. **Test locally**: Start dev server with `npm run dev`
-3. **Build Docker image**: `docker build -t krkn-console .`
-4. **Test against operator**: Deploy to K8s cluster with operator
+1. **Build and push image**: `./scripts/build-and-push.sh`
+2. **Deploy to cluster**: `./scripts/deploy-k8s.sh`
+3. **Test full workflow**: Verify POST /targets → Poll → Clusters → Nodes → Registry → Scenarios flow ✅
+4. **Verify scenarios display**: Test public and private registry authentication ✅
 5. **Iterate based on feedback**
 
 ## Known Limitations
@@ -196,6 +283,9 @@ User selects cluster
 - Follows **PatternFly design patterns** for consistency with Red Hat ecosystem
 - Uses **nginx proxy** to avoid CORS issues and hide internal services
 - **Horizontally scalable** - can run multiple replicas
+- **Podman-first** - Default container tool with Docker fallback
+- **Security hardened** - Runs as non-root user with minimal permissions
+- **Clear cluster context** - Selected cluster prominently displayed throughout workflow
 
 ## Testing Checklist
 
@@ -203,6 +293,10 @@ Before considering this production-ready:
 
 - [ ] Test with real operator API
 - [ ] Verify all error scenarios (network failure, timeout, 404, etc.)
+- [ ] Test public registry scenario loading ✅
+- [ ] Test private registry with username/password authentication ✅
+- [ ] Test private registry with token authentication ✅
+- [ ] Verify TLS options work correctly (skipTls, insecure) ✅
 - [ ] Test on different browsers (Chrome, Firefox, Safari, Edge)
 - [ ] Verify responsive design on mobile/tablet
 - [ ] Test Kubernetes deployment in real cluster
@@ -212,7 +306,69 @@ Before considering this production-ready:
 - [ ] Accessibility audit (WCAG 2.1 AA compliance)
 - [ ] Performance audit (Lighthouse score)
 
+## Recent Changes
+
+### v0.3.0 - Scenarios Selection Feature ✅ NEW
+
+**Date**: 2026-01-12
+
+This release adds the ability to configure and select chaos scenarios from container registries.
+
+#### Features Added
+- **POST /scenarios API Integration**
+  - Created ScenariosRequest and ScenariosResponse types
+  - Added getScenarios() method to operatorApi client
+  - Support for public and private registry authentication
+
+- **RegistrySelector Component**
+  - Public/private registry radio button selection
+  - Private registry authentication form with username/password OR token
+  - Registry URL and scenario repository configuration
+  - TLS options (skipTls, insecure) with checkboxes
+  - Form validation and error handling
+
+- **ScenariosList Component**
+  - Table display of available scenarios with metadata
+  - Multi-select checkboxes for scenario selection
+  - Shows scenario name, digest, size, and last modified date
+  - Select All / Deselect All functionality
+  - Selected scenarios counter and summary
+
+- **State Management Updates**
+  - Added three new phases: configuring_registry, loading_scenarios, selecting_scenarios
+  - New state fields: registryType, registryConfig, scenarios, selectedScenarios
+  - Six new actions for scenarios workflow management
+
+- **Extended Workflow**
+  - NodesDisplay now has "Select Chaos Scenarios" button
+  - Full flow: Nodes → Registry Config → Load Scenarios → Select Scenarios
+  - LoadingScreen supports loading_scenarios phase
+
+#### Technical Details
+- All components use PatternFly 5 design system
+- Type-safe TypeScript implementation
+- State machine pattern for phase transitions
+- Proper error handling for registry authentication failures
+
+### v0.2.0 - Nodes Display Feature ✅
+
+**Date**: 2026-01-12
+
+- Added GET /nodes API integration
+- Created NodesDisplay component with prominent cluster information
+- Extended workflow: cluster selection → node loading → nodes display
+- Enhanced state management with loading_nodes and ready phases
+- Updated all documentation to reflect new workflow
+
+### v0.1.0 - Initial Release ✅
+
+- Complete initialization workflow (POST /targets → poll → clusters)
+- Cluster selection with PatternFly components
+- Security & DevOps improvements (non-root, Podman-first)
+- Complete deployment scripts and Kubernetes manifests
+
 ---
 
 **Last Updated**: 2026-01-12
+**Current Version**: 0.3.0
 **Contributors**: Claude Sonnet 4.5 (AI), tsebasti (Project Lead)
