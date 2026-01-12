@@ -26,7 +26,7 @@ React-based web console using PatternFly design system to interact with the krkn
 
 - Node.js 18+ and npm
 - Access to krkn-operator API endpoint
-- Docker/Podman (for containerization)
+- Podman or Docker (for containerization)
 
 ### Development
 
@@ -119,17 +119,21 @@ krkn-operator-console/
 
 ## Deployment
 
-### Docker Build
+### Container Build
 
 ```bash
-# Build image
-docker build -t quay.io/krkn-chaos/krkn-operator-console:latest .
+# Build image (Podman - default)
+podman build -t quay.io/krkn-chaos/krkn-operator-console:latest .
 
 # Push to registry
-docker push quay.io/krkn-chaos/krkn-operator-console:latest
+podman push quay.io/krkn-chaos/krkn-operator-console:latest
 
 # Run locally for testing
-docker run -p 8080:8080 quay.io/krkn-chaos/krkn-operator-console:latest
+podman run -p 8080:8080 quay.io/krkn-chaos/krkn-operator-console:latest
+
+# Or use Docker
+docker build -t quay.io/krkn-chaos/krkn-operator-console:latest .
+docker push quay.io/krkn-chaos/krkn-operator-console:latest
 ```
 
 ### Kubernetes / OpenShift

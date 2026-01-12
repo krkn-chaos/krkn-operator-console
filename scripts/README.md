@@ -18,32 +18,43 @@ Initial development setup - installs dependencies and creates `.env` file.
 ### 🐳 Docker
 
 #### `build-and-push.sh`
-Build Docker image and push to container registry.
+Build container image and push to container registry.
 
 **Usage:**
 ```bash
-# Use defaults (quay.io/krkn-chaos/krkn-operator-console:latest)
+# Use defaults (podman + quay.io/krkn-chaos/krkn-operator-console:latest)
 ./scripts/build-and-push.sh
+
+# Use Docker instead of Podman
+CONTAINER_TOOL=docker ./scripts/build-and-push.sh
 
 # Custom registry/repo/tag
 IMAGE_REGISTRY=docker.io IMAGE_REPO=myorg/console IMAGE_TAG=v1.0.0 ./scripts/build-and-push.sh
 ```
 
 **Environment Variables:**
+- `CONTAINER_TOOL` - Container tool to use: `podman` or `docker` (default: `podman`)
 - `IMAGE_REGISTRY` - Container registry (default: `quay.io`)
 - `IMAGE_REPO` - Repository path (default: `krkn-chaos/krkn-operator-console`)
 - `IMAGE_TAG` - Image tag (default: `latest`)
 
 #### `test-local-docker.sh`
-Build and run Docker image locally for testing.
+Build and run container image locally for testing.
 
 ```bash
-# Default port 8080
+# Use defaults (podman, port 8080)
 ./scripts/test-local-docker.sh
+
+# Use Docker instead of Podman
+CONTAINER_TOOL=docker ./scripts/test-local-docker.sh
 
 # Custom port
 PORT=3000 ./scripts/test-local-docker.sh
 ```
+
+**Environment Variables:**
+- `CONTAINER_TOOL` - Container tool to use: `podman` or `docker` (default: `podman`)
+- `PORT` - Local port to expose (default: `8080`)
 
 **Notes:**
 - API calls will fail without operator backend
