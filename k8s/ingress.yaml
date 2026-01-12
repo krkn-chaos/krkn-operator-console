@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: krkn-operator-console
+  labels:
+    app: krkn-operator-console
+    app.kubernetes.io/name: krkn-operator-console
+    app.kubernetes.io/component: web-console
+    app.kubernetes.io/part-of: krkn-operator
+  annotations:
+    # Uncomment and configure for your ingress controller
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx  # Change to your ingress class
+  rules:
+  - host: krkn-console.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: krkn-operator-console
+            port:
+              number: 8080
+  tls:
+  - hosts:
+    - krkn-console.example.com  # Change to your domain
+    secretName: krkn-console-tls
