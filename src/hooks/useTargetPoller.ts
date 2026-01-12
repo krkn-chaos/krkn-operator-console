@@ -10,6 +10,8 @@ import { config } from '../config';
  * 1. POST /targets → get UUID
  * 2. Poll GET /targets/{UUID} until 200 OK
  * 3. GET /clusters?id={UUID}
+ * 4. User selects cluster
+ * 5. GET /nodes?id={UUID}&cluster-name={clusterName}
  */
 export function useTargetPoller() {
   const { state, dispatch } = useAppContext();
@@ -164,4 +166,33 @@ export function useTargetPoller() {
 
     fetchClusters();
   }, [state.phase, state.uuid, state.clusters, dispatch]);
+
+  // Fetch nodes: GET /nodes?id={UUID}&cluster-name={clusterName}
+  useEffect(() => {
+    if (state.phase !== 'loading_nodes' || !state.uuid || !state.selectedCluster) {
+      return;
+    }
+
+    async function fetchNodes() {
+      if (!state.uuid || !state.selectedCluster) return;
+
+      try {
+        const response = await operatorApi.getNodes(state.uuid, state.selectedCluster.clusterName);
+        dispatch({
+          type: 'NODES_SUCCESS',
+          payload: { nodes: response.nodes }
+        });
+      } catch (error) {
+        dispatch({
+          type: 'NODES_ERROR',
+          payload: {
+            message: error instanceof Error ? error.message : 'Failed to fetch nodes',
+            type: 'api_error'
+          }
+        });
+      }
+    }
+
+    fetchNodes();
+  }, [state.phase, state.uuid, state.selectedCluster, dispatch]);
 }

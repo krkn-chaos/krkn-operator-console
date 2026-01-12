@@ -1,5 +1,5 @@
 import { config } from '../config';
-import type { CreateTargetResponse, ClustersResponse } from '../types/api';
+import type { CreateTargetResponse, ClustersResponse, NodesResponse } from '../types/api';
 
 class OperatorApiClient {
   private baseUrl: string;
@@ -67,12 +67,12 @@ class OperatorApiClient {
 
   /**
    * GET /nodes?id={uuid}&cluster-name={clusterName}
-   * Get nodes from selected cluster (future feature)
+   * Get nodes from selected cluster
    * @param uuid - Target request UUID
    * @param clusterName - Cluster name
    * @returns Promise with nodes data
    */
-  async getNodes(uuid: string, clusterName: string): Promise<{ nodes: string[] }> {
+  async getNodes(uuid: string, clusterName: string): Promise<NodesResponse> {
     const response = await fetch(
       `${this.baseUrl}/nodes?id=${uuid}&cluster-name=${encodeURIComponent(clusterName)}`,
       {
@@ -84,7 +84,9 @@ class OperatorApiClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch nodes: ${response.status}`);
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to fetch nodes: ${response.status}`;
+      throw new Error(errorMessage);
     }
 
     return response.json();

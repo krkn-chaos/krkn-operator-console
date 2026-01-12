@@ -2,6 +2,7 @@ import { Page, PageSection, Masthead, MastheadMain, MastheadBrand } from '@patte
 import { useAppContext } from './context/AppContext';
 import { useTargetPoller } from './hooks/useTargetPoller';
 import { LoadingScreen, ErrorDisplay, ClusterSelector } from './components';
+import { NodesDisplay } from './components/NodesDisplay';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -15,8 +16,7 @@ function App() {
 
   const handleClusterSelect = (cluster: any) => {
     dispatch({ type: 'SELECT_CLUSTER', payload: cluster });
-    // TODO: Navigate to chaos orchestration (future feature)
-    console.log('Selected cluster:', cluster);
+    dispatch({ type: 'NODES_LOADING' });
   };
 
   const renderContent = () => {
@@ -28,23 +28,21 @@ function App() {
         return <LoadingScreen phase="polling" pollAttempts={state.pollAttempts} />;
 
       case 'selecting_cluster':
-        if (state.selectedCluster) {
-          // Cluster selected - show success message (future: navigate to chaos config)
-          return (
-            <PageSection>
-              <h1>Cluster Selected</h1>
-              <p>Selected: {state.selectedCluster.clusterName}</p>
-              <p>API URL: {state.selectedCluster.clusterApiUrl}</p>
-              <p>Operator: {state.selectedCluster.operatorName}</p>
-              <p style={{ marginTop: '2rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                Future: Chaos orchestration UI will go here
-              </p>
-            </PageSection>
-          );
-        }
         return (
           <PageSection>
             <ClusterSelector clusters={state.clusters} onSelect={handleClusterSelect} />
+          </PageSection>
+        );
+
+      case 'loading_nodes':
+        return <LoadingScreen phase="loading_nodes" />;
+
+      case 'ready':
+        return (
+          <PageSection>
+            {state.selectedCluster && (
+              <NodesDisplay selectedCluster={state.selectedCluster} nodes={state.nodes} />
+            )}
           </PageSection>
         );
 

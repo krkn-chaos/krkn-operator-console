@@ -8,6 +8,7 @@ const initialState: AppState = {
   pollAttempts: 0,
   clusters: null,
   selectedCluster: null,
+  nodes: null,
   error: null,
 };
 
@@ -75,6 +76,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         selectedCluster: action.payload,
+      };
+
+    case 'NODES_LOADING':
+      return {
+        ...state,
+        phase: 'loading_nodes',
+        error: null,
+      };
+
+    case 'NODES_SUCCESS':
+      return {
+        ...state,
+        phase: 'ready',
+        nodes: action.payload.nodes,
+        error: null,
+      };
+
+    case 'NODES_ERROR':
+      return {
+        ...state,
+        phase: 'error',
+        error: action.payload,
       };
 
     case 'RETRY':

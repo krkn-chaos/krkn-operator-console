@@ -16,6 +16,10 @@ export interface ClustersResponse {
   status: string;
 }
 
+export interface NodesResponse {
+  nodes: string[];
+}
+
 export interface ErrorResponse {
   error: string;
   message: string;
@@ -23,7 +27,7 @@ export interface ErrorResponse {
 
 // App State Types
 
-export type AppPhase = 'initializing' | 'polling' | 'selecting_cluster' | 'error';
+export type AppPhase = 'initializing' | 'polling' | 'selecting_cluster' | 'loading_nodes' | 'ready' | 'error';
 
 export type ErrorType = 'network' | 'timeout' | 'api_error' | 'not_found';
 
@@ -44,6 +48,7 @@ export interface AppState {
   pollAttempts: number;
   clusters: ClustersResponse['targetData'] | null;
   selectedCluster: SelectedCluster | null;
+  nodes: string[] | null;
   error: AppError | null;
 }
 
@@ -59,4 +64,7 @@ export type AppAction =
   | { type: 'CLUSTERS_SUCCESS'; payload: { clusters: ClustersResponse['targetData'] } }
   | { type: 'CLUSTERS_ERROR'; payload: AppError }
   | { type: 'SELECT_CLUSTER'; payload: SelectedCluster }
+  | { type: 'NODES_LOADING' }
+  | { type: 'NODES_SUCCESS'; payload: { nodes: string[] } }
+  | { type: 'NODES_ERROR'; payload: AppError }
   | { type: 'RETRY' };
