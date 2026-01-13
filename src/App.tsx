@@ -3,6 +3,7 @@ import { useAppContext } from './context/AppContext';
 import { useTargetPoller } from './hooks/useTargetPoller';
 import { LoadingScreen, ErrorDisplay, ClusterSelector, RegistrySelector, ScenariosList } from './components';
 import { NodesDisplay } from './components/NodesDisplay';
+import { ScenarioDetail } from './components/ScenarioDetail';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -60,6 +61,21 @@ function App() {
         return (
           <PageSection>
             <ScenariosList />
+          </PageSection>
+        );
+
+      case 'loading_scenario_detail':
+        return <LoadingScreen phase="loading_scenario_detail" />;
+
+      case 'configuring_scenario':
+        return (
+          <PageSection>
+            {state.selectedScenario && (
+              <ScenarioDetail
+                scenarioName={state.selectedScenario}
+                registryConfig={state.registryConfig}
+              />
+            )}
           </PageSection>
         );
 

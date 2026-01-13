@@ -1,5 +1,5 @@
 import { config } from '../config';
-import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse } from '../types/api';
+import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse, ScenarioDetail } from '../types/api';
 
 class OperatorApiClient {
   private baseUrl: string;
@@ -110,6 +110,31 @@ class OperatorApiClient {
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
       const errorMessage = errorData?.message || `Failed to fetch scenarios: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * POST /scenarios/detail/{scenarioName}
+   * Get scenario detail with form fields
+   * @param scenarioName - Name of the scenario
+   * @param request - Scenarios request with optional registry authentication
+   * @returns Promise with scenario detail data
+   */
+  async getScenarioDetail(scenarioName: string, request: ScenariosRequest): Promise<ScenarioDetail> {
+    const response = await fetch(`${this.baseUrl}/scenarios/detail/${encodeURIComponent(scenarioName)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to fetch scenario detail: ${response.status}`;
       throw new Error(errorMessage);
     }
 

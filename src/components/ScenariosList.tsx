@@ -131,10 +131,11 @@ export function ScenariosList() {
           <Thead>
             <Tr>
               <Th width={10}>Select</Th>
-              <Th width={30}>Scenario Name</Th>
-              <Th width={25}>Digest</Th>
+              <Th width={25}>Scenario Name</Th>
+              <Th width={20}>Digest</Th>
               <Th width={15}>Size</Th>
-              <Th width={20}>Last Modified</Th>
+              <Th width={15}>Last Modified</Th>
+              <Th width={15}>Actions</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -160,6 +161,19 @@ export function ScenariosList() {
                   </Td>
                   <Td dataLabel="Size">{formatBytes(scenario.size)}</Td>
                   <Td dataLabel="Last Modified">{formatDate(scenario.lastModified)}</Td>
+                  <Td dataLabel="Actions">
+                    <Button
+                      variant="link"
+                      onClick={() => {
+                        dispatch({
+                          type: 'SELECT_SCENARIO_FOR_DETAIL',
+                          payload: { scenarioName: scenario.name },
+                        });
+                      }}
+                    >
+                      Configure
+                    </Button>
+                  </Td>
                 </Tr>
               );
             })}

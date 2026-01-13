@@ -13,6 +13,9 @@ const initialState: AppState = {
   registryConfig: null,
   scenarios: null,
   selectedScenarios: null,
+  selectedScenario: null,
+  scenarioDetail: null,
+  scenarioFormValues: null,
   error: null,
 };
 
@@ -146,6 +149,40 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedScenarios: action.payload.scenarios,
       };
 
+    case 'SELECT_SCENARIO_FOR_DETAIL':
+      return {
+        ...state,
+        selectedScenario: action.payload.scenarioName,
+      };
+
+    case 'SCENARIO_DETAIL_LOADING':
+      return {
+        ...state,
+        phase: 'loading_scenario_detail',
+        error: null,
+      };
+
+    case 'SCENARIO_DETAIL_SUCCESS':
+      return {
+        ...state,
+        phase: 'configuring_scenario',
+        scenarioDetail: action.payload.scenarioDetail,
+        error: null,
+      };
+
+    case 'SCENARIO_DETAIL_ERROR':
+      return {
+        ...state,
+        phase: 'error',
+        error: action.payload,
+      };
+
+    case 'UPDATE_SCENARIO_FORM':
+      return {
+        ...state,
+        scenarioFormValues: action.payload.formValues,
+      };
+
     case 'GO_BACK':
       // Navigate back to previous phase based on current phase
       switch (state.phase) {
@@ -178,6 +215,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
             phase: 'configuring_registry',
             scenarios: null,
             selectedScenarios: null,
+          };
+
+        case 'configuring_scenario':
+          // From scenario detail → back to scenarios list
+          return {
+            ...state,
+            phase: 'selecting_scenarios',
+            selectedScenario: null,
+            scenarioDetail: null,
+            scenarioFormValues: null,
           };
 
         default:
