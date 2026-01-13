@@ -65,8 +65,6 @@ function App() {
         );
 
       case 'loading_scenario_detail':
-        return <LoadingScreen phase="loading_scenario_detail" />;
-
       case 'configuring_scenario':
         return (
           <PageSection>

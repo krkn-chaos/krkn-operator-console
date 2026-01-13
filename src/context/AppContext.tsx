@@ -153,6 +153,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         selectedScenario: action.payload.scenarioName,
+        phase: 'loading_scenario_detail',
       };
 
     case 'SCENARIO_DETAIL_LOADING':

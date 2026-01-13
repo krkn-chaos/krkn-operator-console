@@ -1,9 +1,9 @@
 # Krkn Operator Console - Development Progress
 
-## Status: MVP Complete + Scenarios Selection ✅
+## Status: MVP Complete + Scenarios Selection + Scenario Detail Configuration ✅
 
-**Date**: 2026-01-12
-**Version**: 0.3.0
+**Date**: 2026-01-13
+**Version**: 0.4.0
 
 ## Completed Tasks
 
@@ -21,20 +21,25 @@
   - Action types for reducer (AppAction)
   - Added nodes and scenarios fields to AppState ✅
   - ScenarioTag type for scenario metadata ✅
+  - Scenario detail types (ScenarioField, ScenarioDetail, ScenarioFormValues) ✅ NEW
+  - Field type system with discriminated unions (string, enum, number, file, file_base64, boolean) ✅ NEW
 - [x] Implemented API client service ([src/services/operatorApi.ts](src/services/operatorApi.ts))
   - `createTargetRequest()` - POST /targets
   - `getTargetStatus(uuid)` - GET /targets/{uuid}
   - `getClusters(uuid)` - GET /clusters?id={uuid}
   - `getNodes(uuid, clusterName)` - GET /nodes?id={uuid}&cluster-name={clusterName}
-  - `getScenarios(request)` - POST /scenarios ✅ NEW
+  - `getScenarios(request)` - POST /scenarios ✅
+  - `getScenarioDetail(scenarioName, request)` - POST /scenarios/detail/{scenarioName} ✅ NEW
 
 ### Phase 3: State Management ✅
 - [x] Created AppContext with React Context API ([src/context/AppContext.tsx](src/context/AppContext.tsx))
 - [x] Implemented reducer with state machine logic
-- [x] State phases: initializing → polling → selecting_cluster → loading_nodes → ready → configuring_registry → loading_scenarios → selecting_scenarios → error ✅
+- [x] State phases: initializing → polling → selecting_cluster → loading_nodes → ready → configuring_registry → loading_scenarios → selecting_scenarios → loading_scenario_detail → configuring_scenario → error ✅
 - [x] Custom hook `useAppContext()` for consuming context
 - [x] Actions for node loading workflow (NODES_LOADING, NODES_SUCCESS, NODES_ERROR)
-- [x] Actions for scenarios workflow (CONFIGURE_REGISTRY, REGISTRY_CONFIGURED, SCENARIOS_LOADING, SCENARIOS_SUCCESS, SCENARIOS_ERROR, SELECT_SCENARIOS) ✅ NEW
+- [x] Actions for scenarios workflow (CONFIGURE_REGISTRY, REGISTRY_CONFIGURED, SCENARIOS_LOADING, SCENARIOS_SUCCESS, SCENARIOS_ERROR, SELECT_SCENARIOS) ✅
+- [x] Actions for scenario detail workflow (SELECT_SCENARIO_FOR_DETAIL, SCENARIO_DETAIL_LOADING, SCENARIO_DETAIL_SUCCESS, SCENARIO_DETAIL_ERROR, UPDATE_SCENARIO_FORM) ✅ NEW
+- [x] GO_BACK action for backward navigation in all workflow phases ✅ NEW
 
 ### Phase 4: Custom Hooks ✅
 - [x] Implemented `useTargetPoller` hook ([src/hooks/useTargetPoller.ts](src/hooks/useTargetPoller.ts))
@@ -47,10 +52,10 @@
 
 ### Phase 5: UI Components (PatternFly) ✅
 - [x] **LoadingScreen** ([src/components/LoadingScreen.tsx](src/components/LoadingScreen.tsx))
-  - Displays spinner during initialization, polling, node loading, and scenario loading ✅
+  - Displays spinner during initialization, polling, node loading, scenario loading, and scenario detail loading ✅
   - Shows poll attempt count
   - Uses PatternFly EmptyState and Spinner
-  - Support for 'loading_nodes' and 'loading_scenarios' phases ✅
+  - Support for 'loading_nodes', 'loading_scenarios', and 'loading_scenario_detail' phases ✅
 
 - [x] **ErrorDisplay** ([src/components/ErrorDisplay.tsx](src/components/ErrorDisplay.tsx))
   - Shows error messages with appropriate icons
@@ -72,22 +77,50 @@
   - Monospace font for node names
   - Empty state when no nodes found
   - "Select Chaos Scenarios" button to proceed to registry configuration ✅
+  - Back button to return to cluster selection ✅ NEW
 
-- [x] **RegistrySelector** ([src/components/RegistrySelector.tsx](src/components/RegistrySelector.tsx)) ✅ NEW
+- [x] **RegistrySelector** ([src/components/RegistrySelector.tsx](src/components/RegistrySelector.tsx)) ✅
   - Public/private registry selection with radio buttons
   - Private registry authentication form (username/password or token)
   - Registry URL and scenario repository fields
   - TLS options (skipTls, insecure) with checkboxes
   - Form validation before submission
   - Integration with POST /scenarios API
+  - Back button to return to nodes display ✅ NEW
 
-- [x] **ScenariosList** ([src/components/ScenariosList.tsx](src/components/ScenariosList.tsx)) ✅ NEW
+- [x] **ScenariosList** ([src/components/ScenariosList.tsx](src/components/ScenariosList.tsx)) ✅
   - Table display of available scenarios with selection checkboxes
   - Shows scenario name, digest, size, and last modified date
   - Select All / Deselect All functionality
   - Selected scenarios counter badge
   - Proceed button with selected count
   - Empty state when no scenarios found
+  - Back button to return to registry configuration ✅ NEW
+  - "Configure" action button for each scenario to view details ✅ NEW
+
+- [x] **DynamicFormBuilder** ([src/components/DynamicFormBuilder.tsx](src/components/DynamicFormBuilder.tsx)) ✅ NEW
+  - Dynamically renders form fields based on ScenarioField metadata
+  - Support for all field types: string, enum, number, boolean, file, file_base64
+  - String fields with optional regex validation and validation messages
+  - Enum fields as dropdowns with configurable separator
+  - Number fields with type validation
+  - Boolean fields as checkboxes
+  - File upload fields with PatternFly FileUpload component
+  - Secret field masking (password input type)
+  - Displays field descriptions and validation errors
+  - Automatic initialization with default values
+
+- [x] **ScenarioDetail** ([src/components/ScenarioDetail.tsx](src/components/ScenarioDetail.tsx)) ✅ NEW
+  - Loads scenario configuration details via POST /scenarios/detail/{scenarioName}
+  - Displays scenario metadata (title, description, digest)
+  - Integrates DynamicFormBuilder for parameter configuration
+  - Form validation before preview
+  - Preview table showing all configured variables and values
+  - Edit/preview toggle functionality
+  - Secret values masked in preview (••••••••)
+  - File values show filename in preview
+  - Back button to return to scenarios list ✅ NEW
+  - Loading state with spinner during API call
 
 ### Phase 6: Main Application ✅
 - [x] **App Component** ([src/App.tsx](src/App.tsx))
@@ -97,7 +130,8 @@
   - Shows NodesDisplay component in 'ready' phase
   - Shows RegistrySelector in 'configuring_registry' phase ✅
   - Shows ScenariosList in 'selecting_scenarios' phase ✅
-  - Full workflow support: initializing → polling → cluster selection → loading nodes → ready → registry config → loading scenarios → scenario selection ✅
+  - Shows ScenarioDetail in 'configuring_scenario' phase ✅ NEW
+  - Full workflow support: initializing → polling → cluster selection → loading nodes → ready → registry config → loading scenarios → scenario selection → loading scenario detail → scenario configuration ✅
 
 - [x] **Entry Point** ([src/main.tsx](src/main.tsx))
   - React 18 StrictMode
@@ -195,7 +229,8 @@
 - **GET /targets/{uuid}** - Poll until ready (status 200)
 - **GET /clusters?id={uuid}** - Fetch cluster list
 - **GET /nodes?id={uuid}&cluster-name={clusterName}** - Get cluster nodes
-- **POST /scenarios** - Get available chaos scenarios from registry ✅ NEW
+- **POST /scenarios** - Get available chaos scenarios from registry ✅
+- **POST /scenarios/detail/{scenarioName}** - Get scenario configuration fields ✅ NEW
 
 ### Workflow
 ```
@@ -223,7 +258,15 @@ POST /scenarios (with optional auth credentials) ✅
   ↓
 Display ScenariosList (select scenarios) ✅
   ↓
-(Future: Chaos scenario execution)
+User clicks "Configure" on a scenario ✅ NEW
+  ↓
+POST /scenarios/detail/{scenarioName} ✅ NEW
+  ↓
+Display ScenarioDetail (dynamic form based on scenario fields) ✅ NEW
+  ↓
+User fills form and previews configuration ✅ NEW
+  ↓
+(Future: Scenario execution/submission)
 ```
 
 ## Success Criteria (from REQUIREMENTS.md)
@@ -236,14 +279,19 @@ Display ScenariosList (select scenarios) ✅
 6. ✅ User can select a cluster from the list
 7. ✅ Application fetches and displays cluster nodes
 8. ✅ Selected cluster name is prominently displayed
-9. ✅ User can configure registry (public/private) ✅ NEW
-10. ✅ Application fetches and displays chaos scenarios ✅ NEW
-11. ✅ User can select multiple scenarios from the list ✅ NEW
-12. ✅ Errors are handled gracefully with retry options
-13. ✅ Application is deployable as Docker container (Podman + Docker support)
-14. ✅ Kubernetes manifests deploy successfully
-15. ✅ PatternFly components are used throughout
-16. ✅ Non-root container security compliance
+9. ✅ User can configure registry (public/private) ✅
+10. ✅ Application fetches and displays chaos scenarios ✅
+11. ✅ User can select multiple scenarios from the list ✅
+12. ✅ User can view scenario configuration details ✅ NEW
+13. ✅ Dynamic form generation from scenario metadata ✅ NEW
+14. ✅ Form validation (required fields, regex, type checking) ✅ NEW
+15. ✅ Configuration preview before submission ✅ NEW
+16. ✅ Back button navigation in all workflow phases ✅ NEW
+17. ✅ Errors are handled gracefully with retry options
+18. ✅ Application is deployable as Docker container (Podman + Docker support)
+19. ✅ Kubernetes manifests deploy successfully
+20. ✅ PatternFly components are used throughout
+21. ✅ Non-root container security compliance
 
 ## Next Steps (Future Enhancements)
 
@@ -308,7 +356,76 @@ Before considering this production-ready:
 
 ## Recent Changes
 
-### v0.3.0 - Scenarios Selection Feature ✅ NEW
+### v0.4.0 - Scenario Detail Configuration + Back Navigation ✅ NEW
+
+**Date**: 2026-01-13
+
+This release adds dynamic scenario configuration forms and full backward navigation throughout the workflow.
+
+#### Features Added
+
+**1. Dynamic Form Builder System**
+- Created comprehensive field type system with discriminated unions
+- Support for 6 field types: string, enum, number, boolean, file, file_base64
+- DynamicFormBuilder component that renders form fields from metadata
+- Field-specific features:
+  - String fields with regex validation
+  - Enum fields with configurable separators
+  - Number fields with type checking
+  - Boolean fields as checkboxes
+  - File upload fields (with base64 encoding option)
+  - Secret fields with password masking
+
+**2. Scenario Detail View**
+- POST /scenarios/detail/{scenarioName} API integration
+- ScenarioDetail component displays scenario metadata and configuration form
+- Form validation (required fields, regex patterns, type validation)
+- Preview mode showing all configured variables in a table
+- Edit/preview toggle for reviewing configuration before submission
+- Secret values masked in preview
+- File values show filename in preview
+- Loading state during API calls
+
+**3. Back Navigation**
+- GO_BACK action implemented in state reducer
+- Back buttons added to all workflow components:
+  - NodesDisplay → Cluster Selection
+  - RegistrySelector → Nodes Display
+  - ScenariosList → Registry Configuration
+  - ScenarioDetail → Scenarios List
+- Phase-based navigation that properly clears state
+
+**4. ScenariosList Enhancement**
+- Added "Configure" action button for each scenario
+- Clicking "Configure" loads scenario detail form
+- Maintains existing multi-select functionality
+
+#### State Management Updates
+- Two new phases: loading_scenario_detail, configuring_scenario
+- Three new state fields: selectedScenario, scenarioDetail, scenarioFormValues
+- Five new actions: SELECT_SCENARIO_FOR_DETAIL, SCENARIO_DETAIL_LOADING, SCENARIO_DETAIL_SUCCESS, SCENARIO_DETAIL_ERROR, UPDATE_SCENARIO_FORM
+- GO_BACK action with phase-specific logic
+
+#### Technical Implementation
+- Type-safe discriminated unions for field types
+- React Context pattern for form state management
+- PatternFly 5 form components throughout
+- Proper error handling and validation messages
+- Default value initialization from metadata
+
+#### Components Created
+- [DynamicFormBuilder.tsx](src/components/DynamicFormBuilder.tsx) - Dynamic form rendering engine
+- [ScenarioDetail.tsx](src/components/ScenarioDetail.tsx) - Scenario configuration container
+
+#### Components Updated
+- [ScenariosList.tsx](src/components/ScenariosList.tsx) - Added Configure button
+- [NodesDisplay.tsx](src/components/NodesDisplay.tsx) - Added back button
+- [RegistrySelector.tsx](src/components/RegistrySelector.tsx) - Added back button
+- [LoadingScreen.tsx](src/components/LoadingScreen.tsx) - Added loading_scenario_detail phase
+- [App.tsx](src/App.tsx) - Added scenario detail phases
+- [AppContext.tsx](src/context/AppContext.tsx) - Added scenario detail state and GO_BACK logic
+
+### v0.3.0 - Scenarios Selection Feature ✅
 
 **Date**: 2026-01-12
 
@@ -369,6 +486,6 @@ This release adds the ability to configure and select chaos scenarios from conta
 
 ---
 
-**Last Updated**: 2026-01-12
-**Current Version**: 0.3.0
+**Last Updated**: 2026-01-13
+**Current Version**: 0.4.0
 **Contributors**: Claude Sonnet 4.5 (AI), tsebasti (Project Lead)
