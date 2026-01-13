@@ -573,3 +573,66 @@ type ScenarioTag struct {
 }
 ```
 
+## Scenarios/detail
+
+### Description
+When a scenario is selected, the scenario detail must be pulled from the api with a POST 
+/scenarios/detail/{scenario_id}, the payload must be the same as the /scenarios endpoint using the `ScenariosRequest` object if a private registry is selected or empty in case of quay.io.
+The scenario will return an object of the format that can be found in @misc/scenario_detail.json. the purpose is to dynamically build a form based on the types that are available in the typing system.
+All the fields types share the following properties:
+- name
+- short_description
+- title
+- - that is the label presented in the form for the field
+- description
+- variable
+- - that is the environment variable with which the value will be mapped
+- default
+- - when provided is the default value for the field
+- required
+- - if true it's a required field
+- type
+- - can be:
+- - - string
+- - - enum
+- - - number
+- - - file
+- - - file_base64
+- - - boolean
+
+then there are type specific fields
+
+- string
+- - validator
+- - - a regex to validate the provided string
+- - validation_message
+- - - the message to be presented if the validation fails
+- enum
+- - separator
+- - - the separator character used to split the `allowed_values`
+- - allowed_values
+- the values that the string value can have separated by `separator`
+- file
+- - the value is a file path
+- file_base64
+- - the value is a base64 encoded file
+
+The purpose is to build a form based on the provided fields that the respects the above rules.
+The type of the input types should be:
+
+- number
+- - text that must be validated as a number
+- string
+- - text that if has a validator must be validated against the provided regex in `validator` and present an error message represented by the `validation_message`
+- enum
+- - select 
+- file
+- - file picker
+- file_base64
+- - file picker (must be base64 encoded before setting the corresponding variable)
+
+In the first iteration, after the form is sent a table with the variable and the value must be presented
+
+## Refactoring action items
+
+- add a back button in all the pages to go to the previous section

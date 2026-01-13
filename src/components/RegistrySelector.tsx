@@ -94,9 +94,20 @@ export function RegistrySelector() {
     }
   };
 
+  const handleBack = () => {
+    dispatch({ type: 'GO_BACK' });
+  };
+
   return (
     <Card>
-      <CardTitle>Configure Chaos Scenarios Registry</CardTitle>
+      <CardTitle>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Configure Chaos Scenarios Registry</span>
+          <Button variant="link" onClick={handleBack}>
+            ← Back to Nodes
+          </Button>
+        </div>
+      </CardTitle>
       <CardBody>
         <Form>
           <FormGroup label="Registry Type" isRequired fieldId="registry-type">

@@ -27,8 +27,19 @@ export function NodesDisplay({ selectedCluster, nodes }: NodesDisplayProps) {
     dispatch({ type: 'CONFIGURE_REGISTRY' });
   };
 
+  const handleBack = () => {
+    dispatch({ type: 'GO_BACK' });
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      {/* Back Button */}
+      <div style={{ marginBottom: '1rem' }}>
+        <Button variant="link" onClick={handleBack}>
+          ← Back to Cluster Selection
+        </Button>
+      </div>
+
       {/* Cluster Info Header */}
       <Card style={{ marginBottom: '1.5rem', backgroundColor: 'var(--pf-v5-global--palette--blue-50)' }}>
         <CardBody>

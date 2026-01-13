@@ -1,0 +1,282 @@
+{
+  "name": "node-scenarios",
+  "digest": "sha256:543f90491e761f01a6ef96413a47a3868f85552ff2d41100def2aa9483a2088c",
+  "size": 781591083,
+  "last_modified": "2025-12-19T15:41:15Z",
+  "title": "Node scenarios",
+  "description": "This scenario disrupts the node(s) matching the label on a Kubernetes/OpenShift cluster. Actions/disruptions supported are listed. For further infos visit https://github.com/krkn-chaos/krkn/blob/main/docs/node_scenarios.md",
+  "fields": [
+    {
+      "name": "action",
+      "short_description": "Chaos Duration",
+      "description": "action performed on the node, visit https://github.com/krkn-chaos/krkn/blob/main/docs/node_scenarios.md for more infos",
+      "variable": "ACTION",
+      "type": "enum",
+      "separator": ",",
+      "allowed_values": "node_start_scenario,node_stop_scenario,node_stop_start_scenario,node_termination_scenario,node_reboot_scenario,stop_kubelet_scenario,stop_start_kubelet_scenario,restart_kubelet_scenario,node_crash_scenario,stop_start_helper_node_scenario,node_block_scenario,node_disk_detach_attach_scenario",
+      "required": true
+    },
+    {
+      "name": "label-selector",
+      "short_description": "Label Selector",
+      "description": "Node label to target",
+      "variable": "LABEL_SELECTOR",
+      "type": "string",
+      "default": "node-role.kubernetes.io/worker"
+    },
+    {
+      "name": "exclude-label",
+      "short_description": "Node exclude label",
+      "description": "Label for excluding one or more nodes from chaos",
+      "variable": "EXCLUDE_LABEL",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "node-name",
+      "short_description": "Node Name",
+      "description": "Node name to inject faults in case of targeting a specific node; Can set multiple node names separated by a comma",
+      "variable": "NODE_NAME",
+      "type": "string",
+      "default": "",
+      "validator": "^$|^([a-zA-Z0-9.-_]+(,)?)+[^,]$",
+      "validation_message": "node name can be one or more node names comma separated: e.g node-name or node-name-1,node-name2"
+    },
+    {
+      "name": "instance-count",
+      "short_description": "Instance Count",
+      "description": "Targeted instance count matching the label selector",
+      "variable": "INSTANCE_COUNT",
+      "type": "number",
+      "default": "1"
+    },
+    {
+      "name": "runs",
+      "short_description": "Runs",
+      "description": "Iterations to perform action on a single node",
+      "variable": "RUNS",
+      "type": "number",
+      "default": "1"
+    },
+    {
+      "name": "kube-check",
+      "short_description": "Kube Check",
+      "description": "Connect to the kubernetes api to see if the node gets to a certain state during the node scenario",
+      "variable": "KUBE_CHECK",
+      "type": "enum",
+      "default": "true",
+      "separator": ",",
+      "allowed_values": "true,false"
+    },
+    {
+      "name": "parallel",
+      "short_description": "Parallel",
+      "description": "Run action on label or node name in parallel or sequential, defaults to sequential (false)",
+      "variable": "PARALLEL",
+      "type": "enum",
+      "default": "false",
+      "separator": ",",
+      "allowed_values": "true,false"
+    },
+    {
+      "name": "cloud-type",
+      "short_description": "Cloud Type",
+      "description": "Cloud platform on top of which cluster is running, supported platforms - aws, azure, gcp, vmware, ibmcloud, bm",
+      "variable": "CLOUD_TYPE",
+      "type": "enum",
+      "default": "aws",
+      "separator": ",",
+      "allowed_values": "aws,azure,gcp,vmware,ibmcloud,ibmcloudpower,bm"
+    },
+    {
+      "name": "timeout",
+      "short_description": "Timeout",
+      "description": "Duration to wait for completion of node scenario injection",
+      "variable": "TIMEOUT",
+      "type": "number",
+      "default": "180"
+    },
+    {
+      "name": "duration",
+      "short_description": "Duration",
+      "description": "Duration to wait for completion of node scenario injection",
+      "variable": "DURATION",
+      "type": "number",
+      "default": "120"
+    },
+    {
+      "name": "vsphere-ip",
+      "short_description": "VSphere IP [*VSphere only*]",
+      "description": "VSpere IP Address",
+      "variable": "VSPHERE_IP",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "vsphere-username",
+      "short_description": "VSphere Username [*VSphere only*]",
+      "description": "VSpere IP Address",
+      "variable": "VSPHERE_USERNAME",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "vsphere-password",
+      "short_description": "VSphere Password [*VSphere only*]",
+      "description": "VSpere password",
+      "variable": "VSPHERE_PASSWORD",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "aws-access-key-id",
+      "short_description": "AWS Access Key Id[*AWS only*]",
+      "description": "AWS Access Key Id",
+      "variable": "AWS_ACCESS_KEY_ID",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "aws-secret-access-key",
+      "short_description": "AWS Secret Access Key [*AWS only*]",
+      "description": "AWS Secret Access Key",
+      "variable": "AWS_SECRET_ACCESS_KEY",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "aws-default-region",
+      "short_description": "AWS default region [*AWS only*]",
+      "description": "AWS default region",
+      "variable": "AWS_DEFAULT_REGION",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "bmc-user",
+      "short_description": "Bare Metal Cloud Username [*Bare Metal only*]",
+      "description": "Only needed for Baremetal ( bm ) - IPMI/bmc username",
+      "variable": "BMC_USER",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "bmc-password",
+      "short_description": "Bare Metal Cloud Username [*Bare Metal only*]",
+      "description": "Only needed for Baremetal ( bm ) - IPMI/bmc password",
+      "variable": "BMC_PASSWORD",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "bmc-address",
+      "short_description": "Bare Metal Cloud Username [*Bare Metal only*]",
+      "description": "Only needed for Baremetal ( bm ) - IPMI/bmc address",
+      "variable": "BMC_ADDR",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "disks",
+      "short_description": "Disk List [*Bare Metal only*]",
+      "description": "List of disks for baremetal nodes - format: [\"sda\", \"sdb\"]",
+      "variable": "DISKS",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "ibmc-address",
+      "short_description": "IBM Cloud URL [*IBM Cloud only*]",
+      "description": "IBM Cloud URL",
+      "variable": "IBMC_URL",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "ibmc-power-address",
+      "short_description": "IBM Cloud Power URL [*IBM Power Cloud only*]",
+      "description": "IBM Cloud Power URL",
+      "variable": "IBMC_POWER_URL",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "ibmc-cnr",
+      "short_description": "IBM Cloud Power Workspace CNR [*IBM Power Cloud only*]",
+      "description": "IBM Cloud Power Workspace CNR",
+      "variable": "IBMC_POWER_CRN",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "ibmc-api-key",
+      "short_description": "IBM Cloud API key [*IBM Cloud only*]",
+      "description": "IBM Cloud API Key",
+      "variable": "IBMC_APIKEY",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "disable-ssl-verification",
+      "short_description": "Disable SSL Verification [*IBM Cloud only*]",
+      "description": "Disable SSL certificate verification",
+      "variable": "DISABLE_SSL_VERIFICATION",
+      "type": "enum",
+      "default": "false",
+      "separator": ",",
+      "allowed_values": "true,false,True,False",
+      "required": true
+    },
+    {
+      "name": "azure-tenant",
+      "short_description": "Azure Tenant [*Azure only*]",
+      "description": "Azure Tenant",
+      "variable": "AZURE_TENANT_ID",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "azure-client-secret",
+      "short_description": "Azure Client Secret [*Azure only*]",
+      "description": "Azure Client Secret",
+      "variable": "AZURE_CLIENT_SECRET",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "azure-client-id",
+      "short_description": "Azure Client ID [*Azure only*]",
+      "description": "Azure Client ID",
+      "variable": "AZURE_CLIENT_ID",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "azure-subscription-id",
+      "short_description": "Azure Subscription ID [*Azure only*]",
+      "description": "Azure Subscription ID",
+      "variable": "AZURE_SUBSCRIPTION_ID",
+      "type": "string",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "gcp-application-credentials",
+      "short_description": "GCP application credentials [*GCP only*]",
+      "description": "GCP application credentials file location",
+      "variable": "GOOGLE_APPLICATION_CREDENTIALS",
+      "type": "file",
+      "mount_path": "/home/krkn/osServiceAccount.json"
+    }
+  ]
+}

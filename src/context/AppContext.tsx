@@ -146,6 +146,44 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedScenarios: action.payload.scenarios,
       };
 
+    case 'GO_BACK':
+      // Navigate back to previous phase based on current phase
+      switch (state.phase) {
+        case 'selecting_cluster':
+          // Can't go back from cluster selection (would need to re-initialize)
+          return state;
+
+        case 'ready':
+          // From nodes display → back to cluster selection
+          return {
+            ...state,
+            phase: 'selecting_cluster',
+            selectedCluster: null,
+            nodes: null,
+          };
+
+        case 'configuring_registry':
+          // From registry config → back to nodes display
+          return {
+            ...state,
+            phase: 'ready',
+            registryType: null,
+            registryConfig: null,
+          };
+
+        case 'selecting_scenarios':
+          // From scenarios list → back to registry config
+          return {
+            ...state,
+            phase: 'configuring_registry',
+            scenarios: null,
+            selectedScenarios: null,
+          };
+
+        default:
+          return state;
+      }
+
     case 'RETRY':
       return {
         ...initialState,

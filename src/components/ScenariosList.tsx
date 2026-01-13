@@ -65,6 +65,10 @@ export function ScenariosList() {
     });
   };
 
+  const handleBack = () => {
+    dispatch({ type: 'GO_BACK' });
+  };
+
   const formatBytes = (bytes?: number): string => {
     if (!bytes) return 'N/A';
     const kb = bytes / 1024;
@@ -89,12 +93,19 @@ export function ScenariosList() {
   return (
     <Card>
       <CardTitle>
-        Select Chaos Scenarios
-        {selectedScenarios.length > 0 && (
-          <Badge isRead style={{ marginLeft: '8px' }}>
-            {selectedScenarios.length} selected
-          </Badge>
-        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            Select Chaos Scenarios
+            {selectedScenarios.length > 0 && (
+              <Badge isRead style={{ marginLeft: '8px' }}>
+                {selectedScenarios.length} selected
+              </Badge>
+            )}
+          </div>
+          <Button variant="link" onClick={handleBack}>
+            ← Back to Registry Config
+          </Button>
+        </div>
       </CardTitle>
       <CardBody>
         <Toolbar>

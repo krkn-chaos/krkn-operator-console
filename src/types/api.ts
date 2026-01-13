@@ -98,4 +98,5 @@ export type AppAction =
   | { type: 'SCENARIOS_SUCCESS'; payload: { scenarios: ScenarioTag[] } }
   | { type: 'SCENARIOS_ERROR'; payload: AppError }
   | { type: 'SELECT_SCENARIOS'; payload: { scenarios: string[] } }
+  | { type: 'GO_BACK' }
   | { type: 'RETRY' };
