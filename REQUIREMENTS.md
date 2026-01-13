@@ -633,6 +633,11 @@ The type of the input types should be:
 
 In the first iteration, after the form is sent a table with the variable and the value must be presented
 
+## scenarios/globals
+
+### description
+in the same section of the scenario variables I want another subsection set under a check box with the question "add global parameters", those parameters must be retrieved from the api at the /scenarios/globals/{scenario_name} endpoint, the payload is located in @misc/scenario_globals.json. It must follow the same logic of the mandatory and optional fields for types and validation the only difference is that the VARIABLE must be set *only* if a value is set in the field otherwise not. The ideal logic would be to add the VARIABLE only if the input field state is changed, so if it's "untouched" must be ignored.
+
 ## Refactoring action items
 
 - add a back button in all the pages to go to the previous section

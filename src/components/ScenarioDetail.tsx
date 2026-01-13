@@ -12,8 +12,9 @@ import {
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
+import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields } from '../types/api';
 
 interface ScenarioDetailProps {
   scenarioName: string;
@@ -22,9 +23,10 @@ interface ScenarioDetailProps {
 
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
-  const { scenarioDetail, scenarioFormValues } = state;
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields } = state;
   const [showPreview, setShowPreview] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
@@ -54,10 +56,46 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     fetchScenarioDetail();
   }, [scenarioName, registryConfig, dispatch]);
 
+  useEffect(() => {
+    const fetchGlobalParameters = async () => {
+      if (!showGlobalParameters || scenarioGlobals) {
+        return;
+      }
+
+      try {
+        const globals = await operatorApi.getScenarioGlobals(
+          scenarioName,
+          registryConfig || {}
+        );
+        dispatch({
+          type: 'SCENARIO_GLOBALS_SUCCESS',
+          payload: { scenarioGlobals: globals }
+        });
+      } catch (error) {
+        dispatch({
+          type: 'SCENARIO_GLOBALS_ERROR',
+          payload: {
+            message: error instanceof Error ? error.message : 'Failed to load global parameters',
+            type: 'api_error',
+          },
+        });
+      }
+    };
+
+    fetchGlobalParameters();
+  }, [showGlobalParameters, scenarioName, registryConfig, scenarioGlobals, dispatch]);
+
   const handleFormChange = (values: ScenarioFormValues) => {
     dispatch({
       type: 'UPDATE_SCENARIO_FORM',
       payload: { formValues: values },
+    });
+  };
+
+  const handleGlobalFormChange = (values: ScenarioFormValues, touchedFields: TouchedFields) => {
+    dispatch({
+      type: 'UPDATE_GLOBAL_FORM',
+      payload: { formValues: values, touchedFields },
     });
   };
 
@@ -187,6 +225,64 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             </Card>
           )}
 
+          {/* Global Parameters Toggle */}
+          <div style={{ marginTop: '1.5rem' }}>
+            <Checkbox
+              id="show-global-parameters"
+              label="Add global parameters"
+              isChecked={showGlobalParameters}
+              onChange={(_event, checked) => setShowGlobalParameters(checked)}
+            />
+          </div>
+
+          {/* Global Parameters Section */}
+          {showGlobalParameters && (
+            <>
+              {!scenarioGlobals ? (
+                <Card style={{ marginTop: '1.5rem' }}>
+                  <CardBody>
+                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                      <Spinner size="lg" />
+                      <div style={{ marginTop: '1rem' }}>Loading global parameters...</div>
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : (
+                <>
+                  {/* Required Global Fields */}
+                  {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
+                    <Card style={{ marginTop: '1.5rem' }}>
+                      <CardTitle>Required Global Parameters</CardTitle>
+                      <CardBody>
+                        <DynamicFormBuilderWithTracking
+                          fields={scenarioGlobals.fields.filter(field => field.required)}
+                          values={globalFormValues || {}}
+                          touchedFields={globalTouchedFields || {}}
+                          onChange={handleGlobalFormChange}
+                        />
+                      </CardBody>
+                    </Card>
+                  )}
+
+                  {/* Optional Global Fields */}
+                  {scenarioGlobals.fields.filter(field => !field.required).length > 0 && (
+                    <Card style={{ marginTop: '1.5rem' }}>
+                      <CardTitle>Optional Global Parameters</CardTitle>
+                      <CardBody>
+                        <DynamicFormBuilderWithTracking
+                          fields={scenarioGlobals.fields.filter(field => !field.required)}
+                          values={globalFormValues || {}}
+                          touchedFields={globalTouchedFields || {}}
+                          onChange={handleGlobalFormChange}
+                        />
+                      </CardBody>
+                    </Card>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
           {/* Preview Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
             <Button variant="primary" size="lg" onClick={handlePreview}>
@@ -207,6 +303,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               </div>
             </CardTitle>
             <CardBody>
+              <div style={{ marginBottom: '1rem', fontWeight: 'bold' }}>Scenario Parameters</div>
               <Table variant="compact" borders={true}>
                 <Thead>
                   <Tr>
@@ -242,6 +339,50 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   })}
                 </Tbody>
               </Table>
+
+              {/* Global Parameters Preview - Only show touched fields */}
+              {showGlobalParameters && scenarioGlobals && globalTouchedFields && Object.keys(globalTouchedFields).some(key => globalTouchedFields[key]) && (
+                <>
+                  <div style={{ marginTop: '2rem', marginBottom: '1rem', fontWeight: 'bold' }}>Global Parameters (Modified)</div>
+                  <Table variant="compact" borders={true}>
+                    <Thead>
+                      <Tr>
+                        <Th width={30}>Variable</Th>
+                        <Th width={40}>Description</Th>
+                        <Th width={30}>Value</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {scenarioGlobals.fields
+                        .filter(field => globalTouchedFields[field.variable])
+                        .map((field) => {
+                          const value = globalFormValues?.[field.variable];
+                          let displayValue: string;
+
+                          if (value === undefined || value === null || value === '') {
+                            displayValue = field.default?.toString() || '(empty)';
+                          } else if (field.secret) {
+                            displayValue = '••••••••';
+                          } else if (field.type === 'file' || field.type === 'file_base64') {
+                            displayValue = (value as File)?.name || String(value);
+                          } else {
+                            displayValue = String(value);
+                          }
+
+                          return (
+                            <Tr key={field.variable}>
+                              <Td>
+                                <code>{field.variable}</code>
+                              </Td>
+                              <Td>{field.short_description}</Td>
+                              <Td style={{ fontFamily: 'monospace' }}>{displayValue}</Td>
+                            </Tr>
+                          );
+                        })}
+                    </Tbody>
+                  </Table>
+                </>
+              )}
             </CardBody>
           </Card>
 

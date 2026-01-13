@@ -16,6 +16,9 @@ const initialState: AppState = {
   selectedScenario: null,
   scenarioDetail: null,
   scenarioFormValues: null,
+  scenarioGlobals: null,
+  globalFormValues: null,
+  globalTouchedFields: null,
   error: null,
 };
 
@@ -184,6 +187,26 @@ function appReducer(state: AppState, action: AppAction): AppState {
         scenarioFormValues: action.payload.formValues,
       };
 
+    case 'SCENARIO_GLOBALS_SUCCESS':
+      return {
+        ...state,
+        scenarioGlobals: action.payload.scenarioGlobals,
+        error: null,
+      };
+
+    case 'SCENARIO_GLOBALS_ERROR':
+      return {
+        ...state,
+        error: action.payload,
+      };
+
+    case 'UPDATE_GLOBAL_FORM':
+      return {
+        ...state,
+        globalFormValues: action.payload.formValues,
+        globalTouchedFields: action.payload.touchedFields,
+      };
+
     case 'GO_BACK':
       // Navigate back to previous phase based on current phase
       switch (state.phase) {
@@ -226,6 +249,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
             selectedScenario: null,
             scenarioDetail: null,
             scenarioFormValues: null,
+            scenarioGlobals: null,
+            globalFormValues: null,
+            globalTouchedFields: null,
           };
 
         default:

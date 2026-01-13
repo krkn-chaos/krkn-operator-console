@@ -98,8 +98,22 @@ export interface ScenarioDetail {
   fields: ScenarioField[];
 }
 
+export interface ScenarioGlobals {
+  name: string;
+  digest?: string;
+  size?: number;
+  last_modified?: string;
+  title: string;
+  description: string;
+  fields: ScenarioField[];
+}
+
 export interface ScenarioFormValues {
   [variable: string]: string | number | boolean | File;
+}
+
+export interface TouchedFields {
+  [variable: string]: boolean;
 }
 
 export interface ErrorResponse {
@@ -138,6 +152,9 @@ export interface AppState {
   selectedScenario: string | null;
   scenarioDetail: ScenarioDetail | null;
   scenarioFormValues: ScenarioFormValues | null;
+  scenarioGlobals: ScenarioGlobals | null;
+  globalFormValues: ScenarioFormValues | null;
+  globalTouchedFields: TouchedFields | null;
   error: AppError | null;
 }
 
@@ -167,5 +184,8 @@ export type AppAction =
   | { type: 'SCENARIO_DETAIL_SUCCESS'; payload: { scenarioDetail: ScenarioDetail } }
   | { type: 'SCENARIO_DETAIL_ERROR'; payload: AppError }
   | { type: 'UPDATE_SCENARIO_FORM'; payload: { formValues: ScenarioFormValues } }
+  | { type: 'SCENARIO_GLOBALS_SUCCESS'; payload: { scenarioGlobals: ScenarioGlobals } }
+  | { type: 'SCENARIO_GLOBALS_ERROR'; payload: AppError }
+  | { type: 'UPDATE_GLOBAL_FORM'; payload: { formValues: ScenarioFormValues; touchedFields: TouchedFields } }
   | { type: 'GO_BACK' }
   | { type: 'RETRY' };
