@@ -7,6 +7,7 @@ import {
   Button,
   Alert,
   Spinner,
+  Checkbox,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
@@ -23,6 +24,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const { state, dispatch } = useAppContext();
   const { scenarioDetail, scenarioFormValues } = state;
   const [showPreview, setShowPreview] = useState(false);
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
@@ -143,17 +145,47 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
       {!showPreview ? (
         <>
-          {/* Configuration Form */}
+          {/* Required Fields Section */}
           <Card>
-            <CardTitle>Configure Scenario Parameters</CardTitle>
+            <CardTitle>Required Parameters</CardTitle>
             <CardBody>
               <DynamicFormBuilder
-                fields={scenarioDetail.fields}
+                fields={scenarioDetail.fields.filter(field => field.required)}
                 values={scenarioFormValues || {}}
                 onChange={handleFormChange}
               />
             </CardBody>
           </Card>
+
+          {/* Optional Fields Toggle */}
+          <div style={{ marginTop: '1.5rem' }}>
+            <Checkbox
+              id="show-optional-fields"
+              label="Add optional parameters"
+              isChecked={showOptionalFields}
+              onChange={(_event, checked) => setShowOptionalFields(checked)}
+            />
+          </div>
+
+          {/* Optional Fields Section */}
+          {showOptionalFields && (
+            <Card style={{ marginTop: '1.5rem' }}>
+              <CardTitle>Optional Parameters</CardTitle>
+              <CardBody>
+                {scenarioDetail.fields.filter(field => !field.required).length > 0 ? (
+                  <DynamicFormBuilder
+                    fields={scenarioDetail.fields.filter(field => !field.required)}
+                    values={scenarioFormValues || {}}
+                    onChange={handleFormChange}
+                  />
+                ) : (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
+                    No optional parameters available for this scenario
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          )}
 
           {/* Preview Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>

@@ -636,3 +636,6 @@ In the first iteration, after the form is sent a table with the variable and the
 ## Refactoring action items
 
 - add a back button in all the pages to go to the previous section
+- I want to refactor the /scenarios/detail section in the following way
+- - the required fields must be on two different form sections
+- - the optional fields section must appear if a check box "add optional parameters" is set (the animation or style like accordion or anything else is not relevant can be choosen by the agent based on the easiest to use)
