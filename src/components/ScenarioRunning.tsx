@@ -69,21 +69,21 @@ export function ScenarioRunning() {
     };
   }, [currentJob?.jobId, dispatch]);
 
-  // Stream logs using fetch with ReadableStream
+  // Stream logs using fetch with ReadableStream and automatic reconnection
   useEffect(() => {
     if (!currentJob) {
       console.log('No current job, skipping log streaming');
       return;
     }
 
-    // Don't start streaming if job hasn't started yet or if it's already completed
+    // Don't start streaming if job hasn't started yet
     if (currentJob.status === 'Pending') {
       console.log('Job is pending, waiting for it to start before streaming logs');
       setLogs(['Waiting for pod to start...']);
       return;
     }
 
-    // If job is in terminal state, don't try to stream (will get complete logs)
+    // If job is in terminal state, don't try to stream (will get complete logs once)
     const isTerminal = currentJob.status === 'Succeeded' || currentJob.status === 'Failed' || currentJob.status === 'Stopped';
 
     console.log('Starting log stream for job:', currentJob.jobId, 'status:', currentJob.status);
@@ -97,10 +97,21 @@ export function ScenarioRunning() {
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     let buffer = '';
     let hasReceivedData = false;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    let reconnectTimeout: number | null = null;
+    let isCleanedUp = false;
 
-    // Use fetch with ReadableStream for log streaming
+    // Stream logs with automatic reconnection
     const streamLogs = async () => {
+      // Don't reconnect if job is terminal or component is unmounted
+      if (isCleanedUp || isTerminal) {
+        return;
+      }
+
       try {
+        console.log(`Attempting to connect to log stream (attempt ${reconnectAttempts + 1})`);
+
         const response = await fetch(logsUrl, {
           signal: abortController.signal,
           headers: {
@@ -110,7 +121,6 @@ export function ScenarioRunning() {
         });
 
         console.log('Log stream response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
           console.error('Failed to fetch logs:', response.status, response.statusText);
@@ -127,24 +137,37 @@ export function ScenarioRunning() {
               'Or check the pod status:',
               `kubectl get pod ${currentJob.podName}`,
             ]);
+            return;
           } else if (response.status === 404) {
+            // Pod not ready yet, retry after delay
+            console.log('Pod not found, will retry...');
             setLogs(['Pod not found or not started yet. Waiting for pod to be created...']);
+            scheduleReconnect(2000); // Retry after 2 seconds
+            return;
           } else {
             setLogs(prev => [...prev, `Error fetching logs: ${response.status} ${response.statusText}`]);
+            scheduleReconnect(5000); // Retry after 5 seconds
+            return;
           }
-          return;
         }
 
         if (!response.body) {
           console.error('No response body for logs');
           setLogs(['No logs available yet...']);
+          scheduleReconnect(2000);
           return;
         }
+
+        // Reset reconnect attempts on successful connection
+        reconnectAttempts = 0;
 
         reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
 
         console.log('Started reading log stream');
+
+        // Clear "Connecting..." message on first data
+        let isFirstChunk = true;
 
         try {
           while (true) {
@@ -160,6 +183,10 @@ export function ScenarioRunning() {
               // If job is terminal and we got no data, show message
               if (isTerminal && !hasReceivedData) {
                 setLogs(['No logs available for this job.']);
+              } else if (!isTerminal && !isCleanedUp) {
+                // Stream ended but job is still running - reconnect
+                console.log('Stream ended unexpectedly, reconnecting...');
+                scheduleReconnect(1000);
               }
               break;
             }
@@ -167,7 +194,7 @@ export function ScenarioRunning() {
             // Decode the chunk
             const chunk = decoder.decode(value, { stream: true });
             hasReceivedData = true;
-            console.log('Received log chunk, length:', chunk.length, 'first 200 chars:', chunk.substring(0, 200));
+            console.log('Received log chunk, length:', chunk.length);
 
             // Add to buffer
             buffer += chunk;
@@ -180,9 +207,15 @@ export function ScenarioRunning() {
 
             // Add complete lines to logs
             if (lines.length > 0) {
-              // Don't filter empty lines - they might be intentional
               console.log('Adding', lines.length, 'lines to logs');
-              setLogs(prev => prev[0] === 'Connecting to log stream...' ? lines : [...prev, ...lines]);
+              setLogs(prev => {
+                // Replace "Connecting..." message on first data
+                if (isFirstChunk && prev[0] === 'Connecting to log stream...') {
+                  isFirstChunk = false;
+                  return lines;
+                }
+                return [...prev, ...lines];
+              });
             }
           }
         } catch (readError) {
@@ -194,29 +227,63 @@ export function ScenarioRunning() {
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           console.log('Log stream aborted by user');
-        } else {
-          console.error('Error streaming logs:', error);
-          const errorMsg = error instanceof Error ? error.message : String(error);
+          return;
+        }
 
-          // Check if it's a network error (connection interrupted)
-          if (errorMsg.includes('network') || errorMsg.includes('Failed to fetch')) {
-            if (isTerminal) {
-              console.log('Stream ended because job is in terminal state');
-            } else {
-              setLogs(prev => [...prev, '', '⚠️  Connection to log stream lost. Job may have completed or pod may have terminated.']);
-            }
-          } else {
-            setLogs(prev => [...prev, `Error streaming logs: ${errorMsg}`]);
+        console.error('Error streaming logs:', error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+
+        // Check if it's a network error (connection interrupted)
+        if (errorMsg.includes('network') || errorMsg.includes('Failed to fetch')) {
+          if (!isTerminal && !isCleanedUp) {
+            console.log('Network error, attempting to reconnect...');
+            setLogs(prev => [...prev, '', '⚠️  Connection lost, reconnecting...']);
+            scheduleReconnect(2000);
+          }
+        } else {
+          setLogs(prev => [...prev, `Error streaming logs: ${errorMsg}`]);
+          if (!isTerminal && !isCleanedUp) {
+            scheduleReconnect(5000);
           }
         }
       }
     };
 
+    // Schedule reconnection with exponential backoff
+    const scheduleReconnect = (baseDelay: number) => {
+      if (isCleanedUp || isTerminal) {
+        return;
+      }
+
+      reconnectAttempts++;
+
+      if (reconnectAttempts >= maxReconnectAttempts) {
+        console.log('Max reconnection attempts reached');
+        setLogs(prev => [...prev, '', '⚠️  Max reconnection attempts reached. Please refresh the page.']);
+        return;
+      }
+
+      // Exponential backoff: delay * 2^(attempts-1), capped at 30 seconds
+      const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts - 1), 30000);
+      console.log(`Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+
+      reconnectTimeout = window.setTimeout(() => {
+        streamLogs();
+      }, delay);
+    };
+
+    // Start initial connection
     streamLogs();
 
     return () => {
       console.log('Cleaning up log stream');
+      isCleanedUp = true;
       abortController.abort();
+
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+
       if (reader) {
         reader.cancel().catch((err: unknown) => console.log('Error cancelling reader:', err));
       }
