@@ -87,13 +87,12 @@ export function ScenarioRunning() {
     const isTerminal = currentJob.status === 'Succeeded' || currentJob.status === 'Failed' || currentJob.status === 'Stopped';
 
     console.log('Starting log stream for job:', currentJob.jobId, 'status:', currentJob.status);
-    const logsUrl = operatorApi.getJobLogsUrl(currentJob.jobId, !isTerminal);
-    console.log('Log stream URL:', logsUrl);
 
     if (!isTerminal) {
       setLogs([`Connecting to log stream...`]);
     }
 
+    const logsUrl = operatorApi.getJobLogsUrl(currentJob.jobId, !isTerminal);
     const abortController = new AbortController();
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     let buffer = '';
@@ -219,7 +218,7 @@ export function ScenarioRunning() {
       console.log('Cleaning up log stream');
       abortController.abort();
       if (reader) {
-        reader.cancel().catch(err => console.log('Error cancelling reader:', err));
+        reader.cancel().catch((err: unknown) => console.log('Error cancelling reader:', err));
       }
     };
   }, [currentJob?.jobId, currentJob?.status]);
