@@ -638,6 +638,126 @@ In the first iteration, after the form is sent a table with the variable and the
 ### description
 in the same section of the scenario variables I want another subsection set under a check box with the question "add global parameters", those parameters must be retrieved from the api at the /scenarios/globals/{scenario_name} endpoint, the payload is located in @misc/scenario_globals.json. It must follow the same logic of the mandatory and optional fields for types and validation the only difference is that the VARIABLE must be set *only* if a value is set in the field otherwise not. The ideal logic would be to add the VARIABLE only if the input field state is changed, so if it's "untouched" must be ignored.
 
+## scenarios/run
+
+### description
+
+This section comes immediately after the table of variables is shown, where a "Run" button must be placed.
+After the run button is clicked the /scenarios/run POST method must be called with a payload made as follows:
+
+```json
+{
+  "targetId": "550e8400-e29b-41d4-a716-446655440000",
+  "clusterName": "my-cluster-1",
+  "scenarioImage": "quay.io/krkn-chaos/krkn-hub:pod-scenarios",
+  "scenarioName": "pod-scenarios",
+  "kubeconfigPath": "/home/krkn/.kube/config",
+  "environment": {
+    "NAMESPACE": "default",
+    "LABEL_SELECTOR": "app=myapp",
+    "POD_COUNT": "1"
+  },
+  "files": [
+    {
+      "name": "config.yaml",
+      "content": "base64-encoded-content-here",
+      "mountPath": "/config/scenario.yaml"
+    }
+  ],
+  "registryUrl": "registry.example.com",
+  "scenarioRepository": "org/krkn-scenarios",
+  "username": "user",
+  "password": "pass"
+}
+```
+
+reflecting the inputs set in the previous form. An exception is made for type: file (file_base64 is still passed in the environment map), that must be base64 encoded and passed as the files structure. If present also the private registry settings.The scenarioImage must be with quay.io/krkn-chaos/krkn-hub:<scenario_name> if no private registry is set or must be build with registryUrl/scenarioRepository:<scenario_name>
+
+The response object:
+
+```json
+{
+  "jobId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "Pending",
+  "podName": "krkn-job-550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+After this call is made a scenario running page must be presented, and must have the following sections:
+
+#### job status
+ status of the job must be monitored via a polling of 2 seconds via GET /scenarios/run/{jobId}
+- this method returns the current status of a specific job
+- the method accepts the job ID as a path parameter
+- the method must:
+  - find the pod associated with the job ID using labels
+  - return 404 if job not found
+  - return job status information including:
+    - `jobId`: the unique job identifier
+    - `targetId`: the KrknTargetRequest UUID
+    - `clusterName`: the target cluster name
+    - `scenarioName`: the scenario name
+    - `status`: current status (Pending, Running, Succeeded, Failed, Stopped)
+    - `podName`: the Kubernetes pod name
+    - `startTime`: when the job started (optional)
+    - `completionTime`: when the job completed (optional)
+    - `message`: additional status message or error details (optional)
+
+```json
+{
+  "jobId": "550e8400-e29b-41d4-a716-446655440000",
+  "targetId": "550e8400-e29b-41d4-a716-446655440000",
+  "clusterName": "my-cluster-1",
+  "scenarioName": "pod-scenarios",
+  "status": "Running",
+  "podName": "krkn-job-550e8400-e29b-41d4-a716-446655440000",
+  "startTime": "2026-01-13T16:00:00Z"
+}
+```
+
+A visual evidence of the status must be presented. via an Icon (animated would be great) and the status string
+
+#### job logs
+
+In the center of the page a console streaming the job logs must be presented, the data is provided by:
+
+/scenarios/run/{jobId}/logs
+- this method streams the stdout/stderr logs of a running or completed job
+- the method accepts the job ID as a path parameter
+- the method must:
+  - find the pod associated with the job ID
+  - return 404 if job not found
+  - stream pod logs in real-time using chunked transfer encoding
+  - support the `follow` query parameter (default: false)
+    - if `follow=true`: stream logs continuously until pod terminates
+    - if `follow=false`: return current logs and close connection
+  - support the `tailLines` query parameter to limit output to last N lines (optional)
+  - support the `timestamps` query parameter to include timestamps (default: false)
+  - set appropriate HTTP headers for streaming:
+    - `Content-Type: text/plain`
+    - `Transfer-Encoding: chunked`
+    - `Cache-Control: no-cache`
+
+#### job deletion
+
+A red button with a Cancel scenario must be presented as well this will call the 
+## DELETE methods
+
+### /scenarios/run/{jobId}
+- this method stops and deletes a running job
+- the method accepts the job ID as a path parameter
+- the method must:
+  - find the pod associated with the job ID
+  - return 404 if job not found
+  - delete the Kubernetes pod with graceful termination (5 second grace period)
+  - delete associated ConfigMaps (kubeconfig + any user-provided files)
+  - return 200 status on successful deletion
+  - return the final job status with status: "Stopped"
+
+This will cancel the current job.
+
+
+
 ## Refactoring action items
 
 - add a back button in all the pages to go to the previous section

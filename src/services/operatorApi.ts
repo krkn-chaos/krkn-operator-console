@@ -1,5 +1,5 @@
 import { config } from '../config';
-import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse, ScenarioDetail, ScenarioGlobals } from '../types/api';
+import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse, ScenarioDetail, ScenarioGlobals, ScenarioRunRequest, ScenarioRunResponse, JobStatusResponse } from '../types/api';
 
 class OperatorApiClient {
   private baseUrl: string;
@@ -164,6 +164,90 @@ class OperatorApiClient {
     }
 
     return response.json();
+  }
+
+  /**
+   * POST /scenarios/run
+   * Run a chaos scenario
+   * @param request - Scenario run request with all parameters
+   * @returns Promise with job information
+   */
+  async runScenario(request: ScenarioRunRequest): Promise<ScenarioRunResponse> {
+    const response = await fetch(`${this.baseUrl}/scenarios/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to run scenario: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * GET /scenarios/run/{jobId}
+   * Get status of a running job
+   * @param jobId - Job ID to check
+   * @returns Promise with job status
+   */
+  async getJobStatus(jobId: string): Promise<JobStatusResponse> {
+    const response = await fetch(`${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to fetch job status: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * DELETE /scenarios/run/{jobId}
+   * Cancel a running job
+   * @param jobId - Job ID to cancel
+   * @returns Promise with final job status
+   */
+  async cancelJob(jobId: string): Promise<JobStatusResponse> {
+    const response = await fetch(`${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to cancel job: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * GET /scenarios/run/{jobId}/logs
+   * Get streaming logs URL for a job
+   * @param jobId - Job ID
+   * @param follow - Whether to follow logs (stream)
+   * @param tailLines - Number of lines to tail
+   * @param timestamps - Whether to include timestamps
+   * @returns URL for streaming logs
+   */
+  getJobLogsUrl(jobId: string, follow: boolean = true, tailLines?: number, timestamps: boolean = false): string {
+    const params = new URLSearchParams();
+    params.append('follow', follow.toString());
+    if (tailLines !== undefined) {
+      params.append('tailLines', tailLines.toString());
+    }
+    params.append('timestamps', timestamps.toString());
+
+    return `${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}/logs?${params.toString()}`;
   }
 }
 

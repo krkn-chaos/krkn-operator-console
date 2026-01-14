@@ -121,9 +121,51 @@ export interface ErrorResponse {
   message: string;
 }
 
+// Scenario Run Types
+
+export interface ScenarioFileMount {
+  name: string;
+  content: string; // base64 encoded
+  mountPath: string;
+}
+
+export interface ScenarioRunRequest {
+  targetId: string;
+  clusterName: string;
+  scenarioImage: string;
+  scenarioName: string;
+  kubeconfigPath: string;
+  environment: { [key: string]: string };
+  files?: ScenarioFileMount[];
+  registryUrl?: string;
+  scenarioRepository?: string;
+  username?: string;
+  password?: string;
+}
+
+export interface ScenarioRunResponse {
+  jobId: string;
+  status: string;
+  podName: string;
+}
+
+export type JobStatus = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Stopped';
+
+export interface JobStatusResponse {
+  jobId: string;
+  targetId: string;
+  clusterName: string;
+  scenarioName: string;
+  status: JobStatus;
+  podName: string;
+  startTime?: string;
+  completionTime?: string;
+  message?: string;
+}
+
 // App State Types
 
-export type AppPhase = 'initializing' | 'polling' | 'selecting_cluster' | 'loading_nodes' | 'ready' | 'configuring_registry' | 'loading_scenarios' | 'selecting_scenarios' | 'loading_scenario_detail' | 'configuring_scenario' | 'error';
+export type AppPhase = 'initializing' | 'polling' | 'selecting_cluster' | 'loading_nodes' | 'ready' | 'configuring_registry' | 'loading_scenarios' | 'selecting_scenarios' | 'loading_scenario_detail' | 'configuring_scenario' | 'running_scenario' | 'error';
 
 export type ErrorType = 'network' | 'timeout' | 'api_error' | 'not_found';
 
@@ -155,6 +197,7 @@ export interface AppState {
   scenarioGlobals: ScenarioGlobals | null;
   globalFormValues: ScenarioFormValues | null;
   globalTouchedFields: TouchedFields | null;
+  currentJob: JobStatusResponse | null;
   error: AppError | null;
 }
 
@@ -187,5 +230,9 @@ export type AppAction =
   | { type: 'SCENARIO_GLOBALS_SUCCESS'; payload: { scenarioGlobals: ScenarioGlobals } }
   | { type: 'SCENARIO_GLOBALS_ERROR'; payload: AppError }
   | { type: 'UPDATE_GLOBAL_FORM'; payload: { formValues: ScenarioFormValues; touchedFields: TouchedFields } }
+  | { type: 'SCENARIO_RUN_SUCCESS'; payload: { job: JobStatusResponse } }
+  | { type: 'SCENARIO_RUN_ERROR'; payload: AppError }
+  | { type: 'JOB_STATUS_UPDATE'; payload: { job: JobStatusResponse } }
+  | { type: 'JOB_CANCELLED' }
   | { type: 'GO_BACK' }
   | { type: 'RETRY' };

@@ -1,7 +1,7 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand } from '@patternfly/react-core';
 import { useAppContext } from './context/AppContext';
 import { useTargetPoller } from './hooks/useTargetPoller';
-import { LoadingScreen, ErrorDisplay, ClusterSelector, RegistrySelector, ScenariosList } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterSelector, RegistrySelector, ScenariosList, ScenarioRunning } from './components';
 import { NodesDisplay } from './components/NodesDisplay';
 import { ScenarioDetail } from './components/ScenarioDetail';
 
@@ -74,6 +74,13 @@ function App() {
                 registryConfig={state.registryConfig}
               />
             )}
+          </PageSection>
+        );
+
+      case 'running_scenario':
+        return (
+          <PageSection>
+            <ScenarioRunning />
           </PageSection>
         );
 

@@ -19,6 +19,7 @@ const initialState: AppState = {
   scenarioGlobals: null,
   globalFormValues: null,
   globalTouchedFields: null,
+  currentJob: null,
   error: null,
 };
 
@@ -207,6 +208,34 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalTouchedFields: action.payload.touchedFields,
       };
 
+    case 'SCENARIO_RUN_SUCCESS':
+      return {
+        ...state,
+        phase: 'running_scenario',
+        currentJob: action.payload.job,
+        error: null,
+      };
+
+    case 'SCENARIO_RUN_ERROR':
+      return {
+        ...state,
+        phase: 'error',
+        error: action.payload,
+      };
+
+    case 'JOB_STATUS_UPDATE':
+      return {
+        ...state,
+        currentJob: action.payload.job,
+      };
+
+    case 'JOB_CANCELLED':
+      return {
+        ...state,
+        phase: 'configuring_scenario',
+        currentJob: null,
+      };
+
     case 'GO_BACK':
       // Navigate back to previous phase based on current phase
       switch (state.phase) {
@@ -252,6 +281,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
             scenarioGlobals: null,
             globalFormValues: null,
             globalTouchedFields: null,
+          };
+
+        case 'running_scenario':
+          // From running scenario → back to scenario configuration
+          return {
+            ...state,
+            phase: 'configuring_scenario',
+            currentJob: null,
           };
 
         default:

@@ -14,7 +14,7 @@ import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, JobStatus, JobStatusResponse, FileField } from '../types/api';
 
 interface ScenarioDetailProps {
   scenarioName: string;
@@ -129,6 +129,145 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleEditForm = () => {
     setShowPreview(false);
+  };
+
+  const handleRunScenario = async () => {
+    if (!state.uuid || !state.selectedCluster || !scenarioFormValues || !scenarioDetail) {
+      return;
+    }
+
+    try {
+      // Build environment map from scenario form values and global touched fields
+      const environment: { [key: string]: string } = {};
+      const files: ScenarioFileMount[] = [];
+
+      // Add scenario form values (exclude file type fields)
+      scenarioDetail.fields.forEach((field) => {
+        const value = scenarioFormValues[field.variable];
+
+        if (field.type === 'file') {
+          // Handle file type - add to files array
+          if (value && value instanceof File) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64Content = btoa(reader.result as string);
+              files.push({
+                name: value.name,
+                content: base64Content,
+                mountPath: (field as FileField).mount_path || `/config/${value.name}`,
+              });
+            };
+            reader.readAsText(value);
+          }
+        } else if (field.type !== 'file_base64') {
+          // Add to environment (all types except file and file_base64)
+          if (value !== undefined && value !== null && value !== '') {
+            environment[field.variable] = String(value);
+          } else if (field.default) {
+            environment[field.variable] = field.default;
+          }
+        } else {
+          // file_base64 type - add to environment as base64
+          if (value && value instanceof File) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64Content = btoa(reader.result as string);
+              environment[field.variable] = base64Content;
+            };
+            reader.readAsText(value);
+          }
+        }
+      });
+
+      // Add global form values (only touched fields)
+      if (showGlobalParameters && scenarioGlobals && globalTouchedFields && globalFormValues) {
+        scenarioGlobals.fields.forEach((field) => {
+          if (globalTouchedFields[field.variable]) {
+            const value = globalFormValues[field.variable];
+
+            if (field.type === 'file') {
+              // Handle global file type
+              if (value && value instanceof File) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64Content = btoa(reader.result as string);
+                  files.push({
+                    name: value.name,
+                    content: base64Content,
+                    mountPath: (field as FileField).mount_path || `/config/${value.name}`,
+                  });
+                };
+                reader.readAsText(value);
+              }
+            } else if (field.type !== 'file_base64') {
+              if (value !== undefined && value !== null && value !== '') {
+                environment[field.variable] = String(value);
+              }
+            } else {
+              // file_base64 type
+              if (value && value instanceof File) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64Content = btoa(reader.result as string);
+                  environment[field.variable] = base64Content;
+                };
+                reader.readAsText(value);
+              }
+            }
+          }
+        });
+      }
+
+      // Build scenario image
+      let scenarioImage: string;
+      if (registryConfig && registryConfig.registryUrl && registryConfig.scenarioRepository) {
+        scenarioImage = `${registryConfig.registryUrl}/${registryConfig.scenarioRepository}:${scenarioName}`;
+      } else {
+        scenarioImage = `quay.io/krkn-chaos/krkn-hub:${scenarioName}`;
+      }
+
+      // Build the run request
+      const runRequest: ScenarioRunRequest = {
+        targetId: state.uuid,
+        clusterName: state.selectedCluster.clusterName,
+        scenarioImage,
+        scenarioName,
+        kubeconfigPath: '/home/krkn/.kube/config',
+        environment,
+        files: files.length > 0 ? files : undefined,
+        registryUrl: registryConfig?.registryUrl,
+        scenarioRepository: registryConfig?.scenarioRepository,
+        username: registryConfig?.username,
+        password: registryConfig?.password,
+      };
+
+      // Call the API to run the scenario
+      const runResponse = await operatorApi.runScenario(runRequest);
+
+      // Create initial job status
+      const initialJob: JobStatusResponse = {
+        jobId: runResponse.jobId,
+        targetId: state.uuid,
+        clusterName: state.selectedCluster.clusterName,
+        scenarioName,
+        status: runResponse.status as JobStatus,
+        podName: runResponse.podName,
+      };
+
+      // Dispatch success action
+      dispatch({
+        type: 'SCENARIO_RUN_SUCCESS',
+        payload: { job: initialJob },
+      });
+    } catch (error) {
+      dispatch({
+        type: 'SCENARIO_RUN_ERROR',
+        payload: {
+          message: error instanceof Error ? error.message : 'Failed to run scenario',
+          type: 'api_error',
+        },
+      });
+    }
   };
 
   if (!scenarioDetail) {
@@ -386,10 +525,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             </CardBody>
           </Card>
 
-          {/* Submit Button (placeholder for future) */}
+          {/* Run Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-            <Button variant="primary" size="lg" isDisabled>
-              Submit Scenario (Coming Soon)
+            <Button variant="primary" size="lg" onClick={handleRunScenario}>
+              Run Scenario
             </Button>
           </div>
         </>
