@@ -76,22 +76,28 @@ export function ScenarioRunning() {
       return;
     }
 
-    // Don't start streaming if job hasn't started yet
+    // Don't start streaming if job hasn't started yet or if it's already completed
     if (currentJob.status === 'Pending') {
       console.log('Job is pending, waiting for it to start before streaming logs');
       setLogs(['Waiting for pod to start...']);
       return;
     }
 
-    console.log('Starting log stream for job:', currentJob.jobId);
-    const logsUrl = operatorApi.getJobLogsUrl(currentJob.jobId, true);
+    // If job is in terminal state, don't try to stream (will get complete logs)
+    const isTerminal = currentJob.status === 'Succeeded' || currentJob.status === 'Failed' || currentJob.status === 'Stopped';
+
+    console.log('Starting log stream for job:', currentJob.jobId, 'status:', currentJob.status);
+    const logsUrl = operatorApi.getJobLogsUrl(currentJob.jobId, !isTerminal);
     console.log('Log stream URL:', logsUrl);
 
-    setLogs([`Connecting to log stream...`]);
+    if (!isTerminal) {
+      setLogs([`Connecting to log stream...`]);
+    }
 
     const abortController = new AbortController();
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     let buffer = '';
+    let hasReceivedData = false;
 
     // Use fetch with ReadableStream for log streaming
     const streamLogs = async () => {
@@ -100,6 +106,7 @@ export function ScenarioRunning() {
           signal: abortController.signal,
           headers: {
             'Accept': 'text/plain',
+            'Cache-Control': 'no-cache',
           },
         });
 
@@ -121,6 +128,8 @@ export function ScenarioRunning() {
               'Or check the pod status:',
               `kubectl get pod ${currentJob.podName}`,
             ]);
+          } else if (response.status === 404) {
+            setLogs(['Pod not found or not started yet. Waiting for pod to be created...']);
           } else {
             setLogs(prev => [...prev, `Error fetching logs: ${response.status} ${response.statusText}`]);
           }
@@ -129,7 +138,7 @@ export function ScenarioRunning() {
 
         if (!response.body) {
           console.error('No response body for logs');
-          setLogs(prev => [...prev, 'Error: No response body for logs']);
+          setLogs(['No logs available yet...']);
           return;
         }
 
@@ -143,16 +152,22 @@ export function ScenarioRunning() {
             const { done, value } = await reader.read();
 
             if (done) {
-              console.log('Log stream ended');
+              console.log('Log stream ended normally');
               // Process any remaining buffer
               if (buffer.trim()) {
                 setLogs(prev => [...prev, buffer]);
+              }
+
+              // If job is terminal and we got no data, show message
+              if (isTerminal && !hasReceivedData) {
+                setLogs(['No logs available for this job.']);
               }
               break;
             }
 
             // Decode the chunk
             const chunk = decoder.decode(value, { stream: true });
+            hasReceivedData = true;
             console.log('Received log chunk, length:', chunk.length, 'first 200 chars:', chunk.substring(0, 200));
 
             // Add to buffer
@@ -166,11 +181,9 @@ export function ScenarioRunning() {
 
             // Add complete lines to logs
             if (lines.length > 0) {
-              const nonEmptyLines = lines.filter(line => line.trim());
-              if (nonEmptyLines.length > 0) {
-                console.log('Adding', nonEmptyLines.length, 'lines to logs');
-                setLogs(prev => [...prev, ...nonEmptyLines]);
-              }
+              // Don't filter empty lines - they might be intentional
+              console.log('Adding', lines.length, 'lines to logs');
+              setLogs(prev => prev[0] === 'Connecting to log stream...' ? lines : [...prev, ...lines]);
             }
           }
         } catch (readError) {
@@ -181,10 +194,21 @@ export function ScenarioRunning() {
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
-          console.log('Log stream aborted');
+          console.log('Log stream aborted by user');
         } else {
           console.error('Error streaming logs:', error);
-          setLogs(prev => [...prev, `Error streaming logs: ${error instanceof Error ? error.message : String(error)}`]);
+          const errorMsg = error instanceof Error ? error.message : String(error);
+
+          // Check if it's a network error (connection interrupted)
+          if (errorMsg.includes('network') || errorMsg.includes('Failed to fetch')) {
+            if (isTerminal) {
+              console.log('Stream ended because job is in terminal state');
+            } else {
+              setLogs(prev => [...prev, '', '⚠️  Connection to log stream lost. Job may have completed or pod may have terminated.']);
+            }
+          } else {
+            setLogs(prev => [...prev, `Error streaming logs: ${errorMsg}`]);
+          }
         }
       }
     };
