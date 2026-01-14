@@ -241,13 +241,21 @@ class OperatorApiClient {
    */
   getJobLogsUrl(jobId: string, follow: boolean = true, tailLines?: number, timestamps: boolean = false): string {
     const params = new URLSearchParams();
-    params.append('follow', follow.toString());
+    if (follow) {
+      params.append('follow', 'true');
+    }
     if (tailLines !== undefined) {
       params.append('tailLines', tailLines.toString());
     }
-    params.append('timestamps', timestamps.toString());
+    if (timestamps) {
+      params.append('timestamps', 'true');
+    }
 
-    return `${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}/logs?${params.toString()}`;
+    // Return URL with query params only if there are any
+    const queryString = params.toString();
+    return queryString
+      ? `${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}/logs?${queryString}`
+      : `${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}/logs`;
   }
 }
 

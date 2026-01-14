@@ -69,46 +69,136 @@ export function ScenarioRunning() {
     };
   }, [currentJob?.jobId, dispatch]);
 
-  // Stream logs using EventSource (Server-Sent Events)
+  // Stream logs using fetch with ReadableStream
   useEffect(() => {
-    if (!currentJob) return;
+    if (!currentJob) {
+      console.log('No current job, skipping log streaming');
+      return;
+    }
 
+    // Don't start streaming if job hasn't started yet
+    if (currentJob.status === 'Pending') {
+      console.log('Job is pending, waiting for it to start before streaming logs');
+      setLogs(['Waiting for pod to start...']);
+      return;
+    }
+
+    console.log('Starting log stream for job:', currentJob.jobId);
     const logsUrl = operatorApi.getJobLogsUrl(currentJob.jobId, true);
+    console.log('Log stream URL:', logsUrl);
+
+    setLogs([`Connecting to log stream...`]);
+
+    const abortController = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let buffer = '';
 
     // Use fetch with ReadableStream for log streaming
     const streamLogs = async () => {
       try {
-        const response = await fetch(logsUrl);
+        const response = await fetch(logsUrl, {
+          signal: abortController.signal,
+          headers: {
+            'Accept': 'text/plain',
+          },
+        });
+
+        console.log('Log stream response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          console.error('Failed to fetch logs:', response.statusText);
+          console.error('Failed to fetch logs:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('Error response body:', errorText);
+
+          if (response.status === 501) {
+            setLogs([
+              '⚠️  Log streaming endpoint not yet implemented in the backend.',
+              '',
+              'Job is running. Use kubectl to view logs:',
+              `kubectl logs ${currentJob.podName} -f`,
+              '',
+              'Or check the pod status:',
+              `kubectl get pod ${currentJob.podName}`,
+            ]);
+          } else {
+            setLogs(prev => [...prev, `Error fetching logs: ${response.status} ${response.statusText}`]);
+          }
           return;
         }
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
+        if (!response.body) {
+          console.error('No response body for logs');
+          setLogs(prev => [...prev, 'Error: No response body for logs']);
+          return;
+        }
 
-        if (!reader) return;
+        reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        console.log('Started reading log stream');
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter(line => line.trim());
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
 
-          setLogs(prev => [...prev, ...lines]);
+            if (done) {
+              console.log('Log stream ended');
+              // Process any remaining buffer
+              if (buffer.trim()) {
+                setLogs(prev => [...prev, buffer]);
+              }
+              break;
+            }
+
+            // Decode the chunk
+            const chunk = decoder.decode(value, { stream: true });
+            console.log('Received log chunk, length:', chunk.length, 'first 200 chars:', chunk.substring(0, 200));
+
+            // Add to buffer
+            buffer += chunk;
+
+            // Split by newlines and process complete lines
+            const lines = buffer.split('\n');
+
+            // Keep the last incomplete line in the buffer
+            buffer = lines.pop() || '';
+
+            // Add complete lines to logs
+            if (lines.length > 0) {
+              const nonEmptyLines = lines.filter(line => line.trim());
+              if (nonEmptyLines.length > 0) {
+                console.log('Adding', nonEmptyLines.length, 'lines to logs');
+                setLogs(prev => [...prev, ...nonEmptyLines]);
+              }
+            }
+          }
+        } catch (readError) {
+          if (readError instanceof Error && readError.name !== 'AbortError') {
+            console.error('Error reading stream:', readError);
+            throw readError;
+          }
         }
       } catch (error) {
-        console.error('Error streaming logs:', error);
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Log stream aborted');
+        } else {
+          console.error('Error streaming logs:', error);
+          setLogs(prev => [...prev, `Error streaming logs: ${error instanceof Error ? error.message : String(error)}`]);
+        }
       }
     };
 
     streamLogs();
 
     return () => {
-      // Cleanup if needed
+      console.log('Cleaning up log stream');
+      abortController.abort();
+      if (reader) {
+        reader.cancel().catch(err => console.log('Error cancelling reader:', err));
+      }
     };
-  }, [currentJob?.jobId]);
+  }, [currentJob?.jobId, currentJob?.status]);
 
   const handleCancel = async () => {
     if (!currentJob || isCancelling) return;
