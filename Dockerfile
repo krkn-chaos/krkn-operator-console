@@ -15,30 +15,30 @@ COPY . .
 # Build application
 RUN npm run build
 
-# Stage 2: Serve with Caddy
-FROM docker.io/library/caddy:2-alpine
+# Stage 2: Serve with nginx
+FROM docker.io/library/nginx:alpine
 
 # Copy built assets from builder
-COPY --from=builder /app/dist /usr/share/caddy
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy Caddy configuration
-COPY Caddyfile /etc/caddy/Caddyfile
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# Remove capabilities to bind to privileged ports (OpenShift compatibility)
-# This allows Caddy to run without CAP_NET_BIND_SERVICE
-RUN setcap -r /usr/bin/caddy
+# Create directories for non-root nginx and set permissions
+RUN mkdir -p /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
+    chmod -R 777 /tmp && \
+    chmod -R 755 /usr/share/nginx/html && \
+    chown -R nginx:nginx /usr/share/nginx/html
 
-# Ensure directories are writable by any user (OpenShift compatibility)
-# Caddy needs to write to /data and /config
-RUN chmod -R 777 /data /config /usr/share/caddy && \
-    chmod 666 /etc/caddy/Caddyfile
+# Use non-root user
+USER nginx
 
 # Expose port 8080
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+  CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
 
-# Start Caddy
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
