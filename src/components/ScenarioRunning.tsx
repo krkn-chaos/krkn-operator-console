@@ -235,12 +235,22 @@ export function ScenarioRunning() {
         console.error('Error streaming logs:', error);
         const errorMsg = error instanceof Error ? error.message : String(error);
 
-        // Check if it's a network error (connection interrupted)
-        if (errorMsg.includes('network') || errorMsg.includes('Failed to fetch')) {
+        // Check if it's a network error (connection interrupted or incomplete chunked encoding)
+        if (errorMsg.includes('network') || errorMsg.includes('Failed to fetch') || errorMsg.includes('chunked')) {
           if (!isTerminal && !isCleanedUp) {
-            console.log('Network error, attempting to reconnect...');
-            setLogs(prev => [...prev, '', '⚠️  Connection lost, reconnecting...']);
-            scheduleReconnect(2000);
+            console.log('Network error or incomplete stream, attempting to reconnect...');
+            // Don't show error message on first reconnect, only if it keeps failing
+            if (reconnectAttempts > 0) {
+              setLogs(prev => {
+                const lastLine = prev[prev.length - 1];
+                // Don't duplicate reconnection messages
+                if (!lastLine?.includes('reconnecting')) {
+                  return [...prev, '⚠️  Stream interrupted, reconnecting...'];
+                }
+                return prev;
+              });
+            }
+            scheduleReconnect(1500);
           }
         } else {
           setLogs(prev => [...prev, `Error streaming logs: ${errorMsg}`]);
