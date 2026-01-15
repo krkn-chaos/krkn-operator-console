@@ -174,7 +174,7 @@ export function ScenarioRunning() {
             const { done, value } = await reader.read();
 
             if (done) {
-              console.log('Log stream ended normally');
+              console.log('Log stream ended normally, hasReceivedData:', hasReceivedData, 'buffer length:', buffer.length);
               // Process any remaining buffer
               if (buffer.trim()) {
                 setLogs(prev => [...prev, buffer]);
@@ -194,7 +194,7 @@ export function ScenarioRunning() {
             // Decode the chunk
             const chunk = decoder.decode(value, { stream: true });
             hasReceivedData = true;
-            console.log('Received log chunk, length:', chunk.length);
+            console.log('Received log chunk, length:', chunk.length, 'first 200 chars:', chunk.substring(0, 200));
 
             // Add to buffer
             buffer += chunk;
@@ -207,7 +207,7 @@ export function ScenarioRunning() {
 
             // Add complete lines to logs
             if (lines.length > 0) {
-              console.log('Adding', lines.length, 'lines to logs');
+              console.log('Adding', lines.length, 'lines to logs, first line:', lines[0].substring(0, 100));
               setLogs(prev => {
                 // Replace "Connecting..." message on first data
                 if (isFirstChunk && prev[0] === 'Connecting to log stream...') {
@@ -216,6 +216,8 @@ export function ScenarioRunning() {
                 }
                 return [...prev, ...lines];
               });
+            } else {
+              console.log('No complete lines yet, buffer length:', buffer.length);
             }
           }
         } catch (readError) {
