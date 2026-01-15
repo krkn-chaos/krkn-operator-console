@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Card,
-  CardTitle,
   CardBody,
   Title,
   Button,
@@ -18,19 +17,13 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import type { JobStatus } from '../types/api';
+import { LogViewer } from './LogViewer';
 
 export function ScenarioRunning() {
   const { state, dispatch } = useAppContext();
   const { currentJob } = state;
-  const [logs, setLogs] = useState<string[]>([]);
   const [isCancelling, setIsCancelling] = useState(false);
-  const logsEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<number | null>(null);
-
-  // Scroll to bottom of logs when new logs arrive
-  useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
 
   // Poll job status every 2 seconds
   useEffect(() => {
@@ -69,238 +62,6 @@ export function ScenarioRunning() {
     };
   }, [currentJob?.jobId, dispatch]);
 
-  // Stream logs using fetch with ReadableStream and automatic reconnection
-  useEffect(() => {
-    if (!currentJob) {
-      console.log('No current job, skipping log streaming');
-      return;
-    }
-
-    // Don't start streaming if job hasn't started yet
-    if (currentJob.status === 'Pending') {
-      console.log('Job is pending, waiting for it to start before streaming logs');
-      setLogs(['Waiting for pod to start...']);
-      return;
-    }
-
-    // If job is in terminal state, don't try to stream (will get complete logs once)
-    const isTerminal = currentJob.status === 'Succeeded' || currentJob.status === 'Failed' || currentJob.status === 'Stopped';
-
-    console.log('Starting log stream for job:', currentJob.jobId, 'status:', currentJob.status);
-
-    if (!isTerminal) {
-      setLogs([`Connecting to log stream...`]);
-    }
-
-    const logsUrl = operatorApi.getJobLogsUrl(currentJob.jobId, !isTerminal);
-    const abortController = new AbortController();
-    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-    let buffer = '';
-    let hasReceivedData = false;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10;
-    let reconnectTimeout: number | null = null;
-    let isCleanedUp = false;
-
-    // Stream logs with automatic reconnection
-    const streamLogs = async () => {
-      // Don't reconnect if job is terminal or component is unmounted
-      if (isCleanedUp || isTerminal) {
-        return;
-      }
-
-      try {
-        console.log(`Attempting to connect to log stream (attempt ${reconnectAttempts + 1})`);
-
-        const response = await fetch(logsUrl, {
-          signal: abortController.signal,
-          headers: {
-            'Accept': 'text/plain',
-            'Cache-Control': 'no-cache',
-          },
-        });
-
-        console.log('Log stream response status:', response.status);
-
-        if (!response.ok) {
-          console.error('Failed to fetch logs:', response.status, response.statusText);
-          const errorText = await response.text();
-          console.error('Error response body:', errorText);
-
-          if (response.status === 501) {
-            setLogs([
-              '⚠️  Log streaming endpoint not yet implemented in the backend.',
-              '',
-              'Job is running. Use kubectl to view logs:',
-              `kubectl logs ${currentJob.podName} -f`,
-              '',
-              'Or check the pod status:',
-              `kubectl get pod ${currentJob.podName}`,
-            ]);
-            return;
-          } else if (response.status === 404) {
-            // Pod not ready yet, retry after delay
-            console.log('Pod not found, will retry...');
-            setLogs(['Pod not found or not started yet. Waiting for pod to be created...']);
-            scheduleReconnect(2000); // Retry after 2 seconds
-            return;
-          } else {
-            setLogs(prev => [...prev, `Error fetching logs: ${response.status} ${response.statusText}`]);
-            scheduleReconnect(5000); // Retry after 5 seconds
-            return;
-          }
-        }
-
-        if (!response.body) {
-          console.error('No response body for logs');
-          setLogs(['No logs available yet...']);
-          scheduleReconnect(2000);
-          return;
-        }
-
-        // Reset reconnect attempts on successful connection
-        reconnectAttempts = 0;
-
-        reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-
-        console.log('Started reading log stream');
-
-        // Clear "Connecting..." message on first data
-        let isFirstChunk = true;
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-
-            if (done) {
-              console.log('Log stream ended normally, hasReceivedData:', hasReceivedData, 'buffer length:', buffer.length);
-              // Process any remaining buffer
-              if (buffer.trim()) {
-                setLogs(prev => [...prev, buffer]);
-              }
-
-              // If job is terminal and we got no data, show message
-              if (isTerminal && !hasReceivedData) {
-                setLogs(['No logs available for this job.']);
-              } else if (!isTerminal && !isCleanedUp) {
-                // Stream ended but job is still running - reconnect
-                console.log('Stream ended unexpectedly, reconnecting...');
-                scheduleReconnect(1000);
-              }
-              break;
-            }
-
-            // Decode the chunk
-            const chunk = decoder.decode(value, { stream: true });
-            hasReceivedData = true;
-            console.log('Received log chunk, length:', chunk.length, 'first 200 chars:', chunk.substring(0, 200));
-
-            // Add to buffer
-            buffer += chunk;
-
-            // Split by newlines and process complete lines
-            const lines = buffer.split('\n');
-
-            // Keep the last incomplete line in the buffer
-            buffer = lines.pop() || '';
-
-            // Add complete lines to logs
-            if (lines.length > 0) {
-              console.log('Adding', lines.length, 'lines to logs, first line:', lines[0].substring(0, 100));
-              setLogs(prev => {
-                // Replace "Connecting..." message on first data
-                if (isFirstChunk && prev[0] === 'Connecting to log stream...') {
-                  isFirstChunk = false;
-                  return lines;
-                }
-                return [...prev, ...lines];
-              });
-            } else {
-              console.log('No complete lines yet, buffer length:', buffer.length);
-            }
-          }
-        } catch (readError) {
-          if (readError instanceof Error && readError.name !== 'AbortError') {
-            console.error('Error reading stream:', readError);
-            throw readError;
-          }
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.log('Log stream aborted by user');
-          return;
-        }
-
-        console.error('Error streaming logs:', error);
-        const errorMsg = error instanceof Error ? error.message : String(error);
-
-        // Check if it's a network error (connection interrupted or incomplete chunked encoding)
-        if (errorMsg.includes('network') || errorMsg.includes('Failed to fetch') || errorMsg.includes('chunked')) {
-          if (!isTerminal && !isCleanedUp) {
-            console.log('Network error or incomplete stream, attempting to reconnect...');
-            // Don't show error message on first reconnect, only if it keeps failing
-            if (reconnectAttempts > 0) {
-              setLogs(prev => {
-                const lastLine = prev[prev.length - 1];
-                // Don't duplicate reconnection messages
-                if (!lastLine?.includes('reconnecting')) {
-                  return [...prev, '⚠️  Stream interrupted, reconnecting...'];
-                }
-                return prev;
-              });
-            }
-            scheduleReconnect(1500);
-          }
-        } else {
-          setLogs(prev => [...prev, `Error streaming logs: ${errorMsg}`]);
-          if (!isTerminal && !isCleanedUp) {
-            scheduleReconnect(5000);
-          }
-        }
-      }
-    };
-
-    // Schedule reconnection with exponential backoff
-    const scheduleReconnect = (baseDelay: number) => {
-      if (isCleanedUp || isTerminal) {
-        return;
-      }
-
-      reconnectAttempts++;
-
-      if (reconnectAttempts >= maxReconnectAttempts) {
-        console.log('Max reconnection attempts reached');
-        setLogs(prev => [...prev, '', '⚠️  Max reconnection attempts reached. Please refresh the page.']);
-        return;
-      }
-
-      // Exponential backoff: delay * 2^(attempts-1), capped at 30 seconds
-      const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts - 1), 30000);
-      console.log(`Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
-
-      reconnectTimeout = window.setTimeout(() => {
-        streamLogs();
-      }, delay);
-    };
-
-    // Start initial connection
-    streamLogs();
-
-    return () => {
-      console.log('Cleaning up log stream');
-      isCleanedUp = true;
-      abortController.abort();
-
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-
-      if (reader) {
-        reader.cancel().catch((err: unknown) => console.log('Error cancelling reader:', err));
-      }
-    };
-  }, [currentJob?.jobId, currentJob?.status]);
 
   const handleCancel = async () => {
     if (!currentJob || isCancelling) return;
@@ -427,49 +188,26 @@ export function ScenarioRunning() {
         </CardBody>
       </Card>
 
-      {/* Logs Console */}
-      <Card>
-        <CardTitle>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Job Logs</span>
-            {!isTerminal && (
-              <Button
-                variant="danger"
-                onClick={handleCancel}
-                isLoading={isCancelling}
-                isDisabled={isCancelling}
-              >
-                {isCancelling ? 'Cancelling...' : 'Cancel Scenario'}
-              </Button>
-            )}
-          </div>
-        </CardTitle>
-        <CardBody>
-          <div style={{
-            backgroundColor: 'var(--pf-v5-global--BackgroundColor--dark-100)',
-            color: 'var(--pf-v5-global--Color--light-100)',
-            fontFamily: 'monospace',
-            fontSize: '0.875rem',
-            padding: '1rem',
-            borderRadius: '4px',
-            maxHeight: '500px',
-            overflowY: 'auto',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all',
-          }}>
-            {logs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                {currentJob.status === 'Pending' ? 'Waiting for pod to start...' : 'No logs available yet...'}
-              </div>
-            ) : (
-              logs.map((log, index) => (
-                <div key={index}>{log}</div>
-              ))
-            )}
-            <div ref={logsEndRef} />
-          </div>
-        </CardBody>
-      </Card>
+      {/* Cancel Button */}
+      {!isTerminal && (
+        <div style={{ marginBottom: '1.5rem', textAlign: 'right' }}>
+          <Button
+            variant="danger"
+            onClick={handleCancel}
+            isLoading={isCancelling}
+            isDisabled={isCancelling}
+          >
+            {isCancelling ? 'Cancelling...' : 'Cancel Scenario'}
+          </Button>
+        </div>
+      )}
+
+      {/* Logs Viewer */}
+      <LogViewer
+        jobId={currentJob.jobId}
+        podName={currentJob.podName}
+        status={currentJob.status}
+      />
     </div>
   );
 }

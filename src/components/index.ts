@@ -6,3 +6,4 @@ export { RegistrySelector } from './RegistrySelector';
 export { ScenariosList } from './ScenariosList';
 export { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 export { ScenarioRunning } from './ScenarioRunning';
+export { LogViewer } from './LogViewer';

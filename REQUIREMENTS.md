@@ -719,24 +719,87 @@ A visual evidence of the status must be presented. via an Icon (animated would b
 
 #### job logs
 
-In the center of the page a console streaming the job logs must be presented, the data is provided by:
+ WebSocket Log Streaming - Frontend Requirements
 
-/scenarios/run/{jobId}/logs
-- this method streams the stdout/stderr logs of a running or completed job
-- the method accepts the job ID as a path parameter
-- the method must:
-  - find the pod associated with the job ID
-  - return 404 if job not found
-  - stream pod logs in real-time using chunked transfer encoding
-  - support the `follow` query parameter (default: false)
-    - if `follow=true`: stream logs continuously until pod terminates
-    - if `follow=false`: return current logs and close connection
-  - support the `tailLines` query parameter to limit output to last N lines (optional)
-  - support the `timestamps` query parameter to include timestamps (default: false)
-  - set appropriate HTTP headers for streaming:
-    - `Content-Type: text/plain`
-    - `Transfer-Encoding: chunked`
-    - `Cache-Control: no-cache`
+  Endpoint
+
+  URL: ws://<operator-host>:8080/scenarios/run/{jobId}/logs
+
+  Protocol: WebSocket (upgrade from HTTP/HTTPS)
+
+  Query Parameters
+
+  All query parameters are optional:
+
+  - follow (boolean):
+    - follow=true: Stream logs continuously until pod completes
+    - follow=false or omitted: Return current logs and close connection
+  - timestamps (boolean):
+    - timestamps=true: Each log line includes timestamp prefix
+    - timestamps=false or omitted: No timestamps
+  - tailLines (integer):
+    - tailLines=100: Return only last 100 lines
+    - Omitted: Return all logs
+
+  Example URLs:
+  ws://operator:8080/scenarios/run/550e8400-e29b-41d4-a716-446655440000/logs?follow=true&timestamps=true
+  ws://operator:8080/scenarios/run/550e8400-e29b-41d4-a716-446655440000/logs?tailLines=100
+
+  Connection Flow
+
+  1. Establish WebSocket Connection: Client initiates WebSocket handshake to the endpoint
+  2. Receive Log Lines: Server sends log lines as individual WebSocket text messages
+  3. Handle Errors: Server may send error messages prefixed with ERROR:
+  4. Connection Close: Server sends WebSocket close message when logs complete
+
+  Message Format
+
+  Log Line Messages (WebSocket Text Message):
+  Single line of text from pod stdout/stderr
+
+  Error Messages (WebSocket Text Message):
+  ERROR: Failed to open log stream: <error details>
+  ERROR: Log stream error: <error details>
+
+  Close Message (WebSocket Close Frame):
+  - Close code: 1000 (Normal Closure)
+  - Close reason: Empty string
+
+
+
+  Connection Errors:
+  - WebSocket upgrade fails (404, 400, 500)
+  - Network disconnection
+  - Server shutdown
+
+  Stream Errors:
+  - Pod not found: Check job status first via GET /scenarios/run/{jobId}
+  - Permission errors: Server will send ERROR: message
+  - Stream interruption: onclose event will fire
+
+  Best Practices
+
+  1. Check job status first: Before opening WebSocket, verify job exists via REST API
+  2. Handle reconnection: If connection drops unexpectedly, implement retry logic with exponential backoff
+  3. Resource cleanup: Always close WebSocket in component unmount/cleanup
+  4. Buffer limits: For long-running jobs, consider limiting stored log lines in memory (e.g., keep last 1000 lines)
+  5. ANSI color support: Log lines may contain ANSI color codes - use library like ansi-to-html for rendering
+
+  CORS Considerations
+
+  The WebSocket upgrader is configured with CheckOrigin: true (allows all origins). In production, you should:
+  - Configure proper CORS origin validation
+  - Use secure WebSocket (wss://) with TLS
+  - Implement authentication/authorization
+
+  Testing with wscat
+
+  # Install wscat
+  npm install -g wscat
+
+  # Test connection
+  wscat -c "ws://localhost:8080/scenarios/run/550e8400-e29b-41d4-a716-446655440000/logs?follow=true&timestamps=true"
+
 
 #### job deletion
 
