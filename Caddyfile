@@ -19,8 +19,8 @@
 				dial_timeout 30s
 			}
 
-			# Disable buffering for streaming
-			flush_interval -1
+			# Enable immediate flushing for streaming (0 = immediate)
+			flush_interval 0
 
 			# Headers for streaming
 			header_up X-Real-IP {remote_host}
