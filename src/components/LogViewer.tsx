@@ -95,8 +95,8 @@ export function LogViewer({ jobId, podName, status }: LogViewerProps) {
       const host = window.location.host;
       const follow = !isTerminal;
 
-      // Use /api/ prefix to route through nginx
-      const wsUrl = `${protocol}//${host}/api/scenarios/run/${encodeURIComponent(jobId)}/logs?follow=${follow}`;
+      // Use /api/v1/ prefix to route through nginx
+      const wsUrl = `${protocol}//${host}/api/v1/scenarios/run/${encodeURIComponent(jobId)}/logs?follow=${follow}`;
 
       console.log('WebSocket URL:', wsUrl);
 
