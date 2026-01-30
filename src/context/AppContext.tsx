@@ -4,11 +4,22 @@ import type { AppState, AppAction } from '../types/api';
 // Initial state
 const initialState: AppState = {
   phase: 'initializing',
+
+  // Initialization
   uuid: null,
   pollAttempts: 0,
+
+  // Jobs list
+  jobs: [],
+  pollingJobIds: new Set<string>(),
+  expandedJobIds: new Set<string>(),
+
+  // Workflow state
   clusters: null,
-  selectedCluster: null,
-  nodes: null,
+  selectedClusters: [],
+  targetUUIDs: [],
+
+  // Registry & scenario configuration
   registryType: null,
   registryConfig: null,
   scenarios: null,
@@ -19,7 +30,8 @@ const initialState: AppState = {
   scenarioGlobals: null,
   globalFormValues: null,
   globalTouchedFields: null,
-  currentJob: null,
+
+  // Error handling
   error: null,
 };
 
@@ -58,7 +70,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'POLL_SUCCESS':
       return {
         ...state,
-        phase: 'selecting_cluster',
+        phase: 'jobs_list', // CHANGED: was 'selecting_cluster'
         error: null,
       };
 
@@ -83,28 +95,127 @@ function appReducer(state: AppState, action: AppAction): AppState {
         error: action.payload,
       };
 
-    case 'SELECT_CLUSTER':
+    // Jobs list management
+    case 'JOBS_LIST_READY':
       return {
         ...state,
-        selectedCluster: action.payload,
-      };
-
-    case 'NODES_LOADING':
-      return {
-        ...state,
-        phase: 'loading_nodes',
+        phase: 'jobs_list',
         error: null,
       };
 
-    case 'NODES_SUCCESS':
+    case 'LOAD_JOBS_SUCCESS':
       return {
         ...state,
-        phase: 'ready',
-        nodes: action.payload.nodes,
+        jobs: action.payload.jobs,
         error: null,
       };
 
-    case 'NODES_ERROR':
+    case 'UPDATE_JOB': {
+      const updatedJobs = state.jobs.map(job =>
+        job.jobId === action.payload.job.jobId ? action.payload.job : job
+      );
+      return {
+        ...state,
+        jobs: updatedJobs,
+      };
+    }
+
+    case 'TOGGLE_JOB_ACCORDION': {
+      const newExpanded = new Set(state.expandedJobIds);
+      if (newExpanded.has(action.payload.jobId)) {
+        newExpanded.delete(action.payload.jobId);
+      } else {
+        newExpanded.add(action.payload.jobId);
+      }
+      return {
+        ...state,
+        expandedJobIds: newExpanded,
+      };
+    }
+
+    case 'JOB_CANCELLED': {
+      // Update job status to Stopped
+      const updatedJobs = state.jobs.map(job =>
+        job.jobId === action.payload.jobId
+          ? { ...job, status: 'Stopped' as const }
+          : job
+      );
+      return {
+        ...state,
+        jobs: updatedJobs,
+      };
+    }
+
+    // Workflow control
+    case 'START_CREATE_WORKFLOW':
+      return {
+        ...state,
+        phase: 'selecting_clusters',
+        error: null,
+      };
+
+    case 'CANCEL_WORKFLOW':
+      return {
+        ...state,
+        phase: 'jobs_list',
+        // Clear workflow state
+        selectedClusters: [],
+        targetUUIDs: [],
+        registryType: null,
+        registryConfig: null,
+        scenarios: null,
+        selectedScenarios: null,
+        selectedScenario: null,
+        scenarioDetail: null,
+        scenarioFormValues: null,
+        scenarioGlobals: null,
+        globalFormValues: null,
+        globalTouchedFields: null,
+        error: null,
+      };
+
+    // Multi-cluster selection
+    case 'TOGGLE_CLUSTER': {
+      const { cluster } = action.payload;
+      const isSelected = state.selectedClusters.some(
+        c => c.operatorName === cluster.operatorName && c.clusterName === cluster.clusterName
+      );
+
+      const newSelectedClusters = isSelected
+        ? state.selectedClusters.filter(
+            c => !(c.operatorName === cluster.operatorName && c.clusterName === cluster.clusterName)
+          )
+        : [...state.selectedClusters, cluster];
+
+      return {
+        ...state,
+        selectedClusters: newSelectedClusters,
+      };
+    }
+
+    case 'CLUSTERS_SELECTED':
+      return {
+        ...state,
+        selectedClusters: action.payload.clusters,
+      };
+
+    // Target creation
+    case 'TARGETS_CREATING':
+      return {
+        ...state,
+        phase: 'creating_targets',
+        error: null,
+      };
+
+    case 'TARGETS_CREATED':
+      return {
+        ...state,
+        phase: 'configuring_registry',
+        targetUUIDs: action.payload.targetUUIDs,
+        error: null,
+      };
+
+    case 'TARGETS_ERROR':
       return {
         ...state,
         phase: 'error',
@@ -208,55 +319,45 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalTouchedFields: action.payload.touchedFields,
       };
 
-    case 'SCENARIO_RUN_SUCCESS':
+    // Batch scenario execution
+    case 'SCENARIOS_RUN_BATCH_SUCCESS':
       return {
         ...state,
-        phase: 'running_scenario',
-        currentJob: action.payload.job,
+        phase: 'jobs_list',
+        jobs: [...state.jobs, ...action.payload.jobs],
+        // Clear workflow state
+        selectedClusters: [],
+        targetUUIDs: [],
+        scenarioFormValues: null,
+        globalFormValues: null,
+        globalTouchedFields: null,
         error: null,
       };
 
-    case 'SCENARIO_RUN_ERROR':
+    case 'SCENARIOS_RUN_BATCH_ERROR':
       return {
         ...state,
         phase: 'error',
         error: action.payload,
       };
 
-    case 'JOB_STATUS_UPDATE':
-      return {
-        ...state,
-        currentJob: action.payload.job,
-      };
-
-    case 'JOB_CANCELLED':
-      return {
-        ...state,
-        phase: 'configuring_scenario',
-        currentJob: null,
-      };
-
     case 'GO_BACK':
       // Navigate back to previous phase based on current phase
       switch (state.phase) {
-        case 'selecting_cluster':
-          // Can't go back from cluster selection (would need to re-initialize)
-          return state;
-
-        case 'ready':
-          // From nodes display → back to cluster selection
+        case 'selecting_clusters':
+          // From cluster selection → cancel workflow, back to jobs list
           return {
             ...state,
-            phase: 'selecting_cluster',
-            selectedCluster: null,
-            nodes: null,
+            phase: 'jobs_list',
+            selectedClusters: [],
           };
 
         case 'configuring_registry':
-          // From registry config → back to nodes display
+          // From registry config → back to cluster selection
           return {
             ...state,
-            phase: 'ready',
+            phase: 'selecting_clusters',
+            targetUUIDs: [],
             registryType: null,
             registryConfig: null,
           };
@@ -281,14 +382,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
             scenarioGlobals: null,
             globalFormValues: null,
             globalTouchedFields: null,
-          };
-
-        case 'running_scenario':
-          // From running scenario → back to scenario configuration
-          return {
-            ...state,
-            phase: 'configuring_scenario',
-            currentJob: null,
           };
 
         default:

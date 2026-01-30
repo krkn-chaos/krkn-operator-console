@@ -1,5 +1,5 @@
 import { config } from '../config';
-import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse, ScenarioDetail, ScenarioGlobals, ScenarioRunRequest, ScenarioRunResponse, JobStatusResponse } from '../types/api';
+import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse, ScenarioDetail, ScenarioGlobals, ScenarioRunRequest, ScenarioRunResponse, JobStatusResponse, JobsListResponse } from '../types/api';
 
 class OperatorApiClient {
   private baseUrl: string;
@@ -168,9 +168,9 @@ class OperatorApiClient {
 
   /**
    * POST /scenarios/run
-   * Run a chaos scenario
-   * @param request - Scenario run request with all parameters
-   * @returns Promise with job information
+   * Run a chaos scenario on multiple targets
+   * @param request - Scenario run request with targetUUIDs array
+   * @returns Promise with batch job results
    */
   async runScenario(request: ScenarioRunRequest): Promise<ScenarioRunResponse> {
     const response = await fetch(`${this.baseUrl}/scenarios/run`, {
@@ -181,9 +181,55 @@ class OperatorApiClient {
       body: JSON.stringify(request),
     });
 
+    const data = await response.json().catch(() => null);
+
+    // Handle HTTP 500 (all targets failed)
+    if (response.status === 500) {
+      const failedErrors = data?.jobs?.map((j: any) => j.error).join(', ') || 'Unknown error';
+      throw new Error(`All targets failed: ${failedErrors}`);
+    }
+
+    // Handle HTTP 400 (validation error)
+    if (response.status === 400) {
+      const errorMessage = data?.message || 'Invalid request';
+      throw new Error(`Validation error: ${errorMessage}`);
+    }
+
+    // Handle HTTP 201 (success or partial failure)
+    if (!response.ok) {
+      const errorMessage = data?.message || `Failed to run scenario: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return data;
+  }
+
+  /**
+   * GET /scenarios/run
+   * List all scenario jobs with optional filtering
+   * @param filters - Optional filters (status, scenarioName, targetUUID)
+   * @returns Promise with jobs list
+   */
+  async listJobs(filters?: {
+    status?: string;
+    scenarioName?: string;
+    targetUUID?: string;
+  }): Promise<JobsListResponse> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.scenarioName) params.append('scenarioName', filters.scenarioName);
+    if (filters?.targetUUID) params.append('targetUUID', filters.targetUUID);
+
+    const queryString = params.toString();
+    const url = queryString ? `${this.baseUrl}/scenarios/run?${queryString}` : `${this.baseUrl}/scenarios/run`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to run scenario: ${response.status}`;
+      const errorMessage = errorData?.message || `Failed to list jobs: ${response.status}`;
       throw new Error(errorMessage);
     }
 
@@ -256,6 +302,33 @@ class OperatorApiClient {
     return queryString
       ? `${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}/logs?${queryString}`
       : `${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}/logs`;
+  }
+
+  /**
+   * Validate targetUUIDs array for scenario run request
+   * @param targetUUIDs - Array of target UUIDs to validate
+   * @returns Array of validation error messages (empty if valid)
+   */
+  validateTargetUUIDs(targetUUIDs: string[]): string[] {
+    const errors: string[] = [];
+
+    if (!targetUUIDs || targetUUIDs.length === 0) {
+      errors.push('At least one target UUID is required');
+      return errors;
+    }
+
+    // Check for empty strings
+    if (targetUUIDs.some(uuid => !uuid || uuid.trim() === '')) {
+      errors.push('Target UUIDs cannot be empty');
+    }
+
+    // Check for duplicates
+    const uniqueUUIDs = new Set(targetUUIDs);
+    if (uniqueUUIDs.size !== targetUUIDs.length) {
+      errors.push('Duplicate UUIDs found');
+    }
+
+    return errors;
   }
 }
 

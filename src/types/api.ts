@@ -130,42 +130,68 @@ export interface ScenarioFileMount {
 }
 
 export interface ScenarioRunRequest {
-  targetId: string;
-  clusterName: string;
+  targetUUIDs: string[]; // CHANGED: was targetId + clusterName
   scenarioImage: string;
   scenarioName: string;
-  kubeconfigPath: string;
-  environment: { [key: string]: string };
+  kubeconfigPath?: string;
+  environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
   registryUrl?: string;
   scenarioRepository?: string;
   username?: string;
   password?: string;
+  token?: string;
+  skipTls?: boolean;
+  insecure?: boolean;
 }
 
-export interface ScenarioRunResponse {
+export interface TargetJobResult {
+  targetUUID: string;
   jobId: string;
   status: string;
   podName: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface ScenarioRunResponse {
+  jobs: TargetJobResult[];
+  totalTargets: number;
+  successfulJobs: number;
+  failedJobs: number;
 }
 
 export type JobStatus = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Stopped';
 
 export interface JobStatusResponse {
   jobId: string;
-  targetId: string;
-  clusterName: string;
+  targetUUID: string; // CHANGED: was targetId + clusterName
   scenarioName: string;
   status: JobStatus;
   podName: string;
   startTime?: string;
   completionTime?: string;
-  message?: string;
+  message: string;
+}
+
+export interface JobsListResponse {
+  jobs: JobStatusResponse[];
 }
 
 // App State Types
 
-export type AppPhase = 'initializing' | 'polling' | 'selecting_cluster' | 'loading_nodes' | 'ready' | 'configuring_registry' | 'loading_scenarios' | 'selecting_scenarios' | 'loading_scenario_detail' | 'configuring_scenario' | 'running_scenario' | 'error';
+export type AppPhase =
+  | 'initializing'
+  | 'polling'
+  | 'jobs_list' // NEW: Landing page
+  | 'selecting_clusters' // RENAMED: plural
+  | 'creating_targets' // NEW: Create N target UUIDs
+  | 'configuring_registry'
+  | 'loading_scenarios'
+  | 'selecting_scenarios'
+  | 'loading_scenario_detail'
+  | 'configuring_scenario'
+  | 'error';
 
 export type ErrorType = 'network' | 'timeout' | 'api_error' | 'not_found';
 
@@ -182,11 +208,22 @@ export interface SelectedCluster {
 
 export interface AppState {
   phase: AppPhase;
+
+  // Initialization (shared)
   uuid: string | null;
   pollAttempts: number;
+
+  // Jobs list (NEW)
+  jobs: JobStatusResponse[];
+  pollingJobIds: Set<string>;
+  expandedJobIds: Set<string>;
+
+  // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
-  selectedCluster: SelectedCluster | null;
-  nodes: string[] | null;
+  selectedClusters: SelectedCluster[]; // CHANGED: Array (was single object)
+  targetUUIDs: string[]; // NEW: Target UUIDs for selected clusters
+
+  // Registry & scenario configuration
   registryType: 'public' | 'private' | null;
   registryConfig: ScenariosRequest | null;
   scenarios: ScenarioTag[] | null;
@@ -197,32 +234,56 @@ export interface AppState {
   scenarioGlobals: ScenarioGlobals | null;
   globalFormValues: ScenarioFormValues | null;
   globalTouchedFields: TouchedFields | null;
-  currentJob: JobStatusResponse | null;
+
+  // Error handling
   error: AppError | null;
 }
 
 // Action Types
 
 export type AppAction =
+  // Initialization
   | { type: 'INIT_START' }
   | { type: 'INIT_SUCCESS'; payload: { uuid: string } }
   | { type: 'INIT_ERROR'; payload: AppError }
   | { type: 'POLL_ATTEMPT'; payload: { attempt: number } }
   | { type: 'POLL_SUCCESS' }
   | { type: 'POLL_ERROR'; payload: AppError }
+
+  // Jobs list management (NEW)
+  | { type: 'JOBS_LIST_READY' }
+  | { type: 'LOAD_JOBS_SUCCESS'; payload: { jobs: JobStatusResponse[] } }
+  | { type: 'UPDATE_JOB'; payload: { job: JobStatusResponse } }
+  | { type: 'TOGGLE_JOB_ACCORDION'; payload: { jobId: string } }
+  | { type: 'JOB_CANCELLED'; payload: { jobId: string } }
+
+  // Workflow control (NEW)
+  | { type: 'START_CREATE_WORKFLOW' }
+  | { type: 'CANCEL_WORKFLOW' }
+
+  // Cluster selection
   | { type: 'CLUSTERS_SUCCESS'; payload: { clusters: ClustersResponse['targetData'] } }
   | { type: 'CLUSTERS_ERROR'; payload: AppError }
-  | { type: 'SELECT_CLUSTER'; payload: SelectedCluster }
-  | { type: 'NODES_LOADING' }
-  | { type: 'NODES_SUCCESS'; payload: { nodes: string[] } }
-  | { type: 'NODES_ERROR'; payload: AppError }
+  | { type: 'TOGGLE_CLUSTER'; payload: { cluster: SelectedCluster } } // NEW: Multi-select
+  | { type: 'CLUSTERS_SELECTED'; payload: { clusters: SelectedCluster[] } } // NEW
+
+  // Target creation (NEW)
+  | { type: 'TARGETS_CREATING' }
+  | { type: 'TARGETS_CREATED'; payload: { targetUUIDs: string[] } }
+  | { type: 'TARGETS_ERROR'; payload: AppError }
+
+  // Registry configuration
   | { type: 'CONFIGURE_REGISTRY' }
   | { type: 'REGISTRY_CONFIGURED'; payload: { registryType: 'public' | 'private'; registryConfig: ScenariosRequest } }
+
+  // Scenario selection
   | { type: 'SCENARIOS_LOADING' }
   | { type: 'SCENARIOS_SUCCESS'; payload: { scenarios: ScenarioTag[] } }
   | { type: 'SCENARIOS_ERROR'; payload: AppError }
   | { type: 'SELECT_SCENARIOS'; payload: { scenarios: string[] } }
   | { type: 'SELECT_SCENARIO_FOR_DETAIL'; payload: { scenarioName: string } }
+
+  // Scenario configuration
   | { type: 'SCENARIO_DETAIL_LOADING' }
   | { type: 'SCENARIO_DETAIL_SUCCESS'; payload: { scenarioDetail: ScenarioDetail } }
   | { type: 'SCENARIO_DETAIL_ERROR'; payload: AppError }
@@ -230,9 +291,11 @@ export type AppAction =
   | { type: 'SCENARIO_GLOBALS_SUCCESS'; payload: { scenarioGlobals: ScenarioGlobals } }
   | { type: 'SCENARIO_GLOBALS_ERROR'; payload: AppError }
   | { type: 'UPDATE_GLOBAL_FORM'; payload: { formValues: ScenarioFormValues; touchedFields: TouchedFields } }
-  | { type: 'SCENARIO_RUN_SUCCESS'; payload: { job: JobStatusResponse } }
-  | { type: 'SCENARIO_RUN_ERROR'; payload: AppError }
-  | { type: 'JOB_STATUS_UPDATE'; payload: { job: JobStatusResponse } }
-  | { type: 'JOB_CANCELLED' }
+
+  // Batch scenario execution (NEW)
+  | { type: 'SCENARIOS_RUN_BATCH_SUCCESS'; payload: { jobs: JobStatusResponse[] } }
+  | { type: 'SCENARIOS_RUN_BATCH_ERROR'; payload: AppError }
+
+  // Navigation
   | { type: 'GO_BACK' }
   | { type: 'RETRY' };
