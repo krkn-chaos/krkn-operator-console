@@ -138,9 +138,32 @@ export function useTargetPoller() {
     };
   }, [state.phase, state.uuid, dispatch]);
 
-  // Fetch clusters: GET /clusters?id={UUID}
+  // Load existing jobs: GET /scenarios/run
   useEffect(() => {
-    if (state.phase !== 'selecting_cluster' || !state.uuid || state.clusters) {
+    if (state.phase !== 'jobs_list') {
+      return;
+    }
+
+    async function loadJobs() {
+      try {
+        const response = await operatorApi.listJobs();
+        dispatch({
+          type: 'LOAD_JOBS_SUCCESS',
+          payload: { jobs: response.jobs }
+        });
+      } catch (error) {
+        console.error('Failed to load jobs:', error);
+        // Don't transition to error phase, just log it
+        // Jobs list can be empty on first load
+      }
+    }
+
+    loadJobs();
+  }, [state.phase, dispatch]);
+
+  // Fetch clusters: GET /clusters?id={UUID} (when creating new job)
+  useEffect(() => {
+    if (state.phase !== 'selecting_clusters' || !state.uuid || state.clusters) {
       return;
     }
 
@@ -166,33 +189,4 @@ export function useTargetPoller() {
 
     fetchClusters();
   }, [state.phase, state.uuid, state.clusters, dispatch]);
-
-  // Fetch nodes: GET /nodes?id={UUID}&cluster-name={clusterName}
-  useEffect(() => {
-    if (state.phase !== 'loading_nodes' || !state.uuid || !state.selectedCluster) {
-      return;
-    }
-
-    async function fetchNodes() {
-      if (!state.uuid || !state.selectedCluster) return;
-
-      try {
-        const response = await operatorApi.getNodes(state.uuid, state.selectedCluster.clusterName);
-        dispatch({
-          type: 'NODES_SUCCESS',
-          payload: { nodes: response.nodes }
-        });
-      } catch (error) {
-        dispatch({
-          type: 'NODES_ERROR',
-          payload: {
-            message: error instanceof Error ? error.message : 'Failed to fetch nodes',
-            type: 'api_error'
-          }
-        });
-      }
-    }
-
-    fetchNodes();
-  }, [state.phase, state.uuid, state.selectedCluster, dispatch]);
 }

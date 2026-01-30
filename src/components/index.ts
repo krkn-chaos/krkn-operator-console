@@ -7,3 +7,4 @@ export { ScenariosList } from './ScenariosList';
 export { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 export { ScenarioRunning } from './ScenarioRunning';
 export { LogViewer } from './LogViewer';
+export { JobsList } from './JobsList';

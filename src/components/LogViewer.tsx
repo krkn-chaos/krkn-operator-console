@@ -7,9 +7,10 @@ interface LogViewerProps {
   jobId: string;
   podName: string;
   status: string;
+  compact?: boolean;
 }
 
-export function LogViewer({ jobId, podName, status }: LogViewerProps) {
+export function LogViewer({ jobId, podName, status, compact = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -231,10 +232,10 @@ export function LogViewer({ jobId, podName, status }: LogViewerProps) {
               backgroundColor: '#000000',
               color: '#ffffff',
               fontFamily: 'monospace',
-              fontSize: '12px',
-              padding: '16px',
+              fontSize: compact ? '11px' : '12px',
+              padding: compact ? '12px' : '16px',
               borderRadius: '4px',
-              maxHeight: '500px',
+              maxHeight: compact ? '300px' : '500px',
               overflowY: 'auto',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
