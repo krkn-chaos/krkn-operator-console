@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { operatorApi } from '../services/operatorApi';
 import { useAppContext } from '../context/AppContext';
-import type { JobStatusResponse } from '../types/api';
 
 /**
  * Hook to poll status for all non-terminal jobs

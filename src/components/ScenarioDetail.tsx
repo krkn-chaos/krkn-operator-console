@@ -14,7 +14,7 @@ import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, JobStatus, JobStatusResponse, FileField } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, JobStatus, FileField } from '../types/api';
 
 interface ScenarioDetailProps {
   scenarioName: string;
@@ -132,7 +132,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleRunScenario = async () => {
-    if (!state.uuid || !state.selectedCluster || !scenarioFormValues || !scenarioDetail) {
+    if (!state.targetUUIDs || state.targetUUIDs.length === 0 || !scenarioFormValues || !scenarioDetail) {
       return;
     }
 
@@ -226,10 +226,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         scenarioImage = `quay.io/krkn-chaos/krkn-hub:${scenarioName}`;
       }
 
-      // Build the run request
+      // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
-        targetId: state.uuid,
-        clusterName: state.selectedCluster.clusterName,
+        targetUUIDs: state.targetUUIDs,
         scenarioImage,
         scenarioName,
         kubeconfigPath: '/home/krkn/.kube/config',
@@ -239,29 +238,52 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         scenarioRepository: registryConfig?.scenarioRepository,
         username: registryConfig?.username,
         password: registryConfig?.password,
+        token: registryConfig?.token,
+        skipTls: registryConfig?.skipTls,
+        insecure: registryConfig?.insecure,
       };
 
-      // Call the API to run the scenario
+      // Call the API to run the scenario (batch execution)
       const runResponse = await operatorApi.runScenario(runRequest);
 
-      // Create initial job status
-      const initialJob: JobStatusResponse = {
-        jobId: runResponse.jobId,
-        targetId: state.uuid,
-        clusterName: state.selectedCluster.clusterName,
-        scenarioName,
-        status: runResponse.status as JobStatus,
-        podName: runResponse.podName,
-      };
+      // Extract successful jobs
+      const successfulJobs = runResponse.jobs
+        .filter((job) => job.success)
+        .map((job) => ({
+          jobId: job.jobId,
+          targetUUID: job.targetUUID,
+          scenarioName,
+          status: job.status as JobStatus,
+          podName: job.podName,
+          message: '',
+        }));
 
-      // Dispatch success action
+      // Handle partial failures - show warning
+      if (runResponse.failedJobs > 0) {
+        const failedErrors = runResponse.jobs
+          .filter((job) => !job.success)
+          .map((job) => `${job.targetUUID}: ${job.error}`)
+          .join('\n');
+
+        console.warn(
+          `Partial failure: ${runResponse.failedJobs}/${runResponse.totalTargets} failed\n${failedErrors}`
+        );
+
+        // Set validation errors to show the failures
+        setValidationErrors([
+          `${runResponse.failedJobs} of ${runResponse.totalTargets} jobs failed:`,
+          ...failedErrors.split('\n'),
+        ]);
+      }
+
+      // Dispatch batch success action
       dispatch({
-        type: 'SCENARIO_RUN_SUCCESS',
-        payload: { job: initialJob },
+        type: 'SCENARIOS_RUN_BATCH_SUCCESS',
+        payload: { jobs: successfulJobs },
       });
     } catch (error) {
       dispatch({
-        type: 'SCENARIO_RUN_ERROR',
+        type: 'SCENARIOS_RUN_BATCH_ERROR',
         payload: {
           message: error instanceof Error ? error.message : 'Failed to run scenario',
           type: 'api_error',

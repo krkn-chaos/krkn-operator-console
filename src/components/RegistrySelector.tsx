@@ -94,8 +94,8 @@ export function RegistrySelector() {
     }
   };
 
-  const handleBack = () => {
-    dispatch({ type: 'GO_BACK' });
+  const handleCancel = () => {
+    dispatch({ type: 'CANCEL_WORKFLOW' });
   };
 
   return (
@@ -103,8 +103,8 @@ export function RegistrySelector() {
       <CardTitle>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Configure Chaos Scenarios Registry</span>
-          <Button variant="link" onClick={handleBack}>
-            ← Back to Nodes
+          <Button variant="link" onClick={handleCancel}>
+            Cancel
           </Button>
         </div>
       </CardTitle>

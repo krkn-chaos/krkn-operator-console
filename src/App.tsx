@@ -1,10 +1,10 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand } from '@patternfly/react-core';
 import { useAppContext } from './context/AppContext';
 import { useTargetPoller, useJobsPoller } from './hooks';
-import { LoadingScreen, ErrorDisplay, ClusterSelector, RegistrySelector, ScenariosList, ScenarioRunning, JobsList } from './components';
-import { NodesDisplay } from './components/NodesDisplay';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { operatorApi } from './services/operatorApi';
+import type { SelectedCluster } from './types/api';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -17,9 +17,47 @@ function App() {
     dispatch({ type: 'RETRY' });
   };
 
-  const handleClusterSelect = (cluster: any) => {
-    dispatch({ type: 'SELECT_CLUSTER', payload: cluster });
-    dispatch({ type: 'NODES_LOADING' });
+  // Multi-cluster workflow handlers
+  const handleClusterToggle = (cluster: SelectedCluster) => {
+    dispatch({ type: 'TOGGLE_CLUSTER', payload: { cluster } });
+  };
+
+  const handleClustersProceed = () => {
+    dispatch({ type: 'TARGETS_CREATING' });
+    createTargetsForClusters();
+  };
+
+  const handleWorkflowCancel = () => {
+    dispatch({ type: 'CANCEL_WORKFLOW' });
+  };
+
+  // Target creation for selected clusters
+  const createTargetsForClusters = async () => {
+    const { selectedClusters } = state;
+
+    try {
+      // Create target for each selected cluster
+      const targetPromises = selectedClusters.map(() =>
+        operatorApi.createTargetRequest()
+      );
+
+      const responses = await Promise.all(targetPromises);
+      const targetUUIDs = responses.map((r) => r.uuid);
+
+      // Store UUIDs and transition to registry config
+      dispatch({
+        type: 'TARGETS_CREATED',
+        payload: { targetUUIDs },
+      });
+    } catch (error) {
+      dispatch({
+        type: 'TARGETS_ERROR',
+        payload: {
+          type: 'api_error',
+          message: error instanceof Error ? error.message : 'Failed to create targets',
+        },
+      });
+    }
   };
 
   // Jobs management handlers
@@ -62,24 +100,21 @@ function App() {
           </PageSection>
         );
 
-      case 'selecting_cluster':
+      case 'selecting_clusters':
         return (
           <PageSection>
-            <ClusterSelector clusters={state.clusters} onSelect={handleClusterSelect} />
+            <ClusterMultiSelector
+              clusters={state.clusters}
+              selectedClusters={state.selectedClusters}
+              onToggle={handleClusterToggle}
+              onProceed={handleClustersProceed}
+              onCancel={handleWorkflowCancel}
+            />
           </PageSection>
         );
 
-      case 'loading_nodes':
-        return <LoadingScreen phase="loading_nodes" />;
-
-      case 'ready':
-        return (
-          <PageSection>
-            {state.selectedCluster && (
-              <NodesDisplay selectedCluster={state.selectedCluster} nodes={state.nodes} />
-            )}
-          </PageSection>
-        );
+      case 'creating_targets':
+        return <LoadingScreen phase="creating_targets" />;
 
       case 'configuring_registry':
         return (
@@ -108,13 +143,6 @@ function App() {
                 registryConfig={state.registryConfig}
               />
             )}
-          </PageSection>
-        );
-
-      case 'running_scenario':
-        return (
-          <PageSection>
-            <ScenarioRunning />
           </PageSection>
         );
 
