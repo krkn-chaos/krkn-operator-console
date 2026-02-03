@@ -33,14 +33,31 @@ function App() {
   };
 
   // Jobs management handlers
-  const handleCancelJob = async (jobId: string) => {
+  const handleDeleteScenarioRun = async (scenarioRunName: string) => {
     try {
-      await operatorApi.cancelJob(jobId);
-      // The poller will update the job status automatically
+      await operatorApi.deleteScenarioRun(scenarioRunName);
+      // Remove the scenario run from state immediately
+      const updatedRuns = state.scenarioRuns.filter(
+        (run) => run.scenarioRunName !== scenarioRunName
+      );
+      dispatch({
+        type: 'LOAD_SCENARIO_RUNS_SUCCESS',
+        payload: { runs: updatedRuns }
+      });
     } catch (error) {
-      console.error('Failed to cancel job:', error);
+      console.error('Failed to delete scenario run:', error);
       // Don't dispatch error to avoid interrupting the UI
-      // User can retry the cancel operation
+    }
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      await operatorApi.deleteJob(jobId);
+      // The poller will update the scenario run status automatically
+      // which will reflect the job deletion
+    } catch (error) {
+      console.error('Failed to delete job:', error);
+      // Don't dispatch error to avoid interrupting the UI
     }
   };
 
@@ -86,7 +103,8 @@ function App() {
               onToggleJobAccordion={(jobId) =>
                 dispatch({ type: 'TOGGLE_CLUSTER_JOB_ACCORDION', payload: { jobId } })
               }
-              onCancelJob={handleCancelJob}
+              onDeleteScenarioRun={handleDeleteScenarioRun}
+              onDeleteJob={handleDeleteJob}
               onCreateJob={handleCreateJob}
             />
           </PageSection>

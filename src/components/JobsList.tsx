@@ -18,6 +18,8 @@ import {
   Flex,
   FlexItem,
   Label,
+  Modal,
+  ModalVariant,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -26,6 +28,7 @@ import {
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
   CubesIcon,
+  TrashIcon,
 } from '@patternfly/react-icons';
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase } from '../types/api';
 import { LogViewer } from './LogViewer';
@@ -36,7 +39,8 @@ interface JobsListProps {
   expandedJobIds: Set<string>;
   onToggleRunAccordion: (scenarioRunName: string) => void;
   onToggleJobAccordion: (jobId: string) => void;
-  onCancelJob: (jobId: string) => Promise<void>;
+  onDeleteScenarioRun: (scenarioRunName: string) => Promise<void>;
+  onDeleteJob: (jobId: string) => Promise<void>;
   onCreateJob: () => void;
 }
 
@@ -46,10 +50,14 @@ export function JobsList({
   expandedJobIds,
   onToggleRunAccordion,
   onToggleJobAccordion,
-  onCancelJob,
+  onDeleteScenarioRun,
+  onDeleteJob,
   onCreateJob,
 }: JobsListProps) {
-  const [cancellingJob, setCancellingJob] = useState<string | null>(null);
+  const [deletingRun, setDeletingRun] = useState<string | null>(null);
+  const [deletingJob, setDeletingJob] = useState<string | null>(null);
+  const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
+  const [confirmDeleteJob, setConfirmDeleteJob] = useState<{ jobId: string; jobName: string } | null>(null);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -96,12 +104,29 @@ export function JobsList({
     }
   };
 
-  const handleCancelJob = async (jobId: string) => {
-    setCancellingJob(jobId);
+  const handleConfirmDeleteRun = async () => {
+    if (!confirmDeleteRun) return;
+
+    setDeletingRun(confirmDeleteRun);
+    setConfirmDeleteRun(null);
+
     try {
-      await onCancelJob(jobId);
+      await onDeleteScenarioRun(confirmDeleteRun);
     } finally {
-      setCancellingJob(null);
+      setDeletingRun(null);
+    }
+  };
+
+  const handleConfirmDeleteJob = async () => {
+    if (!confirmDeleteJob) return;
+
+    setDeletingJob(confirmDeleteJob.jobId);
+    setConfirmDeleteJob(null);
+
+    try {
+      await onDeleteJob(confirmDeleteJob.jobId);
+    } finally {
+      setDeletingJob(null);
     }
   };
 
@@ -227,6 +252,18 @@ export function JobsList({
                             </div>
                           </div>
                         </DataListCell>,
+                        <DataListCell key="actions" width={1}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                            <Button
+                              variant="plain"
+                              aria-label="Delete scenario run"
+                              onClick={() => setConfirmDeleteRun(run.scenarioRunName)}
+                              isDisabled={deletingRun === run.scenarioRunName}
+                              icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
+                              style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                            />
+                          </div>
+                        </DataListCell>,
                       ]}
                     />
                   </DataListItemRow>
@@ -243,7 +280,7 @@ export function JobsList({
                           {run.clusterJobs.map((job) => {
                             const isJobExpanded = expandedJobIds.has(job.jobId);
                             const jobPhaseDisplay = getJobPhaseDisplay(job.phase);
-                            const isCancelling = cancellingJob === job.jobId;
+                            const isDeleting = deletingJob === job.jobId;
 
                             return (
                               <DataListItem key={job.jobId} isExpanded={isJobExpanded}>
@@ -312,6 +349,20 @@ export function JobsList({
                                           )}
                                         </div>
                                       </DataListCell>,
+                                      <DataListCell key="actions" width={1}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                          {job.phase === 'Running' && (
+                                            <Button
+                                              variant="plain"
+                                              aria-label="Delete job"
+                                              onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.clusterName}` })}
+                                              isDisabled={deletingJob === job.jobId}
+                                              icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
+                                              style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                                            />
+                                          )}
+                                        </div>
+                                      </DataListCell>,
                                     ]}
                                   />
                                 </DataListItemRow>
@@ -377,16 +428,16 @@ export function JobsList({
                                       </FlexItem>
                                     )}
 
-                                    {/* Cancel button for non-terminal jobs */}
+                                    {/* Delete button for non-terminal jobs */}
                                     {!['Succeeded', 'Failed'].includes(job.phase) && (
                                       <FlexItem>
                                         <Button
                                           variant="danger"
-                                          onClick={() => handleCancelJob(job.jobId)}
-                                          isDisabled={isCancelling}
-                                          isLoading={isCancelling}
+                                          onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.clusterName}` })}
+                                          isDisabled={isDeleting}
+                                          isLoading={isDeleting}
                                         >
-                                          {isCancelling ? 'Cancelling...' : 'Cancel Job'}
+                                          {isDeleting ? 'Deleting...' : 'Delete Job'}
                                         </Button>
                                       </FlexItem>
                                     )}
@@ -409,6 +460,54 @@ export function JobsList({
           </DataList>
         )}
       </CardBody>
+
+      {/* Confirmation Modal for Scenario Run Deletion */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Delete Scenario Run"
+        isOpen={confirmDeleteRun !== null}
+        onClose={() => setConfirmDeleteRun(null)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="danger"
+            onClick={handleConfirmDeleteRun}
+            isLoading={deletingRun !== null}
+            isDisabled={deletingRun !== null}
+          >
+            {deletingRun !== null ? 'Deleting...' : 'Delete'}
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setConfirmDeleteRun(null)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        Are you sure you want to delete <strong>{confirmDeleteRun}</strong> scenario run?
+      </Modal>
+
+      {/* Confirmation Modal for Job Deletion */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Delete Job"
+        isOpen={confirmDeleteJob !== null}
+        onClose={() => setConfirmDeleteJob(null)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="danger"
+            onClick={handleConfirmDeleteJob}
+            isLoading={deletingJob !== null}
+            isDisabled={deletingJob !== null}
+          >
+            {deletingJob !== null ? 'Deleting...' : 'Delete'}
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setConfirmDeleteJob(null)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        Are you sure you want to delete job <strong>{confirmDeleteJob?.jobName}</strong>?
+      </Modal>
     </Card>
   );
 }

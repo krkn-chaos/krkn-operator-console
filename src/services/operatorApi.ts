@@ -225,6 +225,48 @@ class OperatorApiClient {
   }
 
   /**
+   * DELETE /api/v1/scenarios/run/{scenarioRunName}
+   * Delete an entire scenario run and all its jobs
+   * @param scenarioRunName - Scenario run name to delete
+   * @returns Promise that resolves when deletion is complete
+   */
+  async deleteScenarioRun(scenarioRunName: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/scenarios/run/${encodeURIComponent(scenarioRunName)}`,
+      { method: 'DELETE' }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to delete scenario run: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    // Deletion successful - no response body expected
+  }
+
+  /**
+   * DELETE /api/v1/scenarios/run/jobs/{jobId}
+   * Delete a specific job within a scenario run
+   * @param jobId - Job ID to delete
+   * @returns Promise that resolves when deletion is complete
+   */
+  async deleteJob(jobId: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/scenarios/run/jobs/${encodeURIComponent(jobId)}`,
+      { method: 'DELETE' }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to delete job: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    // Deletion successful - no response body expected
+  }
+
+  /**
    * Build WebSocket URL for job logs using jobId (NEW API - CORRECT PATH)
    * @param scenarioRunName - Scenario run name
    * @param jobId - Job ID to get logs from
