@@ -1,6 +1,7 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand } from '@patternfly/react-core';
 import { useAppContext } from './context/AppContext';
-import { useTargetPoller, useJobsPoller } from './hooks';
+import { useTargetPoller } from './hooks';
+import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { operatorApi } from './services/operatorApi';
@@ -11,7 +12,7 @@ function App() {
 
   // Initialize and manage the workflow
   useTargetPoller();
-  useJobsPoller();
+  useScenarioRunsPoller(); // NEW: Poll scenarioRuns instead of individual jobs
 
   const handleRetry = () => {
     dispatch({ type: 'RETRY' });
@@ -23,60 +24,45 @@ function App() {
   };
 
   const handleClustersProceed = () => {
-    dispatch({ type: 'TARGETS_CREATING' });
-    createTargetsForClusters();
+    // No need to create multiple targets - we reuse the original targetRequestId
+    dispatch({ type: 'CLUSTERS_SELECTED' });
   };
 
   const handleWorkflowCancel = () => {
     dispatch({ type: 'CANCEL_WORKFLOW' });
   };
 
-  // Target creation for selected clusters
-  const createTargetsForClusters = async () => {
-    const { selectedClusters } = state;
-
-    try {
-      // Create target for each selected cluster
-      const targetPromises = selectedClusters.map(() =>
-        operatorApi.createTargetRequest()
-      );
-
-      const responses = await Promise.all(targetPromises);
-      const targetUUIDs = responses.map((r) => r.uuid);
-
-      // Store UUIDs and transition to registry config
-      dispatch({
-        type: 'TARGETS_CREATED',
-        payload: { targetUUIDs },
-      });
-    } catch (error) {
-      dispatch({
-        type: 'TARGETS_ERROR',
-        payload: {
-          type: 'api_error',
-          message: error instanceof Error ? error.message : 'Failed to create targets',
-        },
-      });
-    }
-  };
-
   // Jobs management handlers
   const handleCancelJob = async (jobId: string) => {
     try {
       await operatorApi.cancelJob(jobId);
-      const updated = await operatorApi.getJobStatus(jobId);
-      dispatch({ type: 'UPDATE_JOB', payload: { job: updated } });
+      // The poller will update the job status automatically
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to cancel job');
+      console.error('Failed to cancel job:', error);
+      // Don't dispatch error to avoid interrupting the UI
+      // User can retry the cancel operation
     }
   };
 
-  const handleToggleJobAccordion = (jobId: string) => {
-    dispatch({ type: 'TOGGLE_JOB_ACCORDION', payload: { jobId } });
-  };
+  const handleCreateJob = async () => {
+    // Create initial target for fetching clusters
+    dispatch({ type: 'INIT_START' });
 
-  const handleCreateJob = () => {
-    dispatch({ type: 'START_CREATE_WORKFLOW' });
+    try {
+      const response = await operatorApi.createTargetRequest();
+      dispatch({
+        type: 'INIT_SUCCESS',
+        payload: { uuid: response.uuid },
+      });
+    } catch (error) {
+      dispatch({
+        type: 'INIT_ERROR',
+        payload: {
+          type: 'network',
+          message: error instanceof Error ? error.message : 'Failed to create target',
+        },
+      });
+    }
   };
 
   const renderContent = () => {
@@ -87,18 +73,25 @@ function App() {
       case 'polling':
         return <LoadingScreen phase="polling" pollAttempts={state.pollAttempts} />;
 
-      case 'jobs_list':
+      case 'jobs_list': {
         return (
           <PageSection>
             <JobsList
-              jobs={state.jobs}
-              expandedJobIds={state.expandedJobIds}
-              onToggleAccordion={handleToggleJobAccordion}
+              scenarioRuns={state.scenarioRuns}
+              expandedRunIds={state.expandedRunIds}
+              expandedJobIds={state.expandedClusterJobs}
+              onToggleRunAccordion={(scenarioRunName) =>
+                dispatch({ type: 'TOGGLE_RUN_ACCORDION', payload: { scenarioRunName } })
+              }
+              onToggleJobAccordion={(jobId) =>
+                dispatch({ type: 'TOGGLE_CLUSTER_JOB_ACCORDION', payload: { jobId } })
+              }
               onCancelJob={handleCancelJob}
               onCreateJob={handleCreateJob}
             />
           </PageSection>
         );
+      }
 
       case 'selecting_clusters':
         return (
@@ -112,9 +105,6 @@ function App() {
             />
           </PageSection>
         );
-
-      case 'creating_targets':
-        return <LoadingScreen phase="creating_targets" />;
 
       case 'configuring_registry':
         return (

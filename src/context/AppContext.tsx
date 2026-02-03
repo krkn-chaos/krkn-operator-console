@@ -3,21 +3,21 @@ import type { AppState, AppAction } from '../types/api';
 
 // Initial state
 const initialState: AppState = {
-  phase: 'initializing',
+  phase: 'jobs_list', // Start directly on jobs list (no initial target creation)
 
   // Initialization
   uuid: null,
   pollAttempts: 0,
 
-  // Jobs list
-  jobs: [],
-  pollingJobIds: new Set<string>(),
-  expandedJobIds: new Set<string>(),
+  // Scenario runs list (NEW: ScenarioRun-centric)
+  scenarioRuns: [],
+  pollingRunNames: new Set<string>(),
+  expandedRunIds: new Set<string>(),
+  expandedClusterJobs: new Set<string>(),
 
   // Workflow state
   clusters: null,
   selectedClusters: [],
-  targetUUIDs: [],
 
   // Registry & scenario configuration
   registryType: null,
@@ -42,6 +42,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'initializing',
+        uuid: null,
+        clusters: null,
+        pollAttempts: 0,
         error: null,
       };
 
@@ -70,7 +73,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'POLL_SUCCESS':
       return {
         ...state,
-        phase: 'jobs_list', // CHANGED: was 'selecting_cluster'
+        phase: 'selecting_clusters', // Target ready → select clusters for job creation
+        clusters: null, // Reset to force fresh fetch with new UUID
         error: null,
       };
 
@@ -95,7 +99,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         error: action.payload,
       };
 
-    // Jobs list management
+    // Scenario runs list management (NEW: ScenarioRun-centric)
     case 'JOBS_LIST_READY':
       return {
         ...state,
@@ -103,46 +107,58 @@ function appReducer(state: AppState, action: AppAction): AppState {
         error: null,
       };
 
-    case 'LOAD_JOBS_SUCCESS':
+    case 'SCENARIO_RUN_CREATED':
+      // Just for tracking - actual run added via ADD_SCENARIO_RUN
+      return state;
+
+    case 'ADD_SCENARIO_RUN':
       return {
         ...state,
-        jobs: action.payload.jobs,
+        scenarioRuns: [...state.scenarioRuns, action.payload.run],
+      };
+
+    case 'UPDATE_SCENARIO_RUN': {
+      const updatedRuns = state.scenarioRuns.map(run =>
+        run.scenarioRunName === action.payload.run.scenarioRunName
+          ? action.payload.run
+          : run
+      );
+      return {
+        ...state,
+        scenarioRuns: updatedRuns,
+      };
+    }
+
+    case 'LOAD_SCENARIO_RUNS_SUCCESS':
+      return {
+        ...state,
+        scenarioRuns: action.payload.runs,
         error: null,
       };
 
-    case 'UPDATE_JOB': {
-      const updatedJobs = state.jobs.map(job =>
-        job.jobId === action.payload.job.jobId ? action.payload.job : job
-      );
-      return {
-        ...state,
-        jobs: updatedJobs,
-      };
-    }
-
-    case 'TOGGLE_JOB_ACCORDION': {
-      const newExpanded = new Set(state.expandedJobIds);
-      if (newExpanded.has(action.payload.jobId)) {
-        newExpanded.delete(action.payload.jobId);
+    case 'TOGGLE_RUN_ACCORDION': {
+      const newExpandedRuns = new Set(state.expandedRunIds);
+      if (newExpandedRuns.has(action.payload.scenarioRunName)) {
+        newExpandedRuns.delete(action.payload.scenarioRunName);
       } else {
-        newExpanded.add(action.payload.jobId);
+        newExpandedRuns.add(action.payload.scenarioRunName);
       }
       return {
         ...state,
-        expandedJobIds: newExpanded,
+        expandedRunIds: newExpandedRuns,
       };
     }
 
-    case 'JOB_CANCELLED': {
-      // Update job status to Stopped
-      const updatedJobs = state.jobs.map(job =>
-        job.jobId === action.payload.jobId
-          ? { ...job, status: 'Stopped' as const }
-          : job
-      );
+    case 'TOGGLE_CLUSTER_JOB_ACCORDION': {
+      const newExpandedJobs = new Set(state.expandedClusterJobs);
+      if (newExpandedJobs.has(action.payload.jobId)) {
+        newExpandedJobs.delete(action.payload.jobId);
+      } else {
+        newExpandedJobs.add(action.payload.jobId);
+      }
       return {
         ...state,
-        jobs: updatedJobs,
+        expandedClusterJobs: newExpandedJobs,
       };
     }
 
@@ -159,8 +175,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         phase: 'jobs_list',
         // Clear workflow state
+        uuid: null,
+        clusters: null,
         selectedClusters: [],
-        targetUUIDs: [],
         registryType: null,
         registryConfig: null,
         scenarios: null,
@@ -194,32 +211,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'CLUSTERS_SELECTED':
-      return {
-        ...state,
-        selectedClusters: action.payload.clusters,
-      };
-
-    // Target creation
-    case 'TARGETS_CREATING':
-      return {
-        ...state,
-        phase: 'creating_targets',
-        error: null,
-      };
-
-    case 'TARGETS_CREATED':
+      // Proceed directly to registry configuration (no need to create targets)
       return {
         ...state,
         phase: 'configuring_registry',
-        targetUUIDs: action.payload.targetUUIDs,
         error: null,
-      };
-
-    case 'TARGETS_ERROR':
-      return {
-        ...state,
-        phase: 'error',
-        error: action.payload,
       };
 
     case 'CONFIGURE_REGISTRY':
@@ -321,14 +317,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     // Batch scenario execution
     case 'SCENARIOS_RUN_BATCH_SUCCESS':
+      // ScenarioRun already added via ADD_SCENARIO_RUN - just reset workflow state
       return {
         ...state,
         phase: 'jobs_list',
-        jobs: [...state.jobs, ...action.payload.jobs],
         // Clear workflow state
+        uuid: null,
+        clusters: null,
         selectedClusters: [],
-        targetUUIDs: [],
+        registryType: null,
+        registryConfig: null,
+        scenarios: null,
+        selectedScenarios: null,
+        selectedScenario: null,
+        scenarioDetail: null,
         scenarioFormValues: null,
+        scenarioGlobals: null,
         globalFormValues: null,
         globalTouchedFields: null,
         error: null,
@@ -357,7 +361,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
           return {
             ...state,
             phase: 'selecting_clusters',
-            targetUUIDs: [],
             registryType: null,
             registryConfig: null,
           };

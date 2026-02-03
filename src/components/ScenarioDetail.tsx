@@ -14,7 +14,7 @@ import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, JobStatus, FileField } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, FileField } from '../types/api';
 
 interface ScenarioDetailProps {
   scenarioName: string;
@@ -132,7 +132,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleRunScenario = async () => {
-    if (!state.targetUUIDs || state.targetUUIDs.length === 0 || !scenarioFormValues || !scenarioDetail) {
+    if (!state.uuid || !state.selectedClusters || state.selectedClusters.length === 0 || !scenarioFormValues || !scenarioDetail) {
       return;
     }
 
@@ -228,7 +228,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
       // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
-        targetUUIDs: state.targetUUIDs,
+        targetRequestId: state.uuid, // Reuse the original target request ID
+        clusterNames: state.selectedClusters.map(c => c.clusterName), // Extract cluster names
         scenarioImage,
         scenarioName,
         kubeconfigPath: '/home/krkn/.kube/config',
@@ -243,43 +244,63 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         insecure: registryConfig?.insecure,
       };
 
-      // Call the API to run the scenario (batch execution)
-      const runResponse = await operatorApi.runScenario(runRequest);
+      // NEW API Flow: POST returns scenarioRunName, then GET for full status
+      const createResponse = await operatorApi.runScenario(runRequest);
 
-      // Extract successful jobs
-      const successfulJobs = runResponse.jobs
-        .filter((job) => job.success)
-        .map((job) => ({
-          jobId: job.jobId,
-          targetUUID: job.targetUUID,
+      // Immediately fetch full status
+      const statusResponse = await operatorApi.getScenarioRunStatus(createResponse.scenarioRunName);
+
+      // Build ScenarioRunState
+      const newRun: ScenarioRunState = {
+        scenarioRunName: createResponse.scenarioRunName,
+        scenarioName,
+        phase: statusResponse.phase,
+        totalTargets: statusResponse.totalTargets,
+        successfulJobs: statusResponse.successfulJobs,
+        failedJobs: statusResponse.failedJobs,
+        runningJobs: statusResponse.runningJobs,
+        clusterJobs: statusResponse.clusterJobs,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Dispatch creation event
+      dispatch({
+        type: 'SCENARIO_RUN_CREATED',
+        payload: {
+          scenarioRunName: createResponse.scenarioRunName,
+          clusterNames: createResponse.clusterNames,
+          totalTargets: createResponse.totalTargets,
           scenarioName,
-          status: job.status as JobStatus,
-          podName: job.podName,
-          message: '',
-        }));
+        },
+      });
 
-      // Handle partial failures - show warning
-      if (runResponse.failedJobs > 0) {
-        const failedErrors = runResponse.jobs
-          .filter((job) => !job.success)
-          .map((job) => `${job.targetUUID}: ${job.error}`)
+      // Add scenario run to state
+      dispatch({
+        type: 'ADD_SCENARIO_RUN',
+        payload: { run: newRun },
+      });
+
+      // Handle partial failures
+      if (statusResponse.failedJobs > 0) {
+        const failedJobs = statusResponse.clusterJobs.filter((j) => j.phase === 'Failed');
+        const failedErrors = failedJobs
+          .map((j) => `${j.clusterName}: ${j.message || 'Unknown error'}`)
           .join('\n');
 
         console.warn(
-          `Partial failure: ${runResponse.failedJobs}/${runResponse.totalTargets} failed\n${failedErrors}`
+          `Partial failure: ${statusResponse.failedJobs}/${statusResponse.totalTargets} jobs failed\n${failedErrors}`
         );
 
         // Set validation errors to show the failures
         setValidationErrors([
-          `${runResponse.failedJobs} of ${runResponse.totalTargets} jobs failed:`,
-          ...failedErrors.split('\n'),
+          `${statusResponse.failedJobs} of ${statusResponse.totalTargets} jobs failed:`,
+          failedErrors,
         ]);
       }
 
-      // Dispatch batch success action
+      // Transition to jobs_list (scenarioRun already added via ADD_SCENARIO_RUN)
       dispatch({
         type: 'SCENARIOS_RUN_BATCH_SUCCESS',
-        payload: { jobs: successfulJobs },
       });
     } catch (error) {
       dispatch({

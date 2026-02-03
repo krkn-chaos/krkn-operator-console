@@ -130,7 +130,8 @@ export interface ScenarioFileMount {
 }
 
 export interface ScenarioRunRequest {
-  targetUUIDs: string[]; // CHANGED: was targetId + clusterName
+  targetRequestId: string; // Target request UUID
+  clusterNames: string[]; // Array of cluster names to execute scenario on
   scenarioImage: string;
   scenarioName: string;
   kubeconfigPath?: string;
@@ -146,7 +147,7 @@ export interface ScenarioRunRequest {
 }
 
 export interface TargetJobResult {
-  targetUUID: string;
+  clusterName: string;
   jobId: string;
   status: string;
   podName: string;
@@ -161,11 +162,13 @@ export interface ScenarioRunResponse {
   failedJobs: number;
 }
 
+/** @deprecated Use ClusterJobPhase instead */
 export type JobStatus = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Stopped';
 
+/** @deprecated Use ScenarioRunStatusResponse and ClusterJob instead */
 export interface JobStatusResponse {
   jobId: string;
-  targetUUID: string; // CHANGED: was targetId + clusterName
+  clusterName: string;
   scenarioName: string;
   status: JobStatus;
   podName: string;
@@ -174,8 +177,57 @@ export interface JobStatusResponse {
   message: string;
 }
 
+/** @deprecated Use listScenarioRuns() response (ScenarioRunStatusResponse[]) instead */
 export interface JobsListResponse {
   jobs: JobStatusResponse[];
+}
+
+// NEW API Types for ScenarioRun (CRD-based)
+
+export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed';
+export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed';
+
+export interface ClusterJob {
+  clusterName: string;
+  jobId: string; // UUID - still exists but secondary
+  podName: string;
+  phase: ClusterJobPhase;
+  startTime?: string;
+  completionTime?: string;
+  message?: string; // Only on errors
+}
+
+// Response from POST /api/v1/scenarios/run
+export interface CreateScenarioRunResponse {
+  scenarioRunName: string;
+  clusterNames: string[];
+  totalTargets: number;
+}
+
+// Response from GET /api/v1/scenarios/run/{scenarioRunName}
+export interface ScenarioRunStatusResponse {
+  scenarioRunName: string;
+  scenarioName?: string; // Optional - backend may include it in the future
+  phase: ScenarioRunPhase;
+  totalTargets: number;
+  successfulJobs: number;
+  failedJobs: number;
+  runningJobs: number;
+  clusterJobs: ClusterJob[];
+  createdAt?: string; // Optional - backend may include it in the future
+}
+
+// Internal state for tracking scenario runs
+export interface ScenarioRunState {
+  scenarioRunName: string;
+  scenarioName: string; // For display purposes
+  phase: ScenarioRunPhase;
+  totalTargets: number;
+  successfulJobs: number;
+  failedJobs: number;
+  runningJobs: number;
+  clusterJobs: ClusterJob[];
+  createdAt: string;
 }
 
 // App State Types
@@ -183,9 +235,8 @@ export interface JobsListResponse {
 export type AppPhase =
   | 'initializing'
   | 'polling'
-  | 'jobs_list' // NEW: Landing page
-  | 'selecting_clusters' // RENAMED: plural
-  | 'creating_targets' // NEW: Create N target UUIDs
+  | 'jobs_list' // Landing page
+  | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
   | 'selecting_scenarios'
@@ -210,18 +261,18 @@ export interface AppState {
   phase: AppPhase;
 
   // Initialization (shared)
-  uuid: string | null;
+  uuid: string | null; // Used as targetRequestId throughout workflow
   pollAttempts: number;
 
-  // Jobs list (NEW)
-  jobs: JobStatusResponse[];
-  pollingJobIds: Set<string>;
-  expandedJobIds: Set<string>;
+  // Scenario runs list (NEW: ScenarioRun-centric)
+  scenarioRuns: ScenarioRunState[];
+  pollingRunNames: Set<string>;
+  expandedRunIds: Set<string>;
+  expandedClusterJobs: Set<string>; // jobId
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
-  selectedClusters: SelectedCluster[]; // CHANGED: Array (was single object)
-  targetUUIDs: string[]; // NEW: Target UUIDs for selected clusters
+  selectedClusters: SelectedCluster[]; // Array of selected clusters
 
   // Registry & scenario configuration
   registryType: 'public' | 'private' | null;
@@ -250,12 +301,14 @@ export type AppAction =
   | { type: 'POLL_SUCCESS' }
   | { type: 'POLL_ERROR'; payload: AppError }
 
-  // Jobs list management (NEW)
+  // Scenario runs list management (NEW: ScenarioRun-centric)
   | { type: 'JOBS_LIST_READY' }
-  | { type: 'LOAD_JOBS_SUCCESS'; payload: { jobs: JobStatusResponse[] } }
-  | { type: 'UPDATE_JOB'; payload: { job: JobStatusResponse } }
-  | { type: 'TOGGLE_JOB_ACCORDION'; payload: { jobId: string } }
-  | { type: 'JOB_CANCELLED'; payload: { jobId: string } }
+  | { type: 'SCENARIO_RUN_CREATED'; payload: { scenarioRunName: string; clusterNames: string[]; totalTargets: number; scenarioName: string } }
+  | { type: 'ADD_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
+  | { type: 'UPDATE_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
+  | { type: 'LOAD_SCENARIO_RUNS_SUCCESS'; payload: { runs: ScenarioRunState[] } }
+  | { type: 'TOGGLE_RUN_ACCORDION'; payload: { scenarioRunName: string } }
+  | { type: 'TOGGLE_CLUSTER_JOB_ACCORDION'; payload: { jobId: string } }
 
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }
@@ -264,13 +317,8 @@ export type AppAction =
   // Cluster selection
   | { type: 'CLUSTERS_SUCCESS'; payload: { clusters: ClustersResponse['targetData'] } }
   | { type: 'CLUSTERS_ERROR'; payload: AppError }
-  | { type: 'TOGGLE_CLUSTER'; payload: { cluster: SelectedCluster } } // NEW: Multi-select
-  | { type: 'CLUSTERS_SELECTED'; payload: { clusters: SelectedCluster[] } } // NEW
-
-  // Target creation (NEW)
-  | { type: 'TARGETS_CREATING' }
-  | { type: 'TARGETS_CREATED'; payload: { targetUUIDs: string[] } }
-  | { type: 'TARGETS_ERROR'; payload: AppError }
+  | { type: 'TOGGLE_CLUSTER'; payload: { cluster: SelectedCluster } } // Multi-select
+  | { type: 'CLUSTERS_SELECTED' } // Proceed with selected clusters
 
   // Registry configuration
   | { type: 'CONFIGURE_REGISTRY' }
@@ -292,8 +340,8 @@ export type AppAction =
   | { type: 'SCENARIO_GLOBALS_ERROR'; payload: AppError }
   | { type: 'UPDATE_GLOBAL_FORM'; payload: { formValues: ScenarioFormValues; touchedFields: TouchedFields } }
 
-  // Batch scenario execution (NEW)
-  | { type: 'SCENARIOS_RUN_BATCH_SUCCESS'; payload: { jobs: JobStatusResponse[] } }
+  // Batch scenario execution
+  | { type: 'SCENARIOS_RUN_BATCH_SUCCESS' } // No payload - scenarioRun already added via ADD_SCENARIO_RUN
   | { type: 'SCENARIOS_RUN_BATCH_ERROR'; payload: AppError }
 
   // Navigation

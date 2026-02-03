@@ -1,5 +1,18 @@
 import { config } from '../config';
-import type { CreateTargetResponse, ClustersResponse, NodesResponse, ScenariosRequest, ScenariosResponse, ScenarioDetail, ScenarioGlobals, ScenarioRunRequest, ScenarioRunResponse, JobStatusResponse, JobsListResponse } from '../types/api';
+import type {
+  CreateTargetResponse,
+  ClustersResponse,
+  NodesResponse,
+  ScenariosRequest,
+  ScenariosResponse,
+  ScenarioDetail,
+  ScenarioGlobals,
+  ScenarioRunRequest,
+  CreateScenarioRunResponse,
+  ScenarioRunStatusResponse,
+  JobStatusResponse,
+  JobsListResponse
+} from '../types/api';
 
 class OperatorApiClient {
   private baseUrl: string;
@@ -167,12 +180,12 @@ class OperatorApiClient {
   }
 
   /**
-   * POST /scenarios/run
-   * Run a chaos scenario on multiple targets
-   * @param request - Scenario run request with targetUUIDs array
-   * @returns Promise with batch job results
+   * POST /api/v1/scenarios/run
+   * Create a new scenario run (NEW API: Returns scenarioRunName instead of job details)
+   * @param request - Scenario run request with targetRequestId and clusterNames array
+   * @returns Promise with scenarioRunName and basic info
    */
-  async runScenario(request: ScenarioRunRequest): Promise<ScenarioRunResponse> {
+  async runScenario(request: ScenarioRunRequest): Promise<CreateScenarioRunResponse> {
     const response = await fetch(`${this.baseUrl}/scenarios/run`, {
       method: 'POST',
       headers: {
@@ -181,44 +194,127 @@ class OperatorApiClient {
       body: JSON.stringify(request),
     });
 
-    const data = await response.json().catch(() => null);
-
-    // Handle HTTP 500 (all targets failed)
-    if (response.status === 500) {
-      const failedErrors = data?.jobs?.map((j: any) => j.error).join(', ') || 'Unknown error';
-      throw new Error(`All targets failed: ${failedErrors}`);
-    }
-
-    // Handle HTTP 400 (validation error)
-    if (response.status === 400) {
-      const errorMessage = data?.message || 'Invalid request';
-      throw new Error(`Validation error: ${errorMessage}`);
-    }
-
-    // Handle HTTP 201 (success or partial failure)
     if (!response.ok) {
-      const errorMessage = data?.message || `Failed to run scenario: ${response.status}`;
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to create scenario run: ${response.status}`;
       throw new Error(errorMessage);
     }
 
-    return data;
+    return response.json();
+  }
+
+  /**
+   * GET /api/v1/scenarios/run/{scenarioRunName}
+   * Get the status of a scenario run including all cluster jobs
+   * @param scenarioRunName - Scenario run name returned from POST /scenarios/run
+   * @returns Promise with full scenario run status
+   */
+  async getScenarioRunStatus(scenarioRunName: string): Promise<ScenarioRunStatusResponse> {
+    const response = await fetch(
+      `${this.baseUrl}/scenarios/run/${encodeURIComponent(scenarioRunName)}`,
+      { method: 'GET' }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || `Failed to fetch scenario run: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Build WebSocket URL for job logs using jobId (NEW API - CORRECT PATH)
+   * @param scenarioRunName - Scenario run name
+   * @param jobId - Job ID to get logs from
+   * @param follow - Whether to follow/stream logs (default: true)
+   * @returns WebSocket URL for log streaming
+   */
+  getJobLogsWebSocketUrl(
+    scenarioRunName: string,
+    jobId: string,
+    follow: boolean = true
+  ): string {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const params = new URLSearchParams();
+    if (follow) params.append('follow', 'true');
+
+    const path = `/api/v1/scenarios/run/${encodeURIComponent(scenarioRunName)}/jobs/${encodeURIComponent(jobId)}/logs`;
+    const queryString = params.toString();
+
+    return queryString
+      ? `${protocol}//${host}${path}?${queryString}`
+      : `${protocol}//${host}${path}`;
+  }
+
+  /**
+   * Build WebSocket URL for scenario run logs
+   * @deprecated Use getJobLogsWebSocketUrl() instead - this uses clusterName which is incorrect
+   * @param scenarioRunName - Scenario run name
+   * @param clusterName - Cluster name to get logs from
+   * @param follow - Whether to follow/stream logs (default: true)
+   * @returns WebSocket URL for log streaming
+   */
+  getScenarioRunLogsUrl(
+    scenarioRunName: string,
+    clusterName: string,
+    follow: boolean = true
+  ): string {
+    const params = new URLSearchParams();
+    if (follow) params.append('follow', 'true');
+
+    const path = `/scenarios/run/${encodeURIComponent(scenarioRunName)}/logs/${encodeURIComponent(clusterName)}`;
+    const queryString = params.toString();
+
+    return queryString ? `${this.baseUrl}${path}?${queryString}` : `${this.baseUrl}${path}`;
+  }
+
+  /**
+   * GET /api/v1/scenarios/run
+   * List all scenario runs (NEW API)
+   * @returns Promise with scenario runs array
+   */
+  async listScenarioRuns(): Promise<ScenarioRunStatusResponse[]> {
+    const response = await fetch(`${this.baseUrl}/scenarios/run`, { method: 'GET' });
+
+    if (!response.ok) {
+      // Fallback: if backend doesn't support list yet, return empty array
+      // This allows frontend to work with individual polling until backend is ready
+      if (response.status === 404 || response.status === 405) {
+        console.warn('List endpoint not implemented yet, using empty list');
+        return [];
+      }
+      throw new Error(`Failed to list scenario runs: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('listScenarioRuns raw response:', JSON.stringify(data, null, 2));
+
+    // Backend returns: {"scenarioRuns": [...]} (current)
+    // or {"runs": [...]} (future spec)
+    const runs = data.scenarioRuns || data.runs || [];
+    console.log('Extracted runs:', runs);
+    return runs;
   }
 
   /**
    * GET /scenarios/run
    * List all scenario jobs with optional filtering
-   * @param filters - Optional filters (status, scenarioName, targetUUID)
+   * @deprecated Use listScenarioRuns() instead
+   * @param filters - Optional filters (status, scenarioName, clusterName)
    * @returns Promise with jobs list
    */
   async listJobs(filters?: {
     status?: string;
     scenarioName?: string;
-    targetUUID?: string;
+    clusterName?: string;
   }): Promise<JobsListResponse> {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
     if (filters?.scenarioName) params.append('scenarioName', filters.scenarioName);
-    if (filters?.targetUUID) params.append('targetUUID', filters.targetUUID);
+    if (filters?.clusterName) params.append('clusterName', filters.clusterName);
 
     const queryString = params.toString();
     const url = queryString ? `${this.baseUrl}/scenarios/run?${queryString}` : `${this.baseUrl}/scenarios/run`;
@@ -239,6 +335,7 @@ class OperatorApiClient {
   /**
    * GET /scenarios/run/{jobId}
    * Get status of a running job
+   * @deprecated Use getScenarioRunStatus() instead
    * @param jobId - Job ID to check
    * @returns Promise with job status
    */
@@ -259,6 +356,7 @@ class OperatorApiClient {
   /**
    * DELETE /scenarios/run/{jobId}
    * Cancel a running job
+   * @deprecated Will be replaced with scenario run level cancellation
    * @param jobId - Job ID to cancel
    * @returns Promise with final job status
    */
@@ -305,27 +403,27 @@ class OperatorApiClient {
   }
 
   /**
-   * Validate targetUUIDs array for scenario run request
-   * @param targetUUIDs - Array of target UUIDs to validate
+   * Validate clusterNames array for scenario run request
+   * @param clusterNames - Array of cluster names to validate
    * @returns Array of validation error messages (empty if valid)
    */
-  validateTargetUUIDs(targetUUIDs: string[]): string[] {
+  validateClusterNames(clusterNames: string[]): string[] {
     const errors: string[] = [];
 
-    if (!targetUUIDs || targetUUIDs.length === 0) {
-      errors.push('At least one target UUID is required');
+    if (!clusterNames || clusterNames.length === 0) {
+      errors.push('At least one cluster name is required');
       return errors;
     }
 
     // Check for empty strings
-    if (targetUUIDs.some(uuid => !uuid || uuid.trim() === '')) {
-      errors.push('Target UUIDs cannot be empty');
+    if (clusterNames.some(name => !name || name.trim() === '')) {
+      errors.push('Cluster names cannot be empty');
     }
 
     // Check for duplicates
-    const uniqueUUIDs = new Set(targetUUIDs);
-    if (uniqueUUIDs.size !== targetUUIDs.length) {
-      errors.push('Duplicate UUIDs found');
+    const uniqueNames = new Set(clusterNames);
+    if (uniqueNames.size !== clusterNames.length) {
+      errors.push('Duplicate cluster names found');
     }
 
     return errors;

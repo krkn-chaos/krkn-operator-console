@@ -4,13 +4,15 @@ import { CopyIcon } from '@patternfly/react-icons';
 import Anser from 'anser';
 
 interface LogViewerProps {
-  jobId: string;
+  scenarioRunName: string; // ScenarioRun name
+  jobId: string;           // Job ID - required for WebSocket path
+  clusterName: string;     // Cluster name - for display only
   podName: string;
   status: string;
   compact?: boolean;
 }
 
-export function LogViewer({ jobId, podName, status, compact = false }: LogViewerProps) {
+export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status, compact = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -74,7 +76,7 @@ export function LogViewer({ jobId, podName, status, compact = false }: LogViewer
     // If job is in terminal state, don't follow (get static logs)
     const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
 
-    console.log('Starting WebSocket log stream for job:', jobId, 'status:', status);
+    console.log('Starting WebSocket log stream for run:', scenarioRunName, 'cluster:', clusterName, 'status:', status);
 
     if (!isTerminal) {
       setLogs(['Connecting to log stream...']);
@@ -91,13 +93,13 @@ export function LogViewer({ jobId, podName, status, compact = false }: LogViewer
 
       console.log(`Attempting to connect to WebSocket (attempt ${reconnectAttemptsRef.current + 1})`);
 
-      // Build WebSocket URL - use /api/ prefix to go through nginx
+      // Build WebSocket URL - NEW: uses scenarioRunName + clusterName
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       const follow = !isTerminal;
 
-      // Use /api/v1/ prefix to route through nginx
-      const wsUrl = `${protocol}//${host}/api/v1/scenarios/run/${encodeURIComponent(jobId)}/logs?follow=${follow}`;
+      // NEW URL structure: /scenarios/run/{scenarioRunName}/jobs/{jobId}/logs
+      const wsUrl = `${protocol}//${host}/api/v1/scenarios/run/${encodeURIComponent(scenarioRunName)}/jobs/${encodeURIComponent(jobId)}/logs?follow=${follow}`;
 
       console.log('WebSocket URL:', wsUrl);
 
@@ -200,7 +202,7 @@ export function LogViewer({ jobId, podName, status, compact = false }: LogViewer
         wsRef.current = null;
       }
     };
-  }, [jobId, status]);
+  }, [scenarioRunName, jobId, status]); // Dependencies: jobId instead of clusterName
 
   return (
     <>

@@ -18,6 +18,7 @@ import {
   Flex,
   FlexItem,
   ActionGroup,
+  Spinner,
 } from '@patternfly/react-core';
 import { CubesIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
@@ -75,8 +76,23 @@ export function ClusterMultiSelector({
     });
   };
 
-  // Empty state
-  if (!clusters || Object.keys(clusters).length === 0) {
+  // Loading state (clusters is null during fetch/retry)
+  if (clusters === null) {
+    return (
+      <EmptyState>
+        <EmptyStateIcon icon={Spinner} />
+        <Title headingLevel="h1" size="lg">
+          Loading Clusters...
+        </Title>
+        <EmptyStateBody>
+          Fetching available target clusters from operators. This may take a few moments.
+        </EmptyStateBody>
+      </EmptyState>
+    );
+  }
+
+  // Empty state (clusters is an empty object)
+  if (Object.keys(clusters).length === 0) {
     return (
       <EmptyState>
         <EmptyStateIcon icon={CubesIcon} />
@@ -173,23 +189,27 @@ export function ClusterMultiSelector({
             </Card>
           ))}
 
-          <ActionGroup style={{ marginTop: '1.5rem' }}>
-            <Button variant="secondary" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={onProceed}
-              isDisabled={selectedClusters.length === 0}
-              size="lg"
-            >
-              {selectedClusters.length > 0
-                ? `Proceed with ${selectedClusters.length} cluster${
-                    selectedClusters.length === 1 ? '' : 's'
-                  }`
-                : 'Select clusters to proceed'}
-            </Button>
-          </ActionGroup>
+          <Flex style={{ marginTop: '1.5rem', gap: '2rem' }}>
+            <FlexItem>
+              <Button variant="secondary" onClick={onCancel} size="lg">
+                Cancel
+              </Button>
+            </FlexItem>
+            <FlexItem>
+              <Button
+                variant="primary"
+                onClick={onProceed}
+                isDisabled={selectedClusters.length === 0}
+                size="lg"
+              >
+                {selectedClusters.length > 0
+                  ? `Proceed with ${selectedClusters.length} cluster${
+                      selectedClusters.length === 1 ? '' : 's'
+                    }`
+                  : 'Select clusters to proceed'}
+              </Button>
+            </FlexItem>
+          </Flex>
         </CardBody>
       </Card>
     </div>
