@@ -6,3 +6,6 @@ export { ScenariosList } from './ScenariosList';
 export { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 export { LogViewer } from './LogViewer';
 export { JobsList } from './JobsList';
+export { Settings } from './Settings';
+export { TargetsList } from './TargetsList';
+export { TargetForm } from './TargetForm';

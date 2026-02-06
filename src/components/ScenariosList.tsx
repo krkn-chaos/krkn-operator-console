@@ -25,17 +25,20 @@ import {
   MenuToggleElement,
   SearchInput,
 } from '@patternfly/react-core';
-import { CubesIcon, SortAmountDownIcon } from '@patternfly/react-icons';
+import { CubesIcon, SortAmountDownIcon, CopyIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
+import { useNotifications } from '../hooks';
 import type { ScenarioTag } from '../types/api';
 
 type SortOption = 'name-asc' | 'name-desc' | 'date-asc' | 'date-desc';
 
 export function ScenariosList() {
   const { state, dispatch } = useAppContext();
+  const { showSuccess } = useNotifications();
   const [sortBy, setSortBy] = useState<SortOption>('name-asc');
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const [copiedDigest, setCopiedDigest] = useState<string | null>(null);
 
   if (!state.scenarios || state.scenarios.length === 0) {
     return (
@@ -96,6 +99,19 @@ export function ScenariosList() {
     if (value) {
       setSortBy(value as SortOption);
       setIsSortOpen(false);
+    }
+  };
+
+  const handleCopyDigest = async (digest: string, scenarioName: string) => {
+    try {
+      await navigator.clipboard.writeText(digest);
+      setCopiedDigest(scenarioName);
+      showSuccess('Digest copied to clipboard');
+      setTimeout(() => {
+        setCopiedDigest(null);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy digest:', error);
     }
   };
 
@@ -224,9 +240,26 @@ export function ScenariosList() {
                           <div style={{ marginBottom: '0.25rem' }}>
                             <strong>Digest:</strong>
                           </div>
-                          <code style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
-                            {scenario.digest ? scenario.digest.substring(0, 16) + '...' : 'N/A'}
-                          </code>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <code style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                              {scenario.digest ? scenario.digest.substring(0, 16) + '...' : 'N/A'}
+                            </code>
+                            {scenario.digest && (
+                              <Button
+                                variant="plain"
+                                aria-label="Copy digest"
+                                onClick={() => handleCopyDigest(scenario.digest!, scenario.name)}
+                                icon={<CopyIcon />}
+                                style={{
+                                  minWidth: 'auto',
+                                  padding: '0.25rem',
+                                  color: copiedDigest === scenario.name
+                                    ? 'var(--pf-v5-global--success-color--100)'
+                                    : 'var(--pf-v5-global--Color--200)'
+                                }}
+                              />
+                            )}
+                          </div>
                         </div>
                       </DataListCell>,
                       <DataListCell key="size" width={1}>

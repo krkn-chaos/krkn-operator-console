@@ -141,7 +141,7 @@ export function JobsList({
           </FlexItem>
           <FlexItem>
             <Button variant="primary" onClick={onCreateJob} size="lg">
-              Run Scenario
+              Run Scenarios
             </Button>
           </FlexItem>
         </Flex>
@@ -153,7 +153,7 @@ export function JobsList({
             <Title headingLevel="h2" size="lg">
               No Scenario Runs
             </Title>
-            <EmptyStateBody>Click "Run Scenario" to start a new execution.</EmptyStateBody>
+            <EmptyStateBody>Click "Run Scenarios" to start a new execution.</EmptyStateBody>
           </EmptyState>
         ) : (
           <DataList aria-label="Scenario runs list" isCompact>

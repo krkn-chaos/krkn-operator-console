@@ -571,7 +571,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           {/* Run Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
             <Button variant="primary" size="lg" onClick={handleRunScenario}>
-              Run Scenario
+              Run Scenarios
             </Button>
           </div>
         </>

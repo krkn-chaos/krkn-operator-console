@@ -33,6 +33,9 @@ const initialState: AppState = {
 
   // Error handling
   error: null,
+
+  // Global notifications
+  notifications: [],
 };
 
 // Reducer
@@ -348,6 +351,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'GO_BACK':
       // Navigate back to previous phase based on current phase
       switch (state.phase) {
+        case 'settings':
+          // From settings → back to jobs list
+          return {
+            ...state,
+            phase: 'jobs_list',
+          };
+
         case 'selecting_clusters':
           // From cluster selection → cancel workflow, back to jobs list
           return {
@@ -394,6 +404,25 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'RETRY':
       return {
         ...initialState,
+      };
+
+    case 'NAVIGATE_TO_SETTINGS':
+      return {
+        ...state,
+        phase: 'settings',
+      };
+
+    // Notifications
+    case 'SHOW_NOTIFICATION':
+      return {
+        ...state,
+        notifications: [...state.notifications, action.payload.notification],
+      };
+
+    case 'HIDE_NOTIFICATION':
+      return {
+        ...state,
+        notifications: state.notifications.filter(n => n.id !== action.payload.id),
       };
 
     default:

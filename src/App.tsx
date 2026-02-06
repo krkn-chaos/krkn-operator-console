@@ -1,8 +1,9 @@
-import { Page, PageSection, Masthead, MastheadMain, MastheadBrand } from '@patternfly/react-core';
+import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Button, Alert, AlertActionCloseButton, AlertGroup } from '@patternfly/react-core';
+import { CogIcon } from '@patternfly/react-icons';
 import { useAppContext } from './context/AppContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { operatorApi } from './services/operatorApi';
 import type { SelectedCluster } from './types/api';
@@ -30,6 +31,10 @@ function App() {
 
   const handleWorkflowCancel = () => {
     dispatch({ type: 'CANCEL_WORKFLOW' });
+  };
+
+  const handleHideNotification = (id: string) => {
+    dispatch({ type: 'HIDE_NOTIFICATION', payload: { id } });
   };
 
   // Jobs management handlers
@@ -111,6 +116,9 @@ function App() {
         );
       }
 
+      case 'settings':
+        return <Settings />;
+
       case 'selecting_clusters':
         return (
           <PageSection>
@@ -166,20 +174,66 @@ function App() {
     }
   };
 
+  const handleNavigateToSettings = () => {
+    dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
+  };
+
   const header = (
     <Masthead>
       <MastheadMain>
         <MastheadBrand>
-          <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white' }}>
-            Krkn Operator Console
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <img
+              src="/logo.png"
+              alt="Krkn Logo"
+              style={{ height: '32px', width: 'auto' }}
+            />
+            <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white' }}>
+              Krkn Operator Console
+            </div>
           </div>
         </MastheadBrand>
       </MastheadMain>
+      <MastheadContent>
+        <Toolbar isFullHeight isStatic>
+          <ToolbarContent>
+            <ToolbarItem>
+              <Button
+                variant="plain"
+                onClick={handleNavigateToSettings}
+                icon={<CogIcon />}
+                aria-label="Settings"
+                style={{ color: 'white' }}
+              />
+            </ToolbarItem>
+          </ToolbarContent>
+        </Toolbar>
+      </MastheadContent>
     </Masthead>
   );
 
   return (
     <Page header={header}>
+      {/* Global notifications - appears right below header */}
+      {state.notifications.length > 0 && (
+        <div style={{ padding: '1rem 1rem 0 1rem' }}>
+          <AlertGroup>
+            {state.notifications.map((notification) => (
+              <Alert
+                key={notification.id}
+                variant={notification.variant}
+                title={notification.title}
+                actionClose={
+                  <AlertActionCloseButton onClose={() => handleHideNotification(notification.id)} />
+                }
+                isInline
+              >
+                {notification.message}
+              </Alert>
+            ))}
+          </AlertGroup>
+        </div>
+      )}
       <PageSection isFilled>{renderContent()}</PageSection>
     </Page>
   );

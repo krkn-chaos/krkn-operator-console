@@ -20,6 +20,46 @@ export interface NodesResponse {
   nodes: string[];
 }
 
+// Target CRUD API Types
+
+export type SecretType = 'kubeconfig' | 'token' | 'credentials';
+
+export interface CreateTargetRequest {
+  clusterName: string;
+  secretType: SecretType;
+  clusterAPIURL?: string;
+  caBundle?: string;
+  kubeconfig?: string;
+  token?: string;
+  username?: string;
+  password?: string;
+}
+
+export interface UpdateTargetRequest extends CreateTargetRequest {}
+
+export interface TargetResponse {
+  uuid: string;
+  clusterName: string;
+  clusterAPIURL: string;
+  secretType: string;
+  ready: boolean;
+  createdAt?: string;
+}
+
+export interface ListTargetsResponse {
+  targets: TargetResponse[];
+}
+
+export interface TargetOperationResponse {
+  uuid: string;
+  message?: string;
+}
+
+export interface ErrorResponse {
+  error: string;
+  message: string;
+}
+
 export interface ScenariosRequest {
   username?: string;
   password?: string;
@@ -236,6 +276,7 @@ export type AppPhase =
   | 'initializing'
   | 'polling'
   | 'jobs_list' // Landing page
+  | 'settings' // Settings page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -249,6 +290,15 @@ export type ErrorType = 'network' | 'timeout' | 'api_error' | 'not_found';
 export interface AppError {
   message: string;
   type: ErrorType;
+}
+
+export type NotificationVariant = 'success' | 'danger' | 'warning' | 'info';
+
+export interface Notification {
+  id: string;
+  variant: NotificationVariant;
+  title: string;
+  message?: string;
 }
 
 export interface SelectedCluster {
@@ -288,6 +338,9 @@ export interface AppState {
 
   // Error handling
   error: AppError | null;
+
+  // Global notifications
+  notifications: Notification[];
 }
 
 // Action Types
@@ -346,4 +399,9 @@ export type AppAction =
 
   // Navigation
   | { type: 'GO_BACK' }
-  | { type: 'RETRY' };
+  | { type: 'RETRY' }
+  | { type: 'NAVIGATE_TO_SETTINGS' }
+
+  // Notifications
+  | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
+  | { type: 'HIDE_NOTIFICATION'; payload: { id: string } };
