@@ -171,7 +171,7 @@ export interface ScenarioFileMount {
 
 export interface ScenarioRunRequest {
   targetRequestId: string; // Target request UUID
-  clusterNames: string[]; // Array of cluster names to execute scenario on
+  targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
   scenarioImage: string;
   scenarioName: string;
   kubeconfigPath?: string;
@@ -228,6 +228,7 @@ export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyF
 export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed';
 
 export interface ClusterJob {
+  providerName: string; // Provider that owns this cluster (e.g., 'krkn-operator', 'krkn-operator-acm')
   clusterName: string;
   jobId: string; // UUID - still exists but secondary
   podName: string;
@@ -240,7 +241,7 @@ export interface ClusterJob {
 // Response from POST /api/v1/scenarios/run
 export interface CreateScenarioRunResponse {
   scenarioRunName: string;
-  clusterNames: string[];
+  targetClusters: { [providerName: string]: string[] };
   totalTargets: number;
 }
 
@@ -356,7 +357,7 @@ export type AppAction =
 
   // Scenario runs list management (NEW: ScenarioRun-centric)
   | { type: 'JOBS_LIST_READY' }
-  | { type: 'SCENARIO_RUN_CREATED'; payload: { scenarioRunName: string; clusterNames: string[]; totalTargets: number; scenarioName: string } }
+  | { type: 'SCENARIO_RUN_CREATED'; payload: { scenarioRunName: string; targetClusters: { [providerName: string]: string[] }; totalTargets: number; scenarioName: string } }
   | { type: 'ADD_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
   | { type: 'UPDATE_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
   | { type: 'LOAD_SCENARIO_RUNS_SUCCESS'; payload: { runs: ScenarioRunState[] } }

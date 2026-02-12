@@ -29,6 +29,8 @@ export function TargetsList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTarget, setEditingTarget] = useState<TargetResponse | null>(null);
   const [deletingUuid, setDeletingUuid] = useState<string | null>(null);
+  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ uuid: string; clusterName: string } | null>(null);
+  const [apiAvailable, setApiAvailable] = useState(true);
   const { showSuccess, showError } = useNotifications();
 
   useEffect(() => {
@@ -40,8 +42,12 @@ export function TargetsList() {
     try {
       const data = await targetsApi.listTargets();
       setTargets(data);
+      setApiAvailable(true);
     } catch (error) {
-      showError('Failed to load targets', error instanceof Error ? error.message : 'Unknown error');
+      setTargets([]);
+      setApiAvailable(false);
+      // Don't show error notification on initial load - the empty state will handle it
+      console.error('Failed to load targets:', error);
     } finally {
       setLoading(false);
     }
@@ -57,15 +63,19 @@ export function TargetsList() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (uuid: string, clusterName: string) => {
-    if (!confirm(`Are you sure you want to delete target "${clusterName}"?`)) {
-      return;
-    }
+  const handleDelete = (uuid: string, clusterName: string) => {
+    setConfirmDeleteTarget({ uuid, clusterName });
+  };
 
-    setDeletingUuid(uuid);
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteTarget) return;
+
+    setDeletingUuid(confirmDeleteTarget.uuid);
+    setConfirmDeleteTarget(null);
+
     try {
-      await targetsApi.deleteTarget(uuid);
-      showSuccess('Target deleted', `Target "${clusterName}" has been deleted successfully`);
+      await targetsApi.deleteTarget(confirmDeleteTarget.uuid);
+      showSuccess('Target deleted', `Target "${confirmDeleteTarget.clusterName}" has been deleted successfully`);
       await loadTargets();
     } catch (error) {
       showError('Failed to delete target', error instanceof Error ? error.message : 'Unknown error');
@@ -125,14 +135,13 @@ export function TargetsList() {
         <EmptyState>
           <EmptyStateIcon icon={CubesIcon} />
           <Title headingLevel="h2" size="lg">
-            No Targets Configured
+            {apiAvailable ? 'No Targets Configured' : 'Targets API Not Available'}
           </Title>
           <EmptyStateBody>
-            Add a cluster target to start running chaos scenarios on your clusters.
+            {apiAvailable
+              ? 'Click "Add Target" in the toolbar above to start adding cluster targets.'
+              : 'The targets API endpoint is not available. Make sure the backend service is running and the API is properly configured.'}
           </EmptyStateBody>
-          <Button variant="primary" icon={<PlusCircleIcon />} onClick={handleCreate}>
-            Add Target
-          </Button>
         </EmptyState>
       ) : (
         <DataList aria-label="Targets list" isCompact>
@@ -226,6 +235,30 @@ export function TargetsList() {
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
         />
+      </Modal>
+
+      {/* Confirmation Modal for Target Deletion */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Delete Target"
+        isOpen={confirmDeleteTarget !== null}
+        onClose={() => setConfirmDeleteTarget(null)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="danger"
+            onClick={handleConfirmDelete}
+            isLoading={deletingUuid !== null}
+            isDisabled={deletingUuid !== null}
+          >
+            {deletingUuid !== null ? 'Deleting...' : 'Delete'}
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setConfirmDeleteTarget(null)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        Are you sure you want to delete target <strong>{confirmDeleteTarget?.clusterName}</strong>?
       </Modal>
     </>
   );

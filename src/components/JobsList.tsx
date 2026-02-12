@@ -321,7 +321,7 @@ export function JobsList({
                                               border: '1px solid var(--pf-v5-global--BorderColor--100)',
                                             }}
                                           >
-                                            {job.clusterName}
+                                            {job.providerName}/{job.clusterName}
                                           </code>
                                         </div>
                                       </DataListCell>,
@@ -355,7 +355,7 @@ export function JobsList({
                                             <Button
                                               variant="plain"
                                               aria-label="Delete job"
-                                              onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.clusterName}` })}
+                                              onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
                                               isDisabled={deletingJob === job.jobId}
                                               icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
                                               style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
@@ -378,6 +378,9 @@ export function JobsList({
                                     <FlexItem>
                                       <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
                                         <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 }}>
+                                          <dt style={{ fontWeight: 'bold' }}>Provider:</dt>
+                                          <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.providerName}</dd>
+
                                           <dt style={{ fontWeight: 'bold' }}>Cluster:</dt>
                                           <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.clusterName}</dd>
 
@@ -433,7 +436,7 @@ export function JobsList({
                                       <FlexItem>
                                         <Button
                                           variant="danger"
-                                          onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.clusterName}` })}
+                                          onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
                                           isDisabled={isDeleting}
                                           isLoading={isDeleting}
                                         >

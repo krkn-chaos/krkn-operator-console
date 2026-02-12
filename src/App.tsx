@@ -201,7 +201,7 @@ function App() {
               <Button
                 variant="plain"
                 onClick={handleNavigateToSettings}
-                icon={<CogIcon />}
+                icon={<CogIcon style={{ fontSize: '1.5rem' }} />}
                 aria-label="Settings"
                 style={{ color: 'white' }}
               />

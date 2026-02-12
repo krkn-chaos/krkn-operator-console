@@ -182,7 +182,7 @@ class OperatorApiClient {
   /**
    * POST /api/v1/scenarios/run
    * Create a new scenario run (NEW API: Returns scenarioRunName instead of job details)
-   * @param request - Scenario run request with targetRequestId and clusterNames array
+   * @param request - Scenario run request with targetRequestId and targetClusters map
    * @returns Promise with scenarioRunName and basic info
    */
   async runScenario(request: ScenarioRunRequest): Promise<CreateScenarioRunResponse> {
@@ -445,27 +445,58 @@ class OperatorApiClient {
   }
 
   /**
-   * Validate clusterNames array for scenario run request
-   * @param clusterNames - Array of cluster names to validate
+   * Validate targetClusters map for scenario run request
+   * @param targetClusters - Map of provider names to cluster names arrays
    * @returns Array of validation error messages (empty if valid)
    */
-  validateClusterNames(clusterNames: string[]): string[] {
+  validateTargetClusters(targetClusters: { [providerName: string]: string[] }): string[] {
     const errors: string[] = [];
 
-    if (!clusterNames || clusterNames.length === 0) {
-      errors.push('At least one cluster name is required');
+    if (!targetClusters || Object.keys(targetClusters).length === 0) {
+      errors.push('At least one provider with clusters is required');
       return errors;
     }
 
-    // Check for empty strings
-    if (clusterNames.some(name => !name || name.trim() === '')) {
-      errors.push('Cluster names cannot be empty');
+    const allClusterNames: string[] = [];
+
+    for (const [providerName, clusterNames] of Object.entries(targetClusters)) {
+      // Provider name cannot be empty
+      if (!providerName || providerName.trim() === '') {
+        errors.push('Provider names cannot be empty');
+      }
+
+      // Each provider must have at least one cluster
+      if (!clusterNames || clusterNames.length === 0) {
+        errors.push(`Provider '${providerName}' must have at least one cluster`);
+      }
+
+      // Cluster names cannot be empty
+      if (clusterNames.some(name => !name || name.trim() === '')) {
+        errors.push(`Provider '${providerName}' has empty cluster names`);
+      }
+
+      allClusterNames.push(...clusterNames);
     }
 
-    // Check for duplicates
-    const uniqueNames = new Set(clusterNames);
-    if (uniqueNames.size !== clusterNames.length) {
-      errors.push('Duplicate cluster names found');
+    // Check for duplicate cluster names across providers
+    const uniqueNames = new Set(allClusterNames);
+    if (uniqueNames.size !== allClusterNames.length) {
+      // Find duplicates
+      const counts: { [name: string]: string[] } = {};
+      Object.entries(targetClusters).forEach(([provider, clusters]) => {
+        clusters.forEach(cluster => {
+          if (!counts[cluster]) {
+            counts[cluster] = [];
+          }
+          counts[cluster].push(provider);
+        });
+      });
+
+      Object.entries(counts).forEach(([cluster, providers]) => {
+        if (providers.length > 1) {
+          errors.push(`Cluster '${cluster}' appears in multiple providers: ${providers.join(', ')}`);
+        }
+      });
     }
 
     return errors;

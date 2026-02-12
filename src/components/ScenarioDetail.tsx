@@ -226,10 +226,19 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         scenarioImage = `quay.io/krkn-chaos/krkn-hub:${scenarioName}`;
       }
 
+      // Build targetClusters map from selectedClusters
+      const targetClusters: { [providerName: string]: string[] } = {};
+      state.selectedClusters.forEach(cluster => {
+        if (!targetClusters[cluster.operatorName]) {
+          targetClusters[cluster.operatorName] = [];
+        }
+        targetClusters[cluster.operatorName].push(cluster.clusterName);
+      });
+
       // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid, // Reuse the original target request ID
-        clusterNames: state.selectedClusters.map(c => c.clusterName), // Extract cluster names
+        targetClusters, // Map of provider names to cluster names
         scenarioImage,
         scenarioName,
         kubeconfigPath: '/home/krkn/.kube/config',
@@ -268,7 +277,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         type: 'SCENARIO_RUN_CREATED',
         payload: {
           scenarioRunName: createResponse.scenarioRunName,
-          clusterNames: createResponse.clusterNames,
+          targetClusters: createResponse.targetClusters,
           totalTargets: createResponse.totalTargets,
           scenarioName,
         },
