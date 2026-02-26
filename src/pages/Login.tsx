@@ -10,14 +10,16 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   LoginPage as PFLoginPage,
   LoginForm,
   Alert,
+  Button,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/authService';
 
 export function Login() {
   const { state, login } = useAuth();
@@ -29,6 +31,7 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showSessionExpired, setShowSessionExpired] = useState(false);
+  const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
 
   // Check for session expired flag from AuthContext redirect
   useEffect(() => {
@@ -36,6 +39,21 @@ export function Login() {
       setShowSessionExpired(true);
     }
   }, [searchParams]);
+
+  // Check if admin is registered
+  useEffect(() => {
+    async function checkRegistration() {
+      try {
+        const registered = await authService.isRegistered();
+        setIsRegistered(registered);
+      } catch (error) {
+        console.error('Failed to check registration:', error);
+        // Assume registered on error to show login form
+        setIsRegistered(true);
+      }
+    }
+    checkRegistration();
+  }, []);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -129,6 +147,19 @@ export function Login() {
         loginButtonLabel={isLoading ? 'Logging in...' : 'Log in'}
         onLoginButtonClick={handleSubmit}
       />
+
+      {isRegistered === false && (
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <p style={{ marginBottom: '0.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
+            No admin account exists yet.
+          </p>
+          <Link to="/register">
+            <Button variant="secondary" isBlock>
+              Create First Admin Account
+            </Button>
+          </Link>
+        </div>
+      )}
     </PFLoginPage>
   );
 }
