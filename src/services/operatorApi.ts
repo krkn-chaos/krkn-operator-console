@@ -1,4 +1,5 @@
 import { config } from '../config';
+import { BaseApiClient } from '../utils/apiClient';
 import type {
   CreateTargetResponse,
   ClustersResponse,
@@ -14,11 +15,9 @@ import type {
   JobsListResponse
 } from '../types/api';
 
-class OperatorApiClient {
-  private baseUrl: string;
-
+class OperatorApiClient extends BaseApiClient {
   constructor() {
-    this.baseUrl = config.apiBaseUrl;
+    super(config.apiBaseUrl);
   }
 
   /**
@@ -27,18 +26,9 @@ class OperatorApiClient {
    * @returns Promise with UUID
    */
   async createTargetRequest(): Promise<CreateTargetResponse> {
-    const response = await fetch(`${this.baseUrl}/targets`, {
+    return this.fetchJson<CreateTargetResponse>('/targets', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to create target request: ${response.status} ${response.statusText}`);
-    }
-
-    return response.json();
   }
 
   /**
@@ -48,10 +38,7 @@ class OperatorApiClient {
    * @returns HTTP status code (202 = Accepted/pending, 200 = OK/completed)
    */
   async getTargetStatus(uuid: string): Promise<number> {
-    const response = await fetch(`${this.baseUrl}/targets/${uuid}`, {
-      method: 'GET',
-    });
-
+    const response = await this.fetch(`/targets/${uuid}`);
     return response.status;
   }
 
@@ -62,20 +49,7 @@ class OperatorApiClient {
    * @returns Promise with clusters data
    */
   async getClusters(uuid: string): Promise<ClustersResponse> {
-    const response = await fetch(`${this.baseUrl}/clusters?id=${uuid}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to fetch clusters: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.fetchJson<ClustersResponse>(`/clusters?id=${uuid}`);
   }
 
   /**
@@ -86,23 +60,7 @@ class OperatorApiClient {
    * @returns Promise with nodes data
    */
   async getNodes(uuid: string, clusterName: string): Promise<NodesResponse> {
-    const response = await fetch(
-      `${this.baseUrl}/nodes?id=${uuid}&cluster-name=${encodeURIComponent(clusterName)}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to fetch nodes: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.fetchJson<NodesResponse>(`/nodes?id=${uuid}&cluster-name=${encodeURIComponent(clusterName)}`);
   }
 
   /**
@@ -112,21 +70,10 @@ class OperatorApiClient {
    * @returns Promise with scenarios data
    */
   async getScenarios(request: ScenariosRequest): Promise<ScenariosResponse> {
-    const response = await fetch(`${this.baseUrl}/scenarios`, {
+    return this.fetchJson<ScenariosResponse>('/scenarios', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(request),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to fetch scenarios: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
   }
 
   /**
@@ -137,21 +84,10 @@ class OperatorApiClient {
    * @returns Promise with scenario detail data
    */
   async getScenarioDetail(scenarioName: string, request: ScenariosRequest): Promise<ScenarioDetail> {
-    const response = await fetch(`${this.baseUrl}/scenarios/detail/${encodeURIComponent(scenarioName)}`, {
+    return this.fetchJson<ScenarioDetail>(`/scenarios/detail/${encodeURIComponent(scenarioName)}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(request),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to fetch scenario detail: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
   }
 
   /**
@@ -162,21 +98,10 @@ class OperatorApiClient {
    * @returns Promise with scenario globals data
    */
   async getScenarioGlobals(scenarioName: string, request: ScenariosRequest): Promise<ScenarioGlobals> {
-    const response = await fetch(`${this.baseUrl}/scenarios/globals/${encodeURIComponent(scenarioName)}`, {
+    return this.fetchJson<ScenarioGlobals>(`/scenarios/globals/${encodeURIComponent(scenarioName)}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(request),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to fetch scenario globals: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
   }
 
   /**
@@ -186,21 +111,10 @@ class OperatorApiClient {
    * @returns Promise with scenarioRunName and basic info
    */
   async runScenario(request: ScenarioRunRequest): Promise<CreateScenarioRunResponse> {
-    const response = await fetch(`${this.baseUrl}/scenarios/run`, {
+    return this.fetchJson<CreateScenarioRunResponse>('/scenarios/run', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(request),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to create scenario run: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
   }
 
   /**
@@ -210,18 +124,7 @@ class OperatorApiClient {
    * @returns Promise with full scenario run status
    */
   async getScenarioRunStatus(scenarioRunName: string): Promise<ScenarioRunStatusResponse> {
-    const response = await fetch(
-      `${this.baseUrl}/scenarios/run/${encodeURIComponent(scenarioRunName)}`,
-      { method: 'GET' }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to fetch scenario run: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.fetchJson<ScenarioRunStatusResponse>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}`);
   }
 
   /**
@@ -231,18 +134,9 @@ class OperatorApiClient {
    * @returns Promise that resolves when deletion is complete
    */
   async deleteScenarioRun(scenarioRunName: string): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/scenarios/run/${encodeURIComponent(scenarioRunName)}`,
-      { method: 'DELETE' }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to delete scenario run: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    // Deletion successful - no response body expected
+    await this.fetch(`/scenarios/run/${encodeURIComponent(scenarioRunName)}`, {
+      method: 'DELETE',
+    });
   }
 
   /**
@@ -252,18 +146,9 @@ class OperatorApiClient {
    * @returns Promise that resolves when deletion is complete
    */
   async deleteJob(jobId: string): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/scenarios/run/jobs/${encodeURIComponent(jobId)}`,
-      { method: 'DELETE' }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to delete job: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    // Deletion successful - no response body expected
+    await this.fetch(`/scenarios/run/jobs/${encodeURIComponent(jobId)}`, {
+      method: 'DELETE',
+    });
   }
 
   /**
@@ -319,26 +204,21 @@ class OperatorApiClient {
    * @returns Promise with scenario runs array
    */
   async listScenarioRuns(): Promise<ScenarioRunStatusResponse[]> {
-    const response = await fetch(`${this.baseUrl}/scenarios/run`, { method: 'GET' });
+    try {
+      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[] }>('/scenarios/run');
+      console.log('listScenarioRuns raw response:', JSON.stringify(data, null, 2));
 
-    if (!response.ok) {
+      const runs = data.scenarioRuns || data.runs || [];
+      console.log('Extracted runs:', runs);
+      return runs;
+    } catch (error) {
       // Fallback: if backend doesn't support list yet, return empty array
-      // This allows frontend to work with individual polling until backend is ready
-      if (response.status === 404 || response.status === 405) {
+      if (error instanceof Error && error.message.includes('404')) {
         console.warn('List endpoint not implemented yet, using empty list');
         return [];
       }
-      throw new Error(`Failed to list scenario runs: ${response.statusText}`);
+      throw error;
     }
-
-    const data = await response.json();
-    console.log('listScenarioRuns raw response:', JSON.stringify(data, null, 2));
-
-    // Backend returns: {"scenarioRuns": [...]} (current)
-    // or {"runs": [...]} (future spec)
-    const runs = data.scenarioRuns || data.runs || [];
-    console.log('Extracted runs:', runs);
-    return runs;
   }
 
   /**
@@ -359,19 +239,9 @@ class OperatorApiClient {
     if (filters?.clusterName) params.append('clusterName', filters.clusterName);
 
     const queryString = params.toString();
-    const url = queryString ? `${this.baseUrl}/scenarios/run?${queryString}` : `${this.baseUrl}/scenarios/run`;
+    const url = queryString ? `/scenarios/run?${queryString}` : '/scenarios/run';
 
-    const response = await fetch(url, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to list jobs: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.fetchJson<JobsListResponse>(url);
   }
 
   /**
@@ -382,17 +252,7 @@ class OperatorApiClient {
    * @returns Promise with job status
    */
   async getJobStatus(jobId: string): Promise<JobStatusResponse> {
-    const response = await fetch(`${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to fetch job status: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.fetchJson<JobStatusResponse>(`/scenarios/run/${encodeURIComponent(jobId)}`);
   }
 
   /**
@@ -403,17 +263,9 @@ class OperatorApiClient {
    * @returns Promise with final job status
    */
   async cancelJob(jobId: string): Promise<JobStatusResponse> {
-    const response = await fetch(`${this.baseUrl}/scenarios/run/${encodeURIComponent(jobId)}`, {
+    return this.fetchJson<JobStatusResponse>(`/scenarios/run/${encodeURIComponent(jobId)}`, {
       method: 'DELETE',
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.message || `Failed to cancel job: ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
   }
 
   /**
