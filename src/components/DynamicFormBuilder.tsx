@@ -39,7 +39,8 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
     const validated = error ? 'error' : 'default';
 
     switch (field.type) {
-      case 'string':
+      case 'string': {
+        const stringField = field as any; // Cast to access validator/validation_message
         return (
           <FormGroup
             key={field.variable}
@@ -62,6 +63,15 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
                 </HelperText>
               </FormHelperText>
             )}
+            {stringField.validator && stringField.validation_message && !error && (
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant="indeterminate">
+                    {stringField.validation_message}
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            )}
             {error && (
               <FormHelperText>
                 <HelperText>
@@ -73,6 +83,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
             )}
           </FormGroup>
         );
+      }
 
       case 'number':
         return (

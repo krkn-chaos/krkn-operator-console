@@ -34,6 +34,12 @@ const initialState: AppState = {
   // Error handling
   error: null,
 
+  // Provider configuration
+  providers: null,
+  providerConfigUuid: null,
+  providerConfigStatus: 'idle',
+  providerConfigData: null,
+
   // Global notifications
   notifications: [],
 };
@@ -424,6 +430,58 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         notifications: state.notifications.filter(n => n.id !== action.payload.id),
       };
+
+    // Provider configuration
+    case 'PROVIDERS_LOADED':
+      return {
+        ...state,
+        providers: action.payload.providers,
+      };
+
+    case 'PROVIDER_STATUS_UPDATED': {
+      // Update provider active status in providers list
+      const updatedProviders = state.providers?.map(p =>
+        p.name === action.payload.name
+          ? { ...p, active: action.payload.active }
+          : p
+      ) || null;
+      return {
+        ...state,
+        providers: updatedProviders,
+      };
+    }
+
+    case 'PROVIDER_CONFIG_CREATE_START':
+      return {
+        ...state,
+        providerConfigStatus: 'creating',
+        providerConfigUuid: null,
+        providerConfigData: null,
+      };
+
+    case 'PROVIDER_CONFIG_CREATE_SUCCESS':
+      return {
+        ...state,
+        providerConfigStatus: 'polling',
+        providerConfigUuid: action.payload.uuid,
+      };
+
+    case 'PROVIDER_CONFIG_READY':
+      return {
+        ...state,
+        providerConfigStatus: 'ready',
+        providerConfigData: action.payload.data,
+      };
+
+    case 'PROVIDER_CONFIG_ERROR':
+      return {
+        ...state,
+        providerConfigStatus: 'error',
+      };
+
+    case 'PROVIDER_CONFIG_SUBMIT_SUCCESS':
+      // Config submitted successfully - could show notification via UI
+      return state;
 
     default:
       return state;

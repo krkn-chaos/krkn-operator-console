@@ -1,6 +1,9 @@
-import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Button, Alert, AlertActionCloseButton, AlertGroup } from '@patternfly/react-core';
-import { CogIcon } from '@patternfly/react-icons';
+import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Button, Alert, AlertActionCloseButton, AlertGroup, Dropdown, DropdownItem, DropdownList, MenuToggle } from '@patternfly/react-core';
+import { CogIcon, UserIcon } from '@patternfly/react-icons';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
+import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings } from './components';
@@ -10,6 +13,9 @@ import type { SelectedCluster } from './types/api';
 
 function App() {
   const { state, dispatch } = useAppContext();
+  const { state: authState, logout } = useAuth();
+  const navigate = useNavigate();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // Initialize and manage the workflow
   useTargetPoller();
@@ -178,6 +184,19 @@ function App() {
     dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const userMenuItems = (
+    <DropdownList>
+      <DropdownItem key="logout" onClick={handleLogout}>
+        Logout
+      </DropdownItem>
+    </DropdownList>
+  );
+
   const header = (
     <Masthead>
       <MastheadMain>
@@ -205,6 +224,25 @@ function App() {
                 aria-label="Settings"
                 style={{ color: 'white' }}
               />
+            </ToolbarItem>
+            <ToolbarItem>
+              <Dropdown
+                isOpen={isUserMenuOpen}
+                onOpenChange={(isOpen) => setIsUserMenuOpen(isOpen)}
+                toggle={(toggleRef) => (
+                  <MenuToggle
+                    ref={toggleRef}
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    variant="plain"
+                    style={{ color: 'white' }}
+                  >
+                    <UserIcon style={{ fontSize: '1.5rem', marginRight: '0.5rem' }} />
+                    {authState.user?.name} {authState.user?.surname}
+                  </MenuToggle>
+                )}
+              >
+                {userMenuItems}
+              </Dropdown>
             </ToolbarItem>
           </ToolbarContent>
         </Toolbar>

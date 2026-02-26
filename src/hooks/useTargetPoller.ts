@@ -57,10 +57,10 @@ export function useTargetPoller() {
             clearInterval(pollIntervalRef.current);
           }
           dispatch({ type: 'POLL_SUCCESS' });
-        } else if (status === 100) {
-          // Continue polling (100 Continue)
+        } else if (status === 202) {
+          // Continue polling (202 Accepted - pending)
           if (config.debugMode) {
-            console.log(`Poll attempt ${attempt}: 100 Continue`);
+            console.log(`Poll attempt ${attempt}: 202 Accepted (pending)`);
           }
         } else if (status === 404) {
           // UUID not found

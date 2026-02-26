@@ -45,7 +45,7 @@ class OperatorApiClient {
    * GET /targets/{uuid}
    * Check target request completion status
    * @param uuid - Target request UUID
-   * @returns HTTP status code
+   * @returns HTTP status code (202 = Accepted/pending, 200 = OK/completed)
    */
   async getTargetStatus(uuid: string): Promise<number> {
     const response = await fetch(`${this.baseUrl}/targets/${uuid}`, {

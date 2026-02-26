@@ -1,5 +1,7 @@
 // API Request/Response Types
 
+import type { ProviderInfo, ProviderSchema } from './provider';
+
 export interface CreateTargetResponse {
   uuid: string;
 }
@@ -340,6 +342,12 @@ export interface AppState {
   // Error handling
   error: AppError | null;
 
+  // Provider configuration
+  providers: ProviderInfo[] | null;
+  providerConfigUuid: string | null;
+  providerConfigStatus: 'idle' | 'creating' | 'polling' | 'ready' | 'error';
+  providerConfigData: { [providerName: string]: ProviderSchema } | null;
+
   // Global notifications
   notifications: Notification[];
 }
@@ -405,4 +413,13 @@ export type AppAction =
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
-  | { type: 'HIDE_NOTIFICATION'; payload: { id: string } };
+  | { type: 'HIDE_NOTIFICATION'; payload: { id: string } }
+
+  // Provider configuration
+  | { type: 'PROVIDERS_LOADED'; payload: { providers: ProviderInfo[] } }
+  | { type: 'PROVIDER_STATUS_UPDATED'; payload: { name: string; active: boolean } }
+  | { type: 'PROVIDER_CONFIG_CREATE_START' }
+  | { type: 'PROVIDER_CONFIG_CREATE_SUCCESS'; payload: { uuid: string } }
+  | { type: 'PROVIDER_CONFIG_READY'; payload: { data: { [providerName: string]: ProviderSchema } } }
+  | { type: 'PROVIDER_CONFIG_ERROR'; payload: { error: string } }
+  | { type: 'PROVIDER_CONFIG_SUBMIT_SUCCESS'; payload: { providerName: string } };
