@@ -10,3 +10,4 @@ export { Settings } from './Settings';
 export { TargetsList } from './TargetsList';
 export { TargetForm } from './TargetForm';
 export { ProtectedRoute } from './ProtectedRoute';
+export { AdminOnly } from './AdminOnly';
