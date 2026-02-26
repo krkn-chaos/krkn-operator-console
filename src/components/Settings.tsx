@@ -27,6 +27,7 @@ import { UserIcon, CubesIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { useProviderConfigPoller } from '../hooks/useProviderConfigPoller';
 import { useNotifications } from '../hooks/useNotifications';
+import { useRole } from '../hooks/useRole';
 import { providersApi } from '../services/providersApi';
 import { TargetsList } from './TargetsList';
 import { ProviderConfigTab } from './ProviderConfigTab';
@@ -34,6 +35,7 @@ import { ProviderConfigTab } from './ProviderConfigTab';
 export function Settings() {
   const { state, dispatch } = useAppContext();
   const { showSuccess, showError } = useNotifications();
+  const { isAdmin } = useRole();
   const [activeTabKey, setActiveTabKey] = useState<string | number>(0);
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [expandedAccordionItems, setExpandedAccordionItems] = useState<string[]>([]);
@@ -145,11 +147,13 @@ export function Settings() {
             activeKey={activeTabKey}
             onSelect={(_event, tabIndex) => setActiveTabKey(tabIndex)}
           >
-            <Tab eventKey={0} title={<TabTitleText>Cluster Targets</TabTitleText>}>
-              <div style={{ marginTop: '1.5rem' }}>
-                <TargetsList />
-              </div>
-            </Tab>
+            {isAdmin && (
+              <Tab eventKey={0} title={<TabTitleText>Cluster Targets</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <TargetsList />
+                </div>
+              </Tab>
+            )}
             <Tab eventKey={1} title={<TabTitleText>User Settings</TabTitleText>}>
               <div style={{ marginTop: '1.5rem' }}>
                 <EmptyState>
@@ -164,8 +168,9 @@ export function Settings() {
               </div>
             </Tab>
 
-            {/* Provider Configuration Tab */}
-            <Tab eventKey={2} title={<TabTitleText>Provider Configuration</TabTitleText>}>
+            {/* Provider Configuration Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={2} title={<TabTitleText>Provider Configuration</TabTitleText>}>
               <div style={{ marginTop: '1.5rem' }}>
                 {isLoadingProviders && (
                   <EmptyState>
@@ -282,7 +287,8 @@ export function Settings() {
                   </>
                 )}
               </div>
-            </Tab>
+              </Tab>
+            )}
           </Tabs>
         </CardBody>
       </Card>

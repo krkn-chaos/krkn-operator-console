@@ -6,7 +6,7 @@ import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { operatorApi } from './services/operatorApi';
 import type { SelectedCluster } from './types/api';
@@ -216,15 +216,17 @@ function App() {
       <MastheadContent>
         <Toolbar isFullHeight isStatic>
           <ToolbarContent>
-            <ToolbarItem>
-              <Button
-                variant="plain"
-                onClick={handleNavigateToSettings}
-                icon={<CogIcon style={{ fontSize: '1.5rem' }} />}
-                aria-label="Settings"
-                style={{ color: 'white' }}
-              />
-            </ToolbarItem>
+            <AdminOnly>
+              <ToolbarItem>
+                <Button
+                  variant="plain"
+                  onClick={handleNavigateToSettings}
+                  icon={<CogIcon style={{ fontSize: '1.5rem' }} />}
+                  aria-label="Settings"
+                  style={{ color: 'white' }}
+                />
+              </ToolbarItem>
+            </AdminOnly>
             <ToolbarItem>
               <Dropdown
                 isOpen={isUserMenuOpen}
