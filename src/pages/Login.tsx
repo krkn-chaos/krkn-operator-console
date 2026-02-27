@@ -90,10 +90,7 @@ export function Login() {
 
     try {
       await login({ userId: userId.trim(), password });
-
-      // Success - AuthContext will update state and redirect via useEffect
-      const returnUrl = searchParams.get('returnUrl') || '/app';
-      navigate(returnUrl);
+      // Success - AuthContext will update state and useEffect will handle redirect
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Login failed');
     } finally {
