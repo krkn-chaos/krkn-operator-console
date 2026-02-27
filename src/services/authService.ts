@@ -78,11 +78,18 @@ class AuthService {
    * @returns Login response with token and user info
    */
   async login(request: LoginRequest): Promise<LoginResponse> {
+    console.log('[authService.login] Sending login request to:', `${API_BASE}/login`);
     try {
       const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
+      });
+
+      console.log('[authService.login] Login API response:', {
+        status: response.status,
+        ok: response.ok,
+        contentType: response.headers.get('content-type')
       });
 
       const contentType = response.headers.get('content-type');
@@ -102,6 +109,7 @@ class AuthService {
       }
 
       const data: LoginResponse = await response.json();
+      console.log('[authService.login] Login successful, storing session data');
 
       // Store auth data in sessionStorage
       this.setToken(data.token);
@@ -114,9 +122,11 @@ class AuthService {
       });
       sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, data.expiresAt);
 
+      console.log('[authService.login] Session data stored in sessionStorage');
+
       return data;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('[authService.login] Login error:', error);
       throw error instanceof Error ? error : new Error('Login failed');
     }
   }

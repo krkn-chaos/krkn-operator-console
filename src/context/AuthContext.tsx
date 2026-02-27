@@ -121,13 +121,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Automatically logout user and clear session
    */
   const handleUnauthorized = useCallback(() => {
-    console.warn('Session expired or invalid token - logging out');
+    const currentPath = window.location.pathname;
+    console.warn('[AuthContext handleUnauthorized] 401 received!', {
+      currentPath,
+      willRedirect: currentPath !== '/login'
+    });
+
     authService.logout();
     dispatch({ type: 'AUTH_LOGOUT' });
 
     // Redirect to login with expired flag
-    const currentPath = window.location.pathname;
     if (currentPath !== '/login') {
+      console.warn('[AuthContext handleUnauthorized] Redirecting to login with expired flag');
       window.location.href = `/login?expired=true&returnUrl=${encodeURIComponent(currentPath)}`;
     }
   }, []);
@@ -136,6 +141,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Initialize auth state from sessionStorage on mount
    */
   useEffect(() => {
+    console.log('[AuthContext useEffect] Initializing auth state');
+
     // Set up unauthorized handler for API client
     setUnauthorizedHandler(handleUnauthorized);
 
@@ -143,18 +150,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const user = authService.getUser();
     const token = authService.getToken();
 
+    console.log('[AuthContext useEffect] Session check:', {
+      hasUser: !!user,
+      hasToken: !!token,
+      isExpired: token ? authService.isTokenExpired() : null
+    });
+
     if (user && token) {
       // Check if token is expired
       if (authService.isTokenExpired()) {
-        console.warn('Token expired - clearing session');
+        console.warn('[AuthContext useEffect] Token expired - clearing session');
         authService.logout();
         dispatch({ type: 'AUTH_INIT', payload: { user: null } });
       } else {
         // Valid session - restore auth state
+        console.log('[AuthContext useEffect] Valid session found, restoring auth state');
         dispatch({ type: 'AUTH_INIT', payload: { user } });
       }
     } else {
       // No session - user not authenticated
+      console.log('[AuthContext useEffect] No session found');
       dispatch({ type: 'AUTH_INIT', payload: { user: null } });
     }
   }, [handleUnauthorized]);
@@ -164,8 +179,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * @param request - Login credentials
    */
   const login = useCallback(async (request: LoginRequest) => {
+    console.log('[AuthContext login] Starting login for:', request.userId);
     try {
       const response = await authService.login(request);
+      console.log('[AuthContext login] Login response received:', {
+        userId: response.userId,
+        role: response.role,
+        hasToken: !!response.token
+      });
 
       // Dispatch login action with user data
       dispatch({
@@ -180,7 +201,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           },
         },
       });
+      console.log('[AuthContext login] Dispatched AUTH_LOGIN action');
     } catch (error) {
+      console.error('[AuthContext login] Login error:', error);
       dispatch({ type: 'AUTH_ERROR' });
       throw error; // Re-throw for component to handle
     }
