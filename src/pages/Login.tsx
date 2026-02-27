@@ -58,7 +58,7 @@ export function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (state.isAuthenticated && !state.loading) {
-      const returnUrl = searchParams.get('returnUrl') || '/';
+      const returnUrl = searchParams.get('returnUrl') || '/app';
       navigate(returnUrl);
     }
   }, [state.isAuthenticated, state.loading, navigate, searchParams]);
@@ -92,7 +92,7 @@ export function Login() {
       await login({ userId: userId.trim(), password });
 
       // Success - AuthContext will update state and redirect via useEffect
-      const returnUrl = searchParams.get('returnUrl') || '/';
+      const returnUrl = searchParams.get('returnUrl') || '/app';
       navigate(returnUrl);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Login failed');

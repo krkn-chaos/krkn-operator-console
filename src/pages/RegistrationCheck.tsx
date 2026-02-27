@@ -15,14 +15,28 @@ import {
   Spinner,
   Title,
 } from '@patternfly/react-core';
+import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 
 export function RegistrationCheck() {
   const navigate = useNavigate();
+  const { state } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function checkRegistration() {
+      // If user is already authenticated, go to app
+      if (state.isAuthenticated && !state.loading) {
+        navigate('/app', { replace: true });
+        return;
+      }
+
+      // If still loading auth state, wait
+      if (state.loading) {
+        return;
+      }
+
+      // User not authenticated - check if admin exists
       try {
         const isRegistered = await authService.isRegistered();
 
@@ -40,7 +54,7 @@ export function RegistrationCheck() {
     }
 
     checkRegistration();
-  }, [navigate]);
+  }, [navigate, state.isAuthenticated, state.loading]);
 
   if (error) {
     return (
