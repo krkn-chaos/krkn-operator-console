@@ -110,6 +110,7 @@ class AuthService {
 
       const data: LoginResponse = await response.json();
       console.log('[authService.login] Login successful, storing session data');
+      console.log('[authService.login] Token received:', data.token.substring(0, 30) + '...');
 
       // Store auth data in sessionStorage
       this.setToken(data.token);
@@ -123,6 +124,7 @@ class AuthService {
       sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, data.expiresAt);
 
       console.log('[authService.login] Session data stored in sessionStorage');
+      console.log('[authService.login] Token in storage:', sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)?.substring(0, 30) + '...');
 
       return data;
     } catch (error) {
