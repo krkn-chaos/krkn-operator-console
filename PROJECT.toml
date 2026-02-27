@@ -1,0 +1,45 @@
+# Project Configuration for krkn-operator-console
+# This file contains project-specific settings used by Claude Code and automation tools.
+# It should be the ONLY file you need to edit when adapting CLAUDE.md to a new project.
+
+[project]
+# Project identifier - used as beads issue_prefix and in documentation
+name = "krkn-operator-console"
+
+# Project type - determines which sections of CLAUDE.md apply
+type = "react-frontend"
+
+# Ecosystem this project belongs to
+ecosystem = "krkn-operator-ecosystem"
+
+# Brief project description
+description = "Frontend UI console for the krkn chaos engineering ecosystem"
+
+[ecosystem_projects]
+# Related projects in the ecosystem (relative paths)
+core = "../krkn-operator"
+acm = "../krkn-operator-acm"
+console = "."  # This project
+
+[beads]
+# Beads configuration - uses centralized database via symlink
+central_database = "/Users/tsebasti/Projects/beads/.beads"  # Centralized beads database location
+project_label = "project:krkn-operator-console"  # Label to identify this project's issues
+default_create_labels = ["project:krkn-operator-console"]  # Auto-apply to new issues
+export_path = "./beads/"  # Local JSON export path (gitignored)
+
+[react]
+# React-specific settings and commands
+test_command = "npm test"
+lint_command = "npm run lint"
+build_command = "npm run build"
+dev_command = "npm run dev"
+
+# Code quality requirements
+min_coverage = 70  # Minimum test coverage percentage
+required_linters = ["eslint", "prettier"]
+
+[documentation]
+# Documentation standards
+component_docs_required = true  # Components should have JSDoc/TSDoc comments
+examples_required = true  # Complex components need usage examples
