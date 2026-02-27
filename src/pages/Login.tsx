@@ -114,9 +114,8 @@ export function Login() {
 
   return (
     <PFLoginPage
-      brandImgSrc="/krkn-logo.png"
+      brandImgSrc="/logo.png"
       brandImgAlt="Krkn Operator"
-      backgroundImgSrc="/login-background.jpg"
       textContent="Chaos Engineering for Kubernetes"
       loginTitle="Log in to your account"
     >

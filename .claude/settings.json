@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(curl:*)",
-      "Bash(bd list --status=open)"
+      "Bash(bd list --status=open)",
+      "Bash(bd show krkn-operator-console-2q3)"
     ]
   }
 }
