@@ -1,6 +1,7 @@
 // API Request/Response Types
 
 import type { ProviderInfo, ProviderSchema } from './provider';
+import type { UserRole } from './auth';
 
 export interface CreateTargetResponse {
   uuid: string;
@@ -271,6 +272,45 @@ export interface ScenarioRunState {
   runningJobs: number;
   clusterJobs: ClusterJob[];
   createdAt: string;
+}
+
+// User Management Types
+
+export interface UserDetails {
+  userId: string; // Email
+  name: string;
+  surname: string;
+  role: UserRole; // From auth.ts
+  organization?: string;
+  enabled: boolean;
+  createdAt?: string; // ISO 8601
+  lastLogin?: string; // ISO 8601
+}
+
+export interface CreateUserRequest {
+  userId: string;
+  password: string;
+  name: string;
+  surname: string;
+  role: UserRole;
+  organization?: string;
+}
+
+export interface UpdateUserRequest {
+  name?: string;
+  surname?: string;
+  organization?: string;
+  enabled?: boolean;
+  role?: UserRole;
+}
+
+export interface ListUsersResponse {
+  users: UserDetails[];
+}
+
+export interface UserOperationResponse {
+  userId: string;
+  message?: string;
 }
 
 // App State Types

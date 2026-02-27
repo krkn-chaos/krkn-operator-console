@@ -31,6 +31,7 @@ import { useRole } from '../hooks/useRole';
 import { providersApi } from '../services/providersApi';
 import { TargetsList } from './TargetsList';
 import { ProviderConfigTab } from './ProviderConfigTab';
+import { UserManagement } from './UserManagement';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -156,15 +157,7 @@ export function Settings() {
             )}
             <Tab eventKey={1} title={<TabTitleText>User Settings</TabTitleText>}>
               <div style={{ marginTop: '1.5rem' }}>
-                <EmptyState>
-                  <EmptyStateIcon icon={UserIcon} />
-                  <Title headingLevel="h2" size="lg">
-                    User Settings
-                  </Title>
-                  <EmptyStateBody>
-                    User settings configuration will be available soon.
-                  </EmptyStateBody>
-                </EmptyState>
+                <UserManagement />
               </div>
             </Tab>
 

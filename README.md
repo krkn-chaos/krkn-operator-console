@@ -20,6 +20,15 @@ React-based web console using PatternFly design system to interact with the krkn
 - Responsive layout
 - Loading states and progress indicators
 
+### User Management (Admin)
+- Create, edit, and delete user accounts
+- Assign roles (Admin, User)
+- View user details and activity
+- Role-based access control (RBAC)
+- Password policies and validation
+- Self-deletion and last-admin protection
+- See [User Management Documentation](./docs/USER_MANAGEMENT.md)
+
 ## Quick Start
 
 ### Prerequisites
