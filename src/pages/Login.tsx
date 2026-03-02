@@ -125,7 +125,7 @@ export function Login() {
     <PFLoginPage
       header={
         <div style={{ textAlign: 'center' }}>
-          <Title headingLevel="h1" size="3xl" style={{ marginBottom: '2rem', color: 'var(--pf-v5-global--Color--100)' }}>
+          <Title headingLevel="h1" size="4xl" style={{ marginBottom: '2rem', color: 'var(--pf-v5-global--Color--100)', fontSize: '3rem' }}>
             Welcome to Krkn!
           </Title>
           <img src="/logo.png" alt="Krkn Operator" />
