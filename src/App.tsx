@@ -227,7 +227,7 @@ function App() {
                 />
               </ToolbarItem>
             </AdminOnly>
-            <ToolbarItem>
+            <ToolbarItem align={{ default: 'alignRight' }}>
               <Dropdown
                 isOpen={isUserMenuOpen}
                 onOpenChange={(isOpen) => setIsUserMenuOpen(isOpen)}
