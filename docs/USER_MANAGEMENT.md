@@ -265,7 +265,7 @@ The User Management feature interacts with the following backend API endpoints:
 
 ### List Users
 ```http
-GET /api/v1/auth/users
+GET /api/v1/users
 Authorization: Bearer <JWT_TOKEN>
 ```
 
@@ -301,7 +301,7 @@ Authorization: Bearer <JWT_TOKEN>
 
 ### Get User
 ```http
-GET /api/v1/auth/users/{userId}
+GET /api/v1/users/{userId}
 Authorization: Bearer <JWT_TOKEN>
 ```
 
@@ -326,7 +326,7 @@ Authorization: Bearer <JWT_TOKEN>
 
 ### Create User
 ```http
-POST /api/v1/auth/users
+POST /api/v1/users
 Authorization: Bearer <JWT_TOKEN>
 Content-Type: application/json
 ```
@@ -355,7 +355,7 @@ Content-Type: application/json
 
 ### Update User
 ```http
-PUT /api/v1/auth/users/{userId}
+PUT /api/v1/users/{userId}
 Authorization: Bearer <JWT_TOKEN>
 Content-Type: application/json
 ```
@@ -396,7 +396,7 @@ Content-Type: application/json
 
 ### Delete User
 ```http
-DELETE /api/v1/auth/users/{userId}
+DELETE /api/v1/users/{userId}
 Authorization: Bearer <JWT_TOKEN>
 ```
 

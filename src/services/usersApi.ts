@@ -7,7 +7,7 @@ import type {
   UserOperationResponse,
 } from '../types/api';
 
-const API_BASE = '/api/v1/auth';
+const API_BASE = '/api/v1';
 
 /**
  * Users API client for krkn-operator-console
@@ -15,7 +15,7 @@ const API_BASE = '/api/v1/auth';
  * Provides methods for user account management (CRUD operations).
  * All methods require authentication via JWT Bearer token.
  *
- * **Base URL:** `/api/v1/auth`
+ * **Base URL:** `/api/v1`
  *
  * **Authentication:** Required (JWT Bearer token in Authorization header)
  *

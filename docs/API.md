@@ -33,7 +33,7 @@ Base URL: `/api/v1/auth`
 
 Retrieves a complete list of all user accounts in the system.
 
-**Endpoint:** `GET /api/v1/auth/users`
+**Endpoint:** `GET /api/v1/users`
 
 **Authorization:** Admin only
 
@@ -92,7 +92,7 @@ Authorization: Bearer <JWT_TOKEN>
 **Example Request:**
 ```bash
 curl -X GET \
-  'https://api.example.com/api/v1/auth/users' \
+  'https://api.example.com/api/v1/users' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 ```
 
@@ -102,7 +102,7 @@ curl -X GET \
 
 Retrieves detailed information for a specific user account.
 
-**Endpoint:** `GET /api/v1/auth/users/{userId}`
+**Endpoint:** `GET /api/v1/users/{userId}`
 
 **Authorization:** All authenticated users
 
@@ -149,7 +149,7 @@ Authorization: Bearer <JWT_TOKEN>
 **Example Request:**
 ```bash
 curl -X GET \
-  'https://api.example.com/api/v1/auth/users/john.doe%40example.com' \
+  'https://api.example.com/api/v1/users/john.doe%40example.com' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 ```
 
@@ -159,7 +159,7 @@ curl -X GET \
 
 Creates a new user account with the specified credentials and profile information.
 
-**Endpoint:** `POST /api/v1/auth/users`
+**Endpoint:** `POST /api/v1/users`
 
 **Authorization:** Admin only
 
@@ -214,7 +214,7 @@ Content-Type: application/json
 **Example Request:**
 ```bash
 curl -X POST \
-  'https://api.example.com/api/v1/auth/users' \
+  'https://api.example.com/api/v1/users' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -233,7 +233,7 @@ curl -X POST \
 
 Updates an existing user's profile information and optionally changes their password.
 
-**Endpoint:** `PUT /api/v1/auth/users/{userId}`
+**Endpoint:** `PUT /api/v1/users/{userId}`
 
 **Authorization:** Admin only
 
@@ -299,7 +299,7 @@ Content-Type: application/json
 **Example Request:**
 ```bash
 curl -X PUT \
-  'https://api.example.com/api/v1/auth/users/john.doe%40example.com' \
+  'https://api.example.com/api/v1/users/john.doe%40example.com' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -316,7 +316,7 @@ curl -X PUT \
 
 Permanently deletes a user account from the system.
 
-**Endpoint:** `DELETE /api/v1/auth/users/{userId}`
+**Endpoint:** `DELETE /api/v1/users/{userId}`
 
 **Authorization:** Admin only
 
@@ -358,7 +358,7 @@ These checks are performed in both the frontend and backend for defense in depth
 **Example Request:**
 ```bash
 curl -X DELETE \
-  'https://api.example.com/api/v1/auth/users/old.user%40example.com' \
+  'https://api.example.com/api/v1/users/old.user%40example.com' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 ```
 
