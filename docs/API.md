@@ -233,7 +233,7 @@ curl -X POST \
 
 Updates an existing user's profile information and optionally changes their password.
 
-**Endpoint:** `PUT /api/v1/users/{userId}`
+**Endpoint:** `PATCH /api/v1/users/{userId}`
 
 **Authorization:** Admin only
 

@@ -355,7 +355,7 @@ Content-Type: application/json
 
 ### Update User
 ```http
-PUT /api/v1/users/{userId}
+PATCH /api/v1/users/{userId}
 Authorization: Bearer <JWT_TOKEN>
 Content-Type: application/json
 ```

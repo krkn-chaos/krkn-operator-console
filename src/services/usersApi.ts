@@ -201,9 +201,9 @@ class UsersApi extends BaseApiClient {
    *
    * **Authorization:** Admin only
    *
-   * **HTTP Method:** PUT
+   * **HTTP Method:** PATCH
    *
-   * **Endpoint:** `/api/v1/auth/users/{userId}`
+   * **Endpoint:** `/api/v1/users/{userId}`
    *
    * **Editable Fields:**
    * - name (first name)
@@ -252,7 +252,7 @@ class UsersApi extends BaseApiClient {
    */
   async updateUser(userId: string, data: UpdateUserRequest): Promise<UserOperationResponse> {
     return this.fetchJson<UserOperationResponse>(`/users/${encodeURIComponent(userId)}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
