@@ -117,7 +117,7 @@ export function Login() {
 
   const helperText = errorMessage ? (
     <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>
-      <ExclamationCircleIcon /> {errorMessage}
+      {errorMessage}
     </span>
   ) : undefined;
 
