@@ -124,12 +124,13 @@ export function Login() {
   return (
     <PFLoginPage
       header={
-        <Title headingLevel="h1" size="3xl" style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--pf-v5-global--Color--100)' }}>
-          Welcome to Krkn!
-        </Title>
+        <div style={{ textAlign: 'center' }}>
+          <Title headingLevel="h1" size="3xl" style={{ marginBottom: '2rem', color: 'var(--pf-v5-global--Color--100)' }}>
+            Welcome to Krkn!
+          </Title>
+          <img src="/logo.png" alt="Krkn Operator" style={{ maxWidth: '200px', marginBottom: '1rem' }} />
+        </div>
       }
-      brandImgSrc="/logo.png"
-      brandImgAlt="Krkn Operator"
       textContent="Chaos Engineering for Kubernetes"
       loginTitle="Log in to your account"
     >
