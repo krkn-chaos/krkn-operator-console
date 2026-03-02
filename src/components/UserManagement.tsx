@@ -16,14 +16,19 @@ import {
   Modal,
   ModalVariant,
   Spinner,
+  Dropdown,
+  DropdownItem,
+  DropdownList,
+  MenuToggle,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, EyeIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, EyeIcon, EllipsisVIcon, KeyIcon } from '@patternfly/react-icons';
 import { usersApi } from '../services/usersApi';
 import { useNotifications, useRole } from '../hooks';
 import { useAuth } from '../context/AuthContext';
 import { UserForm } from './UserForm';
 import { UserDetails as UserDetailsComponent } from './UserDetails';
-import type { UserDetails, CreateUserRequest, UpdateUserRequest } from '../types/api';
+import { ChangePasswordForm } from './ChangePasswordForm';
+import type { UserDetails, CreateUserRequest, UpdateUserRequest, ChangePasswordRequest } from '../types/api';
 
 /**
  * User Management component
@@ -100,6 +105,8 @@ export function UserManagement() {
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ userId: string; name: string } | null>(null);
   const [viewingUser, setViewingUser] = useState<UserDetails | null>(null);
   const [apiAvailable, setApiAvailable] = useState(true);
+  const [changingPasswordFor, setChangingPasswordFor] = useState<UserDetails | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const { state } = useAuth();
@@ -196,6 +203,27 @@ export function UserManagement() {
 
   const handleViewDetails = (user: UserDetails) => {
     setViewingUser(user);
+  };
+
+  const handleChangePassword = (user: UserDetails) => {
+    setChangingPasswordFor(user);
+    setOpenDropdownId(null); // Close dropdown
+  };
+
+  const handlePasswordChangeSubmit = async (data: ChangePasswordRequest) => {
+    if (!changingPasswordFor) return;
+
+    try {
+      await usersApi.changePassword(changingPasswordFor.userId, data);
+      showSuccess('Password changed', `Password for ${changingPasswordFor.name} ${changingPasswordFor.surname} has been changed successfully`);
+      setChangingPasswordFor(null);
+    } catch (error) {
+      showError('Failed to change password', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
+  const handlePasswordChangeCancel = () => {
+    setChangingPasswordFor(null);
   };
 
   if (loading) {
@@ -295,44 +323,66 @@ export function UserManagement() {
                       </div>
                     </DataListCell>,
                     <DataListCell key="actions" width={1}>
-                      <Flex spaceItems={{ default: 'spaceItemsSm' }}>
-                        <FlexItem>
-                          <Button
-                            variant="secondary"
+                      <Dropdown
+                        isOpen={openDropdownId === user.userId}
+                        onOpenChange={(isOpen) => setOpenDropdownId(isOpen ? user.userId : null)}
+                        toggle={(toggleRef) => (
+                          <MenuToggle
+                            ref={toggleRef}
+                            onClick={() => setOpenDropdownId(openDropdownId === user.userId ? null : user.userId)}
+                            variant="plain"
+                            aria-label="User actions"
+                            isDisabled={deletingUserId === user.userId}
+                          >
+                            <EllipsisVIcon />
+                          </MenuToggle>
+                        )}
+                      >
+                        <DropdownList>
+                          <DropdownItem
+                            key="view"
                             icon={<EyeIcon />}
-                            onClick={() => handleViewDetails(user)}
-                            size="sm"
+                            onClick={() => {
+                              handleViewDetails(user);
+                              setOpenDropdownId(null);
+                            }}
                           >
                             View Details
-                          </Button>
-                        </FlexItem>
-                        {isAdmin && (
-                          <>
-                            <FlexItem>
-                              <Button
-                                variant="secondary"
+                          </DropdownItem>
+                          {isAdmin && (
+                            <>
+                              <DropdownItem
+                                key="edit"
                                 icon={<EditIcon />}
-                                onClick={() => handleEdit(user)}
-                                size="sm"
+                                onClick={() => {
+                                  handleEdit(user);
+                                  setOpenDropdownId(null);
+                                }}
                               >
-                                Edit
-                              </Button>
-                            </FlexItem>
-                            <FlexItem>
-                              <Button
-                                variant="danger"
+                                Edit Profile
+                              </DropdownItem>
+                              <DropdownItem
+                                key="password"
+                                icon={<KeyIcon />}
+                                onClick={() => handleChangePassword(user)}
+                              >
+                                Change Password
+                              </DropdownItem>
+                              <DropdownItem
+                                key="delete"
                                 icon={<TrashIcon />}
-                                onClick={() => handleDelete(user.userId, `${user.name} ${user.surname}`, user.role)}
-                                isLoading={deletingUserId === user.userId}
-                                isDisabled={deletingUserId === user.userId}
-                                size="sm"
+                                onClick={() => {
+                                  handleDelete(user.userId, `${user.name} ${user.surname}`, user.role);
+                                  setOpenDropdownId(null);
+                                }}
+                                style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
                               >
-                                Delete
-                              </Button>
-                            </FlexItem>
-                          </>
-                        )}
-                      </Flex>
+                                Delete User
+                              </DropdownItem>
+                            </>
+                          )}
+                        </DropdownList>
+                      </Dropdown>
                     </DataListCell>,
                   ]}
                 />
@@ -393,6 +443,22 @@ export function UserManagement() {
         ]}
       >
         <UserDetailsComponent user={viewingUser} onClose={() => setViewingUser(null)} />
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title={`Change Password${changingPasswordFor ? ` - ${changingPasswordFor.name} ${changingPasswordFor.surname}` : ''}`}
+        isOpen={changingPasswordFor !== null}
+        onClose={handlePasswordChangeCancel}
+      >
+        {changingPasswordFor && (
+          <ChangePasswordForm
+            isSelfChange={changingPasswordFor.userId === state.user?.userId}
+            onSubmit={handlePasswordChangeSubmit}
+            onCancel={handlePasswordChangeCancel}
+          />
+        )}
       </Modal>
     </>
   );

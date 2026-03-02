@@ -302,7 +302,11 @@ export interface UpdateUserRequest {
   organization?: string;
   enabled?: boolean;
   role?: UserRole;
-  password?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword?: string; // Required for self-change, not required for admin changing other user's password
+  newPassword: string;
 }
 
 export interface ListUsersResponse {

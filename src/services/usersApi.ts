@@ -2,6 +2,7 @@ import { BaseApiClient } from '../utils/apiClient';
 import type {
   CreateUserRequest,
   UpdateUserRequest,
+  ChangePasswordRequest,
   UserDetails,
   ListUsersResponse,
   UserOperationResponse,
@@ -252,6 +253,56 @@ class UsersApi extends BaseApiClient {
    */
   async updateUser(userId: string, data: UpdateUserRequest): Promise<UserOperationResponse> {
     return this.fetchJson<UserOperationResponse>(`/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Change user password
+   *
+   * Changes the password for a user account using a separate endpoint.
+   * Password changes are handled independently from profile updates.
+   *
+   * **Authorization:**
+   * - Users can change their own password (requires current password)
+   * - Admins can change any user's password (no current password required)
+   *
+   * **HTTP Method:** PATCH
+   *
+   * **Endpoint:** `/api/v1/users/{userId}/password`
+   *
+   * **Request Body:**
+   * - For self-change: `{ currentPassword, newPassword }`
+   * - For admin changing other user: `{ newPassword }`
+   *
+   * @param userId - The user's email address (URL will be encoded automatically)
+   * @param data - Password change request data
+   * @param data.currentPassword - Current password (required for self-change)
+   * @param data.newPassword - New password (min 8 characters recommended)
+   * @returns Promise resolving to operation response with success message
+   * @throws {Error} 400 if validation fails or current password is incorrect
+   * @throws {Error} 401 if not authenticated
+   * @throws {Error} 403 if not authorized to change this user's password
+   * @throws {Error} 404 if user not found
+   * @throws {Error} 500 on server error
+   *
+   * @example
+   * ```typescript
+   * // User changing own password
+   * await usersApi.changePassword('john.doe@example.com', {
+   *   currentPassword: 'OldPass123',
+   *   newPassword: 'NewSecurePass456',
+   * });
+   *
+   * // Admin changing another user's password
+   * await usersApi.changePassword('user@example.com', {
+   *   newPassword: 'ResetPass789',
+   * });
+   * ```
+   */
+  async changePassword(userId: string, data: ChangePasswordRequest): Promise<UserOperationResponse> {
+    return this.fetchJson<UserOperationResponse>(`/users/${encodeURIComponent(userId)}/password`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });

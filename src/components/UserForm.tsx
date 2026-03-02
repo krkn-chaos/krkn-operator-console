@@ -200,18 +200,13 @@ export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
 
     try {
       if (initialData) {
-        // EDIT MODE
+        // EDIT MODE - Profile update only (password changed via separate endpoint)
         const data: UpdateUserRequest = {
           name: name.trim(),
           surname: surname.trim(),
           role,
           organization: organization.trim() || undefined,
         };
-
-        // Include password only if it's being changed
-        if (password.trim()) {
-          data.password = password.trim();
-        }
 
         await onSubmit(data);
       } else {
@@ -251,48 +246,51 @@ export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
         )}
       </FormGroup>
 
-      <FormGroup label="Password" isRequired={!initialData} fieldId="password">
-        <TextInput
-          type="password"
-          id="password"
-          value={password}
-          onChange={(_event, value) => setPassword(value)}
-          isRequired={!initialData}
-          validated={errors.password ? 'error' : 'default'}
-        />
-        {!initialData && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>Minimum 8 characters</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-        {errors.password && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{errors.password}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
+      {/* Password fields only shown in CREATE mode - use separate Change Password action for edits */}
+      {!initialData && (
+        <>
+          <FormGroup label="Password" isRequired fieldId="password">
+            <TextInput
+              type="password"
+              id="password"
+              value={password}
+              onChange={(_event, value) => setPassword(value)}
+              isRequired
+              validated={errors.password ? 'error' : 'default'}
+            />
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>Minimum 8 characters</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+            {errors.password && (
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant="error">{errors.password}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            )}
+          </FormGroup>
 
-      <FormGroup label="Confirm Password" isRequired={!initialData} fieldId="confirmPassword">
-        <TextInput
-          type="password"
-          id="confirmPassword"
-          value={confirmPassword}
-          onChange={(_event, value) => setConfirmPassword(value)}
-          isRequired={!initialData}
-          validated={errors.confirmPassword ? 'error' : 'default'}
-        />
-        {errors.confirmPassword && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{errors.confirmPassword}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
+          <FormGroup label="Confirm Password" isRequired fieldId="confirmPassword">
+            <TextInput
+              type="password"
+              id="confirmPassword"
+              value={confirmPassword}
+              onChange={(_event, value) => setConfirmPassword(value)}
+              isRequired
+              validated={errors.confirmPassword ? 'error' : 'default'}
+            />
+            {errors.confirmPassword && (
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant="error">{errors.confirmPassword}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            )}
+          </FormGroup>
+        </>
+      )}
 
       <FormGroup label="First Name" isRequired fieldId="name">
         <TextInput
