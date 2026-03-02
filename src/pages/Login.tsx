@@ -128,7 +128,7 @@ export function Login() {
           <Title headingLevel="h1" size="3xl" style={{ marginBottom: '2rem', color: 'var(--pf-v5-global--Color--100)' }}>
             Welcome to Krkn!
           </Title>
-          <img src="/logo.png" alt="Krkn Operator" style={{ maxWidth: '200px', marginBottom: '1rem' }} />
+          <img src="/logo.png" alt="Krkn Operator" />
         </div>
       }
       textContent="Chaos Engineering for Kubernetes"
