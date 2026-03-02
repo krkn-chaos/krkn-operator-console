@@ -302,6 +302,7 @@ export interface UpdateUserRequest {
   organization?: string;
   enabled?: boolean;
   role?: UserRole;
+  password?: string;
 }
 
 export interface ListUsersResponse {

@@ -207,6 +207,12 @@ export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
           role,
           organization: organization.trim() || undefined,
         };
+
+        // Include password only if it's being changed
+        if (password.trim()) {
+          data.password = password.trim();
+        }
+
         await onSubmit(data);
       } else {
         // CREATE MODE
