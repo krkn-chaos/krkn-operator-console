@@ -259,6 +259,7 @@ export interface ScenarioRunStatusResponse {
   runningJobs: number;
   clusterJobs: ClusterJob[];
   createdAt?: string; // Optional - backend may include it in the future
+  ownerUserId?: string; // Email of the user who created the run
 }
 
 // Internal state for tracking scenario runs
@@ -272,6 +273,7 @@ export interface ScenarioRunState {
   runningJobs: number;
   clusterJobs: ClusterJob[];
   createdAt: string;
+  ownerUserId?: string; // Email of the user who created the run
 }
 
 // User Management Types
@@ -282,8 +284,8 @@ export interface UserDetails {
   surname: string;
   role: UserRole; // From auth.ts
   organization?: string;
-  enabled: boolean;
-  createdAt?: string; // ISO 8601
+  active: boolean; // Account active status
+  created?: string; // ISO 8601
   lastLogin?: string; // ISO 8601
 }
 
@@ -300,7 +302,7 @@ export interface UpdateUserRequest {
   name?: string;
   surname?: string;
   organization?: string;
-  enabled?: boolean;
+  active?: boolean;
   role?: UserRole;
 }
 
@@ -467,4 +469,14 @@ export type AppAction =
   | { type: 'PROVIDER_CONFIG_CREATE_SUCCESS'; payload: { uuid: string } }
   | { type: 'PROVIDER_CONFIG_READY'; payload: { data: { [providerName: string]: ProviderSchema } } }
   | { type: 'PROVIDER_CONFIG_ERROR'; payload: { error: string } }
-  | { type: 'PROVIDER_CONFIG_SUBMIT_SUCCESS'; payload: { providerName: string } };
+  | { type: 'PROVIDER_CONFIG_SUBMIT_SUCCESS'; payload: { providerName: string } }
+  | { type: 'PROVIDER_CONFIG_RESET' };
+
+// Active Runs Dashboard API Types
+export interface ActiveRunsResponse {
+  totalActiveRuns: number;
+  totalClusters: number;
+  clusterRuns: {
+    [clusterName: string]: string[]; // cluster name -> array of run names
+  };
+}

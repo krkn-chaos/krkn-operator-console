@@ -20,6 +20,11 @@ import {
   Label,
   Modal,
   ModalVariant,
+  DatePicker,
+  Select,
+  SelectOption,
+  SelectList,
+  MenuToggle,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -27,11 +32,14 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
-  CubesIcon,
   TrashIcon,
 } from '@patternfly/react-icons';
+import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase } from '../types/api';
 import { LogViewer } from './LogViewer';
+import { ActiveRunsSummary } from './ActiveRunsSummary';
+import { useRole } from '../hooks/useRole';
+import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
 interface JobsListProps {
   scenarioRuns: ScenarioRunState[];
@@ -54,10 +62,16 @@ export function JobsList({
   onDeleteJob,
   onCreateJob,
 }: JobsListProps) {
+  const { isAdmin } = useRole();
+  const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
   const [confirmDeleteJob, setConfirmDeleteJob] = useState<{ jobId: string; jobName: string } | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -130,6 +144,38 @@ export function JobsList({
     }
   };
 
+  // Get unique owner user IDs for autocomplete
+  const uniqueOwners = Array.from(
+    new Set(scenarioRuns.map((run) => run.ownerUserId).filter((id): id is string => !!id))
+  ).sort();
+
+  // Filter scenario runs by owner and date range
+  const filteredScenarioRuns = scenarioRuns.filter((run) => {
+    // Owner filter (exact match)
+    if (ownerFilter && run.ownerUserId !== ownerFilter) {
+      return false;
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      const runDate = new Date(run.createdAt);
+
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (runDate < fromDate) return false;
+      }
+
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        if (runDate > toDate) return false;
+      }
+    }
+
+    return true;
+  });
+
   return (
     <Card>
       <CardTitle>
@@ -147,9 +193,155 @@ export function JobsList({
         </Flex>
       </CardTitle>
       <CardBody>
-        {scenarioRuns.length === 0 ? (
+        {/* Active Runs Summary */}
+        <ActiveRunsSummary
+          activeRuns={activeRuns}
+          loading={activeRunsLoading}
+          error={activeRunsError}
+        />
+
+        {/* Filters Box (Admin Only) */}
+        {isAdmin && (uniqueOwners.length > 0 || scenarioRuns.length > 0) && (
+          <Card
+            isCompact
+            style={{
+              marginBottom: '1.5rem',
+              backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+              border: '1px solid var(--pf-v5-global--BorderColor--100)',
+            }}
+          >
+            <CardTitle>
+              <Title headingLevel="h3" size="md">
+                Filters
+              </Title>
+            </CardTitle>
+            <CardBody>
+              <style>{`
+                .custom-select-toggle {
+                  background-color: var(--pf-v5-global--BackgroundColor--100) !important;
+                }
+              `}</style>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                {/* Owner Filter - Search with Autocomplete */}
+                {uniqueOwners.length > 0 && (
+                  <div>
+                    <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
+                      Filter by User:
+                    </div>
+
+                    {/* Show selected user as Label */}
+                    {ownerFilter ? (
+                      <Label
+                        color="blue"
+                        onClose={() => setOwnerFilter('')}
+                        closeBtnAriaLabel="Remove user filter"
+                      >
+                        {ownerFilter}
+                      </Label>
+                    ) : (
+                      <Select
+                        isOpen={isOwnerSelectOpen}
+                        onOpenChange={(isOpen) => setIsOwnerSelectOpen(isOpen)}
+                        onSelect={(_event, value) => {
+                          setOwnerFilter(value as string);
+                          setIsOwnerSelectOpen(false);
+                        }}
+                        toggle={(toggleRef) => (
+                          <MenuToggle
+                            ref={toggleRef}
+                            onClick={() => setIsOwnerSelectOpen(!isOwnerSelectOpen)}
+                            isExpanded={isOwnerSelectOpen}
+                            style={{ width: '222px' }}
+                            className="custom-select-toggle"
+                          >
+                            {ownerFilter || 'Select user...'}
+                          </MenuToggle>
+                        )}
+                      >
+                        <SelectList>
+                          {uniqueOwners.map(owner => (
+                            <SelectOption key={owner} value={owner}>
+                              {owner}
+                            </SelectOption>
+                          ))}
+                        </SelectList>
+                      </Select>
+                    )}
+                  </div>
+                )}
+
+                {/* Date From Filter */}
+                {scenarioRuns.length > 0 && (
+                  <div>
+                    <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
+                      From Date:
+                    </div>
+                    <DatePicker
+                      value={dateFrom}
+                      onChange={(_event, value) => setDateFrom(value)}
+                      placeholder="Select start date"
+                      aria-label="From date"
+                      dateParse={(date) => {
+                        const parsed = new Date(date);
+                        return isNaN(parsed.getTime()) ? new Date() : parsed;
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Date To Filter */}
+                {scenarioRuns.length > 0 && (
+                  <div>
+                    <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
+                      To Date:
+                    </div>
+                    <DatePicker
+                      value={dateTo}
+                      onChange={(_event, value) => setDateTo(value)}
+                      placeholder="Select end date"
+                      aria-label="To date"
+                      dateParse={(date) => {
+                        const parsed = new Date(date);
+                        return isNaN(parsed.getTime()) ? new Date() : parsed;
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Clear filters button */}
+              {(ownerFilter || dateFrom || dateTo) && (
+                <div style={{ marginTop: '1rem' }}>
+                  <Button
+                    variant="link"
+                    isInline
+                    onClick={() => {
+                      setOwnerFilter('');
+                      setDateFrom('');
+                      setDateTo('');
+                    }}
+                  >
+                    Clear all filters
+                  </Button>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {filteredScenarioRuns.length === 0 && scenarioRuns.length > 0 ? (
           <EmptyState>
-            <EmptyStateIcon icon={CubesIcon} />
+            <EmptyStateIcon icon={HiOutlineRocketLaunch} />
+            <Title headingLevel="h2" size="lg">
+              No Matching Runs
+            </Title>
+            <EmptyStateBody>
+              No scenario runs match the current filter. Try clearing the filter.
+            </EmptyStateBody>
+          </EmptyState>
+        ) : scenarioRuns.length === 0 ? (
+          <EmptyState>
+            <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
               No Scenario Runs
             </Title>
@@ -157,7 +349,7 @@ export function JobsList({
           </EmptyState>
         ) : (
           <DataList aria-label="Scenario runs list" isCompact>
-            {scenarioRuns.map((run) => {
+            {filteredScenarioRuns.map((run) => {
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
 
@@ -174,7 +366,7 @@ export function JobsList({
                     />
                     <DataListItemCells
                       dataListCells={[
-                        <DataListCell key="status" width={2}>
+                        <DataListCell key="status" width={1}>
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Status:</strong>
@@ -184,7 +376,7 @@ export function JobsList({
                             </Label>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="scenario" width={3}>
+                        <DataListCell key="scenario" width={2}>
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Scenario:</strong>
@@ -198,9 +390,31 @@ export function JobsList({
                                 borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
                                 display: 'inline-block',
                                 border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {run.scenarioName}
+                            </code>
+                          </div>
+                        </DataListCell>,
+                        <DataListCell key="owner" width={2}>
+                          <div>
+                            <div style={{ marginBottom: '0.25rem' }}>
+                              <strong>User:</strong>
+                            </div>
+                            <code
+                              style={{
+                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                padding: '0.125rem 0.5rem',
+                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                display: 'inline-block',
+                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {run.ownerUserId || 'Unknown'}
                             </code>
                           </div>
                         </DataListCell>,
@@ -218,6 +432,7 @@ export function JobsList({
                                 borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
                                 display: 'inline-block',
                                 border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {run.scenarioRunName}

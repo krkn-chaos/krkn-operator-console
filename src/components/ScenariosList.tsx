@@ -25,7 +25,7 @@ import {
   MenuToggleElement,
   SearchInput,
 } from '@patternfly/react-core';
-import { CubesIcon, SortAmountDownIcon, CopyIcon } from '@patternfly/react-icons';
+import { FileCodeIcon, SortAmountDownIcon, CopyIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { useNotifications } from '../hooks';
 import type { ScenarioTag } from '../types/api';
@@ -45,7 +45,7 @@ export function ScenariosList() {
       <Card>
         <CardBody>
           <EmptyState>
-            <EmptyStateIcon icon={CubesIcon} />
+            <EmptyStateIcon icon={FileCodeIcon} />
             <Title headingLevel="h4" size="lg">
               No Scenarios Found
             </Title>
@@ -203,7 +203,7 @@ export function ScenariosList() {
 
         {filteredAndSortedScenarios.length === 0 ? (
           <EmptyState>
-            <EmptyStateIcon icon={CubesIcon} />
+            <EmptyStateIcon icon={FileCodeIcon} />
             <Title headingLevel="h4" size="lg">
               No Scenarios Found
             </Title>

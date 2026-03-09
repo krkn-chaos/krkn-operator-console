@@ -12,7 +12,8 @@ import type {
   CreateScenarioRunResponse,
   ScenarioRunStatusResponse,
   JobStatusResponse,
-  JobsListResponse
+  JobsListResponse,
+  ActiveRunsResponse
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -352,6 +353,15 @@ class OperatorApiClient extends BaseApiClient {
     }
 
     return errors;
+  }
+
+  /**
+   * GET /api/v1/dashboard/active-runs
+   * Get information about currently active scenario runs across all clusters
+   * @returns Promise with active runs data including total counts and cluster-to-runs mapping
+   */
+  async getActiveRuns(): Promise<ActiveRunsResponse> {
+    return this.fetchJson<ActiveRunsResponse>('/dashboard/active-runs');
   }
 }
 

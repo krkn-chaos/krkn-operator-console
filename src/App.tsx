@@ -1,6 +1,7 @@
-import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Button, Alert, AlertActionCloseButton, AlertGroup, Dropdown, DropdownItem, DropdownList, MenuToggle } from '@patternfly/react-core';
-import { CogIcon, UserIcon } from '@patternfly/react-icons';
-import { useState } from 'react';
+import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Button, Alert, AlertActionCloseButton, AlertGroup, Dropdown, DropdownItem, DropdownList, MenuToggle, Modal, ModalVariant, Switch } from '@patternfly/react-core';
+import { CogIcon, EditIcon, KeyIcon, MoonIcon, SunIcon } from '@patternfly/react-icons';
+import { HiOutlineUserCircle } from 'react-icons/hi2';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
@@ -8,14 +9,35 @@ import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
+import { UserForm } from './components/UserForm';
+import { ChangePasswordForm } from './components/ChangePasswordForm';
 import { operatorApi } from './services/operatorApi';
-import type { SelectedCluster } from './types/api';
+import { usersApi } from './services/usersApi';
+import { useNotifications } from './hooks';
+import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest } from './types/api';
 
 function App() {
   const { state, dispatch } = useAppContext();
   const { state: authState, logout } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess, showError } = useNotifications();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved === 'dark';
+  });
+
+  // Apply theme to document root
+  useEffect(() => {
+    if (isDarkTheme) {
+      document.documentElement.classList.add('pf-v5-theme-dark');
+    } else {
+      document.documentElement.classList.remove('pf-v5-theme-dark');
+    }
+    localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
+  }, [isDarkTheme]);
 
   // Initialize and manage the workflow
   useTargetPoller();
@@ -184,13 +206,78 @@ function App() {
     dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
   };
 
+  const handleNavigateToHome = () => {
+    dispatch({ type: 'JOBS_LIST_READY' });
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const handleEditProfile = () => {
+    setIsEditProfileOpen(true);
+    setIsUserMenuOpen(false);
+  };
+
+  const handleChangePassword = () => {
+    setIsChangePasswordOpen(true);
+    setIsUserMenuOpen(false);
+  };
+
+  const handleProfileSubmit = async (data: UpdateUserRequest) => {
+    if (!authState.user) return;
+
+    try {
+      await usersApi.updateUser(authState.user.userId, data);
+      showSuccess('Profile updated', 'Your profile has been updated successfully');
+      setIsEditProfileOpen(false);
+      // Reload user data - for now just close the modal
+      // In a real app, you'd want to refresh the user data in AuthContext
+    } catch (error) {
+      showError('Failed to update profile', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
+  const handlePasswordChangeSubmit = async (data: ChangePasswordRequest) => {
+    if (!authState.user) return;
+
+    try {
+      await usersApi.changePassword(authState.user.userId, data);
+      showSuccess('Password changed', 'Your password has been changed successfully');
+      setIsChangePasswordOpen(false);
+    } catch (error) {
+      showError('Failed to change password', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
   const userMenuItems = (
     <DropdownList>
+      <AdminOnly>
+        <DropdownItem
+          key="settings"
+          icon={<CogIcon />}
+          onClick={() => {
+            handleNavigateToSettings();
+            setIsUserMenuOpen(false);
+          }}
+        >
+          Admin Settings
+        </DropdownItem>
+      </AdminOnly>
+      <DropdownItem key="editProfile" icon={<EditIcon />} onClick={handleEditProfile}>
+        Edit Profile
+      </DropdownItem>
+      <DropdownItem key="changePassword" icon={<KeyIcon />} onClick={handleChangePassword}>
+        Change Password
+      </DropdownItem>
+      <DropdownItem
+        key="theme"
+        icon={isDarkTheme ? <SunIcon /> : <MoonIcon />}
+        onClick={() => setIsDarkTheme(!isDarkTheme)}
+      >
+        {isDarkTheme ? 'Light Theme' : 'Dark Theme'}
+      </DropdownItem>
       <DropdownItem key="logout" onClick={handleLogout}>
         Logout
       </DropdownItem>
@@ -201,7 +288,10 @@ function App() {
     <Masthead>
       <MastheadMain>
         <MastheadBrand>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div
+            onClick={handleNavigateToHome}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+          >
             <img
               src="/logo.png"
               alt="Krkn Logo"
@@ -216,17 +306,6 @@ function App() {
       <MastheadContent>
         <Toolbar isFullHeight isStatic>
           <ToolbarContent>
-            <AdminOnly>
-              <ToolbarItem>
-                <Button
-                  variant="plain"
-                  onClick={handleNavigateToSettings}
-                  icon={<CogIcon style={{ fontSize: '1.5rem' }} />}
-                  aria-label="Settings"
-                  style={{ color: 'white' }}
-                />
-              </ToolbarItem>
-            </AdminOnly>
             <ToolbarItem align={{ default: 'alignRight' }}>
               <Dropdown
                 isOpen={isUserMenuOpen}
@@ -238,8 +317,10 @@ function App() {
                     variant="plain"
                     style={{ color: 'white' }}
                   >
-                    <UserIcon style={{ fontSize: '1.5rem', marginRight: '0.5rem' }} />
-                    {authState.user?.name} {authState.user?.surname}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <HiOutlineUserCircle style={{ fontSize: '1.5rem' }} />
+                      <span>{authState.user?.name} {authState.user?.surname}</span>
+                    </div>
                   </MenuToggle>
                 )}
               >
@@ -275,6 +356,42 @@ function App() {
         </div>
       )}
       <PageSection isFilled>{renderContent()}</PageSection>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        variant={ModalVariant.medium}
+        title="Edit Profile"
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+      >
+        {authState.user && (
+          <UserForm
+            initialData={{
+              ...authState.user,
+              active: true, // Active status not stored in session, assume active
+              created: undefined,
+              lastLogin: undefined,
+            }}
+            onSubmit={handleProfileSubmit}
+            onCancel={() => setIsEditProfileOpen(false)}
+            isSelfEdit={true}
+          />
+        )}
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Change Password"
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      >
+        <ChangePasswordForm
+          isSelfChange={true}
+          onSubmit={handlePasswordChangeSubmit}
+          onCancel={() => setIsChangePasswordOpen(false)}
+        />
+      </Modal>
     </Page>
   );
 }

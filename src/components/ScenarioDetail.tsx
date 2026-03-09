@@ -13,6 +13,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
+import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, FileField } from '../types/api';
 
@@ -28,6 +29,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [conflictWarning, setConflictWarning] = useState<{
+    clusterName: string;
+    existingRuns: string[];
+  } | null>(null);
+  const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -129,6 +135,74 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleEditForm = () => {
     setShowPreview(false);
+  };
+
+  const executeScenarioRun = async (runRequest: ScenarioRunRequest) => {
+    try {
+      // NEW API Flow: POST returns scenarioRunName, then GET for full status
+      const createResponse = await operatorApi.runScenario(runRequest);
+
+      // Immediately fetch full status
+      const statusResponse = await operatorApi.getScenarioRunStatus(createResponse.scenarioRunName);
+
+      // Build ScenarioRunState
+      const newRun: ScenarioRunState = {
+        scenarioRunName: createResponse.scenarioRunName,
+        scenarioName,
+        phase: statusResponse.phase,
+        totalTargets: statusResponse.totalTargets,
+        successfulJobs: statusResponse.successfulJobs,
+        failedJobs: statusResponse.failedJobs,
+        runningJobs: statusResponse.runningJobs,
+        clusterJobs: statusResponse.clusterJobs,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Dispatch creation event
+      dispatch({
+        type: 'SCENARIO_RUN_CREATED',
+        payload: {
+          scenarioRunName: createResponse.scenarioRunName,
+          targetClusters: createResponse.targetClusters,
+          totalTargets: createResponse.totalTargets,
+          scenarioName,
+        },
+      });
+
+      // Add scenario run to state
+      dispatch({
+        type: 'ADD_SCENARIO_RUN',
+        payload: { run: newRun },
+      });
+
+      // Handle partial failures
+      if (statusResponse.failedJobs > 0) {
+        const failedJobs = statusResponse.clusterJobs.filter((j) => j.phase === 'Failed');
+        const failedErrors = failedJobs
+          .map((j) => `${j.clusterName}: ${j.message || 'Unknown error'}`)
+          .join('\n');
+
+        console.warn(
+          `Partial failure: ${statusResponse.failedJobs}/${statusResponse.totalTargets} jobs failed\n${failedErrors}`
+        );
+
+        // Set validation errors to show the failures
+        setValidationErrors([
+          `${statusResponse.failedJobs} of ${statusResponse.totalTargets} jobs failed:`,
+          failedErrors,
+        ]);
+      }
+
+      // Transition to jobs_list (scenarioRun already added via ADD_SCENARIO_RUN)
+      dispatch({
+        type: 'SCENARIOS_RUN_BATCH_SUCCESS',
+      });
+    } catch (error) {
+      console.error('Failed to run scenario:', error);
+      setValidationErrors([
+        error instanceof Error ? error.message : 'Failed to run scenario',
+      ]);
+    }
   };
 
   const handleRunScenario = async () => {
@@ -253,64 +327,25 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         insecure: registryConfig?.insecure,
       };
 
-      // NEW API Flow: POST returns scenarioRunName, then GET for full status
-      const createResponse = await operatorApi.runScenario(runRequest);
+      // Check for cluster conflicts before running
+      const activeRuns = await operatorApi.getActiveRuns();
 
-      // Immediately fetch full status
-      const statusResponse = await operatorApi.getScenarioRunStatus(createResponse.scenarioRunName);
-
-      // Build ScenarioRunState
-      const newRun: ScenarioRunState = {
-        scenarioRunName: createResponse.scenarioRunName,
-        scenarioName,
-        phase: statusResponse.phase,
-        totalTargets: statusResponse.totalTargets,
-        successfulJobs: statusResponse.successfulJobs,
-        failedJobs: statusResponse.failedJobs,
-        runningJobs: statusResponse.runningJobs,
-        clusterJobs: statusResponse.clusterJobs,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Dispatch creation event
-      dispatch({
-        type: 'SCENARIO_RUN_CREATED',
-        payload: {
-          scenarioRunName: createResponse.scenarioRunName,
-          targetClusters: createResponse.targetClusters,
-          totalTargets: createResponse.totalTargets,
-          scenarioName,
-        },
-      });
-
-      // Add scenario run to state
-      dispatch({
-        type: 'ADD_SCENARIO_RUN',
-        payload: { run: newRun },
-      });
-
-      // Handle partial failures
-      if (statusResponse.failedJobs > 0) {
-        const failedJobs = statusResponse.clusterJobs.filter((j) => j.phase === 'Failed');
-        const failedErrors = failedJobs
-          .map((j) => `${j.clusterName}: ${j.message || 'Unknown error'}`)
-          .join('\n');
-
-        console.warn(
-          `Partial failure: ${statusResponse.failedJobs}/${statusResponse.totalTargets} jobs failed\n${failedErrors}`
-        );
-
-        // Set validation errors to show the failures
-        setValidationErrors([
-          `${statusResponse.failedJobs} of ${statusResponse.totalTargets} jobs failed:`,
-          failedErrors,
-        ]);
+      // Check if any selected cluster has active runs
+      for (const cluster of state.selectedClusters) {
+        const existingRuns = activeRuns.clusterRuns[cluster.clusterName];
+        if (existingRuns && existingRuns.length > 0) {
+          // Found a conflict - show warning modal
+          setConflictWarning({
+            clusterName: cluster.clusterName,
+            existingRuns,
+          });
+          setPendingRunRequest(runRequest);
+          return; // Stop here, wait for user decision
+        }
       }
 
-      // Transition to jobs_list (scenarioRun already added via ADD_SCENARIO_RUN)
-      dispatch({
-        type: 'SCENARIOS_RUN_BATCH_SUCCESS',
-      });
+      // No conflicts - proceed with run
+      await executeScenarioRun(runRequest);
     } catch (error) {
       dispatch({
         type: 'SCENARIOS_RUN_BATCH_ERROR',
@@ -320,6 +355,23 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         },
       });
     }
+  };
+
+  const handleConflictCancel = () => {
+    setConflictWarning(null);
+    setPendingRunRequest(null);
+  };
+
+  const handleConflictContinue = async () => {
+    if (!pendingRunRequest) return;
+
+    // Close modal
+    setConflictWarning(null);
+    const request = pendingRunRequest;
+    setPendingRunRequest(null);
+
+    // Proceed with the run
+    await executeScenarioRun(request);
   };
 
   if (!scenarioDetail) {
@@ -584,6 +636,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             </Button>
           </div>
         </>
+      )}
+
+      {/* Cluster Conflict Warning Modal */}
+      {conflictWarning && (
+        <ClusterConflictWarning
+          isOpen={true}
+          clusterName={conflictWarning.clusterName}
+          existingRuns={conflictWarning.existingRuns}
+          onCancel={handleConflictCancel}
+          onContinue={handleConflictContinue}
+        />
       )}
     </div>
   );

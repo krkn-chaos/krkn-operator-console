@@ -20,7 +20,7 @@ import {
   ActionGroup,
   Spinner,
 } from '@patternfly/react-core';
-import { CubesIcon } from '@patternfly/react-icons';
+import { TopologyIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
 
 interface ClusterMultiSelectorProps {
@@ -95,7 +95,7 @@ export function ClusterMultiSelector({
   if (Object.keys(clusters).length === 0) {
     return (
       <EmptyState>
-        <EmptyStateIcon icon={CubesIcon} />
+        <EmptyStateIcon icon={TopologyIcon} />
         <Title headingLevel="h1" size="lg">
           No Clusters Found
         </Title>

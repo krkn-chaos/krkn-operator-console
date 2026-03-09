@@ -17,7 +17,7 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, CubesIcon, TrashIcon, EditIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, TopologyIcon, TrashIcon, EditIcon } from '@patternfly/react-icons';
 import { targetsApi } from '../services/targetsApi';
 import { useNotifications } from '../hooks';
 import { TargetForm } from './TargetForm';
@@ -133,7 +133,7 @@ export function TargetsList() {
 
       {targets.length === 0 ? (
         <EmptyState>
-          <EmptyStateIcon icon={CubesIcon} />
+          <EmptyStateIcon icon={TopologyIcon} />
           <Title headingLevel="h2" size="lg">
             {apiAvailable ? 'No Targets Configured' : 'Targets API Not Available'}
           </Title>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -22,8 +22,9 @@ import {
   AccordionToggle,
   Badge,
   Switch,
+  Bullseye,
 } from '@patternfly/react-core';
-import { UserIcon, CubesIcon } from '@patternfly/react-icons';
+import { UserIcon, RegistryIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { useProviderConfigPoller } from '../hooks/useProviderConfigPoller';
 import { useNotifications } from '../hooks/useNotifications';
@@ -41,9 +42,24 @@ export function Settings() {
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [expandedAccordionItems, setExpandedAccordionItems] = useState<string[]>([]);
   const [togglingProvider, setTogglingProvider] = useState<string | null>(null);
+  const previousTabKeyRef = useRef<string | number>(0);
 
   // Use provider config poller
   useProviderConfigPoller();
+
+  // Reset provider config when entering Provider Configuration tab (eventKey 2)
+  useEffect(() => {
+    const previousTabKey = previousTabKeyRef.current;
+
+    // If we're switching TO tab 2 (from any other tab)
+    if (activeTabKey === 2 && previousTabKey !== 2) {
+      console.log('Provider Configuration tab accessed, resetting state');
+      dispatch({ type: 'PROVIDER_CONFIG_RESET' });
+    }
+
+    // Update previous tab key for next comparison
+    previousTabKeyRef.current = activeTabKey;
+  }, [activeTabKey, dispatch]);
 
   // Fetch providers on mount
   useEffect(() => {
@@ -128,7 +144,35 @@ export function Settings() {
 
   return (
     <PageSection isFilled>
-      <Card>
+      <Card style={{ position: 'relative' }}>
+        {/* Loading Overlay - Covers entire Card */}
+        {(isLoadingProviders || state.providerConfigStatus === 'creating' || state.providerConfigStatus === 'polling') && activeTabKey === 2 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+            }}
+          >
+            <Bullseye>
+              <div style={{ textAlign: 'center', color: 'white' }}>
+                <Spinner size="xl" />
+                <Title headingLevel="h3" size="lg" style={{ marginTop: '1rem', color: 'white' }}>
+                  Loading...
+                </Title>
+              </div>
+            </Bullseye>
+          </div>
+        )}
+
         <CardTitle>
           <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
             <FlexItem>
@@ -165,18 +209,9 @@ export function Settings() {
             {isAdmin && (
               <Tab eventKey={2} title={<TabTitleText>Provider Configuration</TabTitleText>}>
               <div style={{ marginTop: '1.5rem' }}>
-                {isLoadingProviders && (
-                  <EmptyState>
-                    <EmptyStateIcon icon={() => <Spinner size="xl" />} />
-                    <Title headingLevel="h2" size="lg">
-                      Loading Providers
-                    </Title>
-                  </EmptyState>
-                )}
-
                 {!isLoadingProviders && (!state.providers || state.providers.length === 0) && (
                   <EmptyState>
-                    <EmptyStateIcon icon={CubesIcon} />
+                    <EmptyStateIcon icon={RegistryIcon} />
                     <Title headingLevel="h2" size="lg">
                       No Providers Available
                     </Title>
@@ -188,27 +223,14 @@ export function Settings() {
 
                 {!isLoadingProviders && state.providers && state.providers.length > 0 && (
                   <>
-                    {/* Loading config schemas */}
-                    {state.providerConfigStatus === 'creating' && (
-                      <Alert variant="info" title="Initializing Provider Configuration">
-                        Creating configuration request...
-                      </Alert>
-                    )}
-
-                    {state.providerConfigStatus === 'polling' && (
-                      <Alert variant="info" title="Loading Provider Schemas">
-                        <Spinner size="md" style={{ marginRight: '0.5rem' }} />
-                        Collecting configuration schemas from active providers...
-                      </Alert>
-                    )}
-
+                    {/* Error Alert */}
                     {state.providerConfigStatus === 'error' && (
-                      <Alert variant="danger" title="Failed to Load Provider Configuration">
+                      <Alert variant="danger" title="Failed to Load Provider Configuration" style={{ marginBottom: '1rem' }}>
                         An error occurred while loading provider schemas. Please try refreshing the page.
                       </Alert>
                     )}
 
-                    {/* Provider accordion (show when ready or still polling) */}
+                    {/* Provider accordion */}
                     {(state.providerConfigStatus === 'ready' || state.providerConfigStatus === 'polling') && (
                       <Accordion asDefinitionList={false}>
                         {state.providers.map((provider) => {
