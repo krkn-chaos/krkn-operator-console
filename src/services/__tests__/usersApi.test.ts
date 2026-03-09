@@ -195,7 +195,7 @@ describe('usersApi', () => {
       const result = await usersApi.updateUser('user@example.com', updateRequest);
 
       expect(mockFetchJson).toHaveBeenCalledWith('/users/user%40example.com', {
-        method: 'PUT',
+        method: 'PATCH',
         body: JSON.stringify(updateRequest),
       });
       expect(result).toEqual(mockResponse);

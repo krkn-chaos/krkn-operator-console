@@ -10,8 +10,8 @@ describe('UserDetails', () => {
     surname: 'Doe',
     role: 'admin',
     organization: 'Test Organization',
-    enabled: true,
-    createdAt: '2023-01-01T12:00:00Z',
+    active: true,
+    created: '2023-01-01T12:00:00Z',
     lastLogin: '2023-01-15T14:30:00Z',
   };
 
@@ -32,7 +32,13 @@ describe('UserDetails', () => {
   });
 
   it('should format dates properly using toLocaleString', () => {
-    render(<UserDetails user={mockUser} onClose={mockOnClose} />);
+    const userWithDates: UserDetailsType = {
+      ...mockUser,
+      created: '2023-01-01T12:00:00Z',
+      lastLogin: '2023-01-15T14:30:00Z',
+    };
+
+    render(<UserDetails user={userWithDates} onClose={mockOnClose} />);
 
     const createdDate = new Date('2023-01-01T12:00:00Z').toLocaleString();
     const loginDate = new Date('2023-01-15T14:30:00Z').toLocaleString();
@@ -71,12 +77,12 @@ describe('UserDetails', () => {
   it('should show correct status label for disabled user', () => {
     const disabledUser: UserDetailsType = {
       ...mockUser,
-      enabled: false,
+      active: false,
     };
 
     render(<UserDetails user={disabledUser} onClose={mockOnClose} />);
 
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
   });
 
   it('should show "N/A" for missing optional organization field', () => {
@@ -95,7 +101,7 @@ describe('UserDetails', () => {
   it('should show "N/A" for missing createdAt field', () => {
     const userWithoutCreatedAt: UserDetailsType = {
       ...mockUser,
-      createdAt: undefined,
+      created: undefined,
     };
 
     render(<UserDetails user={userWithoutCreatedAt} onClose={mockOnClose} />);

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import userEvent from '@testing-library/user-event';
 import type { UserDetails } from '../../types/api';
 
 // Mock usersApi - define mocks first
@@ -154,26 +155,47 @@ describe('UserManagement', () => {
     });
 
     it('should show Edit and Delete buttons for admin', async () => {
+      const user = userEvent.setup();
       mockListUsers.mockResolvedValue(mockUsers);
       mockIsAdmin.mockReturnValue(true);
 
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /edit/i })).toHaveLength(2);
-        expect(screen.getAllByRole('button', { name: /delete/i })).toHaveLength(2);
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      // Open the first user's action menu
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await user.click(actionMenus[0]);
+
+      // Now the dropdown should be open and we can find Edit and Delete
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument();
+        expect(screen.getByText('Delete User')).toBeInTheDocument();
       });
     });
 
     it('should not show Edit and Delete buttons for non-admin', async () => {
+      const user = userEvent.setup();
       mockListUsers.mockResolvedValue(mockUsers);
       mockIsAdmin.mockReturnValue(false);
 
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      // Open the first user's action menu
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await user.click(actionMenus[0]);
+
+      // Non-admin should only see View Details, not Edit/Delete
+      await waitFor(() => {
+        expect(screen.getByText('View Details')).toBeInTheDocument();
+        expect(screen.queryByText('Edit Profile')).not.toBeInTheDocument();
+        expect(screen.queryByText('Delete User')).not.toBeInTheDocument();
       });
     });
   });
@@ -295,10 +317,18 @@ describe('UserManagement', () => {
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /edit/i })[0]).toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      await user.click(screen.getAllByRole('button', { name: /edit/i })[0]);
+      // Open first user's action menu
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await user.click(actionMenus[0]);
+
+      // Click Edit Profile
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Edit Profile'));
 
       expect(screen.getByText(/edit user/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/email/i)).toHaveValue('user1@example.com');
@@ -312,10 +342,16 @@ describe('UserManagement', () => {
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /edit/i })[0]).toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      await user.click(screen.getAllByRole('button', { name: /edit/i })[0]);
+      // Open first user's action menu and click Edit Profile
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await user.click(actionMenus[0]);
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Edit Profile'));
 
       // Update name
       const firstNameInput = screen.getByLabelText(/first name/i);
@@ -365,15 +401,23 @@ describe('UserManagement', () => {
       const user = userEvent.setup();
       mockListUsers.mockResolvedValue(mockUsers);
       mockDeleteUser.mockResolvedValue({ userId: 'user2@example.com' });
+      mockAuthState.user = { userId: 'other-admin@example.com', role: 'admin' };
 
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /delete/i })[1]).toBeInTheDocument();
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      // Click delete on second user
-      await user.click(screen.getAllByRole('button', { name: /delete/i })[1]);
+      // Open second user's action menu (Jane Smith)
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await user.click(actionMenus[1]);
+
+      // Click Delete User
+      await waitFor(() => {
+        expect(screen.getByText('Delete User')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Delete User'));
 
       // Confirm deletion
       const modal = screen.getByRole('dialog');
@@ -400,11 +444,18 @@ describe('UserManagement', () => {
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /delete/i })[0]).toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // Try to delete yourself (first user)
-      await user.click(screen.getAllByRole('button', { name: /delete/i })[0]);
+      // Open first user's action menu (yourself)
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await user.click(actionMenus[0]);
+
+      // Click Delete User
+      await waitFor(() => {
+        expect(screen.getByText('Delete User')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Delete User'));
 
       await waitFor(() => {
         expect(mockShowError).toHaveBeenCalledWith(
@@ -425,10 +476,18 @@ describe('UserManagement', () => {
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole('button', { name: /delete/i }));
+      // Open the only user's action menu
+      const actionMenu = screen.getByRole('button', { name: /user actions/i });
+      await user.click(actionMenu);
+
+      // Click Delete User
+      await waitFor(() => {
+        expect(screen.getByText('Delete User')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Delete User'));
 
       await waitFor(() => {
         expect(mockShowError).toHaveBeenCalledWith(
@@ -447,10 +506,18 @@ describe('UserManagement', () => {
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /view details/i })[0]).toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      await userInteraction.click(screen.getAllByRole('button', { name: /view details/i })[0]);
+      // Open first user's action menu
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await userInteraction.click(actionMenus[0]);
+
+      // Click View Details
+      await waitFor(() => {
+        expect(screen.getByText('View Details')).toBeInTheDocument();
+      });
+      await userInteraction.click(screen.getByText('View Details'));
 
       expect(screen.getByText(/user details/i)).toBeInTheDocument();
       // Text appears multiple times (in list + modal), so use getAllByText
@@ -480,10 +547,18 @@ describe('UserManagement', () => {
       render(<UserManagement />);
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /delete/i })[1]).toBeInTheDocument();
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      await user.click(screen.getAllByRole('button', { name: /delete/i })[1]);
+      // Open second user's action menu
+      const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
+      await user.click(actionMenus[1]);
+
+      // Click Delete User
+      await waitFor(() => {
+        expect(screen.getByText('Delete User')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Delete User'));
 
       const modal = screen.getByRole('dialog');
       const confirmButton = within(modal).getByRole('button', { name: /delete/i });

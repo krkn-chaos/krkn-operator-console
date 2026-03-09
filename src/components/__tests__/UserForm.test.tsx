@@ -219,7 +219,7 @@ describe('UserForm', () => {
       surname: 'Smith',
       role: 'admin',
       organization: 'Existing Org',
-      enabled: true,
+      active: true,
     };
 
     it('should pre-fill form in edit mode', () => {
@@ -257,37 +257,12 @@ describe('UserForm', () => {
       expect(screen.queryByText(/password is required/i)).not.toBeInTheDocument();
     });
 
-    it('should validate password length if provided in edit mode', async () => {
-      const user = userEvent.setup();
+    it('should not show password fields in edit mode', () => {
       const { container } = render(<UserForm initialData={mockInitialUser} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
 
-      const passwordInput = container.querySelector('#password') as HTMLInputElement;
-      await user.type(passwordInput, 'short');
-
-      const submitButton = screen.getByRole('button', { name: /update user/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/password must be at least 8 characters/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should validate password confirmation match in edit mode', async () => {
-      const user = userEvent.setup();
-      const { container } = render(<UserForm initialData={mockInitialUser} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
-
-      const passwordInput = container.querySelector('#password') as HTMLInputElement;
-      const confirmInput = container.querySelector('#confirmPassword') as HTMLInputElement;
-
-      await user.type(passwordInput, 'newpassword123');
-      await user.type(confirmInput, 'different123');
-
-      const submitButton = screen.getByRole('button', { name: /update user/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
-      });
+      // Password fields should not exist in edit mode (password changed via separate endpoint)
+      expect(container.querySelector('#password')).not.toBeInTheDocument();
+      expect(container.querySelector('#confirmPassword')).not.toBeInTheDocument();
     });
 
     it('should submit correct UpdateUserRequest data format', async () => {
@@ -312,6 +287,7 @@ describe('UserForm', () => {
           surname: 'Name',
           role: 'user',
           organization: 'Existing Org',
+          active: true,
         } as UpdateUserRequest);
       });
     });
