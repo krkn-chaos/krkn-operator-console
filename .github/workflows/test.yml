@@ -1,0 +1,57 @@
+name: Tests & Coverage
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Tests with Coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Generate coverage report
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# TEST COVERAGE: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          echo "TOTAL_COVERAGE=${COVERAGE}" >> $GITHUB_ENV
+
+      - name: Checkout docs repo
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        uses: actions/checkout@v4
+        with:
+          repository: krkn-chaos/krkn-lib-docs
+          path: krkn-lib-docs
+          ssh-key: ${{ secrets.KRKN_LIB_DOCS_PRIV_KEY }}
+
+      - name: Push updated coverage badge
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        env:
+          COLOR: yellow
+        run: |
+          COVERAGE_INT=$(echo $TOTAL_COVERAGE | cut -d. -f1)
+          [[ $COVERAGE_INT -gt 40 ]] && COLOR=green
+          curl -s "https://img.shields.io/badge/coverage-${TOTAL_COVERAGE}%25-$COLOR" > ./krkn-lib-docs/coverage_badge_krkn-operator-console.svg
+          cd krkn-lib-docs
+          git add .
+          git config user.name "krkn-chaos"
+          git config user.email "<>"
+          git commit -m "[KRKN] Coverage Badge krkn-operator-console ${GITHUB_REF##*/}" || echo "no changes to commit"
+          git push

@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-push:
+    name: Build and Push Image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Login to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Set version from tag
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "Building version: ${GITHUB_REF#refs/tags/}"
+
+      - name: Build and push console image
+        run: |
+          docker build -t quay.io/krkn-chaos/krkn-operator-console:$VERSION .
+          docker tag quay.io/krkn-chaos/krkn-operator-console:$VERSION quay.io/krkn-chaos/krkn-operator-console:latest
+          docker push quay.io/krkn-chaos/krkn-operator-console:$VERSION
+          docker push quay.io/krkn-chaos/krkn-operator-console:latest
+
+      - name: Update release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat <<EOF > release-notes.md
+          ## Container Image
+
+          - \`quay.io/krkn-chaos/krkn-operator-console:$VERSION\`
+          - \`quay.io/krkn-chaos/krkn-operator-console:latest\`
+
+          ## Installation
+
+          \`\`\`bash
+          # Using Helm (recommended)
+          helm install krkn-operator oci://quay.io/krkn-chaos/charts/krkn-operator \\
+            --set console.enabled=true \\
+            --version $VERSION
+
+          # Using kubectl
+          kubectl apply -f https://raw.githubusercontent.com/krkn-chaos/krkn-operator-console/$VERSION/deployment/kubernetes/console.yaml
+          \`\`\`
+          EOF
+
+          gh release edit $VERSION --notes-file release-notes.md

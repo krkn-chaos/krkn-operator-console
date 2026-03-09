@@ -1,5 +1,9 @@
 # Krkn Operator Console
 
+![test](https://github.com/krkn-chaos/krkn-operator-console/actions/workflows/test.yml/badge.svg)
+![pr-checks](https://github.com/krkn-chaos/krkn-operator-console/actions/workflows/pr-checks.yml/badge.svg)
+![coverage](https://krkn-chaos.github.io/krkn-lib-docs/coverage_badge_krkn-operator-console.svg)
+
 Web console for the krkn-operator chaos orchestration platform.
 
 ## Status
