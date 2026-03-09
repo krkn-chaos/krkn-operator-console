@@ -45,6 +45,7 @@ export function useScenarioRunsPoller() {
             runningJobs: updated.runningJobs,
             clusterJobs: updated.clusterJobs || [], // Fallback
             createdAt: run.createdAt,
+            ownerUserId: updated.ownerUserId || run.ownerUserId, // Preserve owner from backend or fallback to original
           };
 
           // Only update if there are changes

@@ -173,6 +173,7 @@ export function useTargetPoller() {
                 successfulJobs: details.successfulJobs,
                 failedJobs: details.failedJobs,
                 runningJobs: details.runningJobs,
+                ownerUserId: details.ownerUserId || run.ownerUserId, // Preserve owner from backend or fallback to original
               };
 
               console.log(`Fetched details for ${run.scenarioRunName}:`, updatedRun);
