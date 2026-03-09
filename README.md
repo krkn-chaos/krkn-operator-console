@@ -37,7 +37,7 @@ React-based web console using PatternFly design system to interact with the krkn
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 20+ and npm
 - Access to krkn-operator API endpoint
 - Podman or Docker (for containerization)
 
