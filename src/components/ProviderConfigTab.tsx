@@ -4,6 +4,8 @@ import {
   Button,
   ActionGroup,
   Alert,
+  Modal,
+  ModalVariant,
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { providersApi } from '../services/providersApi';
@@ -23,6 +25,7 @@ export function ProviderConfigTab({ provider, schema, uuid }: ProviderConfigTabP
   const { showSuccess, showError } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formValues, setFormValues] = useState<ScenarioFormValues>({});
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,10 +50,8 @@ export function ProviderConfigTab({ provider, schema, uuid }: ProviderConfigTabP
         payload: { providerName: provider.name }
       });
 
-      showSuccess(
-        'Configuration Saved',
-        `Configuration for ${provider.name} has been updated successfully`
-      );
+      // Show confirmation modal instead of notification
+      setShowSuccessModal(true);
     } catch (error) {
       showError(
         'Failed to Save Configuration',
@@ -59,6 +60,18 @@ export function ProviderConfigTab({ provider, schema, uuid }: ProviderConfigTabP
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoHome = () => {
+    setShowSuccessModal(false);
+    // Go back to jobs list
+    dispatch({ type: 'JOBS_LIST_READY' });
+  };
+
+  const handleReloadConfig = () => {
+    setShowSuccessModal(false);
+    // Reset provider config to trigger reload
+    dispatch({ type: 'PROVIDER_CONFIG_RESET' });
   };
 
   const hasConfigFields = schema && schema.fields.length > 0;
@@ -103,6 +116,24 @@ export function ProviderConfigTab({ provider, schema, uuid }: ProviderConfigTabP
           </Alert>
         )}
       </Form>
+
+      {/* Success Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Configuration Applied"
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        actions={[
+          <Button key="home" variant="primary" onClick={handleGoHome}>
+            Yes, go to Home
+          </Button>,
+          <Button key="reload" variant="secondary" onClick={handleReloadConfig}>
+            No, reload configuration
+          </Button>
+        ]}
+      >
+        Changes have been applied successfully. Do you want to return to the home page?
+      </Modal>
     </div>
   );
 }

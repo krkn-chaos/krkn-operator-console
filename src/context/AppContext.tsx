@@ -483,6 +483,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
       // Config submitted successfully - could show notification via UI
       return state;
 
+    case 'PROVIDER_CONFIG_RESET':
+      // Reset provider config to idle state (used when re-entering tab)
+      return {
+        ...state,
+        providerConfigStatus: 'idle',
+        providerConfigUuid: null,
+        providerConfigData: null,
+      };
+
     default:
       return state;
   }

@@ -1,3 +1,4 @@
+import { BaseApiClient } from '../utils/apiClient';
 import type {
   ProviderInfo,
   ListProvidersResponse,
@@ -12,40 +13,17 @@ import type {
 
 const API_BASE = '/api/v1';
 
-class ProvidersApi {
+class ProvidersApi extends BaseApiClient {
+  constructor() {
+    super(API_BASE);
+  }
   /**
    * GET /providers
    * List all registered providers with their active status
    */
   async listProviders(): Promise<ProviderInfo[]> {
-    try {
-      const response = await fetch(`${API_BASE}/providers`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error('Providers API returned non-JSON response:', contentType);
-        throw new Error('Providers API endpoint not available. Make sure the backend is running.');
-      }
-
-      if (!response.ok) {
-        try {
-          const error: ProviderErrorResponse = await response.json();
-          throw new Error(error.message || 'Failed to list providers');
-        } catch (parseError) {
-          throw new Error(`Failed to list providers (HTTP ${response.status})`);
-        }
-      }
-
-      const data: ListProvidersResponse = await response.json();
-      return data.providers || [];
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to connect to providers API');
-    }
+    const data = await this.fetchJson<ListProvidersResponse>('/providers');
+    return data.providers || [];
   }
 
   /**
@@ -53,36 +31,11 @@ class ProvidersApi {
    * Activate or deactivate a provider
    */
   async updateProviderStatus(name: string, active: boolean): Promise<UpdateProviderStatusResponse> {
-    try {
-      const requestBody: UpdateProviderStatusRequest = { active };
-
-      const response = await fetch(`${API_BASE}/providers/${encodeURIComponent(name)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Provider status update endpoint not available.');
-      }
-
-      if (!response.ok) {
-        try {
-          const error: ProviderErrorResponse = await response.json();
-          throw new Error(error.message || 'Failed to update provider status');
-        } catch (parseError) {
-          throw new Error(`Failed to update provider status (HTTP ${response.status})`);
-        }
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to update provider status');
-    }
+    const requestBody: UpdateProviderStatusRequest = { active };
+    return this.fetchJson<UpdateProviderStatusResponse>(`/providers/${encodeURIComponent(name)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(requestBody),
+    });
   }
 
   /**
@@ -91,35 +44,11 @@ class ProvidersApi {
    * Returns UUID for polling
    */
   async createProviderConfigRequest(): Promise<string> {
-    try {
-      const response = await fetch(`${API_BASE}/provider-config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}), // Empty body
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Provider config API endpoint not available.');
-      }
-
-      if (!response.ok) {
-        try {
-          const error: ProviderErrorResponse = await response.json();
-          throw new Error(error.message || 'Failed to create provider config request');
-        } catch (parseError) {
-          throw new Error(`Failed to create provider config request (HTTP ${response.status})`);
-        }
-      }
-
-      const data: CreateProviderConfigResponse = await response.json();
-      return data.uuid;
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to create provider config request');
-    }
+    const data = await this.fetchJson<CreateProviderConfigResponse>('/provider-config', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    return data.uuid;
   }
 
   /**
@@ -128,10 +57,7 @@ class ProvidersApi {
    * Returns: 202 = Accepted (pending), 200 = OK (completed with data)
    */
   async getProviderConfigStatus(uuid: string): Promise<{ status: number; data?: GetProviderConfigResponse }> {
-    const response = await fetch(`${API_BASE}/provider-config/${encodeURIComponent(uuid)}`, {
-      headers: { 'Content-Type': 'application/json' },
-    });
-
+    const response = await this.fetch(`/provider-config/${encodeURIComponent(uuid)}`);
     const status = response.status;
 
     // If status is 200 (completed), read and return the data immediately
@@ -156,49 +82,40 @@ class ProvidersApi {
    * Get provider config data when status is 200 OK
    */
   async getProviderConfig(uuid: string): Promise<GetProviderConfigResponse> {
-    try {
-      const response = await fetch(`${API_BASE}/provider-config/${encodeURIComponent(uuid)}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const response = await this.fetch(`/provider-config/${encodeURIComponent(uuid)}`);
 
-      console.log('getProviderConfig response status:', response.status);
-      console.log('getProviderConfig response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('getProviderConfig response status:', response.status);
+    console.log('getProviderConfig response headers:', Object.fromEntries(response.headers.entries()));
 
-      if (!response.ok) {
-        try {
-          const error: ProviderErrorResponse = await response.json();
-          throw new Error(error.message || 'Failed to get provider config');
-        } catch (parseError) {
-          throw new Error(`Failed to get provider config (HTTP ${response.status})`);
-        }
-      }
-
-      // Check if response has content
-      const contentType = response.headers.get('content-type');
-      console.log('Response content-type:', contentType);
-
-      const text = await response.text();
-      console.log('Response body (raw text):', text);
-      console.log('Response body length:', text.length);
-
-      if (!text || text.trim().length === 0) {
-        throw new Error('Empty response body from provider config API');
-      }
-
+    if (!response.ok) {
       try {
-        const data = JSON.parse(text);
-        console.log('Parsed provider config data:', data);
-        return data;
+        const error: ProviderErrorResponse = await response.json();
+        throw new Error(error.message || 'Failed to get provider config');
       } catch (parseError) {
-        console.error('Failed to parse response as JSON:', parseError);
-        console.error('Response text was:', text);
-        throw new Error('Invalid JSON in provider config response');
+        throw new Error(`Failed to get provider config (HTTP ${response.status})`);
       }
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to get provider config');
+    }
+
+    // Check if response has content
+    const contentType = response.headers.get('content-type');
+    console.log('Response content-type:', contentType);
+
+    const text = await response.text();
+    console.log('Response body (raw text):', text);
+    console.log('Response body length:', text.length);
+
+    if (!text || text.trim().length === 0) {
+      throw new Error('Empty response body from provider config API');
+    }
+
+    try {
+      const data = JSON.parse(text);
+      console.log('Parsed provider config data:', data);
+      return data;
+    } catch (parseError) {
+      console.error('Failed to parse response as JSON:', parseError);
+      console.error('Response text was:', text);
+      throw new Error('Invalid JSON in provider config response');
     }
   }
 
@@ -211,45 +128,21 @@ class ProvidersApi {
     providerName: string,
     values: { [key: string]: string | number | boolean }
   ): Promise<SubmitProviderConfigResponse> {
-    try {
-      // Convert all values to strings as required by API
-      const stringValues: { [key: string]: string } = {};
-      Object.entries(values).forEach(([key, value]) => {
-        stringValues[key] = String(value);
-      });
+    // Convert all values to strings as required by API
+    const stringValues: { [key: string]: string } = {};
+    Object.entries(values).forEach(([key, value]) => {
+      stringValues[key] = String(value);
+    });
 
-      const requestBody: SubmitProviderConfigRequest = {
-        provider_name: providerName,
-        values: stringValues,
-      };
+    const requestBody: SubmitProviderConfigRequest = {
+      provider_name: providerName,
+      values: stringValues,
+    };
 
-      const response = await fetch(`${API_BASE}/provider-config/${encodeURIComponent(uuid)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Provider config submit endpoint not available.');
-      }
-
-      if (!response.ok) {
-        try {
-          const error: ProviderErrorResponse = await response.json();
-          throw new Error(error.message || 'Failed to submit provider config');
-        } catch (parseError) {
-          throw new Error(`Failed to submit provider config (HTTP ${response.status})`);
-        }
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to submit provider config');
-    }
+    return this.fetchJson<SubmitProviderConfigResponse>(`/provider-config/${encodeURIComponent(uuid)}`, {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    });
   }
 }
 

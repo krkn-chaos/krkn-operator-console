@@ -6,6 +6,7 @@ import {
   Button,
   ActionGroup,
   Radio,
+  Checkbox,
   FormHelperText,
   HelperText,
   HelperTextItem,
@@ -29,6 +30,11 @@ interface UserFormProps {
    * Cancel handler to close the form
    */
   onCancel: () => void;
+  /**
+   * If true, this is a self-edit (user editing their own profile)
+   * Hides admin-only fields like role and active status
+   */
+  isSelfEdit?: boolean;
 }
 
 /**
@@ -133,7 +139,7 @@ interface UserFormProps {
  * </Modal>
  * ```
  */
-export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
+export function UserForm({ initialData, onSubmit, onCancel, isSelfEdit }: UserFormProps) {
   const [userId, setUserId] = useState(initialData?.userId || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -141,6 +147,7 @@ export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
   const [surname, setSurname] = useState(initialData?.surname || '');
   const [role, setRole] = useState<UserRole>(initialData?.role || 'user');
   const [organization, setOrganization] = useState(initialData?.organization || '');
+  const [active, setActive] = useState(initialData?.active ?? true); // Default to active for new users
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -206,6 +213,7 @@ export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
           surname: surname.trim(),
           role,
           organization: organization.trim() || undefined,
+          active,
         };
 
         await onSubmit(data);
@@ -326,22 +334,24 @@ export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
         )}
       </FormGroup>
 
-      <FormGroup label="Role" isRequired fieldId="role">
-        <Radio
-          id="role-user"
-          name="role"
-          label="User"
-          isChecked={role === 'user'}
-          onChange={() => setRole('user')}
-        />
-        <Radio
-          id="role-admin"
-          name="role"
-          label="Admin"
-          isChecked={role === 'admin'}
-          onChange={() => setRole('admin')}
-        />
-      </FormGroup>
+      {!isSelfEdit && (
+        <FormGroup label="Role" isRequired fieldId="role">
+          <Radio
+            id="role-user"
+            name="role"
+            label="User"
+            isChecked={role === 'user'}
+            onChange={() => setRole('user')}
+          />
+          <Radio
+            id="role-admin"
+            name="role"
+            label="Admin"
+            isChecked={role === 'admin'}
+            onChange={() => setRole('admin')}
+          />
+        </FormGroup>
+      )}
 
       <FormGroup label="Organization" fieldId="organization">
         <TextInput
@@ -350,6 +360,18 @@ export function UserForm({ initialData, onSubmit, onCancel }: UserFormProps) {
           onChange={(_event, value) => setOrganization(value)}
         />
       </FormGroup>
+
+      {initialData && !isSelfEdit && (
+        <FormGroup label="Account Status" fieldId="active">
+          <Checkbox
+            id="active"
+            label="Active"
+            description="Uncheck to disable this user account"
+            isChecked={active}
+            onChange={(_event, checked) => setActive(checked)}
+          />
+        </FormGroup>
+      )}
 
       <ActionGroup>
         <Button variant="primary" onClick={handleSubmit} isLoading={submitting} isDisabled={submitting}>

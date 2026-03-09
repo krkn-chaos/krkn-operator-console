@@ -142,6 +142,7 @@ export function useTargetPoller() {
             runningJobs: run.runningJobs,
             clusterJobs: run.clusterJobs || [], // Fallback to empty array
             createdAt: run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || new Date().toISOString(),
+            ownerUserId: run.ownerUserId, // Owner user ID (email)
           };
         });
 

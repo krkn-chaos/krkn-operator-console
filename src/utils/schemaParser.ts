@@ -99,11 +99,33 @@ export function parseJsonSchema(schemaString: string): ScenarioField[] {
 }
 
 /**
- * Convert custom schema field type number to ScenarioField type
- * Type mapping: 1=string, 2=number, 3=enum, 4=boolean
+ * Convert custom schema field type to ScenarioField type
+ * Supports both numeric and string types:
+ * - Numeric: 1=string, 2=number, 3=enum, 4=boolean
+ * - String: "string", "number", "enum", "boolean"
  */
-function mapCustomSchemaType(typeNum: number): FieldType {
-  switch (typeNum) {
+function mapCustomSchemaType(type: number | string): FieldType {
+  // Handle string types (new backend format)
+  if (typeof type === 'string') {
+    const lowerType = type.toLowerCase();
+    switch (lowerType) {
+      case 'string':
+        return 'string';
+      case 'number':
+      case 'integer':
+        return 'number';
+      case 'enum':
+        return 'enum';
+      case 'boolean':
+        return 'boolean';
+      default:
+        console.warn(`Unknown custom schema type string: ${type}, defaulting to string`);
+        return 'string';
+    }
+  }
+
+  // Handle numeric types (legacy format)
+  switch (type) {
     case 1:
       return 'string';
     case 2:
@@ -113,7 +135,7 @@ function mapCustomSchemaType(typeNum: number): FieldType {
     case 4:
       return 'boolean';
     default:
-      console.warn(`Unknown custom schema type: ${typeNum}, defaulting to string`);
+      console.warn(`Unknown custom schema type number: ${type}, defaulting to string`);
       return 'string';
   }
 }
@@ -135,7 +157,15 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
     }
 
     const fields = customFields.map(customField => {
+      console.log(`Mapping custom field "${customField.variable}":`, {
+        inputType: customField.type,
+        typeOf: typeof customField.type,
+        separator: customField.separator,
+        allowed_values: customField.allowed_values
+      });
+
       const fieldType = mapCustomSchemaType(customField.type);
+      console.log(`  → Mapped to fieldType: ${fieldType}`);
 
       const scenarioField: ScenarioField = {
         name: customField.name,
@@ -148,9 +178,17 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
       } as ScenarioField;
 
       // Add enum-specific fields
-      if (fieldType === 'enum' && customField.separator && customField.allowed_values) {
-        (scenarioField as any).separator = customField.separator;
-        (scenarioField as any).allowed_values = customField.allowed_values;
+      if (fieldType === 'enum') {
+        if (customField.separator && customField.allowed_values) {
+          (scenarioField as any).separator = customField.separator;
+          (scenarioField as any).allowed_values = customField.allowed_values;
+          console.log(`  → Enum field configured with separator="${customField.separator}", allowed_values="${customField.allowed_values}"`);
+        } else {
+          console.error(`  → ERROR: Enum field missing separator or allowed_values!`, {
+            separator: customField.separator,
+            allowed_values: customField.allowed_values
+          });
+        }
       }
 
       return scenarioField;

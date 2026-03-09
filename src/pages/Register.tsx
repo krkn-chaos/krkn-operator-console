@@ -5,7 +5,7 @@
  * Creates the first admin account.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LoginPage as PFLoginPage,
@@ -44,6 +44,16 @@ export function Register() {
     name: '',
     surname: '',
   });
+
+  // Apply theme from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('pf-v5-theme-dark');
+    } else {
+      document.documentElement.classList.remove('pf-v5-theme-dark');
+    }
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors = {

@@ -120,8 +120,39 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
           </FormGroup>
         );
 
-      case 'enum':
-        const options = field.allowed_values.split(field.separator).map((opt) => opt.trim());
+      case 'enum': {
+        // Type narrowing: cast to EnumField to access allowed_values and separator
+        const enumField = field as any;
+
+        // Validate that enum field has required properties
+        if (!enumField.allowed_values || !enumField.separator) {
+          console.error('Enum field missing required properties:', field);
+          return (
+            <FormGroup
+              key={field.variable}
+              label={field.short_description}
+              isRequired={field.required}
+              fieldId={field.variable}
+            >
+              <TextInput
+                id={field.variable}
+                value={value as string}
+                onChange={(_event, val) => handleChange(field.variable, val)}
+                placeholder="Error: enum configuration missing"
+                isDisabled
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant="error">
+                    Enum field is misconfigured (missing allowed_values or separator)
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+          );
+        }
+
+        const options = enumField.allowed_values.split(enumField.separator).map((opt: string) => opt.trim());
         return (
           <FormGroup
             key={field.variable}
@@ -158,6 +189,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
             )}
           </FormGroup>
         );
+      }
 
       case 'boolean':
         return (

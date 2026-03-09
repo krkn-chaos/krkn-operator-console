@@ -124,8 +124,8 @@ export function UserDetails({ user, onClose }: UserDetailsProps) {
       <DescriptionListGroup>
         <DescriptionListTerm>Status</DescriptionListTerm>
         <DescriptionListDescription>
-          <Label color={user.enabled ? 'green' : 'red'}>
-            {user.enabled ? 'Active' : 'Disabled'}
+          <Label color={user.active ? 'green' : 'red'}>
+            {user.active ? 'Active' : 'Inactive'}
           </Label>
         </DescriptionListDescription>
       </DescriptionListGroup>
@@ -133,7 +133,7 @@ export function UserDetails({ user, onClose }: UserDetailsProps) {
       <DescriptionListGroup>
         <DescriptionListTerm>Created At</DescriptionListTerm>
         <DescriptionListDescription>
-          {user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A'}
+          {user.created ? new Date(user.created).toLocaleString() : 'N/A'}
         </DescriptionListDescription>
       </DescriptionListGroup>
 

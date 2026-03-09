@@ -180,7 +180,14 @@ export function UserManagement() {
   const handleFormSubmit = async (data: CreateUserRequest | UpdateUserRequest) => {
     try {
       if (editingUser) {
-        await usersApi.updateUser(editingUser.userId, data as UpdateUserRequest);
+        // Prevent admin from disabling themselves
+        const updateData = data as UpdateUserRequest;
+        if (editingUser.userId === state.user?.userId && updateData.active === false) {
+          showError('Cannot disable yourself', 'You cannot disable your own account');
+          return;
+        }
+
+        await usersApi.updateUser(editingUser.userId, updateData);
         showSuccess('User updated', `User has been updated successfully`);
       } else {
         await usersApi.createUser(data as CreateUserRequest);
@@ -307,8 +314,8 @@ export function UserManagement() {
                         <div style={{ marginBottom: '0.25rem' }}>
                           <strong>Status:</strong>
                         </div>
-                        <Label color={user.enabled ? 'green' : 'red'}>
-                          {user.enabled ? 'Enabled' : 'Disabled'}
+                        <Label color={user.active ? 'green' : 'red'}>
+                          {user.active ? 'Active' : 'Inactive'}
                         </Label>
                       </div>
                     </DataListCell>,
@@ -454,7 +461,7 @@ export function UserManagement() {
       >
         {changingPasswordFor && (
           <ChangePasswordForm
-            isSelfChange={changingPasswordFor.userId === state.user?.userId}
+            isSelfChange={false}
             onSubmit={handlePasswordChangeSubmit}
             onCancel={handlePasswordChangeCancel}
           />

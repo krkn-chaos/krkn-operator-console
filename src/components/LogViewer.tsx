@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardTitle, CardBody, Button, Alert, AlertGroup, AlertActionCloseButton, Flex, FlexItem } from '@patternfly/react-core';
 import { CopyIcon } from '@patternfly/react-icons';
 import Anser from 'anser';
+import { authService } from '../services/authService';
 
 interface LogViewerProps {
   scenarioRunName: string; // ScenarioRun name
@@ -10,6 +11,24 @@ interface LogViewerProps {
   podName: string;
   status: string;
   compact?: boolean;
+}
+
+// Helper function to interpret WebSocket close codes
+function getCloseCodeMeaning(code: number): string {
+  switch (code) {
+    case 1000: return 'Normal closure';
+    case 1001: return 'Going away (server shutdown or browser navigation)';
+    case 1002: return 'Protocol error (likely auth/subprotocol issue)';
+    case 1003: return 'Unsupported data';
+    case 1006: return 'Abnormal closure (connection dropped, no close frame)';
+    case 1007: return 'Invalid frame payload data';
+    case 1008: return 'Policy violation (likely authentication failure)';
+    case 1009: return 'Message too big';
+    case 1010: return 'Missing extension';
+    case 1011: return 'Internal server error';
+    case 1015: return 'TLS handshake failure';
+    default: return `Unknown code (${code})`;
+  }
 }
 
 export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status, compact = false }: LogViewerProps) {
@@ -98,17 +117,47 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       const host = window.location.host;
       const follow = !isTerminal;
 
+      // Get JWT token for authentication
+      const token = authService.getToken();
+      if (!token) {
+        console.error('No authentication token available for WebSocket connection');
+        setLogs(['⚠️  Authentication required. Please login again.']);
+        return;
+      }
+
       // NEW URL structure: /scenarios/run/{scenarioRunName}/jobs/{jobId}/logs
       const wsUrl = `${protocol}//${host}/api/v1/scenarios/run/${encodeURIComponent(scenarioRunName)}/jobs/${encodeURIComponent(jobId)}/logs?follow=${follow}`;
 
-      console.log('WebSocket URL:', wsUrl);
+      console.log('=== WebSocket Connection Attempt ===');
+      console.log('URL:', wsUrl);
+      console.log('Token available:', !!token);
+      console.log('Token length:', token.length);
+      console.log('Token preview (first 30 chars):', token.substring(0, 30) + '...');
 
       try {
-        const ws = new WebSocket(wsUrl);
+        // Use WebSocket subprotocol to pass JWT token securely
+        // Protocol format: "access_token.{token}"
+        // Backend will receive this in Sec-WebSocket-Protocol header and must:
+        // 1. Split on first '.' to separate prefix from token
+        // 2. Validate the token part
+        // 3. Accept connection with Sec-WebSocket-Protocol: access_token
+        const wsProtocol = `access_token.${token}`;
+        console.log('Full protocol length:', wsProtocol.length);
+        console.log('Protocol format check:', wsProtocol.substring(0, 13), '(should be "access_token.")');
+        console.log('Creating WebSocket with subprotocol...');
+
+        const ws = new WebSocket(wsUrl, wsProtocol);
         wsRef.current = ws;
 
+        console.log('WebSocket created. ReadyState:', ws.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)');
+
         ws.onopen = () => {
-          console.log('WebSocket connected');
+          console.log('=== WebSocket Connection Established ===');
+          console.log('✅ Connected successfully!');
+          console.log('Accepted protocol:', ws.protocol);
+          console.log('Expected protocol: "access_token"');
+          console.log('Protocol match:', ws.protocol === 'access_token' ? '✅ YES' : '❌ NO');
+          console.log('ReadyState:', ws.readyState, '(should be 1=OPEN)');
           reconnectAttemptsRef.current = 0; // Reset on successful connection
         };
 
@@ -135,12 +184,38 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         };
 
         ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          console.error('=== WebSocket Error Event ===');
+          console.error('Error object:', error);
+          console.error('ReadyState at error:', ws.readyState);
+          console.error('Error type:', error.type);
           // Error handling is done in onclose
         };
 
         ws.onclose = (event) => {
-          console.log('WebSocket closed:', event.code, event.reason);
+          console.log('=== WebSocket Close Event ===');
+          console.log('Close code:', event.code);
+          console.log('Close reason:', event.reason || '(no reason provided)');
+          console.log('Was clean:', event.wasClean);
+          console.log('Terminal state:', isTerminal);
+          console.log('Cleaned up:', isCleanedUpRef.current);
+          console.log('ReadyState:', ws.readyState);
+
+          // Common close codes reference:
+          // 1000: Normal closure
+          // 1001: Going away
+          // 1002: Protocol error
+          // 1006: Abnormal closure (no close frame received)
+          // 1008: Policy violation
+          // 1009: Message too big
+          // 1011: Server error
+          console.log('Close code meaning:', getCloseCodeMeaning(event.code));
+
+          // Authentication failure (code 1002 = protocol error, 1008 = policy violation)
+          if (event.code === 1002 || event.code === 1008) {
+            console.error('WebSocket authentication failed. Backend may not support subprotocol auth.');
+            setLogs(prev => [...prev, '', '⚠️  Authentication failed. Please check backend WebSocket implementation.']);
+            return;
+          }
 
           // Normal closure (code 1000)
           if (event.code === 1000) {

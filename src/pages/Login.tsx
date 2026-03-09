@@ -34,6 +34,16 @@ export function Login() {
   const [showSessionExpired, setShowSessionExpired] = useState(false);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
 
+  // Apply theme from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('pf-v5-theme-dark');
+    } else {
+      document.documentElement.classList.remove('pf-v5-theme-dark');
+    }
+  }, []);
+
   // Check for session expired flag from AuthContext redirect
   useEffect(() => {
     if (searchParams.get('expired') === 'true') {
@@ -131,7 +141,6 @@ export function Login() {
           <img src="/logo.png" alt="Krkn Operator" />
         </div>
       }
-      textContent="Chaos Engineering for Kubernetes"
       loginTitle="Log in to your account"
     >
       {showSessionExpired && (

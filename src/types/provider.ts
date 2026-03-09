@@ -42,17 +42,18 @@ export interface JsonSchema {
 }
 
 // Custom schema format (for krkn-operator-acm style schemas)
-// Maps to ScenarioField but uses numeric type codes
+// Maps to ScenarioField but uses numeric type codes or string type names
 export interface CustomSchemaField {
   name: string;
   short_description?: string;
   description: string;
   variable: string;
-  type: number; // 1=string, 2=number, 3=enum, 4=boolean
+  type: number | string; // Numeric: 1=string, 2=number, 3=enum, 4=boolean OR String: "string", "number", "enum", "boolean"
   default?: string;
   separator?: string;
   allowed_values?: string;
   required?: boolean;
+  secret?: boolean; // For password fields
 }
 
 // Provider config data from GET /provider-config/{uuid}
