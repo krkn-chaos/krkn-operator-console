@@ -24,7 +24,7 @@ import {
   Switch,
   Bullseye,
 } from '@patternfly/react-core';
-import { UserIcon, RegistryIcon } from '@patternfly/react-icons';
+import { RegistryIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { useProviderConfigPoller } from '../hooks/useProviderConfigPoller';
 import { useNotifications } from '../hooks/useNotifications';

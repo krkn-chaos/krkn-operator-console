@@ -40,7 +40,7 @@ describe('ClusterConflictWarning', () => {
   });
 
   it('should display singular message for one existing run', () => {
-    const { container } = render(
+    render(
       <ClusterConflictWarning
         isOpen={true}
         clusterName="test-cluster"
@@ -58,7 +58,7 @@ describe('ClusterConflictWarning', () => {
   });
 
   it('should display plural message for multiple existing runs', () => {
-    const { container } = render(
+    render(
       <ClusterConflictWarning
         isOpen={true}
         clusterName="test-cluster"

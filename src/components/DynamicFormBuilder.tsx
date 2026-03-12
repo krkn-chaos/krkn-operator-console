@@ -167,7 +167,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               validated={validated}
             >
               {!field.required && <FormSelectOption key="empty" value="" label="Select an option" />}
-              {options.map((option) => (
+              {options.map((option: string) => (
                 <FormSelectOption key={option} value={option} label={option} />
               ))}
             </FormSelect>

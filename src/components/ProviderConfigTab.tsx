@@ -22,7 +22,7 @@ interface ProviderConfigTabProps {
 
 export function ProviderConfigTab({ provider, schema, uuid }: ProviderConfigTabProps) {
   const { dispatch } = useAppContext();
-  const { showSuccess, showError } = useNotifications();
+  const { showError } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formValues, setFormValues] = useState<ScenarioFormValues>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);

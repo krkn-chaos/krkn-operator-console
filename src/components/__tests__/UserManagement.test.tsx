@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import userEvent from '@testing-library/user-event';
 import type { UserDetails } from '../../types/api';
 
 // Mock usersApi - define mocks first
@@ -67,8 +66,8 @@ describe('UserManagement', () => {
       surname: 'Doe',
       role: 'admin',
       organization: 'Test Org',
-      enabled: true,
-      createdAt: '2023-01-01T00:00:00Z',
+      active: true,
+      created: '2023-01-01T00:00:00Z',
       lastLogin: '2023-01-15T00:00:00Z',
     },
     {
@@ -77,8 +76,8 @@ describe('UserManagement', () => {
       surname: 'Smith',
       role: 'user',
       organization: 'Another Org',
-      enabled: true,
-      createdAt: '2023-02-01T00:00:00Z',
+      active: true,
+      created: '2023-02-01T00:00:00Z',
     },
   ];
 

@@ -16,7 +16,6 @@ import {
   LoginForm,
   Alert,
   Button,
-  Title,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
@@ -133,14 +132,8 @@ export function Login() {
 
   return (
     <PFLoginPage
-      header={
-        <div style={{ textAlign: 'center' }}>
-          <Title headingLevel="h1" size="4xl" style={{ marginBottom: '2rem', color: 'var(--pf-v5-global--Color--100)', fontSize: '3rem' }}>
-            Welcome to Krkn!
-          </Title>
-          <img src="/logo.png" alt="Krkn Operator" />
-        </div>
-      }
+      brandImgSrc="/logo.png"
+      brandImgAlt="Krkn Operator"
       loginTitle="Log in to your account"
     >
       {showSessionExpired && (

@@ -449,7 +449,7 @@ export function UserManagement() {
           </Button>,
         ]}
       >
-        <UserDetailsComponent user={viewingUser} onClose={() => setViewingUser(null)} />
+        <UserDetailsComponent user={viewingUser} />
       </Modal>
 
       {/* Change Password Modal */}

@@ -35,8 +35,8 @@ describe('usersApi', () => {
           surname: 'Doe',
           role: 'admin',
           organization: 'Test Org',
-          enabled: true,
-          createdAt: '2023-01-01T00:00:00Z',
+          active: true,
+          created: '2023-01-01T00:00:00Z',
           lastLogin: '2023-01-15T00:00:00Z',
         },
         {
@@ -44,7 +44,7 @@ describe('usersApi', () => {
           name: 'Jane',
           surname: 'Smith',
           role: 'user',
-          enabled: true,
+          active: true,
         },
       ];
 
@@ -80,7 +80,7 @@ describe('usersApi', () => {
         name: 'John',
         surname: 'Doe',
         role: 'admin',
-        enabled: true,
+        active: true,
       };
 
       mockFetchJson.mockResolvedValue(mockUser);
@@ -97,7 +97,7 @@ describe('usersApi', () => {
         name: 'Test',
         surname: 'User',
         role: 'user',
-        enabled: true,
+        active: true,
       };
 
       mockFetchJson.mockResolvedValue(mockUser);

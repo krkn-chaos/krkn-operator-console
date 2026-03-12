@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   DescriptionList,
   DescriptionListGroup,
@@ -16,10 +15,6 @@ interface UserDetailsProps {
    * User data to display (null if no user selected)
    */
   user: UserDetailsType | null;
-  /**
-   * Callback to close the details view
-   */
-  onClose: () => void;
 }
 
 /**
@@ -59,7 +54,6 @@ interface UserDetailsProps {
  *
  * @param props - Component props
  * @param props.user - The user details to display (null if no user selected)
- * @param props.onClose - Callback to close the modal (used by parent component)
  *
  * @example
  * ```tsx
@@ -75,20 +69,17 @@ interface UserDetailsProps {
  *     </Button>
  *   ]}
  * >
- *   <UserDetails user={viewingUser} onClose={() => setViewingUser(null)} />
+ *   <UserDetails user={viewingUser} />
  * </Modal>
  * ```
  *
  * @example
  * ```tsx
  * // Standalone usage (less common)
- * <UserDetails
- *   user={selectedUser}
- *   onClose={handleClose}
- * />
+ * <UserDetails user={selectedUser} />
  * ```
  */
-export function UserDetails({ user, onClose }: UserDetailsProps) {
+export function UserDetails({ user }: UserDetailsProps) {
   if (!user) return null;
 
   return (
