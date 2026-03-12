@@ -14,7 +14,8 @@
       "Bash(git tag:*)",
       "Bash(git push:*)",
       "Read(//Users/tsebasti/Projects/krkn-operator-ecosystem/krkn-operator/.github/workflows/**)",
-      "Read(//Users/tsebasti/Projects/krkn-operator-ecosystem/krkn-operator/**)"
+      "Read(//Users/tsebasti/Projects/krkn-operator-ecosystem/krkn-operator/**)",
+      "Bash(gh run:*)"
     ],
     "additionalDirectories": [
       "/tmp"
