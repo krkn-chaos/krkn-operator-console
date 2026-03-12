@@ -3,7 +3,14 @@
     "allow": [
       "Bash(curl:*)",
       "Bash(bd list --status=open)",
-      "Bash(bd show krkn-operator-console-2q3)"
+      "Bash(bd show krkn-operator-console-2q3)",
+      "Bash(bd ready:*)",
+      "Bash(bd show:*)",
+      "Bash(bd update:*)",
+      "Bash(npm test:*)",
+      "Bash(bd close:*)",
+      "Bash(bd list:*)",
+      "Bash(git add:*)"
     ]
   }
 }
