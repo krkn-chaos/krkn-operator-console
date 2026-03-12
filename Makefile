@@ -103,3 +103,23 @@ podman-build: ## Build container image with podman
 .PHONY: podman-push
 podman-push: ## Push container image with podman
 	$(MAKE) docker-push CONTAINER_TOOL=podman
+
+# Multi-architecture build configuration
+PLATFORMS ?= linux/amd64,linux/arm64
+
+.PHONY: docker-buildx
+docker-buildx: ## Build and push multi-architecture container image
+	- $(CONTAINER_TOOL) buildx create --name krkn-operator-console-builder
+	$(CONTAINER_TOOL) buildx use krkn-operator-console-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} .
+ifeq ($(origin IMG)$(origin REGISTRY)$(origin IMG_NAME),filefilefile)
+ifneq ($(strip $(GIT_TAG)),)
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag $(REGISTRY)/$(IMG_NAME):$(GIT_TAG) .
+	@echo "✓ Built and pushed multi-arch: ${IMG} and $(REGISTRY)/$(IMG_NAME):$(GIT_TAG)"
+else
+	@echo "✓ Built and pushed multi-arch: ${IMG}"
+endif
+else
+	@echo "✓ Built and pushed multi-arch: ${IMG} (override detected, git tag skipped)"
+endif
+	- $(CONTAINER_TOOL) buildx rm krkn-operator-console-builder

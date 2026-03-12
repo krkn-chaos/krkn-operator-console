@@ -27,6 +27,12 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to Quay.io
         uses: docker/login-action@v3
         with:
@@ -40,18 +46,23 @@ jobs:
           echo "Building version: ${GITHUB_REF#refs/tags/}"
 
       - name: Build and push console image
-        run: |
-          docker build -t quay.io/krkn-chaos/krkn-operator-console:$VERSION .
-          docker tag quay.io/krkn-chaos/krkn-operator-console:$VERSION quay.io/krkn-chaos/krkn-operator-console:latest
-          docker push quay.io/krkn-chaos/krkn-operator-console:$VERSION
-          docker push quay.io/krkn-chaos/krkn-operator-console:latest
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            quay.io/krkn-chaos/krkn-operator-console:${{ env.VERSION }}
+            quay.io/krkn-chaos/krkn-operator-console:latest
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat <<EOF > release-notes.md
-          ## Container Image
+          ## Container Images
+
+          Multi-architecture images (linux/amd64, linux/arm64):
 
           - \`quay.io/krkn-chaos/krkn-operator-console:$VERSION\`
           - \`quay.io/krkn-chaos/krkn-operator-console:latest\`
@@ -67,6 +78,9 @@ jobs:
           # Using kubectl
           kubectl apply -f https://raw.githubusercontent.com/krkn-chaos/krkn-operator-console/$VERSION/deployment/kubernetes/console.yaml
           \`\`\`
+
+          **Note**: Container images are automatically built for both AMD64 and ARM64 architectures.
+          Docker/Podman will automatically pull the correct image for your system architecture.
           EOF
 
           gh release create $VERSION --title "Release $VERSION" --notes-file release-notes.md

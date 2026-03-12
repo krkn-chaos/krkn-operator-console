@@ -10,7 +10,11 @@
       "Bash(npm test:*)",
       "Bash(bd close:*)",
       "Bash(bd list:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "Read(//Users/tsebasti/Projects/krkn-operator-ecosystem/krkn-operator/.github/workflows/**)",
+      "Read(//Users/tsebasti/Projects/krkn-operator-ecosystem/krkn-operator/**)"
     ],
     "additionalDirectories": [
       "/tmp"
