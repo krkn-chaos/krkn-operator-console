@@ -1,25 +1,9 @@
-# Stage 1: Build React app
-FROM docker.io/library/node:20-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies (include devDependencies for build)
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build application
-RUN npm run build
-
-# Stage 2: Serve with nginx
+# Serve pre-built React app with nginx
+# Build happens in CI before Docker build for faster multi-arch builds
 FROM docker.io/library/nginx:alpine
 
-# Copy built assets from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy pre-built assets (built by CI before Docker build)
+COPY dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
