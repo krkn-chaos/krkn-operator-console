@@ -632,8 +632,8 @@ export function JobsList({
                                       </div>
                                     </FlexItem>
 
-                                    {/* Logs for running jobs */}
-                                    {job.phase === 'Running' && (
+                                    {/* Logs for running, succeeded, and failed jobs */}
+                                    {['Running', 'Succeeded', 'Failed'].includes(job.phase) && (
                                       <FlexItem>
                                         <LogViewer
                                           scenarioRunName={run.scenarioRunName}
