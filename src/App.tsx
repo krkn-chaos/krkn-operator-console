@@ -252,7 +252,7 @@ function App() {
   };
 
   const userMenuItems = (
-    <DropdownList>
+    <DropdownList style={{ minWidth: '170px' }}>
       <AdminOnly>
         <DropdownItem
           key="settings"
@@ -306,12 +306,12 @@ function App() {
       <MastheadContent>
         <Toolbar isFullHeight isStatic>
           <ToolbarContent>
-            <ToolbarItem align={{ default: 'alignRight' }}>
+            <ToolbarItem align={{ default: 'alignRight' }} style={{ marginRight: '4rem' }}>
               <Dropdown
                 isOpen={isUserMenuOpen}
                 onOpenChange={(isOpen) => setIsUserMenuOpen(isOpen)}
                 popperProps={{
-                  minWidth: '200px',
+                  minWidth: '170px',
                   enableFlip: true,
                   appendTo: () => document.body
                 }}
