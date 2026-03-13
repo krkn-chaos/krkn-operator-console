@@ -310,6 +310,11 @@ function App() {
               <Dropdown
                 isOpen={isUserMenuOpen}
                 onOpenChange={(isOpen) => setIsUserMenuOpen(isOpen)}
+                popperProps={{
+                  minWidth: '200px',
+                  enableFlip: true,
+                  appendTo: () => document.body
+                }}
                 toggle={(toggleRef) => (
                   <MenuToggle
                     ref={toggleRef}
@@ -323,7 +328,6 @@ function App() {
                     </div>
                   </MenuToggle>
                 )}
-                style={{ minWidth: '200px' }}
               >
                 {userMenuItems}
               </Dropdown>
