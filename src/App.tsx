@@ -323,6 +323,7 @@ function App() {
                     </div>
                   </MenuToggle>
                 )}
+                style={{ minWidth: '200px' }}
               >
                 {userMenuItems}
               </Dropdown>
