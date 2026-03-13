@@ -105,8 +105,14 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
     isFirstMessageRef.current = true;
 
     const connectWebSocket = () => {
-      // Don't reconnect if job is terminal or component is unmounted
-      if (isCleanedUpRef.current || isTerminal) {
+      // Don't reconnect if component is unmounted
+      if (isCleanedUpRef.current) {
+        return;
+      }
+
+      // Don't reconnect terminal jobs (but allow initial connection)
+      if (isTerminal && reconnectAttemptsRef.current > 0) {
+        console.log('Terminal job - skipping reconnect');
         return;
       }
 
