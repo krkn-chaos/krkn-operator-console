@@ -21,8 +21,13 @@ import {
   MenuToggle,
   Flex,
   FlexItem,
+  DataList,
+  DataListItem,
+  DataListItemRow,
+  DataListItemCells,
+  DataListCell,
+  Label,
 } from '@patternfly/react-core';
-import { Table, Thead, Tbody, Tr, Th, Td, ThProps } from '@patternfly/react-table';
 import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications } from '../hooks';
@@ -84,8 +89,6 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [filteredGroups, setFilteredGroups] = useState<GroupDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchValue, setSearchValue] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'memberCount'>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGroupName, setEditingGroupName] = useState<string | null>(null);
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<{ name: string } | null>(null);
@@ -98,37 +101,19 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
     loadGroups();
   }, []);
 
+  // Filter groups based on search value
   useEffect(() => {
-    // Filter and sort groups
-    let result = [...groups];
-
-    // Filter by search
-    if (searchValue) {
-      result = result.filter((group) =>
-        group.name.toLowerCase().includes(searchValue.toLowerCase())
+    if (!searchValue) {
+      setFilteredGroups(groups);
+    } else {
+      const searchLower = searchValue.toLowerCase();
+      const filtered = groups.filter((group) =>
+        group.name.toLowerCase().includes(searchLower) ||
+        (group.description && group.description.toLowerCase().includes(searchLower))
       );
+      setFilteredGroups(filtered);
     }
-
-    // Sort
-    result.sort((a, b) => {
-      let aVal: string | number;
-      let bVal: string | number;
-
-      if (sortBy === 'name') {
-        aVal = a.name.toLowerCase();
-        bVal = b.name.toLowerCase();
-      } else {
-        aVal = a.memberCount || 0;
-        bVal = b.memberCount || 0;
-      }
-
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    setFilteredGroups(result);
-  }, [groups, searchValue, sortBy, sortDirection]);
+  }, [groups, searchValue]);
 
   const loadGroups = async () => {
     setLoading(true);
@@ -142,24 +127,6 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
       setLoading(false);
     }
   };
-
-  const handleSort = (column: 'name' | 'memberCount') => {
-    if (sortBy === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortDirection('asc');
-    }
-  };
-
-  const getSortParams = (column: 'name' | 'memberCount'): ThProps['sort'] => ({
-    sortBy: {
-      index: sortBy === column ? 0 : undefined,
-      direction: sortDirection,
-    },
-    onSort: () => handleSort(column),
-    columnIndex: 0,
-  });
 
   const handleCreate = () => {
     setIsCreateModalOpen(true);
@@ -258,105 +225,111 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
                 </EmptyStateBody>
               </EmptyState>
             ) : (
-              <Table aria-label="Groups table" variant="compact">
-                <Thead>
-                  <Tr>
-                    <Th sort={getSortParams('name')} width={20}>Name</Th>
-                    <Th width={35}>Description</Th>
-                    <Th sort={getSortParams('memberCount')} width={15}>Members</Th>
-                    <Th width={15}>Clusters</Th>
-                    <Th width={15}>Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {filteredGroups.map((group) => {
-                    const clusterCount = Object.keys(group.clusterPermissions || {}).length;
-                    return (
-                      <Tr key={group.name}>
-                        <Td dataLabel="Name">
-                          <strong>{group.name}</strong>
-                        </Td>
-                        <Td dataLabel="Description">
-                          <div style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            maxWidth: '300px'
-                          }}>
-                            {group.description || <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>No description</span>}
-                          </div>
-                        </Td>
-                        <Td dataLabel="Members">
-                          <Button
-                            variant="link"
-                            isInline
-                            onClick={() => handleViewMembers(group.name)}
-                            style={{ padding: 0, fontSize: 'inherit' }}
-                          >
-                            {group.memberCount || 0} {(group.memberCount || 0) === 1 ? 'member' : 'members'}
-                          </Button>
-                        </Td>
-                        <Td dataLabel="Clusters">
-                          {clusterCount} {clusterCount === 1 ? 'cluster' : 'clusters'}
-                        </Td>
-                        <Td dataLabel="Actions">
-                          <Dropdown
-                            isOpen={openDropdownId === group.name}
-                            onOpenChange={(isOpen) => setOpenDropdownId(isOpen ? group.name : null)}
-                            toggle={(toggleRef) => (
-                              <MenuToggle
-                                ref={toggleRef}
-                                onClick={() =>
-                                  setOpenDropdownId(openDropdownId === group.name ? null : group.name)
-                                }
-                                variant="plain"
-                                aria-label="Group actions"
-                                isDisabled={deletingGroupName === group.name}
+              <DataList aria-label="Groups list" isCompact>
+                {filteredGroups.map((group) => {
+                  const clusterCount = Object.keys(group.clusterPermissions || {}).length;
+                  return (
+                    <DataListItem key={group.name}>
+                      <DataListItemRow>
+                        <DataListItemCells
+                          dataListCells={[
+                            <DataListCell key="name" width={2}>
+                              <div>
+                                <div style={{ marginBottom: '0.25rem' }}>
+                                  <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                                    {group.name}
+                                  </strong>
+                                </div>
+                                <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                                  {group.description || 'No description'}
+                                </div>
+                              </div>
+                            </DataListCell>,
+                            <DataListCell key="members" width={1}>
+                              <div>
+                                <div style={{ marginBottom: '0.25rem' }}>
+                                  <strong>Members:</strong>
+                                </div>
+                                <Button
+                                  variant="link"
+                                  isInline
+                                  onClick={() => handleViewMembers(group.name)}
+                                  style={{ padding: 0, fontSize: 'var(--pf-v5-global--FontSize--sm)' }}
+                                >
+                                  {group.memberCount || 0}
+                                </Button>
+                              </div>
+                            </DataListCell>,
+                            <DataListCell key="clusters" width={1}>
+                              <div>
+                                <div style={{ marginBottom: '0.25rem' }}>
+                                  <strong>Clusters:</strong>
+                                </div>
+                                <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                                  {clusterCount}
+                                </div>
+                              </div>
+                            </DataListCell>,
+                            <DataListCell key="actions" width={1}>
+                              <Dropdown
+                                isOpen={openDropdownId === group.name}
+                                onOpenChange={(isOpen) => setOpenDropdownId(isOpen ? group.name : null)}
+                                toggle={(toggleRef) => (
+                                  <MenuToggle
+                                    ref={toggleRef}
+                                    onClick={() =>
+                                      setOpenDropdownId(openDropdownId === group.name ? null : group.name)
+                                    }
+                                    variant="plain"
+                                    aria-label="Group actions"
+                                    isDisabled={deletingGroupName === group.name}
+                                  >
+                                    <EllipsisVIcon />
+                                  </MenuToggle>
+                                )}
                               >
-                                <EllipsisVIcon />
-                              </MenuToggle>
-                            )}
-                          >
-                            <DropdownList>
-                              <DropdownItem
-                                key="members"
-                                icon={<UsersIcon />}
-                                onClick={() => {
-                                  handleViewMembers(group.name);
-                                  setOpenDropdownId(null);
-                                }}
-                              >
-                                Members
-                              </DropdownItem>
-                              <DropdownItem
-                                key="edit"
-                                icon={<EditIcon />}
-                                onClick={() => {
-                                  handleEdit(group);
-                                  setOpenDropdownId(null);
-                                }}
-                              >
-                                Edit
-                              </DropdownItem>
-                              <DropdownItem
-                                key="delete"
-                                icon={<TrashIcon />}
-                                onClick={() => {
-                                  handleDelete(group.name);
-                                  setOpenDropdownId(null);
-                                }}
-                                style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
-                              >
-                                Delete
-                              </DropdownItem>
-                            </DropdownList>
-                          </Dropdown>
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                </Tbody>
-              </Table>
+                                <DropdownList>
+                                  <DropdownItem
+                                    key="members"
+                                    icon={<UsersIcon />}
+                                    onClick={() => {
+                                      handleViewMembers(group.name);
+                                      setOpenDropdownId(null);
+                                    }}
+                                  >
+                                    Members
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    key="edit"
+                                    icon={<EditIcon />}
+                                    onClick={() => {
+                                      handleEdit(group);
+                                      setOpenDropdownId(null);
+                                    }}
+                                  >
+                                    Edit
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    key="delete"
+                                    icon={<TrashIcon />}
+                                    onClick={() => {
+                                      handleDelete(group.name);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                                  >
+                                    Delete
+                                  </DropdownItem>
+                                </DropdownList>
+                              </Dropdown>
+                            </DataListCell>,
+                          ]}
+                        />
+                      </DataListItemRow>
+                    </DataListItem>
+                  );
+                })}
+              </DataList>
             )}
           </>
         )}
