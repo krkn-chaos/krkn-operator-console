@@ -480,3 +480,60 @@ export interface ActiveRunsResponse {
     [clusterName: string]: string[]; // cluster name -> array of run names
   };
 }
+
+// Group Management Types
+
+export interface ClusterPermissions {
+  [clusterAPIURL: string]: {
+    actions: Array<'view' | 'run' | 'cancel'>;
+  };
+}
+
+export interface GroupDetails {
+  name: string;
+  description?: string;
+  clusterPermissions: ClusterPermissions;
+  memberCount?: number;
+  createdAt?: string;
+}
+
+export interface CreateGroupRequest {
+  name: string;
+  description?: string;
+  clusterPermissions: ClusterPermissions;
+}
+
+export interface UpdateGroupRequest {
+  description?: string;
+  clusterPermissions?: ClusterPermissions;
+}
+
+export interface ListGroupsResponse {
+  groups: GroupDetails[];
+}
+
+export interface GroupOperationResponse {
+  name: string;
+  message?: string;
+}
+
+export interface GroupMemberDetails {
+  userId: string; // Email
+  name: string;
+  surname: string;
+  role: UserRole;
+}
+
+export interface ListGroupMembersResponse {
+  members: GroupMemberDetails[];
+}
+
+export interface AddGroupMemberRequest {
+  userId: string; // Email
+}
+
+export interface GroupMemberOperationResponse {
+  groupName: string;
+  userId: string;
+  message?: string;
+}

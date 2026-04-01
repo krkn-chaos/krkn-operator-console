@@ -199,7 +199,7 @@ export function Settings() {
                 </div>
               </Tab>
             )}
-            <Tab eventKey={1} title={<TabTitleText>User Settings</TabTitleText>}>
+            <Tab eventKey={1} title={<TabTitleText>Users & Groups</TabTitleText>}>
               <div style={{ marginTop: '1.5rem' }}>
                 <UserManagement />
               </div>
