@@ -69,7 +69,7 @@ function App() {
   const handleDeleteScenarioRun = async (scenarioRunName: string) => {
     try {
       await operatorApi.deleteScenarioRun(scenarioRunName);
-      // Remove the scenario run from state immediately
+      // Remove the scenario run from state only after successful deletion
       const updatedRuns = state.scenarioRuns.filter(
         (run) => run.scenarioRunName !== scenarioRunName
       );
@@ -77,9 +77,17 @@ function App() {
         type: 'LOAD_SCENARIO_RUNS_SUCCESS',
         payload: { runs: updatedRuns }
       });
+      showSuccess('Scenario run deleted', `Successfully deleted ${scenarioRunName}`);
     } catch (error) {
       console.error('Failed to delete scenario run:', error);
-      // Don't dispatch error to avoid interrupting the UI
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete scenario run';
+
+      // Check if it's a 403 Forbidden error
+      if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
+        showError('Permission denied', 'You do not have permission to delete this scenario run');
+      } else {
+        showError('Failed to delete scenario run', errorMessage);
+      }
     }
   };
 
@@ -88,9 +96,17 @@ function App() {
       await operatorApi.deleteJob(jobId);
       // The poller will update the scenario run status automatically
       // which will reflect the job deletion
+      showSuccess('Job deleted', `Successfully deleted job ${jobId}`);
     } catch (error) {
       console.error('Failed to delete job:', error);
-      // Don't dispatch error to avoid interrupting the UI
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete job';
+
+      // Check if it's a 403 Forbidden error
+      if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
+        showError('Permission denied', 'You do not have permission to delete this job');
+      } else {
+        showError('Failed to delete job', errorMessage);
+      }
     }
   };
 
