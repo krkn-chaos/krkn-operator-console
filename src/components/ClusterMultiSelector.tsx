@@ -102,7 +102,7 @@ export function ClusterMultiSelector({
           No Clusters Available
         </Title>
         <EmptyStateBody>
-          No target clusters were discovered. Please configure target clusters before running scenarios.
+          No target clusters were discovered.
         </EmptyStateBody>
         <Button variant="secondary" onClick={onCancel} style={{ marginTop: '1rem' }}>
           Go Back
