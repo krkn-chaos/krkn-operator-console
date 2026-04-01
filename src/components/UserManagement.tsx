@@ -9,11 +9,11 @@ import type { GroupDetails } from '../types/api';
  * User Management component
  *
  * Orchestrates both user and group management in a unified interface.
- * Displays UsersCard and GroupsCard side by side, managing shared state
+ * Displays GroupsCard and UsersCard in vertical layout, managing shared state
  * to ensure users can only be created when at least one group exists.
  *
  * **Features:**
- * - Side-by-side layout of Users and Groups cards
+ * - Vertical layout with Groups card above Users card
  * - Fetches groups and passes to UsersCard for validation
  * - Validates group existence before allowing user creation
  * - Responsive grid layout
@@ -76,11 +76,11 @@ export function UserManagement() {
 
   return (
     <Grid hasGutter>
-      <GridItem span={6}>
-        <UsersCard groups={groups} />
-      </GridItem>
-      <GridItem span={6}>
+      <GridItem span={12}>
         <GroupsCard onGroupsChange={loadGroups} />
+      </GridItem>
+      <GridItem span={12}>
+        <UsersCard groups={groups} />
       </GridItem>
     </Grid>
   );
