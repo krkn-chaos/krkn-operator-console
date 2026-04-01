@@ -135,9 +135,23 @@ class OperatorApiClient extends BaseApiClient {
    * @returns Promise that resolves when deletion is complete
    */
   async deleteScenarioRun(scenarioRunName: string): Promise<void> {
-    await this.fetch(`/scenarios/run/${encodeURIComponent(scenarioRunName)}`, {
+    const response = await this.fetch(`/scenarios/run/${encodeURIComponent(scenarioRunName)}`, {
       method: 'DELETE',
     });
+
+    if (!response.ok) {
+      // Try to parse error message from response
+      try {
+        const error = await response.json();
+        throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
+      } catch (e) {
+        // If JSON parsing fails, throw error with status code
+        if (e instanceof Error && e.message.startsWith('HTTP')) {
+          throw e;
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
   }
 
   /**
@@ -147,9 +161,23 @@ class OperatorApiClient extends BaseApiClient {
    * @returns Promise that resolves when deletion is complete
    */
   async deleteJob(jobId: string): Promise<void> {
-    await this.fetch(`/scenarios/run/jobs/${encodeURIComponent(jobId)}`, {
+    const response = await this.fetch(`/scenarios/run/jobs/${encodeURIComponent(jobId)}`, {
       method: 'DELETE',
     });
+
+    if (!response.ok) {
+      // Try to parse error message from response
+      try {
+        const error = await response.json();
+        throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
+      } catch (e) {
+        // If JSON parsing fails, throw error with status code
+        if (e instanceof Error && e.message.startsWith('HTTP')) {
+          throw e;
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
   }
 
   /**
