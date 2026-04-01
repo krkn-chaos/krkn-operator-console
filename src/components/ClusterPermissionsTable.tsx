@@ -18,8 +18,16 @@ import {
   Checkbox,
   Badge,
   Button,
+  DataList,
+  DataListItem,
+  DataListItemRow,
+  DataListItemCells,
+  DataListCell,
+  Toolbar,
+  ToolbarContent,
+  ToolbarItem,
+  ToolbarGroup,
 } from '@patternfly/react-core';
-import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import type { ClusterPermissions, TargetResponse } from '../types/api';
 
 interface ClusterPermissionsTableProps {
@@ -156,165 +164,208 @@ export function ClusterPermissionsTable({
   }
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <Table aria-label="Cluster permissions table" variant="compact">
-        <Thead>
-          <Tr>
-            <Th>Cluster Name</Th>
-            <Th>Cluster API URL</Th>
-            <Th>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <span>View</span>
-                <div style={{ fontSize: '0.75rem' }}>
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => selectAllForAction('view')}
-                    isDisabled={allHaveAction('view')}
-                  >
-                    All
-                  </Button>
-                  {' / '}
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => deselectAllForAction('view')}
-                    isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('view'))}
-                  >
-                    None
-                  </Button>
-                </div>
-              </div>
-            </Th>
-            <Th>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <span>Run</span>
-                <div style={{ fontSize: '0.75rem' }}>
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => selectAllForAction('run')}
-                    isDisabled={allHaveAction('run')}
-                  >
-                    All
-                  </Button>
-                  {' / '}
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => deselectAllForAction('run')}
-                    isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('run'))}
-                  >
-                    None
-                  </Button>
-                </div>
-              </div>
-            </Th>
-            <Th>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <span>Cancel</span>
-                <div style={{ fontSize: '0.75rem' }}>
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => selectAllForAction('cancel')}
-                    isDisabled={allHaveAction('cancel')}
-                  >
-                    All
-                  </Button>
-                  {' / '}
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => deselectAllForAction('cancel')}
-                    isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('cancel'))}
-                  >
-                    None
-                  </Button>
-                </div>
-              </div>
-            </Th>
-          </Tr>
-        </Thead>
-        <Tbody>
-          {/* Active targets */}
-          {targets.map((target) => (
-            <Tr key={target.clusterAPIURL}>
-              <Td dataLabel="Cluster Name">{target.clusterName}</Td>
-              <Td dataLabel="Cluster API URL">
-                <span style={{ fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                  {target.clusterAPIURL}
-                </span>
-              </Td>
-              <Td dataLabel="View">
-                <Checkbox
-                  id={`${target.uuid}-view`}
-                  isChecked={hasAction(target.clusterAPIURL, 'view')}
-                  onChange={() => toggleAction(target.clusterAPIURL, 'view')}
-                  aria-label={`View permission for ${target.clusterName}`}
-                />
-              </Td>
-              <Td dataLabel="Run">
-                <Checkbox
-                  id={`${target.uuid}-run`}
-                  isChecked={hasAction(target.clusterAPIURL, 'run')}
-                  onChange={() => toggleAction(target.clusterAPIURL, 'run')}
-                  aria-label={`Run permission for ${target.clusterName}`}
-                />
-              </Td>
-              <Td dataLabel="Cancel">
-                <Checkbox
-                  id={`${target.uuid}-cancel`}
-                  isChecked={hasAction(target.clusterAPIURL, 'cancel')}
-                  onChange={() => toggleAction(target.clusterAPIURL, 'cancel')}
-                  aria-label={`Cancel permission for ${target.clusterName}`}
-                />
-              </Td>
-            </Tr>
-          ))}
+    <div>
+      <Toolbar>
+        <ToolbarContent>
+          <ToolbarGroup>
+            <ToolbarItem>
+              <strong style={{ marginRight: '0.5rem' }}>View:</strong>
+              <Button
+                variant="link"
+                isInline
+                onClick={() => selectAllForAction('view')}
+                isDisabled={allHaveAction('view')}
+                size="sm"
+              >
+                All
+              </Button>
+              {' / '}
+              <Button
+                variant="link"
+                isInline
+                onClick={() => deselectAllForAction('view')}
+                isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('view'))}
+                size="sm"
+              >
+                None
+              </Button>
+            </ToolbarItem>
+            <ToolbarItem>
+              <strong style={{ marginRight: '0.5rem' }}>Run:</strong>
+              <Button
+                variant="link"
+                isInline
+                onClick={() => selectAllForAction('run')}
+                isDisabled={allHaveAction('run')}
+                size="sm"
+              >
+                All
+              </Button>
+              {' / '}
+              <Button
+                variant="link"
+                isInline
+                onClick={() => deselectAllForAction('run')}
+                isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('run'))}
+                size="sm"
+              >
+                None
+              </Button>
+            </ToolbarItem>
+            <ToolbarItem>
+              <strong style={{ marginRight: '0.5rem' }}>Cancel:</strong>
+              <Button
+                variant="link"
+                isInline
+                onClick={() => selectAllForAction('cancel')}
+                isDisabled={allHaveAction('cancel')}
+                size="sm"
+              >
+                All
+              </Button>
+              {' / '}
+              <Button
+                variant="link"
+                isInline
+                onClick={() => deselectAllForAction('cancel')}
+                isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('cancel'))}
+                size="sm"
+              >
+                None
+              </Button>
+            </ToolbarItem>
+          </ToolbarGroup>
+        </ToolbarContent>
+      </Toolbar>
 
-          {/* Orphaned clusters (in permissions but not in targets) */}
-          {orphanedUrls.map((url) => (
-            <Tr key={url}>
-              <Td dataLabel="Cluster Name">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>Unknown</span>
-                  {showOrphanedWarning && <Badge>Removed</Badge>}
-                </div>
-              </Td>
-              <Td dataLabel="Cluster API URL">
-                <span style={{ fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                  {url}
-                </span>
-              </Td>
-              <Td dataLabel="View">
-                <Checkbox
-                  id={`${url}-view`}
-                  isChecked={hasAction(url, 'view')}
-                  onChange={() => toggleAction(url, 'view')}
-                  aria-label={`View permission for ${url}`}
-                />
-              </Td>
-              <Td dataLabel="Run">
-                <Checkbox
-                  id={`${url}-run`}
-                  isChecked={hasAction(url, 'run')}
-                  onChange={() => toggleAction(url, 'run')}
-                  aria-label={`Run permission for ${url}`}
-                />
-              </Td>
-              <Td dataLabel="Cancel">
-                <Checkbox
-                  id={`${url}-cancel`}
-                  isChecked={hasAction(url, 'cancel')}
-                  onChange={() => toggleAction(url, 'cancel')}
-                  aria-label={`Cancel permission for ${url}`}
-                />
-              </Td>
-            </Tr>
-          ))}
-        </Tbody>
-      </Table>
+      <DataList aria-label="Cluster permissions list" isCompact>
+        {/* Active targets */}
+        {targets.map((target) => (
+          <DataListItem key={target.clusterAPIURL}>
+            <DataListItemRow>
+              <DataListItemCells
+                dataListCells={[
+                  <DataListCell key="name" width={2}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                          {target.clusterName}
+                        </strong>
+                      </div>
+                      <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                        {target.clusterAPIURL}
+                      </div>
+                    </div>
+                  </DataListCell>,
+                  <DataListCell key="view" width={1}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <strong>View:</strong>
+                      </div>
+                      <Checkbox
+                        id={`${target.uuid}-view`}
+                        isChecked={hasAction(target.clusterAPIURL, 'view')}
+                        onChange={() => toggleAction(target.clusterAPIURL, 'view')}
+                        aria-label={`View permission for ${target.clusterName}`}
+                      />
+                    </div>
+                  </DataListCell>,
+                  <DataListCell key="run" width={1}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <strong>Run:</strong>
+                      </div>
+                      <Checkbox
+                        id={`${target.uuid}-run`}
+                        isChecked={hasAction(target.clusterAPIURL, 'run')}
+                        onChange={() => toggleAction(target.clusterAPIURL, 'run')}
+                        aria-label={`Run permission for ${target.clusterName}`}
+                      />
+                    </div>
+                  </DataListCell>,
+                  <DataListCell key="cancel" width={1}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <strong>Cancel:</strong>
+                      </div>
+                      <Checkbox
+                        id={`${target.uuid}-cancel`}
+                        isChecked={hasAction(target.clusterAPIURL, 'cancel')}
+                        onChange={() => toggleAction(target.clusterAPIURL, 'cancel')}
+                        aria-label={`Cancel permission for ${target.clusterName}`}
+                      />
+                    </div>
+                  </DataListCell>,
+                ]}
+              />
+            </DataListItemRow>
+          </DataListItem>
+        ))}
+
+        {/* Orphaned clusters (in permissions but not in targets) */}
+        {orphanedUrls.map((url) => (
+          <DataListItem key={url}>
+            <DataListItemRow>
+              <DataListItemCells
+                dataListCells={[
+                  <DataListCell key="name" width={2}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)', color: 'var(--pf-v5-global--Color--200)' }}>
+                          Unknown
+                        </strong>
+                        {showOrphanedWarning && <Badge>Removed</Badge>}
+                      </div>
+                      <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                        {url}
+                      </div>
+                    </div>
+                  </DataListCell>,
+                  <DataListCell key="view" width={1}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <strong>View:</strong>
+                      </div>
+                      <Checkbox
+                        id={`${url}-view`}
+                        isChecked={hasAction(url, 'view')}
+                        onChange={() => toggleAction(url, 'view')}
+                        aria-label={`View permission for ${url}`}
+                      />
+                    </div>
+                  </DataListCell>,
+                  <DataListCell key="run" width={1}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <strong>Run:</strong>
+                      </div>
+                      <Checkbox
+                        id={`${url}-run`}
+                        isChecked={hasAction(url, 'run')}
+                        onChange={() => toggleAction(url, 'run')}
+                        aria-label={`Run permission for ${url}`}
+                      />
+                    </div>
+                  </DataListCell>,
+                  <DataListCell key="cancel" width={1}>
+                    <div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <strong>Cancel:</strong>
+                      </div>
+                      <Checkbox
+                        id={`${url}-cancel`}
+                        isChecked={hasAction(url, 'cancel')}
+                        onChange={() => toggleAction(url, 'cancel')}
+                        aria-label={`Cancel permission for ${url}`}
+                      />
+                    </div>
+                  </DataListCell>,
+                ]}
+              />
+            </DataListItemRow>
+          </DataListItem>
+        ))}
+      </DataList>
     </div>
   );
 }

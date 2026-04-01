@@ -15,8 +15,13 @@ import {
   Form,
   HelperText,
   HelperTextItem,
+  DataList,
+  DataListItem,
+  DataListItemRow,
+  DataListItemCells,
+  DataListCell,
+  Label,
 } from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { UsersIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
 import { usersApi } from '../services/usersApi';
@@ -302,48 +307,71 @@ export function AddMembersModal({
             </HelperText>
           </FormGroup>
 
-          <Table variant="compact" aria-label="Available users table">
-            <Thead>
-              <Tr>
-                <Th>
-                  <Checkbox
-                    id="select-all"
-                    aria-label="Select all users"
-                    isChecked={
-                      selectedUserIds.size > 0 && selectedUserIds.size === availableUsers.length
-                    }
-                    onChange={handleToggleAll}
-                    isDisabled={submitting}
+          <div style={{ marginBottom: '1rem' }}>
+            <Checkbox
+              id="select-all"
+              label="Select all users"
+              isChecked={
+                selectedUserIds.size > 0 && selectedUserIds.size === availableUsers.length
+              }
+              onChange={handleToggleAll}
+              isDisabled={submitting}
+            />
+          </div>
+
+          <DataList aria-label="Available users list" isCompact>
+            {availableUsers.map((user) => (
+              <DataListItem key={user.userId}>
+                <DataListItemRow>
+                  <DataListItemCells
+                    dataListCells={[
+                      <DataListCell key="checkbox" width={1}>
+                        <Checkbox
+                          id={`select-${user.userId}`}
+                          aria-label={`Select ${user.name} ${user.surname}`}
+                          isChecked={selectedUserIds.has(user.userId)}
+                          onChange={() => handleToggleUser(user.userId)}
+                          isDisabled={submitting}
+                        />
+                      </DataListCell>,
+                      <DataListCell key="name" width={2}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                              {user.name} {user.surname}
+                            </strong>
+                          </div>
+                          <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                            {user.userId}
+                          </div>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="role" width={1}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong>Role:</strong>
+                          </div>
+                          <Label color={user.role === 'admin' ? 'blue' : 'green'}>
+                            {user.role}
+                          </Label>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="organization" width={1}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong>Organization:</strong>
+                          </div>
+                          <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                            {user.organization || 'N/A'}
+                          </div>
+                        </div>
+                      </DataListCell>,
+                    ]}
                   />
-                </Th>
-                <Th>User ID</Th>
-                <Th>Name</Th>
-                <Th>Surname</Th>
-                <Th>Role</Th>
-                <Th>Organization</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {availableUsers.map((user) => (
-                <Tr key={user.userId}>
-                  <Td dataLabel="Select">
-                    <Checkbox
-                      id={`select-${user.userId}`}
-                      aria-label={`Select ${user.name} ${user.surname}`}
-                      isChecked={selectedUserIds.has(user.userId)}
-                      onChange={() => handleToggleUser(user.userId)}
-                      isDisabled={submitting}
-                    />
-                  </Td>
-                  <Td dataLabel="User ID">{user.userId}</Td>
-                  <Td dataLabel="Name">{user.name}</Td>
-                  <Td dataLabel="Surname">{user.surname}</Td>
-                  <Td dataLabel="Role">{user.role}</Td>
-                  <Td dataLabel="Organization">{user.organization || 'N/A'}</Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
+                </DataListItemRow>
+              </DataListItem>
+            ))}
+          </DataList>
         </Form>
       )}
     </Modal>

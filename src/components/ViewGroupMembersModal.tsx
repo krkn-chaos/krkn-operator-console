@@ -10,8 +10,13 @@ import {
   Spinner,
   Alert,
   Bullseye,
+  DataList,
+  DataListItem,
+  DataListItemRow,
+  DataListItemCells,
+  DataListCell,
+  Label,
 } from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { UsersIcon, TrashIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications } from '../hooks';
@@ -219,38 +224,51 @@ export function ViewGroupMembersModal({
             </EmptyStateBody>
           </EmptyState>
         ) : (
-          <Table variant="compact" aria-label="Group members table">
-            <Thead>
-              <Tr>
-                <Th>User ID</Th>
-                <Th>Name</Th>
-                <Th>Surname</Th>
-                <Th>Role</Th>
-                <Th>Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {members.map((member) => (
-                <Tr key={member.userId}>
-                  <Td dataLabel="User ID">{member.userId}</Td>
-                  <Td dataLabel="Name">{member.name}</Td>
-                  <Td dataLabel="Surname">{member.surname}</Td>
-                  <Td dataLabel="Role">{member.role}</Td>
-                  <Td dataLabel="Actions">
-                    <Button
-                      variant="link"
-                      icon={<TrashIcon />}
-                      onClick={() => handleRemoveClick(member.userId, member.name, member.surname)}
-                      isDisabled={removingUserId === member.userId}
-                      isDanger
-                    >
-                      {removingUserId === member.userId ? 'Removing...' : 'Remove'}
-                    </Button>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
+          <DataList aria-label="Group members list" isCompact>
+            {members.map((member) => (
+              <DataListItem key={member.userId}>
+                <DataListItemRow>
+                  <DataListItemCells
+                    dataListCells={[
+                      <DataListCell key="name" width={2}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                              {member.name} {member.surname}
+                            </strong>
+                          </div>
+                          <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                            {member.userId}
+                          </div>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="role" width={1}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong>Role:</strong>
+                          </div>
+                          <Label color={member.role === 'admin' ? 'blue' : 'green'}>
+                            {member.role}
+                          </Label>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="actions" width={1}>
+                        <Button
+                          variant="link"
+                          icon={<TrashIcon />}
+                          onClick={() => handleRemoveClick(member.userId, member.name, member.surname)}
+                          isDisabled={removingUserId === member.userId}
+                          isDanger
+                        >
+                          {removingUserId === member.userId ? 'Removing...' : 'Remove'}
+                        </Button>
+                      </DataListCell>,
+                    ]}
+                  />
+                </DataListItemRow>
+              </DataListItem>
+            ))}
+          </DataList>
         )}
       </Modal>
 
