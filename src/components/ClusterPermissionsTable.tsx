@@ -39,6 +39,8 @@ interface ClusterPermissionsTableProps {
   onChange: (permissions: ClusterPermissions) => void;
   /** Whether to show warning for orphaned clusters */
   showOrphanedWarning?: boolean;
+  /** Whether to show bulk action toolbar (All/None buttons) */
+  showBulkActions?: boolean;
 }
 
 type Action = 'view' | 'run' | 'cancel';
@@ -76,6 +78,7 @@ export function ClusterPermissionsTable({
   clusterPermissions,
   onChange,
   showOrphanedWarning = false,
+  showBulkActions = true,
 }: ClusterPermissionsTableProps) {
   // Get all cluster API URLs from targets
   const targetUrls = new Set(targets.map((t) => t.clusterAPIURL));
@@ -165,78 +168,80 @@ export function ClusterPermissionsTable({
 
   return (
     <div>
-      <Toolbar>
-        <ToolbarContent>
-          <ToolbarGroup>
-            <ToolbarItem>
-              <strong style={{ marginRight: '0.5rem' }}>View:</strong>
-              <Button
-                variant="link"
-                isInline
-                onClick={() => selectAllForAction('view')}
-                isDisabled={allHaveAction('view')}
-                size="sm"
-              >
-                All
-              </Button>
-              {' / '}
-              <Button
-                variant="link"
-                isInline
-                onClick={() => deselectAllForAction('view')}
-                isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('view'))}
-                size="sm"
-              >
-                None
-              </Button>
-            </ToolbarItem>
-            <ToolbarItem>
-              <strong style={{ marginRight: '0.5rem' }}>Run:</strong>
-              <Button
-                variant="link"
-                isInline
-                onClick={() => selectAllForAction('run')}
-                isDisabled={allHaveAction('run')}
-                size="sm"
-              >
-                All
-              </Button>
-              {' / '}
-              <Button
-                variant="link"
-                isInline
-                onClick={() => deselectAllForAction('run')}
-                isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('run'))}
-                size="sm"
-              >
-                None
-              </Button>
-            </ToolbarItem>
-            <ToolbarItem>
-              <strong style={{ marginRight: '0.5rem' }}>Cancel:</strong>
-              <Button
-                variant="link"
-                isInline
-                onClick={() => selectAllForAction('cancel')}
-                isDisabled={allHaveAction('cancel')}
-                size="sm"
-              >
-                All
-              </Button>
-              {' / '}
-              <Button
-                variant="link"
-                isInline
-                onClick={() => deselectAllForAction('cancel')}
-                isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('cancel'))}
-                size="sm"
-              >
-                None
-              </Button>
-            </ToolbarItem>
-          </ToolbarGroup>
-        </ToolbarContent>
-      </Toolbar>
+      {showBulkActions && (
+        <Toolbar>
+          <ToolbarContent>
+            <ToolbarGroup>
+              <ToolbarItem>
+                <strong style={{ marginRight: '0.5rem' }}>View:</strong>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => selectAllForAction('view')}
+                  isDisabled={allHaveAction('view')}
+                  size="sm"
+                >
+                  All
+                </Button>
+                {' / '}
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => deselectAllForAction('view')}
+                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('view'))}
+                  size="sm"
+                >
+                  None
+                </Button>
+              </ToolbarItem>
+              <ToolbarItem>
+                <strong style={{ marginRight: '0.5rem' }}>Run:</strong>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => selectAllForAction('run')}
+                  isDisabled={allHaveAction('run')}
+                  size="sm"
+                >
+                  All
+                </Button>
+                {' / '}
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => deselectAllForAction('run')}
+                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('run'))}
+                  size="sm"
+                >
+                  None
+                </Button>
+              </ToolbarItem>
+              <ToolbarItem>
+                <strong style={{ marginRight: '0.5rem' }}>Cancel:</strong>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => selectAllForAction('cancel')}
+                  isDisabled={allHaveAction('cancel')}
+                  size="sm"
+                >
+                  All
+                </Button>
+                {' / '}
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => deselectAllForAction('cancel')}
+                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('cancel'))}
+                  size="sm"
+                >
+                  None
+                </Button>
+              </ToolbarItem>
+            </ToolbarGroup>
+          </ToolbarContent>
+        </Toolbar>
+      )}
 
       <DataList aria-label="Cluster permissions list" isCompact>
         {/* Active targets */}

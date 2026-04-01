@@ -258,6 +258,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
               clusterPermissions={clusterPermissions}
               onChange={setClusterPermissions}
               showOrphanedWarning
+              showBulkActions={false}
             />
             <FormHelperText>
               <HelperText>
