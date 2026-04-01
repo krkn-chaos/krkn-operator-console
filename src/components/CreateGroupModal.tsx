@@ -50,20 +50,12 @@ import {
   EmptyStateIcon,
   Spinner,
   Title,
-  Checkbox,
 } from '@patternfly/react-core';
-import {
-  Table,
-  Thead,
-  Tr,
-  Th,
-  Tbody,
-  Td,
-} from '@patternfly/react-table';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
 import { targetsApi } from '../services/targetsApi';
 import { useNotifications } from '../hooks/useNotifications';
+import { ClusterPermissionsTable } from './ClusterPermissionsTable';
 import type { TargetResponse, ClusterPermissions } from '../types/api';
 
 interface CreateGroupModalProps {
@@ -81,14 +73,6 @@ interface CreateGroupModalProps {
   onSuccess: () => void;
 }
 
-interface ClusterAction {
-  clusterAPIURL: string;
-  clusterName: string;
-  view: boolean;
-  run: boolean;
-  cancel: boolean;
-}
-
 export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModalProps) {
   const { showSuccess, showError } = useNotifications();
 
@@ -97,8 +81,8 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   const [description, setDescription] = useState('');
 
   // Cluster data
-  const [targets, setTargets] = useState<TargetResponse[] | null>(null);
-  const [clusterActions, setClusterActions] = useState<ClusterAction[]>([]);
+  const [targets, setTargets] = useState<TargetResponse[]>([]);
+  const [clusterPermissions, setClusterPermissions] = useState<ClusterPermissions>({});
   const [loadingTargets, setLoadingTargets] = useState(false);
   const [targetsError, setTargetsError] = useState<string | null>(null);
 
@@ -114,9 +98,9 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
       // Reset form when modal closes
       setName('');
       setDescription('');
-      setClusterActions([]);
+      setClusterPermissions({});
       setErrors({});
-      setTargets(null);
+      setTargets([]);
       setTargetsError(null);
     }
   }, [isOpen]);
@@ -128,32 +112,13 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     try {
       const data = await targetsApi.listTargets();
       setTargets(data);
-
-      // Initialize cluster actions state
-      const actions: ClusterAction[] = data.map((target) => ({
-        clusterAPIURL: target.clusterAPIURL,
-        clusterName: target.clusterName,
-        view: false,
-        run: false,
-        cancel: false,
-      }));
-      setClusterActions(actions);
+      setClusterPermissions({});
     } catch (error) {
       console.error('Failed to fetch targets:', error);
       setTargetsError(error instanceof Error ? error.message : 'Failed to load clusters');
     } finally {
       setLoadingTargets(false);
     }
-  };
-
-  const handleActionToggle = (clusterAPIURL: string, action: 'view' | 'run' | 'cancel') => {
-    setClusterActions((prev) =>
-      prev.map((cluster) =>
-        cluster.clusterAPIURL === clusterAPIURL
-          ? { ...cluster, [action]: !cluster[action] }
-          : cluster
-      )
-    );
   };
 
   const validate = (): boolean => {
@@ -165,8 +130,8 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     }
 
     // Cluster permissions validation
-    const hasAnyPermission = clusterActions.some(
-      (cluster) => cluster.view || cluster.run || cluster.cancel
+    const hasAnyPermission = Object.values(clusterPermissions).some(
+      (perms) => perms.actions && perms.actions.length > 0
     );
     if (!hasAnyPermission) {
       newErrors.clusters = 'At least one cluster must have at least one action selected';
@@ -184,21 +149,6 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     setSubmitting(true);
 
     try {
-      // Build clusterPermissions object
-      const clusterPermissions: ClusterPermissions = {};
-
-      clusterActions.forEach((cluster) => {
-        const actions: Array<'view' | 'run' | 'cancel'> = [];
-        if (cluster.view) actions.push('view');
-        if (cluster.run) actions.push('run');
-        if (cluster.cancel) actions.push('cancel');
-
-        // Only include clusters with at least one action
-        if (actions.length > 0) {
-          clusterPermissions[cluster.clusterAPIURL] = { actions };
-        }
-      });
-
       // Create group
       await groupsApi.createGroup({
         name: name.trim(),
@@ -250,7 +200,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
       );
     }
 
-    if (!targets || targets.length === 0) {
+    if (targets.length === 0) {
       return (
         <EmptyState>
           <EmptyStateIcon icon={ExclamationCircleIcon} />
@@ -304,69 +254,19 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           isRequired
           fieldId="cluster-permissions"
         >
-          <div style={{ marginBottom: '0.5rem' }}>
-            <HelperText>
-              <HelperTextItem>
-                Select which actions members of this group can perform on each cluster
-              </HelperTextItem>
-            </HelperText>
-          </div>
-
-          <Table variant="compact" borders>
-            <Thead>
-              <Tr>
-                <Th width={40}>Cluster Name</Th>
-                <Th width={30}>API Endpoint</Th>
-                <Th width={10} textCenter>View</Th>
-                <Th width={10} textCenter>Run</Th>
-                <Th width={10} textCenter>Cancel</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {clusterActions.map((cluster) => (
-                <Tr key={cluster.clusterAPIURL}>
-                  <Td dataLabel="Cluster Name">{cluster.clusterName}</Td>
-                  <Td dataLabel="API Endpoint">
-                    <span style={{ fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                      {cluster.clusterAPIURL}
-                    </span>
-                  </Td>
-                  <Td dataLabel="View" textCenter>
-                    <Checkbox
-                      id={`${cluster.clusterAPIURL}-view`}
-                      aria-label={`View permission for ${cluster.clusterName}`}
-                      isChecked={cluster.view}
-                      onChange={() => handleActionToggle(cluster.clusterAPIURL, 'view')}
-                      isDisabled={submitting}
-                    />
-                  </Td>
-                  <Td dataLabel="Run" textCenter>
-                    <Checkbox
-                      id={`${cluster.clusterAPIURL}-run`}
-                      aria-label={`Run permission for ${cluster.clusterName}`}
-                      isChecked={cluster.run}
-                      onChange={() => handleActionToggle(cluster.clusterAPIURL, 'run')}
-                      isDisabled={submitting}
-                    />
-                  </Td>
-                  <Td dataLabel="Cancel" textCenter>
-                    <Checkbox
-                      id={`${cluster.clusterAPIURL}-cancel`}
-                      aria-label={`Cancel permission for ${cluster.clusterName}`}
-                      isChecked={cluster.cancel}
-                      onChange={() => handleActionToggle(cluster.clusterAPIURL, 'cancel')}
-                      isDisabled={submitting}
-                    />
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-
+          <ClusterPermissionsTable
+            targets={targets}
+            clusterPermissions={clusterPermissions}
+            onChange={setClusterPermissions}
+            showOrphanedWarning={false}
+            showBulkActions={true}
+          />
           {errors.clusters && (
             <FormHelperText>
               <HelperText>
-                <HelperTextItem variant="error">{errors.clusters}</HelperTextItem>
+                <HelperTextItem variant="error" icon={<ExclamationCircleIcon />}>
+                  {errors.clusters}
+                </HelperTextItem>
               </HelperText>
             </FormHelperText>
           )}
