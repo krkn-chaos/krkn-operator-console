@@ -213,7 +213,7 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
         <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
           <FlexItem>
             <Title headingLevel="h2" size="lg">
-              Groups
+              Groups ({groups.length})
             </Title>
           </FlexItem>
           <FlexItem>

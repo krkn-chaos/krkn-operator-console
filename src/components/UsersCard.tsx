@@ -24,6 +24,10 @@ import {
   DropdownList,
   MenuToggle,
   Tooltip,
+  SearchInput,
+  Toolbar,
+  ToolbarContent,
+  ToolbarItem,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, EyeIcon, EllipsisVIcon, KeyIcon } from '@patternfly/react-icons';
 import { usersApi } from '../services/usersApi';
@@ -92,6 +96,8 @@ interface UsersCardProps {
 
 export function UsersCard({ groups }: UsersCardProps) {
   const [users, setUsers] = useState<UserDetails[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserDetails[]>([]);
+  const [searchValue, setSearchValue] = useState('');
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserDetails | null>(null);
@@ -108,6 +114,23 @@ export function UsersCard({ groups }: UsersCardProps) {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  // Filter users based on search value
+  useEffect(() => {
+    if (!searchValue) {
+      setFilteredUsers(users);
+    } else {
+      const searchLower = searchValue.toLowerCase();
+      const filtered = users.filter(
+        (user) =>
+          user.userId.toLowerCase().includes(searchLower) ||
+          user.name.toLowerCase().includes(searchLower) ||
+          user.surname.toLowerCase().includes(searchLower) ||
+          (user.organization && user.organization.toLowerCase().includes(searchLower))
+      );
+      setFilteredUsers(filtered);
+    }
+  }, [users, searchValue]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -298,6 +321,19 @@ export function UsersCard({ groups }: UsersCardProps) {
           </div>
         ) : (
           <>
+            <Toolbar>
+              <ToolbarContent>
+                <ToolbarItem>
+                  <SearchInput
+                    placeholder="Filter by name, email, or organization"
+                    value={searchValue}
+                    onChange={(_event, value) => setSearchValue(value)}
+                    onClear={() => setSearchValue('')}
+                  />
+                </ToolbarItem>
+              </ToolbarContent>
+            </Toolbar>
+
             {users.length === 0 ? (
               <EmptyState>
                 <EmptyStateIcon icon={UsersIcon} />
@@ -312,9 +348,19 @@ export function UsersCard({ groups }: UsersCardProps) {
                     : 'The users API endpoint is not available. Make sure the backend service is running and the API is properly configured.'}
                 </EmptyStateBody>
               </EmptyState>
+            ) : filteredUsers.length === 0 ? (
+              <EmptyState>
+                <EmptyStateIcon icon={UsersIcon} />
+                <Title headingLevel="h2" size="lg">
+                  No Matching Users
+                </Title>
+                <EmptyStateBody>
+                  No users match your search criteria. Try a different filter.
+                </EmptyStateBody>
+              </EmptyState>
             ) : (
               <DataList aria-label="Users list" isCompact>
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <DataListItem key={user.userId}>
                     <DataListItemRow>
                       <DataListItemCells
