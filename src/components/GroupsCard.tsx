@@ -261,11 +261,11 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
               <Table aria-label="Groups table" variant="compact">
                 <Thead>
                   <Tr>
-                    <Th sort={getSortParams('name')}>Name</Th>
-                    <Th>Description</Th>
-                    <Th sort={getSortParams('memberCount')}>Member Count</Th>
-                    <Th>Clusters</Th>
-                    <Th>Actions</Th>
+                    <Th sort={getSortParams('name')} width={20}>Name</Th>
+                    <Th width={35}>Description</Th>
+                    <Th sort={getSortParams('memberCount')} width={15}>Members</Th>
+                    <Th width={15}>Clusters</Th>
+                    <Th width={15}>Actions</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -273,19 +273,32 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
                     const clusterCount = Object.keys(group.clusterPermissions || {}).length;
                     return (
                       <Tr key={group.name}>
-                        <Td dataLabel="Name">{group.name}</Td>
-                        <Td dataLabel="Description">{group.description || 'N/A'}</Td>
-                        <Td dataLabel="Member Count">
+                        <Td dataLabel="Name">
+                          <strong>{group.name}</strong>
+                        </Td>
+                        <Td dataLabel="Description">
+                          <div style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: '300px'
+                          }}>
+                            {group.description || <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>No description</span>}
+                          </div>
+                        </Td>
+                        <Td dataLabel="Members">
                           <Button
                             variant="link"
                             isInline
                             onClick={() => handleViewMembers(group.name)}
                             style={{ padding: 0, fontSize: 'inherit' }}
                           >
-                            {group.memberCount || 0}
+                            {group.memberCount || 0} {(group.memberCount || 0) === 1 ? 'member' : 'members'}
                           </Button>
                         </Td>
-                        <Td dataLabel="Clusters">{clusterCount}</Td>
+                        <Td dataLabel="Clusters">
+                          {clusterCount} {clusterCount === 1 ? 'cluster' : 'clusters'}
+                        </Td>
                         <Td dataLabel="Actions">
                           <Dropdown
                             isOpen={openDropdownId === group.name}
