@@ -90,6 +90,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showRunWithoutViewWarning, setShowRunWithoutViewWarning] = useState(false);
+  const [missingViewPermissions, setMissingViewPermissions] = useState<string[]>([]);
 
   // Fetch targets when modal opens
   useEffect(() => {
@@ -142,11 +143,29 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     return Object.keys(newErrors).length === 0;
   };
 
-  const checkRunWithoutView = (): boolean => {
-    // Check if any cluster has "run" permission without "view" permission
-    return Object.values(clusterPermissions).some(
+  const checkRunOrCancelWithoutView = (): { hasIssue: boolean; missingPermissions: string[] } => {
+    const issues: string[] = [];
+
+    const hasRunWithoutView = Object.values(clusterPermissions).some(
       (perms) => perms.actions.includes('run') && !perms.actions.includes('view')
     );
+
+    const hasCancelWithoutView = Object.values(clusterPermissions).some(
+      (perms) => perms.actions.includes('cancel') && !perms.actions.includes('view')
+    );
+
+    if (hasRunWithoutView) {
+      issues.push('Run');
+    }
+
+    if (hasCancelWithoutView) {
+      issues.push('Cancel');
+    }
+
+    return {
+      hasIssue: issues.length > 0,
+      missingPermissions: issues
+    };
   };
 
   const handleSubmit = async () => {
@@ -154,8 +173,10 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
       return;
     }
 
-    // Check for "run" without "view" warning
-    if (checkRunWithoutView()) {
+    // Check for "run" or "cancel" without "view" warning
+    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView();
+    if (hasIssue) {
+      setMissingViewPermissions(missingPermissions);
       setShowRunWithoutViewWarning(true);
       return;
     }
@@ -335,7 +356,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
         {renderContent()}
       </Modal>
 
-      {/* Warning Modal for "run" without "view" */}
+      {/* Warning Modal for "run" or "cancel" without "view" */}
       <Modal
         variant={ModalVariant.small}
         title="Permission Warning"
@@ -358,7 +379,21 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           </Button>,
         ]}
       >
-        By selecting <strong>Run</strong> permission without <strong>View</strong> permission, users in this group will not be able to properly view scenario run creation and status. Are you sure you want to continue?
+        {missingViewPermissions.length === 1 ? (
+          missingViewPermissions[0] === 'Run' ? (
+            <>
+              By selecting <strong>Run</strong> permission without <strong>View</strong> permission, users in this group will not be able to properly view scenario run creation and status. Are you sure you want to continue?
+            </>
+          ) : (
+            <>
+              By selecting <strong>Cancel</strong> permission without <strong>View</strong> permission, users in this group will not be able to see scenario runs to cancel them. Are you sure you want to continue?
+            </>
+          )
+        ) : (
+          <>
+            By selecting <strong>Run</strong> and <strong>Cancel</strong> permissions without <strong>View</strong> permission, users in this group will not be able to view scenario runs or their status. Are you sure you want to continue?
+          </>
+        )}
       </Modal>
     </>
   );
