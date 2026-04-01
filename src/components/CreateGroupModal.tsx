@@ -259,7 +259,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
             clusterPermissions={clusterPermissions}
             onChange={setClusterPermissions}
             showOrphanedWarning={false}
-            showBulkActions={true}
+            showBulkActions={false}
           />
           {errors.clusters && (
             <FormHelperText>
