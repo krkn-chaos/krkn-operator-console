@@ -10,8 +10,10 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
+  Card,
+  CardBody,
 } from '@patternfly/react-core';
-import type { CreateUserRequest, UpdateUserRequest, UserDetails } from '../types/api';
+import type { CreateUserRequest, UpdateUserRequest, UserDetails, GroupDetails } from '../types/api';
 import type { UserRole } from '../types/auth';
 
 /**
@@ -23,9 +25,14 @@ interface UserFormProps {
    */
   initialData?: UserDetails;
   /**
-   * Submit handler that receives either CreateUserRequest or UpdateUserRequest
+   * Available groups for selection (required for create mode)
    */
-  onSubmit: (data: CreateUserRequest | UpdateUserRequest) => Promise<void>;
+  groups?: GroupDetails[];
+  /**
+   * Submit handler that receives either CreateUserRequest or UpdateUserRequest
+   * and the selected group names (only for create mode)
+   */
+  onSubmit: (data: CreateUserRequest | UpdateUserRequest, selectedGroups?: string[]) => Promise<void>;
   /**
    * Cancel handler to close the form
    */
@@ -139,7 +146,7 @@ interface UserFormProps {
  * </Modal>
  * ```
  */
-export function UserForm({ initialData, onSubmit, onCancel, isSelfEdit }: UserFormProps) {
+export function UserForm({ initialData, groups, onSubmit, onCancel, isSelfEdit }: UserFormProps) {
   const [userId, setUserId] = useState(initialData?.userId || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -148,6 +155,7 @@ export function UserForm({ initialData, onSubmit, onCancel, isSelfEdit }: UserFo
   const [role, setRole] = useState<UserRole>(initialData?.role || 'user');
   const [organization, setOrganization] = useState(initialData?.organization || '');
   const [active, setActive] = useState(initialData?.active ?? true); // Default to active for new users
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -194,6 +202,11 @@ export function UserForm({ initialData, onSubmit, onCancel, isSelfEdit }: UserFo
       newErrors.surname = 'Last name is required';
     }
 
+    // Groups validation - CREATE MODE only
+    if (!initialData && selectedGroups.size === 0) {
+      newErrors.groups = 'At least one group must be selected';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -227,11 +240,27 @@ export function UserForm({ initialData, onSubmit, onCancel, isSelfEdit }: UserFo
           role,
           organization: organization.trim() || undefined,
         };
-        await onSubmit(data);
+        // Pass selected groups as second parameter
+        await onSubmit(data, Array.from(selectedGroups));
       }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  /**
+   * Toggle group selection
+   */
+  const handleToggleGroup = (groupName: string) => {
+    setSelectedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
   };
 
   return (
@@ -360,6 +389,45 @@ export function UserForm({ initialData, onSubmit, onCancel, isSelfEdit }: UserFo
           onChange={(_event, value) => setOrganization(value)}
         />
       </FormGroup>
+
+      {!initialData && groups && groups.length > 0 && (
+        <FormGroup
+          label="Groups"
+          isRequired
+          fieldId="groups"
+        >
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem>
+                Select one or more groups. The user will inherit cluster permissions from these groups.
+              </HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+          <Card isCompact style={{ marginTop: '0.5rem' }}>
+            <CardBody style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {groups.map((group) => (
+                <Checkbox
+                  key={group.name}
+                  id={`group-${group.name}`}
+                  label={`${group.name} (${group.memberCount || 0} members)`}
+                  description={group.description}
+                  isChecked={selectedGroups.has(group.name)}
+                  onChange={() => handleToggleGroup(group.name)}
+                  isDisabled={submitting}
+                  style={{ marginBottom: '0.5rem' }}
+                />
+              ))}
+            </CardBody>
+          </Card>
+          {errors.groups && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem variant="error">{errors.groups}</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </FormGroup>
+      )}
 
       {initialData && !isSelfEdit && (
         <FormGroup label="Account Status" fieldId="active">

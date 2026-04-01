@@ -2,11 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { UserForm } from '../UserForm';
-import type { UserDetails, CreateUserRequest, UpdateUserRequest } from '../../types/api';
+import type { UserDetails, CreateUserRequest, UpdateUserRequest, GroupDetails } from '../../types/api';
 
 describe('UserForm', () => {
   const mockOnSubmit = vi.fn();
   const mockOnCancel = vi.fn();
+
+  const mockGroups: GroupDetails[] = [
+    {
+      name: 'dev-team',
+      description: 'Development team',
+      clusterPermissions: {},
+      memberCount: 5,
+    },
+    {
+      name: 'ops-team',
+      description: 'Operations team',
+      clusterPermissions: {},
+      memberCount: 3,
+    },
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -130,7 +145,7 @@ describe('UserForm', () => {
       const user = userEvent.setup();
       mockOnSubmit.mockResolvedValue(undefined);
 
-      const { container } = render(<UserForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const { container } = render(<UserForm groups={mockGroups} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
 
       await user.type(screen.getByLabelText(/email/i), 'newuser@example.com');
       const passwordInput = container.querySelector('#password') as HTMLInputElement;
@@ -141,6 +156,9 @@ describe('UserForm', () => {
       await user.type(screen.getByLabelText(/last name/i), 'Doe');
       await user.type(screen.getByLabelText(/organization/i), 'Test Org');
       await user.click(screen.getByLabelText(/Admin/i));
+
+      // Select a group
+      await user.click(screen.getByLabelText(/dev-team \(5 members\)/i));
 
       const submitButton = screen.getByRole('button', { name: /create user/i });
       await user.click(submitButton);
@@ -153,7 +171,7 @@ describe('UserForm', () => {
           surname: 'Doe',
           role: 'admin',
           organization: 'Test Org',
-        } as CreateUserRequest);
+        } as CreateUserRequest, ['dev-team']);
       });
     });
 
@@ -161,7 +179,7 @@ describe('UserForm', () => {
       const user = userEvent.setup();
       mockOnSubmit.mockResolvedValue(undefined);
 
-      const { container } = render(<UserForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const { container } = render(<UserForm groups={mockGroups} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
 
       await user.type(screen.getByLabelText(/email/i), 'newuser@example.com');
       const passwordInput = container.querySelector('#password') as HTMLInputElement;
@@ -170,6 +188,9 @@ describe('UserForm', () => {
       await user.type(confirmInput, 'password123');
       await user.type(screen.getByLabelText(/first name/i), 'John');
       await user.type(screen.getByLabelText(/last name/i), 'Doe');
+
+      // Select a group
+      await user.click(screen.getByLabelText(/ops-team \(3 members\)/i));
 
       const submitButton = screen.getByRole('button', { name: /create user/i });
       await user.click(submitButton);
@@ -182,7 +203,7 @@ describe('UserForm', () => {
           surname: 'Doe',
           role: 'user',
           organization: undefined,
-        } as CreateUserRequest);
+        } as CreateUserRequest, ['ops-team']);
       });
     });
 
@@ -209,6 +230,73 @@ describe('UserForm', () => {
       await user.click(cancelButton);
 
       expect(mockOnCancel).toHaveBeenCalled();
+    });
+
+    it('should show groups field when groups are provided', () => {
+      render(<UserForm groups={mockGroups} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+
+      expect(screen.getByLabelText(/dev-team \(5 members\)/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/ops-team \(3 members\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/select one or more groups/i)).toBeInTheDocument();
+    });
+
+    it('should not show groups field when no groups provided', () => {
+      render(<UserForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+
+      expect(screen.queryByText(/groups/i)).not.toBeInTheDocument();
+    });
+
+    it('should validate at least one group is selected in create mode', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<UserForm groups={mockGroups} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+
+      await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+      const passwordInput = container.querySelector('#password') as HTMLInputElement;
+      const confirmInput = container.querySelector('#confirmPassword') as HTMLInputElement;
+      await user.type(passwordInput, 'password123');
+      await user.type(confirmInput, 'password123');
+      await user.type(screen.getByLabelText(/first name/i), 'John');
+      await user.type(screen.getByLabelText(/last name/i), 'Doe');
+
+      const submitButton = screen.getByRole('button', { name: /create user/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/at least one group must be selected/i)).toBeInTheDocument();
+      });
+
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    it('should allow selecting multiple groups', async () => {
+      const user = userEvent.setup();
+      mockOnSubmit.mockResolvedValue(undefined);
+
+      const { container } = render(<UserForm groups={mockGroups} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+
+      await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+      const passwordInput = container.querySelector('#password') as HTMLInputElement;
+      const confirmInput = container.querySelector('#confirmPassword') as HTMLInputElement;
+      await user.type(passwordInput, 'password123');
+      await user.type(confirmInput, 'password123');
+      await user.type(screen.getByLabelText(/first name/i), 'John');
+      await user.type(screen.getByLabelText(/last name/i), 'Doe');
+
+      // Select both groups
+      await user.click(screen.getByLabelText(/dev-team \(5 members\)/i));
+      await user.click(screen.getByLabelText(/ops-team \(3 members\)/i));
+
+      const submitButton = screen.getByRole('button', { name: /create user/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: 'test@example.com',
+          }),
+          ['dev-team', 'ops-team']
+        );
+      });
     });
   });
 
@@ -340,7 +428,7 @@ describe('UserForm', () => {
       });
       mockOnSubmit.mockReturnValue(submitPromise);
 
-      const { container } = render(<UserForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const { container } = render(<UserForm groups={mockGroups} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
 
       await user.type(screen.getByLabelText(/email/i), 'test@example.com');
       const passwordInput = container.querySelector('#password') as HTMLInputElement;
@@ -349,6 +437,9 @@ describe('UserForm', () => {
       await user.type(confirmInput, 'password123');
       await user.type(screen.getByLabelText(/first name/i), 'John');
       await user.type(screen.getByLabelText(/last name/i), 'Doe');
+
+      // Select a group
+      await user.click(screen.getByLabelText(/dev-team \(5 members\)/i));
 
       const submitButton = screen.getByRole('button', { name: /create user/i });
       await user.click(submitButton);

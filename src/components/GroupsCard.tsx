@@ -71,8 +71,15 @@ import type { GroupDetails } from '../types/api';
  *   );
  * }
  * ```
+ *
+ * @param {Object} props - Component props
+ * @param {() => void} [props.onGroupsChange] - Optional callback invoked when groups are created/edited/deleted
  */
-export function GroupsCard() {
+interface GroupsCardProps {
+  onGroupsChange?: () => void;
+}
+
+export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [groups, setGroups] = useState<GroupDetails[]>([]);
   const [filteredGroups, setFilteredGroups] = useState<GroupDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,6 +187,7 @@ export function GroupsCard() {
       await groupsApi.deleteGroup(confirmDeleteGroup.name);
       showSuccess('Group deleted', `Group "${confirmDeleteGroup.name}" has been deleted successfully`);
       await loadGroups();
+      onGroupsChange?.();
     } catch (error) {
       showError('Failed to delete group', error instanceof Error ? error.message : 'Unknown error');
     } finally {
@@ -190,11 +198,13 @@ export function GroupsCard() {
   const handleCreateSuccess = () => {
     setIsCreateModalOpen(false);
     loadGroups();
+    onGroupsChange?.();
   };
 
   const handleEditSuccess = () => {
     setEditingGroupName(null);
     loadGroups();
+    onGroupsChange?.();
   };
 
   return (
