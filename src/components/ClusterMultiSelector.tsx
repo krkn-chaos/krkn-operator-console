@@ -91,17 +91,22 @@ export function ClusterMultiSelector({
     );
   }
 
-  // Empty state (clusters is an empty object)
-  if (Object.keys(clusters).length === 0) {
+  // Empty state (clusters is an empty object OR all operators have empty cluster arrays)
+  const hasAnyClusters = Object.values(clusters).some((clusterList) => clusterList.length > 0);
+
+  if (Object.keys(clusters).length === 0 || !hasAnyClusters) {
     return (
       <EmptyState>
         <EmptyStateIcon icon={TopologyIcon} />
         <Title headingLevel="h1" size="lg">
-          No Clusters Found
+          No Clusters Available
         </Title>
         <EmptyStateBody>
-          No target clusters were discovered. Please check your operator configuration.
+          No target clusters were discovered. Please configure target clusters before running scenarios.
         </EmptyStateBody>
+        <Button variant="secondary" onClick={onCancel} style={{ marginTop: '1rem' }}>
+          Go Back
+        </Button>
       </EmptyState>
     );
   }
