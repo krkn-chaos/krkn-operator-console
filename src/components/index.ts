@@ -14,3 +14,7 @@ export { AdminOnly } from './AdminOnly';
 export { ActiveRunsSummary } from './ActiveRunsSummary';
 export { ActiveRunsModal } from './ActiveRunsModal';
 export { ClusterConflictWarning } from './ClusterConflictWarning';
+export { EditGroupModal } from './EditGroupModal';
+export { ClusterPermissionsTable } from './ClusterPermissionsTable';
+export { ViewGroupMembersModal } from './ViewGroupMembersModal';
+export { AddMembersModal } from './AddMembersModal';
