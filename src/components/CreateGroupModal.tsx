@@ -89,6 +89,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showRunWithoutViewWarning, setShowRunWithoutViewWarning] = useState(false);
 
   // Fetch targets when modal opens
   useEffect(() => {
@@ -141,11 +142,28 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     return Object.keys(newErrors).length === 0;
   };
 
+  const checkRunWithoutView = (): boolean => {
+    // Check if any cluster has "run" permission without "view" permission
+    return Object.values(clusterPermissions).some(
+      (perms) => perms.actions.includes('run') && !perms.actions.includes('view')
+    );
+  };
+
   const handleSubmit = async () => {
     if (!validate()) {
       return;
     }
 
+    // Check for "run" without "view" warning
+    if (checkRunWithoutView()) {
+      setShowRunWithoutViewWarning(true);
+      return;
+    }
+
+    await performSubmit();
+  };
+
+  const performSubmit = async () => {
     setSubmitting(true);
 
     try {
@@ -166,6 +184,11 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleConfirmRunWithoutView = () => {
+    setShowRunWithoutViewWarning(false);
+    performSubmit();
   };
 
   const renderContent = () => {
@@ -302,13 +325,41 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   };
 
   return (
-    <Modal
-      variant={ModalVariant.large}
-      title="Create New Group"
-      isOpen={isOpen}
-      onClose={onClose}
-    >
-      {renderContent()}
-    </Modal>
+    <>
+      <Modal
+        variant={ModalVariant.large}
+        title="Create New Group"
+        isOpen={isOpen}
+        onClose={onClose}
+      >
+        {renderContent()}
+      </Modal>
+
+      {/* Warning Modal for "run" without "view" */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Permission Warning"
+        isOpen={showRunWithoutViewWarning}
+        onClose={() => setShowRunWithoutViewWarning(false)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="warning"
+            onClick={handleConfirmRunWithoutView}
+          >
+            Continue Anyway
+          </Button>,
+          <Button
+            key="cancel"
+            variant="link"
+            onClick={() => setShowRunWithoutViewWarning(false)}
+          >
+            Go Back
+          </Button>,
+        ]}
+      >
+        By selecting <strong>Run</strong> permission without <strong>View</strong> permission, users in this group will not be able to properly view scenario run creation and status. Are you sure you want to continue?
+      </Modal>
+    </>
   );
 }

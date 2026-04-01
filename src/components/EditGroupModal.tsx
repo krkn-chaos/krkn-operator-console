@@ -86,6 +86,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
   const [error, setError] = useState('');
   const [validationError, setValidationError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showRunWithoutViewWarning, setShowRunWithoutViewWarning] = useState(false);
 
   // Form state
   const [description, setDescription] = useState('');
@@ -149,6 +150,13 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     return true;
   };
 
+  const checkRunWithoutView = (): boolean => {
+    // Check if any cluster has "run" permission without "view" permission
+    return Object.values(clusterPermissions).some(
+      (perms) => perms.actions.includes('run') && !perms.actions.includes('view')
+    );
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -156,6 +164,16 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
       return;
     }
 
+    // Check for "run" without "view" warning
+    if (checkRunWithoutView()) {
+      setShowRunWithoutViewWarning(true);
+      return;
+    }
+
+    await performSubmit();
+  };
+
+  const performSubmit = async () => {
     setIsSaving(true);
     setError('');
     setSuccessMessage('');
@@ -180,110 +198,143 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     }
   };
 
+  const handleConfirmRunWithoutView = () => {
+    setShowRunWithoutViewWarning(false);
+    performSubmit();
+  };
+
   const handleCancel = () => {
     onClose();
   };
 
   return (
-    <Modal
-      variant={ModalVariant.large}
-      title={`Edit Group: ${groupName}`}
-      isOpen={isOpen}
-      onClose={handleCancel}
-    >
-      {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '2rem' }}>
-          <Spinner size="xl" />
-          <div style={{ marginTop: '1rem' }}>Loading group data...</div>
-        </div>
-      ) : error && !groupData ? (
-        <Alert variant="danger" title="Failed to Load Group" isInline>
-          {error}
-        </Alert>
-      ) : (
-        <Form onSubmit={handleSubmit}>
-          {error && !successMessage && (
-            <Alert variant="danger" title="Update Failed" isInline style={{ marginBottom: '1rem' }}>
-              {error}
-            </Alert>
-          )}
+    <>
+      <Modal
+        variant={ModalVariant.large}
+        title={`Edit Group: ${groupName}`}
+        isOpen={isOpen}
+        onClose={handleCancel}
+      >
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <Spinner size="xl" />
+            <div style={{ marginTop: '1rem' }}>Loading group data...</div>
+          </div>
+        ) : error && !groupData ? (
+          <Alert variant="danger" title="Failed to Load Group" isInline>
+            {error}
+          </Alert>
+        ) : (
+          <Form onSubmit={handleSubmit}>
+            {error && !successMessage && (
+              <Alert variant="danger" title="Update Failed" isInline style={{ marginBottom: '1rem' }}>
+                {error}
+              </Alert>
+            )}
 
-          {successMessage && (
-            <Alert variant="success" title="Success" isInline style={{ marginBottom: '1rem' }}>
-              {successMessage}
-            </Alert>
-          )}
+            {successMessage && (
+              <Alert variant="success" title="Success" isInline style={{ marginBottom: '1rem' }}>
+                {successMessage}
+              </Alert>
+            )}
 
-          {validationError && (
-            <Alert variant="warning" title="Validation Error" isInline style={{ marginBottom: '1rem' }}>
-              {validationError}
-            </Alert>
-          )}
+            {validationError && (
+              <Alert variant="warning" title="Validation Error" isInline style={{ marginBottom: '1rem' }}>
+                {validationError}
+              </Alert>
+            )}
 
-          <FormGroup label="Group Name" isRequired fieldId="edit-group-name">
-            <TextInput
+            <FormGroup label="Group Name" isRequired fieldId="edit-group-name">
+              <TextInput
+                isRequired
+                type="text"
+                id="edit-group-name"
+                name="name"
+                value={groupName}
+                isDisabled
+                aria-label="Group name (read-only)"
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>Group name cannot be changed after creation</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+
+            <FormGroup label="Description" fieldId="edit-group-description">
+              <TextArea
+                id="edit-group-description"
+                name="description"
+                value={description}
+                onChange={(_, value) => setDescription(value)}
+                rows={3}
+                placeholder="Optional description for this group"
+              />
+            </FormGroup>
+
+            <FormGroup
+              label="Cluster Permissions"
               isRequired
-              type="text"
-              id="edit-group-name"
-              name="name"
-              value={groupName}
-              isDisabled
-              aria-label="Group name (read-only)"
-            />
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem>Group name cannot be changed after creation</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          </FormGroup>
-
-          <FormGroup label="Description" fieldId="edit-group-description">
-            <TextArea
-              id="edit-group-description"
-              name="description"
-              value={description}
-              onChange={(_, value) => setDescription(value)}
-              rows={3}
-              placeholder="Optional description for this group"
-            />
-          </FormGroup>
-
-          <FormGroup
-            label="Cluster Permissions"
-            isRequired
-            fieldId="edit-group-permissions"
-          >
-            <ClusterPermissionsTable
-              targets={targets}
-              clusterPermissions={clusterPermissions}
-              onChange={setClusterPermissions}
-              showOrphanedWarning
-              showBulkActions={false}
-            />
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem icon={<ExclamationCircleIcon />}>
-                  At least one cluster must have at least one action selected
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          </FormGroup>
-
-          <ActionGroup>
-            <Button
-              variant="primary"
-              type="submit"
-              isDisabled={isSaving || isLoading}
-              isLoading={isSaving}
+              fieldId="edit-group-permissions"
             >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-            <Button variant="link" onClick={handleCancel} isDisabled={isSaving}>
-              Cancel
-            </Button>
-          </ActionGroup>
-        </Form>
-      )}
-    </Modal>
+              <ClusterPermissionsTable
+                targets={targets}
+                clusterPermissions={clusterPermissions}
+                onChange={setClusterPermissions}
+                showOrphanedWarning
+                showBulkActions={false}
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem icon={<ExclamationCircleIcon />}>
+                    At least one cluster must have at least one action selected
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+
+            <ActionGroup>
+              <Button
+                variant="primary"
+                type="submit"
+                isDisabled={isSaving || isLoading}
+                isLoading={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
+              <Button variant="link" onClick={handleCancel} isDisabled={isSaving}>
+                Cancel
+              </Button>
+            </ActionGroup>
+          </Form>
+        )}
+      </Modal>
+
+      {/* Warning Modal for "run" without "view" */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Permission Warning"
+        isOpen={showRunWithoutViewWarning}
+        onClose={() => setShowRunWithoutViewWarning(false)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="warning"
+            onClick={handleConfirmRunWithoutView}
+          >
+            Continue Anyway
+          </Button>,
+          <Button
+            key="cancel"
+            variant="link"
+            onClick={() => setShowRunWithoutViewWarning(false)}
+          >
+            Go Back
+          </Button>,
+        ]}
+      >
+        By selecting <strong>Run</strong> permission without <strong>View</strong> permission, users in this group will not be able to properly view scenario run creation and status. Are you sure you want to continue?
+      </Modal>
+    </>
   );
 }
