@@ -366,6 +366,7 @@ export interface AppState {
 
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: ScenarioRunState[];
+  scenarioRunsRefreshTrigger: number; // Increment to force immediate refresh
   pollingRunNames: Set<string>;
   expandedRunIds: Set<string>;
   expandedClusterJobs: Set<string>; // jobId

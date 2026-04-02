@@ -11,6 +11,7 @@ const initialState: AppState = {
 
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: [],
+  scenarioRunsRefreshTrigger: 0,
   pollingRunNames: new Set<string>(),
   expandedRunIds: new Set<string>(),
   expandedClusterJobs: new Set<string>(),
@@ -113,6 +114,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'jobs_list',
+        scenarioRunsRefreshTrigger: state.scenarioRunsRefreshTrigger + 1, // Force immediate refresh
         error: null,
       };
 
@@ -330,6 +332,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'jobs_list',
+        scenarioRunsRefreshTrigger: state.scenarioRunsRefreshTrigger + 1, // Force immediate refresh
         // Clear workflow state
         uuid: null,
         clusters: null,

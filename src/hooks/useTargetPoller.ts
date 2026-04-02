@@ -116,10 +116,13 @@ export function useTargetPoller() {
   // Load existing scenario runs: GET /api/v1/scenarios/run
   // Uses new API - no adapter needed
   // Polls every 10 seconds to detect new runs and refresh the list
+  // Also triggers immediate refresh when scenarioRunsRefreshTrigger changes
   useEffect(() => {
     if (state.phase !== 'jobs_list') {
       return;
     }
+
+    console.log('[useTargetPoller] Scenario runs refresh triggered (trigger:', state.scenarioRunsRefreshTrigger, ')');
 
     async function loadScenarioRuns() {
       try {
@@ -207,7 +210,7 @@ export function useTargetPoller() {
       console.log('[useTargetPoller] Stopping scenario runs list polling');
       clearInterval(intervalId);
     };
-  }, [state.phase, dispatch]);
+  }, [state.phase, state.scenarioRunsRefreshTrigger, dispatch]);
 
   // NOTE: Polling is now handled by useScenarioRunsPoller (hybrid approach)
   // This hook only handles initial load - ongoing polling is done per scenario run
