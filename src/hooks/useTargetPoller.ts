@@ -115,6 +115,7 @@ export function useTargetPoller() {
 
   // Load existing scenario runs: GET /api/v1/scenarios/run
   // Uses new API - no adapter needed
+  // Polls every 10 seconds to detect new runs and refresh the list
   useEffect(() => {
     if (state.phase !== 'jobs_list') {
       return;
@@ -124,7 +125,7 @@ export function useTargetPoller() {
       try {
         const scenarioRuns = await operatorApi.listScenarioRuns();
 
-        console.log('Raw API response:', scenarioRuns);
+        console.log('[useTargetPoller] Raw API response:', scenarioRuns);
 
         // Convert ScenarioRunStatusResponse[] to ScenarioRunState[]
         const scenarioRunStates: ScenarioRunState[] = scenarioRuns.map((run) => {
@@ -146,7 +147,7 @@ export function useTargetPoller() {
           };
         });
 
-        console.log('Mapped scenario runs:', scenarioRunStates);
+        console.log('[useTargetPoller] Mapped scenario runs:', scenarioRunStates);
 
         dispatch({
           type: 'LOAD_SCENARIO_RUNS_SUCCESS',
@@ -160,7 +161,7 @@ export function useTargetPoller() {
         );
 
         if (runsWithoutJobs.length > 0) {
-          console.log(`Fetching details for ${runsWithoutJobs.length} runs without clusterJobs...`);
+          console.log(`[useTargetPoller] Fetching details for ${runsWithoutJobs.length} runs without clusterJobs...`);
 
           for (const run of runsWithoutJobs) {
             try {
@@ -176,25 +177,35 @@ export function useTargetPoller() {
                 ownerUserId: details.ownerUserId || run.ownerUserId, // Preserve owner from backend or fallback to original
               };
 
-              console.log(`Fetched details for ${run.scenarioRunName}:`, updatedRun);
+              console.log(`[useTargetPoller] Fetched details for ${run.scenarioRunName}:`, updatedRun);
 
               dispatch({
                 type: 'UPDATE_SCENARIO_RUN',
                 payload: { run: updatedRun }
               });
             } catch (error) {
-              console.error(`Failed to fetch details for ${run.scenarioRunName}:`, error);
+              console.error(`[useTargetPoller] Failed to fetch details for ${run.scenarioRunName}:`, error);
             }
           }
         }
       } catch (error) {
-        console.error('Failed to load scenario runs:', error);
+        console.error('[useTargetPoller] Failed to load scenario runs:', error);
         // Don't transition to error phase, just log it
         // Scenario runs list can be empty on first load
       }
     }
 
+    // Initial load
     loadScenarioRuns();
+
+    // Poll every 10 seconds to refresh the full list
+    // This ensures new runs are discovered and completed runs are refreshed
+    const intervalId = setInterval(loadScenarioRuns, 10000);
+
+    return () => {
+      console.log('[useTargetPoller] Stopping scenario runs list polling');
+      clearInterval(intervalId);
+    };
   }, [state.phase, dispatch]);
 
   // NOTE: Polling is now handled by useScenarioRunsPoller (hybrid approach)
