@@ -22,6 +22,17 @@ vi.mock('../../services/usersApi', () => {
   };
 });
 
+// Mock groupsApi
+const mockListGroups = vi.fn();
+
+vi.mock('../../services/groupsApi', () => {
+  return {
+    groupsApi: {
+      listGroups: (...args: any[]) => mockListGroups(...args),
+    },
+  };
+});
+
 // Mock hooks
 const mockShowSuccess = vi.fn();
 const mockShowError = vi.fn();
@@ -85,6 +96,7 @@ describe('UserManagement', () => {
     vi.clearAllMocks();
     mockIsAdmin.mockReturnValue(true);
     mockAuthState.user = { userId: 'admin@example.com', role: 'admin' };
+    mockListGroups.mockResolvedValue([]);
   });
 
   describe('Loading and Display', () => {
@@ -203,6 +215,9 @@ describe('UserManagement', () => {
     it('should open create form when Create User button clicked', async () => {
       const user = userEvent.setup();
       mockListUsers.mockResolvedValue(mockUsers);
+      mockListGroups.mockResolvedValue([
+        { name: 'test-group', description: 'Test group', clusterPermissions: {}, memberCount: 0 },
+      ]);
 
       render(<UserManagement />);
 
@@ -212,7 +227,9 @@ describe('UserManagement', () => {
 
       await user.click(screen.getByRole('button', { name: /create user/i }));
 
-      expect(screen.getByText(/create new user/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/create new user/i)).toBeInTheDocument();
+      });
     });
 
     it.skip('should execute create and reload users on form submission', async () => {

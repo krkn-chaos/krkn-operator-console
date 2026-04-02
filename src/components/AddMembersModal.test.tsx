@@ -79,11 +79,11 @@ describe('AddMembersModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText('user1@example.com')).toBeInTheDocument();
-      expect(screen.getByText('John')).toBeInTheDocument();
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
     expect(screen.getByText('user2@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Jane')).toBeInTheDocument();
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
 
     // Existing member should NOT be in the list
     expect(screen.queryByText('existing@example.com')).not.toBeInTheDocument();

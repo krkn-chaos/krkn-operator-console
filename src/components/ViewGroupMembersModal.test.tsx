@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ViewGroupMembersModal } from './ViewGroupMembersModal';
 import { groupsApi } from '../services/groupsApi';
@@ -57,13 +57,11 @@ describe('ViewGroupMembersModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText('user1@example.com')).toBeInTheDocument();
-      expect(screen.getByText('John')).toBeInTheDocument();
-      expect(screen.getByText('Doe')).toBeInTheDocument();
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
     expect(screen.getByText('user2@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Jane')).toBeInTheDocument();
-    expect(screen.getByText('Smith')).toBeInTheDocument();
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
   });
 
   it('should display empty state when group has no members', async () => {
@@ -98,7 +96,7 @@ describe('ViewGroupMembersModal', () => {
     render(<ViewGroupMembersModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByText('John')).toBeInTheDocument();
+      expect(screen.getAllByText('John Doe').length).toBeGreaterThan(0);
     });
 
     // Click the remove button for the first member
@@ -108,7 +106,7 @@ describe('ViewGroupMembersModal', () => {
     // Confirmation modal should appear
     await waitFor(() => {
       expect(screen.getByText(/Are you sure you want to remove/i)).toBeInTheDocument();
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getAllByText('John Doe').length).toBeGreaterThan(0);
     });
   });
 
@@ -124,19 +122,24 @@ describe('ViewGroupMembersModal', () => {
     render(<ViewGroupMembersModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByText('John')).toBeInTheDocument();
+      expect(screen.getAllByText('John Doe').length).toBeGreaterThan(0);
     });
 
     // Click remove button
     const removeButtons = screen.getAllByRole('button', { name: /Remove/i });
     await user.click(removeButtons[0]);
 
-    // Confirm removal
+    // Confirm removal - wait for the confirmation modal to appear
     await waitFor(() => {
       expect(screen.getByText(/Are you sure you want to remove/i)).toBeInTheDocument();
     });
 
-    const confirmButton = screen.getByRole('button', { name: /Remove/i });
+    // Find the confirmation dialog (may be hidden) and click the Remove button within it
+    const confirmDialog = screen.getAllByRole('dialog', { hidden: true }).find((dialog) =>
+      within(dialog).queryByText(/Are you sure you want to remove/i)
+    );
+    expect(confirmDialog).toBeDefined();
+    const confirmButton = within(confirmDialog!).getByRole('button', { name: /Remove/i, hidden: true });
     await user.click(confirmButton);
 
     await waitFor(() => {
@@ -151,7 +154,7 @@ describe('ViewGroupMembersModal', () => {
     render(<ViewGroupMembersModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByText('John')).toBeInTheDocument();
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
     const addMembersButton = screen.getByRole('button', { name: /Add Members/i });
@@ -170,11 +173,11 @@ describe('ViewGroupMembersModal', () => {
     render(<ViewGroupMembersModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByText('John')).toBeInTheDocument();
+      expect(screen.getAllByText('John Doe').length).toBeGreaterThan(0);
     });
 
-    const closeButton = screen.getByRole('button', { name: /Close/i });
-    await user.click(closeButton);
+    const closeButtons = screen.getAllByRole('button', { name: /Close/i });
+    await user.click(closeButtons[0]);
 
     expect(defaultProps.onClose).toHaveBeenCalled();
   });

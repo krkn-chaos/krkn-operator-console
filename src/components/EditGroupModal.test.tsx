@@ -24,8 +24,8 @@ const mockGroupsApi = groupsApi as vi.Mocked<typeof groupsApi>;
 const mockTargetsApi = targetsApi as vi.Mocked<typeof targetsApi>;
 
 describe('EditGroupModal', () => {
-  const mockOnClose = jest.fn();
-  const mockOnSuccess = jest.fn();
+  const mockOnClose = vi.fn();
+  const mockOnSuccess = vi.fn();
 
   const mockGroupData: GroupDetails = {
     name: 'test-group',
@@ -191,7 +191,7 @@ describe('EditGroupModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Removed/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Removed/i).length).toBeGreaterThan(0);
       expect(screen.getByText('https://api.removed-cluster.example.com')).toBeInTheDocument();
     });
   });
