@@ -1,10 +1,17 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ReactNode } from 'react';
 import { useActiveRunsPoller } from './useActiveRunsPoller';
 import { operatorApi } from '../services/operatorApi';
+import { AppProvider } from '../context/AppContext';
 import type { ActiveRunsResponse } from '../types/api';
 
 vi.mock('../services/operatorApi');
+
+// Wrapper component to provide AppContext
+function AppProviderWrapper({ children }: { children: ReactNode }) {
+  return <AppProvider>{children}</AppProvider>;
+}
 
 describe('useActiveRunsPoller', () => {
   beforeEach(() => {
@@ -28,7 +35,9 @@ describe('useActiveRunsPoller', () => {
 
     vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockData);
 
-    const { result } = renderHook(() => useActiveRunsPoller());
+    const { result } = renderHook(() => useActiveRunsPoller(), {
+      wrapper: AppProviderWrapper,
+    });
 
     expect(result.current.loading).toBe(true);
     expect(result.current.activeRuns).toBe(null);
@@ -46,7 +55,9 @@ describe('useActiveRunsPoller', () => {
     const errorMessage = 'Failed to fetch active runs';
     vi.mocked(operatorApi.getActiveRuns).mockRejectedValue(new Error(errorMessage));
 
-    const { result } = renderHook(() => useActiveRunsPoller());
+    const { result } = renderHook(() => useActiveRunsPoller(), {
+      wrapper: AppProviderWrapper,
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -67,7 +78,9 @@ describe('useActiveRunsPoller', () => {
 
     vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockData);
 
-    const { unmount } = renderHook(() => useActiveRunsPoller());
+    const { unmount } = renderHook(() => useActiveRunsPoller(), {
+      wrapper: AppProviderWrapper,
+    });
 
     // Wait for initial call
     await vi.waitFor(() => {
