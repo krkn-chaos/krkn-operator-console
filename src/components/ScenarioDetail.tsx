@@ -200,10 +200,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         type: 'SCENARIOS_RUN_BATCH_SUCCESS',
       });
 
-      // Show success notification
+      // Show success notification with scenario run name
       showSuccess(
         'Scenario run created successfully',
-        'Please wait for the job to appear in the list. This may take a few moments.'
+        `Run ID: ${createResponse.scenarioRunName}. Please wait for the job to appear in the list.`
       );
     } catch (error) {
       console.error('Failed to run scenario:', error);
