@@ -56,7 +56,7 @@ describe('ActiveRunsSummary', () => {
     expect(screen.getByText('There are 3 scenarios currently running')).toBeInTheDocument();
   });
 
-  it('should render warning Alert variant', () => {
+  it('should render info Alert variant', () => {
     const activeRuns: ActiveRunsResponse = {
       totalActiveRuns: 1,
       totalClusters: 1,
@@ -66,7 +66,7 @@ describe('ActiveRunsSummary', () => {
       <ActiveRunsSummary activeRuns={activeRuns} loading={false} error={null} />
     );
 
-    const alert = container.querySelector('.pf-v5-c-alert.pf-m-warning');
+    const alert = container.querySelector('.pf-v5-c-alert.pf-m-info');
     expect(alert).toBeInTheDocument();
   });
 

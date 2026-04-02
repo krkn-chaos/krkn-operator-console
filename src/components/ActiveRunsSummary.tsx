@@ -45,7 +45,7 @@ export function ActiveRunsSummary({ activeRuns, loading, error }: ActiveRunsSumm
   return (
     <>
       <Alert
-        variant="warning"
+        variant="info"
         isInline
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
