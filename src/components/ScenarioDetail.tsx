@@ -11,6 +11,7 @@ import {
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
+import { useNotifications } from '../hooks';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
@@ -25,6 +26,7 @@ interface ScenarioDetailProps {
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
   const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields } = state;
+  const { showSuccess } = useNotifications();
   const [showPreview, setShowPreview] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
@@ -197,6 +199,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       dispatch({
         type: 'SCENARIOS_RUN_BATCH_SUCCESS',
       });
+
+      // Show success notification
+      showSuccess(
+        'Scenario run created successfully',
+        'Please wait for the job to appear in the list. This may take a few moments.'
+      );
     } catch (error) {
       console.error('Failed to run scenario:', error);
       setValidationErrors([
