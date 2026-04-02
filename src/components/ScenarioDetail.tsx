@@ -200,10 +200,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         type: 'SCENARIOS_RUN_BATCH_SUCCESS',
       });
 
-      // Show success notification with scenario run name
+      // Show success notification with scenario run name (persistent - no auto-dismiss)
       showSuccess(
         'Scenario run created successfully',
-        `Run ID: ${createResponse.scenarioRunName}. Please wait for the job to appear in the list.`
+        `Run ID: ${createResponse.scenarioRunName}. Please wait for the job to appear in the list.`,
+        0 // Don't auto-dismiss - user must close manually
       );
     } catch (error) {
       console.error('Failed to run scenario:', error);
