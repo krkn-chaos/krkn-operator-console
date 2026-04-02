@@ -198,9 +198,10 @@ export function useTargetPoller() {
     // Initial load
     loadScenarioRuns();
 
-    // Poll every 5 seconds to refresh the full list
+    // Poll every 30 seconds to refresh the full list
     // This ensures new runs are discovered and completed runs are refreshed
-    const intervalId = setInterval(loadScenarioRuns, 5000);
+    // useScenarioRunsPoller handles more frequent updates (5s) for active runs
+    const intervalId = setInterval(loadScenarioRuns, 30000);
 
     return () => {
       console.log('[useTargetPoller] Stopping scenario runs list polling');
