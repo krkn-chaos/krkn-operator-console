@@ -26,7 +26,6 @@ import {
   DataListItemRow,
   DataListItemCells,
   DataListCell,
-  Label,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';

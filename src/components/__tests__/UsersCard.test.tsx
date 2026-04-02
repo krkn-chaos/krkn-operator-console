@@ -21,7 +21,6 @@ const mockUsers: UserDetails[] = [
     organization: 'Acme Corp',
     role: 'admin',
     active: true,
-    groups: ['group1'],
     lastLogin: '2024-01-01T00:00:00Z',
   },
   {
@@ -31,7 +30,6 @@ const mockUsers: UserDetails[] = [
     organization: 'Tech Inc',
     role: 'user',
     active: true,
-    groups: ['group1'],
     lastLogin: '2024-01-02T00:00:00Z',
   },
 ];
@@ -54,15 +52,20 @@ describe('UsersCard', () => {
 
     // Setup default mocks
     vi.mocked(useNotifications).mockReturnValue({
+      showNotification: vi.fn(),
       showSuccess: mockShowSuccess,
       showError: mockShowError,
       showInfo: vi.fn(),
       showWarning: vi.fn(),
+      hideNotification: vi.fn(),
     });
 
     vi.mocked(useRole).mockReturnValue({
-      isAdmin: true,
       role: 'admin',
+      isAdmin: true,
+      isUser: false,
+      hasRole: vi.fn(),
+      isAuthenticated: true,
     });
 
     vi.mocked(useAuth).mockReturnValue({
@@ -74,14 +77,13 @@ describe('UsersCard', () => {
           surname: 'Doe',
           organization: 'Acme Corp',
           role: 'admin',
-          active: true,
-          groups: ['group1'],
-          lastLogin: '2024-01-01T00:00:00Z',
         },
         loading: false,
       },
       login: vi.fn(),
       logout: vi.fn(),
+      register: vi.fn(),
+      isAdmin: vi.fn(() => true),
     });
 
     vi.mocked(usersApi.listUsers).mockResolvedValue(mockUsers);
@@ -160,8 +162,11 @@ describe('UsersCard', () => {
 
   it('should not show Create User button for non-admin users', async () => {
     vi.mocked(useRole).mockReturnValue({
-      isAdmin: false,
       role: 'user',
+      isAdmin: false,
+      isUser: true,
+      hasRole: vi.fn(),
+      isAuthenticated: true,
     });
 
     render(<UsersCard groups={mockGroups} />);

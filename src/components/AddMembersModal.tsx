@@ -212,7 +212,7 @@ export function AddMembersModal({
     // Add members sequentially (to avoid overwhelming the API)
     for (let i = 0; i < selectedIds.length; i++) {
       const userId = selectedIds[i];
-      setProgress({ current: i + 1, total: selectedIds.size });
+      setProgress({ current: i + 1, total: selectedIds.length });
 
       try {
         await groupsApi.addGroupMember(groupName, userId);

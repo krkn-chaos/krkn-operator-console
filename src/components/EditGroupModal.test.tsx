@@ -20,9 +20,6 @@ import type { GroupDetails, TargetResponse } from '../types/api';
 vi.mock('../services/groupsApi');
 vi.mock('../services/targetsApi');
 
-const mockGroupsApi = groupsApi as vi.Mocked<typeof groupsApi>;
-const mockTargetsApi = targetsApi as vi.Mocked<typeof targetsApi>;
-
 describe('EditGroupModal', () => {
   const mockOnClose = vi.fn();
   const mockOnSuccess = vi.fn();
@@ -56,8 +53,8 @@ describe('EditGroupModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGroupsApi.getGroup.mockResolvedValue(mockGroupData);
-    mockTargetsApi.listTargets.mockResolvedValue(mockTargets);
+    vi.mocked(groupsApi).getGroup.mockResolvedValue(mockGroupData);
+    vi.mocked(targetsApi).listTargets.mockResolvedValue(mockTargets);
   });
 
   it('should display loading state initially', async () => {
@@ -89,8 +86,8 @@ describe('EditGroupModal', () => {
     );
 
     await waitFor(() => {
-      expect(mockGroupsApi.getGroup).toHaveBeenCalledWith('test-group');
-      expect(mockTargetsApi.listTargets).toHaveBeenCalled();
+      expect(vi.mocked(groupsApi).getGroup).toHaveBeenCalledWith('test-group');
+      expect(vi.mocked(targetsApi).listTargets).toHaveBeenCalled();
     });
   });
 
@@ -115,7 +112,7 @@ describe('EditGroupModal', () => {
   });
 
   it('should display error when group fetch fails', async () => {
-    mockGroupsApi.getGroup.mockRejectedValue(new Error('Group not found'));
+    vi.mocked(groupsApi).getGroup.mockRejectedValue(new Error('Group not found'));
 
     render(
       <EditGroupModal
@@ -179,7 +176,7 @@ describe('EditGroupModal', () => {
       },
     };
 
-    mockGroupsApi.getGroup.mockResolvedValue(groupWithOrphanedCluster);
+    vi.mocked(groupsApi).getGroup.mockResolvedValue(groupWithOrphanedCluster);
 
     render(
       <EditGroupModal
