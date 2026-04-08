@@ -84,7 +84,7 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
     };
 
     switch (secretType) {
-      case 'kubeconfig':
+      case 'kubeconfig': {
         // Convert to base64 if not already
         const kubeconfigContent = kubeconfig.trim();
         try {
@@ -96,6 +96,7 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
           data.kubeconfig = btoa(kubeconfigContent);
         }
         break;
+      }
 
       case 'token':
         data.token = token.trim();

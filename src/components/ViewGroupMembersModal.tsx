@@ -101,15 +101,6 @@ export function ViewGroupMembersModal({
   const { showSuccess, showError } = useNotifications();
 
   /**
-   * Load group members when modal opens
-   */
-  useEffect(() => {
-    if (isOpen) {
-      loadMembers();
-    }
-  }, [isOpen, groupName]);
-
-  /**
    * Fetch group members from API
    */
   const loadMembers = async () => {
@@ -126,6 +117,16 @@ export function ViewGroupMembersModal({
       setLoading(false);
     }
   };
+
+  /**
+   * Load group members when modal opens
+   */
+  useEffect(() => {
+    if (isOpen) {
+      loadMembers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, groupName]); // Reload when modal opens or group changes
 
   /**
    * Handle remove member button click - shows confirmation

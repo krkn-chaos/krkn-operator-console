@@ -13,12 +13,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EditGroupModal } from './EditGroupModal';
 import { groupsApi } from '../services/groupsApi';
-import { targetsApi } from '../services/targetsApi';
-import type { GroupDetails, TargetResponse } from '../types/api';
+import { operatorApi } from '../services/operatorApi';
+import type { GroupDetails, ClustersResponse } from '../types/api';
 
 // Mock the API modules
 vi.mock('../services/groupsApi');
-vi.mock('../services/targetsApi');
+vi.mock('../services/operatorApi');
 
 describe('EditGroupModal', () => {
   const mockOnClose = vi.fn();
@@ -34,27 +34,30 @@ describe('EditGroupModal', () => {
     memberCount: 5,
   };
 
-  const mockTargets: TargetResponse[] = [
-    {
-      uuid: 'target-1',
-      clusterName: 'cluster1',
-      clusterAPIURL: 'https://api.cluster1.example.com',
-      secretType: 'token',
-      ready: true,
+  const mockClustersResponse: ClustersResponse = {
+    targetData: {
+      'krkn-operator': [
+        {
+          'cluster-name': 'cluster1',
+          'cluster-api-url': 'https://api.cluster1.example.com',
+        },
+        {
+          'cluster-name': 'cluster2',
+          'cluster-api-url': 'https://api.cluster2.example.com',
+        },
+      ],
     },
-    {
-      uuid: 'target-2',
-      clusterName: 'cluster2',
-      clusterAPIURL: 'https://api.cluster2.example.com',
-      secretType: 'token',
-      ready: true,
-    },
-  ];
+    status: 'Completed',
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(groupsApi).getGroup.mockResolvedValue(mockGroupData);
-    vi.mocked(targetsApi).listTargets.mockResolvedValue(mockTargets);
+
+    // Mock cluster discovery flow
+    vi.mocked(operatorApi).createTargetRequest.mockResolvedValue({ uuid: 'test-discovery-uuid' });
+    vi.mocked(operatorApi).getTargetStatus.mockResolvedValue(200); // Ready immediately
+    vi.mocked(operatorApi).getClusters.mockResolvedValue(mockClustersResponse);
   });
 
   it('should display loading state initially', async () => {
@@ -67,15 +70,16 @@ describe('EditGroupModal', () => {
       />
     );
 
-    expect(screen.getByText(/Loading group data/i)).toBeInTheDocument();
+    // Should show loading message (can be various messages depending on what's loading)
+    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
 
     // Wait for loading to complete
     await waitFor(() => {
-      expect(screen.queryByText(/Loading group data/i)).not.toBeInTheDocument();
+      expect(screen.getByDisplayValue('test-group')).toBeInTheDocument();
     });
   });
 
-  it('should fetch group data and targets when modal opens', async () => {
+  it('should fetch group data and start cluster discovery when modal opens', async () => {
     render(
       <EditGroupModal
         isOpen={true}
@@ -87,7 +91,9 @@ describe('EditGroupModal', () => {
 
     await waitFor(() => {
       expect(vi.mocked(groupsApi).getGroup).toHaveBeenCalledWith('test-group');
-      expect(vi.mocked(targetsApi).listTargets).toHaveBeenCalled();
+      expect(vi.mocked(operatorApi).createTargetRequest).toHaveBeenCalled();
+      expect(vi.mocked(operatorApi).getTargetStatus).toHaveBeenCalledWith('test-discovery-uuid');
+      expect(vi.mocked(operatorApi).getClusters).toHaveBeenCalledWith('test-discovery-uuid');
     });
   });
 
@@ -124,7 +130,7 @@ describe('EditGroupModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Failed to Load Group/i)).toBeInTheDocument();
+      expect(screen.getByText(/Failed to Load/i)).toBeInTheDocument();
       expect(screen.getByText(/Group not found/i)).toBeInTheDocument();
     });
   });
@@ -163,8 +169,8 @@ describe('EditGroupModal', () => {
       />
     );
 
-    // Should show loading again
-    expect(screen.getByText(/Loading group data/i)).toBeInTheDocument();
+    // Should show loading again (any loading message)
+    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
   });
 
   it('should handle orphaned clusters (clusters in permissions but not in targets)', async () => {

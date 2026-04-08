@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardTitle,
@@ -96,9 +96,22 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [viewMembersGroupName, setViewMembersGroupName] = useState<string | null>(null);
   const { showSuccess, showError } = useNotifications();
 
+  const loadGroups = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await groupsApi.listGroups();
+      setGroups(data);
+    } catch (error) {
+      showError('Failed to load groups', error instanceof Error ? error.message : 'Unknown error');
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [showError]);
+
   useEffect(() => {
     loadGroups();
-  }, []);
+  }, [loadGroups]);
 
   // Filter groups based on search value
   useEffect(() => {
@@ -113,19 +126,6 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
       setFilteredGroups(filtered);
     }
   }, [groups, searchValue]);
-
-  const loadGroups = async () => {
-    setLoading(true);
-    try {
-      const data = await groupsApi.listGroups();
-      setGroups(data);
-    } catch (error) {
-      showError('Failed to load groups', error instanceof Error ? error.message : 'Unknown error');
-      setGroups([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreate = () => {
     setIsCreateModalOpen(true);
@@ -161,15 +161,15 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
     }
   };
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = async () => {
     setIsCreateModalOpen(false);
-    loadGroups();
+    await loadGroups(); // Wait for refresh to complete
     onGroupsChange?.();
   };
 
-  const handleEditSuccess = () => {
+  const handleEditSuccess = async () => {
     setEditingGroupName(null);
-    loadGroups();
+    await loadGroups(); // Wait for refresh to complete
     onGroupsChange?.();
   };
 

@@ -11,7 +11,7 @@ vi.mock('../../utils/apiClient', () => {
       constructor(baseUrl: string) {
         this.baseUrl = baseUrl;
       }
-      protected fetchJson(...args: any[]) {
+      protected fetchJson(...args: unknown[]) {
         return mockFetchJson(...args);
       }
     },

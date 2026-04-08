@@ -47,6 +47,7 @@ export interface TargetResponse {
   secretType: string;
   ready: boolean;
   createdAt?: string;
+  operatorSource?: string; // Source operator (krkn-operator, krkn-operator-acm, etc.) - only for discovered clusters
 }
 
 export interface ListTargetsResponse {
@@ -502,11 +503,13 @@ export interface CreateGroupRequest {
   name: string;
   description?: string;
   clusterPermissions: ClusterPermissions;
+  discoveryUuid?: string; // UUID of cluster discovery request for cleanup
 }
 
 export interface UpdateGroupRequest {
   description?: string;
   clusterPermissions?: ClusterPermissions;
+  discoveryUuid?: string; // UUID of cluster discovery request for cleanup
 }
 
 export interface ListGroupsResponse {

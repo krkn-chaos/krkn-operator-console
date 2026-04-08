@@ -222,13 +222,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * @param request - Registration data
    */
   const register = useCallback(async (request: RegisterRequest) => {
-    try {
-      await authService.register(request);
-      // Note: Register does NOT automatically log in the user
-      // User must login after registration
-    } catch (error) {
-      throw error; // Re-throw for component to handle
-    }
+    await authService.register(request);
+    // Note: Register does NOT automatically log in the user
+    // User must login after registration
   }, []);
 
   /**
@@ -266,6 +262,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
  * return <Dashboard user={state.user} />;
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
 

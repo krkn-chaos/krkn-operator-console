@@ -13,11 +13,11 @@ const mockDeleteUser = vi.fn();
 vi.mock('../../services/usersApi', () => {
   return {
     usersApi: {
-      listUsers: (...args: any[]) => mockListUsers(...args),
-      getUser: (...args: any[]) => mockGetUser(...args),
-      createUser: (...args: any[]) => mockCreateUser(...args),
-      updateUser: (...args: any[]) => mockUpdateUser(...args),
-      deleteUser: (...args: any[]) => mockDeleteUser(...args),
+      listUsers: (...args: unknown[]) => mockListUsers(...args),
+      getUser: (...args: unknown[]) => mockGetUser(...args),
+      createUser: (...args: unknown[]) => mockCreateUser(...args),
+      updateUser: (...args: unknown[]) => mockUpdateUser(...args),
+      deleteUser: (...args: unknown[]) => mockDeleteUser(...args),
     },
   };
 });
@@ -28,7 +28,7 @@ const mockListGroups = vi.fn();
 vi.mock('../../services/groupsApi', () => {
   return {
     groupsApi: {
-      listGroups: (...args: any[]) => mockListGroups(...args),
+      listGroups: (...args: unknown[]) => mockListGroups(...args),
     },
   };
 });

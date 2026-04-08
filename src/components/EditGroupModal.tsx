@@ -18,7 +18,7 @@
  * @component
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -36,8 +36,8 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
-import { targetsApi } from '../services/targetsApi';
-import type { GroupDetails, ClusterPermissions, TargetResponse } from '../types/api';
+import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
+import type { GroupDetails, ClusterPermissions } from '../types/api';
 import { ClusterPermissionsTable } from './ClusterPermissionsTable';
 
 interface EditGroupModalProps {
@@ -88,6 +88,8 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
   const [successMessage, setSuccessMessage] = useState('');
   const [showRunWithoutViewWarning, setShowRunWithoutViewWarning] = useState(false);
   const [missingViewPermissions, setMissingViewPermissions] = useState<string[]>([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateClusters, setDuplicateClusters] = useState<string[]>([]);
 
   // Form state
   const [description, setDescription] = useState('');
@@ -95,46 +97,77 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
 
   // Data fetching state
   const [groupData, setGroupData] = useState<GroupDetails | null>(null);
-  const [targets, setTargets] = useState<TargetResponse[]>([]);
 
-  // Fetch group data and targets when modal opens
+  // Cluster discovery hook
+  const {
+    clusters: discoveredClusters,
+    discoveryUuid,
+    isLoading: loadingClusters,
+    error: clustersError,
+    startDiscovery,
+    retry: retryDiscovery,
+    reset: resetDiscovery,
+  } = useClusterDiscovery();
+
+  // Transform to array for compatibility with ClusterPermissionsTable
+  const targets = discoveredClusters || [];
+
+  // Track the last group/modal state we loaded to prevent duplicate discoveries
+  const lastLoadedRef = useRef<string>('');
+
+  // Fetch group data and start cluster discovery when modal opens
   useEffect(() => {
     if (!isOpen) {
-      // Reset state when modal closes
+      // Reset state and warning modals when modal closes
       setDescription('');
       setClusterPermissions({});
       setGroupData(null);
-      setTargets([]);
       setError('');
       setValidationError('');
       setSuccessMessage('');
+      setShowDuplicateWarning(false);
+      setDuplicateClusters([]);
+      setShowRunWithoutViewWarning(false);
+      setMissingViewPermissions([]);
+      resetDiscovery();
+      lastLoadedRef.current = ''; // Reset tracking
       return;
     }
+
+    // Create a unique key for this modal open + group combination
+    const loadKey = `${isOpen}-${groupName}`;
+
+    // Prevent duplicate loads for the same modal state
+    if (lastLoadedRef.current === loadKey) {
+      return;
+    }
+
+    lastLoadedRef.current = loadKey;
 
     const fetchData = async () => {
       setIsLoading(true);
       setError('');
 
       try {
-        // Fetch group data and targets in parallel
-        const [group, targetsData] = await Promise.all([
-          groupsApi.getGroup(groupName),
-          targetsApi.listTargets(),
-        ]);
+        // Fetch group data and start cluster discovery in parallel
+        const groupPromise = groupsApi.getGroup(groupName);
+        const discoveryPromise = startDiscovery();
+
+        const [group] = await Promise.all([groupPromise, discoveryPromise]);
 
         setGroupData(group);
         setDescription(group.description || '');
         setClusterPermissions(group.clusterPermissions || {});
-        setTargets(targetsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load group data');
+        lastLoadedRef.current = ''; // Allow retry on error
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [isOpen, groupName]);
+  }, [isOpen, groupName, startDiscovery, resetDiscovery]);
 
   const validateForm = (): boolean => {
     // Check if at least one cluster has at least one action
@@ -176,10 +209,45 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     };
   };
 
+  const checkDuplicateClusters = (): { hasDuplicates: boolean; duplicates: string[] } => {
+    const duplicates: string[] = [];
+    const selectedUrls = Object.keys(clusterPermissions).filter(
+      (url) => clusterPermissions[url].actions.length > 0
+    );
+
+    // Check if the same API URL is selected more than once (from different sources)
+    selectedUrls.forEach((url) => {
+      // Find all clusters with this URL
+      const clustersWithUrl = targets.filter((t) => t.clusterAPIURL === url);
+
+      if (clustersWithUrl.length > 1) {
+        // Same cluster from multiple sources
+        const clusterNames = clustersWithUrl
+          .map((c) => `${c.clusterName} (${c.operatorSource || 'unknown'})`)
+          .join(', ');
+
+        duplicates.push(`${url}: ${clusterNames}`);
+      }
+    });
+
+    return {
+      hasDuplicates: duplicates.length > 0,
+      duplicates
+    };
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!validateForm()) {
+      return;
+    }
+
+    // Check for duplicate clusters (same API URL from different sources)
+    const { hasDuplicates, duplicates } = checkDuplicateClusters();
+    if (hasDuplicates) {
+      setDuplicateClusters(duplicates);
+      setShowDuplicateWarning(true);
       return;
     }
 
@@ -203,6 +271,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
       await groupsApi.updateGroup(groupName, {
         description: description.trim() || undefined,
         clusterPermissions,
+        discoveryUuid: discoveryUuid || undefined, // Pass UUID for backend cleanup
       });
 
       setSuccessMessage('Group updated successfully');
@@ -219,6 +288,20 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     }
   };
 
+  const handleConfirmDuplicates = async () => {
+    setShowDuplicateWarning(false);
+
+    // Check for "run" or "cancel" without "view" warning after duplicates confirmed
+    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView();
+    if (hasIssue) {
+      setMissingViewPermissions(missingPermissions);
+      setShowRunWithoutViewWarning(true);
+      return;
+    }
+
+    await performSubmit();
+  };
+
   const handleConfirmRunWithoutView = () => {
     setShowRunWithoutViewWarning(false);
     performSubmit();
@@ -228,6 +311,10 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     onClose();
   };
 
+  // Combined loading state
+  const isFullyLoading = isLoading || loadingClusters;
+  const combinedError = error || clustersError;
+
   return (
     <>
       <Modal
@@ -236,20 +323,35 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
         isOpen={isOpen}
         onClose={handleCancel}
       >
-        {isLoading ? (
+        {isFullyLoading && !groupData ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <Spinner size="xl" />
-            <div style={{ marginTop: '1rem' }}>Loading group data...</div>
+            <div style={{ marginTop: '1rem' }}>
+              {isLoading && loadingClusters
+                ? 'Loading group and discovering clusters...'
+                : isLoading
+                ? 'Loading group data...'
+                : 'Discovering clusters...'}
+            </div>
           </div>
-        ) : error && !groupData ? (
-          <Alert variant="danger" title="Failed to Load Group" isInline>
-            {error}
+        ) : combinedError && !groupData ? (
+          <Alert variant="danger" title="Failed to Load" isInline>
+            {combinedError}
           </Alert>
         ) : (
           <Form onSubmit={handleSubmit}>
             {error && !successMessage && (
               <Alert variant="danger" title="Update Failed" isInline style={{ marginBottom: '1rem' }}>
                 {error}
+              </Alert>
+            )}
+
+            {clustersError && (
+              <Alert variant="warning" title="Cluster Discovery Failed" isInline style={{ marginBottom: '1rem' }}>
+                {clustersError}
+                <Button variant="link" onClick={retryDiscovery} style={{ marginLeft: '1rem' }}>
+                  Retry Discovery
+                </Button>
               </Alert>
             )}
 
@@ -298,13 +400,20 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
               isRequired
               fieldId="edit-group-permissions"
             >
-              <ClusterPermissionsTable
-                targets={targets}
-                clusterPermissions={clusterPermissions}
-                onChange={setClusterPermissions}
-                showOrphanedWarning
-                showBulkActions={false}
-              />
+              {loadingClusters ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Spinner size="lg" />
+                  <div style={{ marginTop: '1rem' }}>Discovering clusters...</div>
+                </div>
+              ) : (
+                <ClusterPermissionsTable
+                  targets={targets}
+                  clusterPermissions={clusterPermissions}
+                  onChange={setClusterPermissions}
+                  showOrphanedWarning
+                  showBulkActions={false}
+                />
+              )}
               <FormHelperText>
                 <HelperText>
                   <HelperTextItem icon={<ExclamationCircleIcon />}>
@@ -329,6 +438,43 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
             </ActionGroup>
           </Form>
         )}
+      </Modal>
+
+      {/* Warning Modal for duplicate clusters */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Duplicate Clusters Detected"
+        isOpen={showDuplicateWarning}
+        onClose={() => setShowDuplicateWarning(false)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="warning"
+            onClick={handleConfirmDuplicates}
+          >
+            Continue Anyway
+          </Button>,
+          <Button
+            key="cancel"
+            variant="link"
+            onClick={() => setShowDuplicateWarning(false)}
+          >
+            Go Back
+          </Button>,
+        ]}
+      >
+        <p>The following clusters have been selected multiple times from different operators:</p>
+        <ul style={{ marginTop: '1rem', marginLeft: '1.5rem' }}>
+          {duplicateClusters.map((duplicate, index) => (
+            <li key={index} style={{ marginBottom: '0.5rem' }}>
+              <strong>{duplicate}</strong>
+            </li>
+          ))}
+        </ul>
+        <p style={{ marginTop: '1rem' }}>
+          This means the same cluster will receive permissions from multiple operator sources.
+          Are you sure you want to continue?
+        </p>
       </Modal>
 
       {/* Warning Modal for "run" or "cancel" without "view" */}

@@ -45,18 +45,15 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
-  EmptyState,
-  EmptyStateBody,
-  EmptyStateIcon,
   Spinner,
-  Title,
+  Alert,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
-import { targetsApi } from '../services/targetsApi';
 import { useNotifications } from '../hooks/useNotifications';
+import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { ClusterPermissionsTable } from './ClusterPermissionsTable';
-import type { TargetResponse, ClusterPermissions } from '../types/api';
+import type { ClusterPermissions } from '../types/api';
 
 interface CreateGroupModalProps {
   /**
@@ -81,47 +78,47 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   const [description, setDescription] = useState('');
 
   // Cluster data
-  const [targets, setTargets] = useState<TargetResponse[]>([]);
   const [clusterPermissions, setClusterPermissions] = useState<ClusterPermissions>({});
-  const [loadingTargets, setLoadingTargets] = useState(false);
-  const [targetsError, setTargetsError] = useState<string | null>(null);
+
+  // Cluster discovery hook
+  const {
+    clusters: discoveredClusters,
+    discoveryUuid,
+    isLoading: loadingTargets,
+    error: targetsError,
+    startDiscovery,
+    retry: retryDiscovery,
+    reset: resetDiscovery,
+  } = useClusterDiscovery();
+
+  // Transform to array for compatibility with ClusterPermissionsTable
+  const targets = discoveredClusters || [];
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showRunWithoutViewWarning, setShowRunWithoutViewWarning] = useState(false);
   const [missingViewPermissions, setMissingViewPermissions] = useState<string[]>([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateClusters, setDuplicateClusters] = useState<string[]>([]);
 
-  // Fetch targets when modal opens
+  // Start cluster discovery when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchTargets();
+      startDiscovery();
     } else {
-      // Reset form when modal closes
+      // Reset form and warning modals when modal closes
       setName('');
       setDescription('');
       setClusterPermissions({});
       setErrors({});
-      setTargets([]);
-      setTargetsError(null);
+      setShowDuplicateWarning(false);
+      setDuplicateClusters([]);
+      setShowRunWithoutViewWarning(false);
+      setMissingViewPermissions([]);
+      resetDiscovery();
     }
-  }, [isOpen]);
-
-  const fetchTargets = async () => {
-    setLoadingTargets(true);
-    setTargetsError(null);
-
-    try {
-      const data = await targetsApi.listTargets();
-      setTargets(data);
-      setClusterPermissions({});
-    } catch (error) {
-      console.error('Failed to fetch targets:', error);
-      setTargetsError(error instanceof Error ? error.message : 'Failed to load clusters');
-    } finally {
-      setLoadingTargets(false);
-    }
-  };
+  }, [isOpen, startDiscovery, resetDiscovery]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -168,8 +165,43 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     };
   };
 
+  const checkDuplicateClusters = (): { hasDuplicates: boolean; duplicates: string[] } => {
+    const duplicates: string[] = [];
+    const selectedUrls = Object.keys(clusterPermissions).filter(
+      (url) => clusterPermissions[url].actions.length > 0
+    );
+
+    // Check if the same API URL is selected more than once (from different sources)
+    selectedUrls.forEach((url) => {
+      // Find all clusters with this URL
+      const clustersWithUrl = targets.filter((t) => t.clusterAPIURL === url);
+
+      if (clustersWithUrl.length > 1) {
+        // Same cluster from multiple sources
+        const clusterNames = clustersWithUrl
+          .map((c) => `${c.clusterName} (${c.operatorSource || 'unknown'})`)
+          .join(', ');
+
+        duplicates.push(`${url}: ${clusterNames}`);
+      }
+    });
+
+    return {
+      hasDuplicates: duplicates.length > 0,
+      duplicates
+    };
+  };
+
   const handleSubmit = async () => {
     if (!validate()) {
+      return;
+    }
+
+    // Check for duplicate clusters (same API URL from different sources)
+    const { hasDuplicates, duplicates } = checkDuplicateClusters();
+    if (hasDuplicates) {
+      setDuplicateClusters(duplicates);
+      setShowDuplicateWarning(true);
       return;
     }
 
@@ -193,6 +225,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
         name: name.trim(),
         description: description.trim() || undefined,
         clusterPermissions,
+        discoveryUuid: discoveryUuid || undefined, // Pass UUID for backend cleanup
       });
 
       showSuccess('Group created', `Group "${name}" was created successfully`);
@@ -207,59 +240,34 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     }
   };
 
+  const handleConfirmDuplicates = async () => {
+    setShowDuplicateWarning(false);
+
+    // Check for "run" or "cancel" without "view" warning after duplicates confirmed
+    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView();
+    if (hasIssue) {
+      setMissingViewPermissions(missingPermissions);
+      setShowRunWithoutViewWarning(true);
+      return;
+    }
+
+    await performSubmit();
+  };
+
   const handleConfirmRunWithoutView = () => {
     setShowRunWithoutViewWarning(false);
     performSubmit();
   };
 
-  const renderContent = () => {
-    if (loadingTargets) {
-      return (
-        <EmptyState>
-          <EmptyStateIcon icon={Spinner} />
-          <Title headingLevel="h2" size="lg">
-            Loading Clusters...
-          </Title>
-          <EmptyStateBody>
-            Fetching available target clusters
-          </EmptyStateBody>
-        </EmptyState>
-      );
-    }
-
-    if (targetsError) {
-      return (
-        <EmptyState>
-          <EmptyStateIcon icon={ExclamationCircleIcon} color="var(--pf-v5-global--danger-color--100)" />
-          <Title headingLevel="h2" size="lg">
-            Failed to Load Clusters
-          </Title>
-          <EmptyStateBody>
-            {targetsError}
-          </EmptyStateBody>
-          <Button variant="primary" onClick={fetchTargets}>
-            Retry
-          </Button>
-        </EmptyState>
-      );
-    }
-
-    if (targets.length === 0) {
-      return (
-        <EmptyState>
-          <EmptyStateIcon icon={ExclamationCircleIcon} />
-          <Title headingLevel="h2" size="lg">
-            No Clusters Available
-          </Title>
-          <EmptyStateBody>
-            No target clusters found. Please configure target clusters before creating groups.
-          </EmptyStateBody>
-        </EmptyState>
-      );
-    }
-
-    return (
-      <Form>
+  return (
+    <>
+      <Modal
+        variant={ModalVariant.large}
+        title="Create New Group"
+        isOpen={isOpen}
+        onClose={onClose}
+      >
+        <Form>
         <FormGroup label="Group Name" isRequired fieldId="group-name">
           <TextInput
             id="group-name"
@@ -298,13 +306,31 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           isRequired
           fieldId="cluster-permissions"
         >
-          <ClusterPermissionsTable
-            targets={targets}
-            clusterPermissions={clusterPermissions}
-            onChange={setClusterPermissions}
-            showOrphanedWarning={false}
-            showBulkActions={false}
-          />
+          {loadingTargets ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <Spinner size="lg" />
+              <div style={{ marginTop: '1rem' }}>Discovering clusters...</div>
+            </div>
+          ) : targetsError ? (
+            <Alert variant="danger" title="Failed to Load Clusters" isInline>
+              {targetsError}
+              <Button variant="link" onClick={retryDiscovery} style={{ marginLeft: '1rem' }}>
+                Retry
+              </Button>
+            </Alert>
+          ) : targets.length === 0 ? (
+            <Alert variant="warning" title="No Clusters Available" isInline>
+              No target clusters found. Please configure target clusters before creating groups.
+            </Alert>
+          ) : (
+            <ClusterPermissionsTable
+              targets={targets}
+              clusterPermissions={clusterPermissions}
+              onChange={setClusterPermissions}
+              showOrphanedWarning={false}
+              showBulkActions={false}
+            />
+          )}
           {errors.clusters && (
             <FormHelperText>
               <HelperText>
@@ -342,18 +368,43 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           </Button>
         </ActionGroup>
       </Form>
-    );
-  };
+      </Modal>
 
-  return (
-    <>
+      {/* Warning Modal for duplicate clusters */}
       <Modal
-        variant={ModalVariant.large}
-        title="Create New Group"
-        isOpen={isOpen}
-        onClose={onClose}
+        variant={ModalVariant.small}
+        title="Duplicate Clusters Detected"
+        isOpen={showDuplicateWarning}
+        onClose={() => setShowDuplicateWarning(false)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="warning"
+            onClick={handleConfirmDuplicates}
+          >
+            Continue Anyway
+          </Button>,
+          <Button
+            key="cancel"
+            variant="link"
+            onClick={() => setShowDuplicateWarning(false)}
+          >
+            Go Back
+          </Button>,
+        ]}
       >
-        {renderContent()}
+        <p>The following clusters have been selected multiple times from different operators:</p>
+        <ul style={{ marginTop: '1rem', marginLeft: '1.5rem' }}>
+          {duplicateClusters.map((duplicate, index) => (
+            <li key={index} style={{ marginBottom: '0.5rem' }}>
+              <strong>{duplicate}</strong>
+            </li>
+          ))}
+        </ul>
+        <p style={{ marginTop: '1rem' }}>
+          This means the same cluster will receive permissions from multiple operator sources.
+          Are you sure you want to continue?
+        </p>
       </Modal>
 
       {/* Warning Modal for "run" or "cancel" without "view" */}

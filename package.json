@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest",
+    "test:run": "vitest run --reporter=basic --silent",
+    "test:summary": "vitest run --reporter=dot --silent",
+    "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {

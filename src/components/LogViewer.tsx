@@ -283,7 +283,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         wsRef.current = null;
       }
     };
-  }, [scenarioRunName, jobId, status]); // Dependencies: jobId instead of clusterName
+  }, [scenarioRunName, jobId, clusterName, status]);
 
   return (
     <>

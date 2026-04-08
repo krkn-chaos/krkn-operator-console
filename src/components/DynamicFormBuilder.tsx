@@ -12,7 +12,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
-import type { ScenarioField, ScenarioFormValues } from '../types/api';
+import type { ScenarioField, ScenarioFormValues, StringField, EnumField } from '../types/api';
 
 interface DynamicFormBuilderProps {
   fields: ScenarioField[];
@@ -40,7 +40,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
 
     switch (field.type) {
       case 'string': {
-        const stringField = field as any; // Cast to access validator/validation_message
+        const stringField = field as StringField; // Cast to access validator/validation_message
         return (
           <FormGroup
             key={field.variable}
@@ -122,7 +122,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
 
       case 'enum': {
         // Type narrowing: cast to EnumField to access allowed_values and separator
-        const enumField = field as any;
+        const enumField = field as EnumField;
 
         // Validate that enum field has required properties
         if (!enumField.allowed_values || !enumField.separator) {
@@ -245,6 +245,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
   };
 
   // Initialize form values with defaults
+  // Set default values on mount
   useEffect(() => {
     const initialValues: ScenarioFormValues = {};
     fields.forEach((field) => {
@@ -253,7 +254,8 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
       }
     });
     onChange({ ...initialValues, ...values });
-  }, [fields]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fields]); // Only run when fields change, not when onChange or values change
 
   return <Form>{fields.map((field) => renderField(field))}</Form>;
 }
