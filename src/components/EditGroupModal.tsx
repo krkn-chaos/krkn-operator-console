@@ -18,7 +18,7 @@
  * @component
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -112,6 +112,9 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
   // Transform to array for compatibility with ClusterPermissionsTable
   const targets = discoveredClusters || [];
 
+  // Track the last group/modal state we loaded to prevent duplicate discoveries
+  const lastLoadedRef = useRef<string>('');
+
   // Fetch group data and start cluster discovery when modal opens
   useEffect(() => {
     if (!isOpen) {
@@ -123,8 +126,19 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
       setValidationError('');
       setSuccessMessage('');
       resetDiscovery();
+      lastLoadedRef.current = ''; // Reset tracking
       return;
     }
+
+    // Create a unique key for this modal open + group combination
+    const loadKey = `${isOpen}-${groupName}`;
+
+    // Prevent duplicate loads for the same modal state
+    if (lastLoadedRef.current === loadKey) {
+      return;
+    }
+
+    lastLoadedRef.current = loadKey;
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -142,6 +156,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
         setClusterPermissions(group.clusterPermissions || {});
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load group data');
+        lastLoadedRef.current = ''; // Allow retry on error
       } finally {
         setIsLoading(false);
       }
