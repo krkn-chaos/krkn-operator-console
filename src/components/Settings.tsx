@@ -90,7 +90,7 @@ export function Settings() {
       state.providers.length > 0 &&
       state.providerConfigStatus === 'idle'
     ) {
-      async function createConfigRequest() {
+      const createConfigRequest = async () => {
         dispatch({ type: 'PROVIDER_CONFIG_CREATE_START' });
         try {
           const uuid = await providersApi.createProviderConfigRequest();
@@ -102,7 +102,7 @@ export function Settings() {
             payload: { error: error instanceof Error ? error.message : 'Failed to create config request' }
           });
         }
-      }
+      };
 
       createConfigRequest();
     }

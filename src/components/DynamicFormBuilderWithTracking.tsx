@@ -116,7 +116,7 @@ export function DynamicFormBuilderWithTracking({
           </FormGroup>
         );
 
-      case 'enum':
+      case 'enum': {
         const options = field.allowed_values.split(field.separator).map((opt) => opt.trim());
         return (
           <FormGroup
@@ -154,6 +154,7 @@ export function DynamicFormBuilderWithTracking({
             )}
           </FormGroup>
         );
+      }
 
       case 'boolean':
         return (

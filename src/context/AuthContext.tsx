@@ -222,13 +222,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * @param request - Registration data
    */
   const register = useCallback(async (request: RegisterRequest) => {
-    try {
-      await authService.register(request);
-      // Note: Register does NOT automatically log in the user
-      // User must login after registration
-    } catch (error) {
-      throw error; // Re-throw for component to handle
-    }
+    await authService.register(request);
+    // Note: Register does NOT automatically log in the user
+    // User must login after registration
   }, []);
 
   /**
