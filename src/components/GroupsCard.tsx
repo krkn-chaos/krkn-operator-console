@@ -161,15 +161,15 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
     }
   };
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = async () => {
     setIsCreateModalOpen(false);
-    loadGroups();
+    await loadGroups(); // Wait for refresh to complete
     onGroupsChange?.();
   };
 
-  const handleEditSuccess = () => {
+  const handleEditSuccess = async () => {
     setEditingGroupName(null);
-    loadGroups();
+    await loadGroups(); // Wait for refresh to complete
     onGroupsChange?.();
   };
 
