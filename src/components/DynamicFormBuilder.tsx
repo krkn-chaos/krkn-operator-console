@@ -12,7 +12,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
-import type { ScenarioField, ScenarioFormValues } from '../types/api';
+import type { ScenarioField, ScenarioFormValues, StringField, EnumField } from '../types/api';
 
 interface DynamicFormBuilderProps {
   fields: ScenarioField[];

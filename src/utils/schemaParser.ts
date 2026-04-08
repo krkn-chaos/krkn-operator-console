@@ -1,4 +1,4 @@
-import type { ScenarioField, FieldType } from '../types/api';
+import type { ScenarioField, FieldType, StringField, EnumField } from '../types/api';
 import type { JsonSchema, JsonSchemaProperty, CustomSchemaField } from '../types/provider';
 
 /**
