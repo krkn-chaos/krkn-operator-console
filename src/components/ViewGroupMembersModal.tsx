@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -101,31 +101,31 @@ export function ViewGroupMembersModal({
   const { showSuccess, showError } = useNotifications();
 
   /**
-   * Fetch group members from API
-   */
-  const loadMembers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await groupsApi.listGroupMembers(groupName);
-      setMembers(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load members';
-      setError(errorMessage);
-      showError('Failed to load group members', errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [groupName, showError]);
-
-  /**
    * Load group members when modal opens
    */
   useEffect(() => {
-    if (isOpen) {
-      loadMembers();
+    if (!isOpen) {
+      return;
     }
-  }, [isOpen, loadMembers]);
+
+    const loadMembers = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await groupsApi.listGroupMembers(groupName);
+        setMembers(data);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load members';
+        setError(errorMessage);
+        showError('Failed to load group members', errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, groupName]); // Reload when modal opens or group changes
 
   /**
    * Handle remove member button click - shows confirmation
