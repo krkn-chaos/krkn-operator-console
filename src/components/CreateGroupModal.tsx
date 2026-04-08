@@ -45,11 +45,8 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
-  EmptyState,
-  EmptyStateBody,
-  EmptyStateIcon,
   Spinner,
-  Title,
+  Alert,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
@@ -256,54 +253,15 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     performSubmit();
   };
 
-  const renderContent = () => {
-    if (loadingTargets) {
-      return (
-        <EmptyState>
-          <EmptyStateIcon icon={Spinner} />
-          <Title headingLevel="h2" size="lg">
-            Loading Clusters...
-          </Title>
-          <EmptyStateBody>
-            Fetching available target clusters
-          </EmptyStateBody>
-        </EmptyState>
-      );
-    }
-
-    if (targetsError) {
-      return (
-        <EmptyState>
-          <EmptyStateIcon icon={ExclamationCircleIcon} color="var(--pf-v5-global--danger-color--100)" />
-          <Title headingLevel="h2" size="lg">
-            Failed to Load Clusters
-          </Title>
-          <EmptyStateBody>
-            {targetsError}
-          </EmptyStateBody>
-          <Button variant="primary" onClick={retryDiscovery}>
-            Retry
-          </Button>
-        </EmptyState>
-      );
-    }
-
-    if (targets.length === 0) {
-      return (
-        <EmptyState>
-          <EmptyStateIcon icon={ExclamationCircleIcon} />
-          <Title headingLevel="h2" size="lg">
-            No Clusters Available
-          </Title>
-          <EmptyStateBody>
-            No target clusters found. Please configure target clusters before creating groups.
-          </EmptyStateBody>
-        </EmptyState>
-      );
-    }
-
-    return (
-      <Form>
+  return (
+    <>
+      <Modal
+        variant={ModalVariant.large}
+        title="Create New Group"
+        isOpen={isOpen}
+        onClose={onClose}
+      >
+        <Form>
         <FormGroup label="Group Name" isRequired fieldId="group-name">
           <TextInput
             id="group-name"
@@ -342,13 +300,31 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           isRequired
           fieldId="cluster-permissions"
         >
-          <ClusterPermissionsTable
-            targets={targets}
-            clusterPermissions={clusterPermissions}
-            onChange={setClusterPermissions}
-            showOrphanedWarning={false}
-            showBulkActions={false}
-          />
+          {loadingTargets ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <Spinner size="lg" />
+              <div style={{ marginTop: '1rem' }}>Discovering clusters...</div>
+            </div>
+          ) : targetsError ? (
+            <Alert variant="danger" title="Failed to Load Clusters" isInline>
+              {targetsError}
+              <Button variant="link" onClick={retryDiscovery} style={{ marginLeft: '1rem' }}>
+                Retry
+              </Button>
+            </Alert>
+          ) : targets.length === 0 ? (
+            <Alert variant="warning" title="No Clusters Available" isInline>
+              No target clusters found. Please configure target clusters before creating groups.
+            </Alert>
+          ) : (
+            <ClusterPermissionsTable
+              targets={targets}
+              clusterPermissions={clusterPermissions}
+              onChange={setClusterPermissions}
+              showOrphanedWarning={false}
+              showBulkActions={false}
+            />
+          )}
           {errors.clusters && (
             <FormHelperText>
               <HelperText>
@@ -386,18 +362,6 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           </Button>
         </ActionGroup>
       </Form>
-    );
-  };
-
-  return (
-    <>
-      <Modal
-        variant={ModalVariant.large}
-        title="Create New Group"
-        isOpen={isOpen}
-        onClose={onClose}
-      >
-        {renderContent()}
       </Modal>
 
       {/* Warning Modal for duplicate clusters */}
