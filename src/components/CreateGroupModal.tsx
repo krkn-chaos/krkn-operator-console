@@ -107,11 +107,15 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     if (isOpen) {
       startDiscovery();
     } else {
-      // Reset form when modal closes
+      // Reset form and warning modals when modal closes
       setName('');
       setDescription('');
       setClusterPermissions({});
       setErrors({});
+      setShowDuplicateWarning(false);
+      setDuplicateClusters([]);
+      setShowRunWithoutViewWarning(false);
+      setMissingViewPermissions([]);
       resetDiscovery();
     }
   }, [isOpen, startDiscovery, resetDiscovery]);

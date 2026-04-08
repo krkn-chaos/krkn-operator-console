@@ -141,7 +141,7 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
       let attempt = 0;
       pollStartTimeRef.current = Date.now();
 
-      const poll = async () => {
+      const poll = async (): Promise<boolean> => {
         attempt++;
 
         // Check timeout
@@ -153,7 +153,7 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
           setIsPolling(false);
           setIsLoading(false);
           setError('Discovery timeout - please try again');
-          return;
+          return false; // Terminal state - stop polling
         }
 
         try {
@@ -181,6 +181,7 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
               setIsPolling(false);
               setIsLoading(false);
             }
+            return false; // Terminal state - stop polling
           } else if (status === 202) {
             // Still pending - continue polling
             if (config.debugMode) {
@@ -188,16 +189,19 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
                 `[useClusterDiscovery] Poll attempt ${attempt}: status 202 (pending)`
               );
             }
+            return true; // Continue polling
           } else if (status === 404) {
             cleanup();
             setError('Discovery request not found');
             setIsPolling(false);
             setIsLoading(false);
+            return false; // Terminal state - stop polling
           } else {
             cleanup();
             setError(`Unexpected status: ${status}`);
             setIsPolling(false);
             setIsLoading(false);
+            return false; // Terminal state - stop polling
           }
         } catch (err) {
           cleanup();
@@ -206,12 +210,17 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
           setError(errorMessage);
           setIsPolling(false);
           setIsLoading(false);
+          return false; // Terminal state - stop polling
         }
       };
 
       // Start polling immediately
-      await poll();
-      pollIntervalRef.current = window.setInterval(poll, config.pollInterval);
+      const shouldContinue = await poll();
+
+      // Only schedule interval if first poll returned 202 (pending)
+      if (shouldContinue) {
+        pollIntervalRef.current = window.setInterval(poll, config.pollInterval);
+      }
     },
     [cleanup, transformClusters]
   );

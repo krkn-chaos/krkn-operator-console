@@ -118,13 +118,17 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
   // Fetch group data and start cluster discovery when modal opens
   useEffect(() => {
     if (!isOpen) {
-      // Reset state when modal closes
+      // Reset state and warning modals when modal closes
       setDescription('');
       setClusterPermissions({});
       setGroupData(null);
       setError('');
       setValidationError('');
       setSuccessMessage('');
+      setShowDuplicateWarning(false);
+      setDuplicateClusters([]);
+      setShowRunWithoutViewWarning(false);
+      setMissingViewPermissions([]);
       resetDiscovery();
       lastLoadedRef.current = ''; // Reset tracking
       return;

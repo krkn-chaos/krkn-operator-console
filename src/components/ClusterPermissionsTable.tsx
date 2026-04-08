@@ -273,7 +273,7 @@ export function ClusterPermissionsTable({
           </div>
           <DataList aria-label={`${operatorName} clusters`} isCompact>
             {operatorTargets.map((target) => (
-              <DataListItem key={target.clusterAPIURL}>
+              <DataListItem key={`${target.operatorSource || 'unknown'}-${target.clusterAPIURL}`}>
                 <DataListItemRow>
                   <DataListItemCells
                     dataListCells={[
@@ -341,7 +341,7 @@ export function ClusterPermissionsTable({
       {targetsWithoutSource.length > 0 && (
         <DataList aria-label="Cluster permissions list" isCompact>
           {targetsWithoutSource.map((target) => (
-            <DataListItem key={target.clusterAPIURL}>
+            <DataListItem key={`no-source-${target.clusterAPIURL}`}>
               <DataListItemRow>
                 <DataListItemCells
                   dataListCells={[
