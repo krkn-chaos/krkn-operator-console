@@ -106,7 +106,8 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
             clusterName: cluster['cluster-name'],
             clusterAPIURL: cluster['cluster-api-url'],
             ready: true,
-            // Optional fields - not used by ClusterPermissionsTable
+            operatorSource: operatorName, // Source operator for grouping
+            // Optional fields
             secretType: 'kubeconfig',
             createdAt: new Date().toISOString(),
           });
