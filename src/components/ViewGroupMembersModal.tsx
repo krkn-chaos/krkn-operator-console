@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -101,18 +101,9 @@ export function ViewGroupMembersModal({
   const { showSuccess, showError } = useNotifications();
 
   /**
-   * Load group members when modal opens
-   */
-  useEffect(() => {
-    if (isOpen) {
-      loadMembers();
-    }
-  }, [isOpen, groupName]);
-
-  /**
    * Fetch group members from API
    */
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -125,7 +116,16 @@ export function ViewGroupMembersModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [groupName, showError]);
+
+  /**
+   * Load group members when modal opens
+   */
+  useEffect(() => {
+    if (isOpen) {
+      loadMembers();
+    }
+  }, [isOpen, loadMembers]);
 
   /**
    * Handle remove member button click - shows confirmation

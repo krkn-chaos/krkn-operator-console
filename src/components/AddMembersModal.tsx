@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -130,23 +130,9 @@ export function AddMembersModal({
   const { showSuccess, showError } = useNotifications();
 
   /**
-   * Load all users and filter out current members
-   */
-  useEffect(() => {
-    if (isOpen) {
-      loadUsers();
-    } else {
-      // Reset state when modal closes
-      setSelectedUserIds(new Set());
-      setProgress(null);
-      setError(null);
-    }
-  }, [isOpen, currentMembers]);
-
-  /**
    * Fetch all users and filter out current members
    */
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -164,7 +150,21 @@ export function AddMembersModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentMembers, showError]);
+
+  /**
+   * Load all users and filter out current members when modal opens
+   */
+  useEffect(() => {
+    if (isOpen) {
+      loadUsers();
+    } else {
+      // Reset state when modal closes
+      setSelectedUserIds(new Set());
+      setProgress(null);
+      setError(null);
+    }
+  }, [isOpen, loadUsers]);
 
   /**
    * Toggle user selection

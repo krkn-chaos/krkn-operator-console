@@ -79,7 +79,7 @@ export function Login() {
       console.log('[Login useEffect] Redirecting to:', returnUrl);
       navigate(returnUrl);
     }
-  }, [state.isAuthenticated, state.loading, navigate, searchParams]);
+  }, [state.isAuthenticated, state.loading, state.user, navigate, searchParams]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

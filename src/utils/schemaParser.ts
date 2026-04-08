@@ -62,8 +62,9 @@ function flattenJsonSchemaProperties(
 
     // Add validator for string fields with pattern
     if (prop.type === 'string' && prop.pattern) {
-      (field as any).validator = prop.pattern;
-      (field as any).validation_message = `Must match pattern: ${prop.pattern}`;
+      const stringField = field as StringField;
+      stringField.validator = prop.pattern;
+      stringField.validation_message = `Must match pattern: ${prop.pattern}`;
     }
 
     fields.push(field);
@@ -180,8 +181,9 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
       // Add enum-specific fields
       if (fieldType === 'enum') {
         if (customField.separator && customField.allowed_values) {
-          (scenarioField as any).separator = customField.separator;
-          (scenarioField as any).allowed_values = customField.allowed_values;
+          const enumField = scenarioField as EnumField;
+          enumField.separator = customField.separator;
+          enumField.allowed_values = customField.allowed_values;
           console.log(`  → Enum field configured with separator="${customField.separator}", allowed_values="${customField.allowed_values}"`);
         } else {
           console.error(`  → ERROR: Enum field missing separator or allowed_values!`, {

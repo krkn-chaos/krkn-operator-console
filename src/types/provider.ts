@@ -31,7 +31,7 @@ export interface CreateProviderConfigResponse {
 export interface JsonSchemaProperty {
   type: 'string' | 'number' | 'boolean' | 'object';
   description?: string;
-  default?: any;
+  default?: string | number | boolean | Record<string, unknown>;
   pattern?: string;
   properties?: { [key: string]: JsonSchemaProperty };
 }
