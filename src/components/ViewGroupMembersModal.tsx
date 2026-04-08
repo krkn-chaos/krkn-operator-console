@@ -101,29 +101,30 @@ export function ViewGroupMembersModal({
   const { showSuccess, showError } = useNotifications();
 
   /**
+   * Fetch group members from API
+   */
+  const loadMembers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await groupsApi.listGroupMembers(groupName);
+      setMembers(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load members';
+      setError(errorMessage);
+      showError('Failed to load group members', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Load group members when modal opens
    */
   useEffect(() => {
-    if (!isOpen) {
-      return;
+    if (isOpen) {
+      loadMembers();
     }
-
-    const loadMembers = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await groupsApi.listGroupMembers(groupName);
-        setMembers(data);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load members';
-        setError(errorMessage);
-        showError('Failed to load group members', errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadMembers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, groupName]); // Reload when modal opens or group changes
 
