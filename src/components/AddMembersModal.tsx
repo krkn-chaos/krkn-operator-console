@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -130,41 +130,40 @@ export function AddMembersModal({
   const { showSuccess, showError } = useNotifications();
 
   /**
-   * Fetch all users and filter out current members
-   */
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const users = await usersApi.listUsers();
-      setAllUsers(users);
-
-      // Filter out users who are already members
-      const currentMemberIds = new Set(currentMembers.map((m) => m.userId));
-      const available = users.filter((user) => !currentMemberIds.has(user.userId));
-      setAvailableUsers(available);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load users';
-      setError(errorMessage);
-      showError('Failed to load users', errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentMembers, showError]);
-
-  /**
-   * Load all users and filter out current members when modal opens
+   * Load all users when modal opens
    */
   useEffect(() => {
-    if (isOpen) {
-      loadUsers();
-    } else {
+    if (!isOpen) {
       // Reset state when modal closes
       setSelectedUserIds(new Set());
       setProgress(null);
       setError(null);
+      return;
     }
-  }, [isOpen, loadUsers]);
+
+    const loadUsers = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const users = await usersApi.listUsers();
+        setAllUsers(users);
+
+        // Filter out users who are already members
+        const currentMemberIds = new Set(currentMembers.map((m) => m.userId));
+        const available = users.filter((user) => !currentMemberIds.has(user.userId));
+        setAvailableUsers(available);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load users';
+        setError(errorMessage);
+        showError('Failed to load users', errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, currentMembers]); // Reload when currentMembers change or modal opens
 
   /**
    * Toggle user selection
