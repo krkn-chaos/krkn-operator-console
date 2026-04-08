@@ -83,6 +83,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   // Cluster discovery hook
   const {
     clusters: discoveredClusters,
+    discoveryUuid,
     isLoading: loadingTargets,
     error: targetsError,
     startDiscovery,
@@ -220,6 +221,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
         name: name.trim(),
         description: description.trim() || undefined,
         clusterPermissions,
+        discoveryUuid: discoveryUuid || undefined, // Pass UUID for backend cleanup
       });
 
       showSuccess('Group created', `Group "${name}" was created successfully`);

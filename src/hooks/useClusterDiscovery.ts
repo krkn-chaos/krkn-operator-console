@@ -42,6 +42,9 @@ interface UseClusterDiscoveryResult {
   /** Discovered clusters in TargetResponse[] format (compatible with ClusterPermissionsTable) */
   clusters: TargetResponse[] | null;
 
+  /** UUID of the discovery request (for cleanup after group creation/update) */
+  discoveryUuid: string | null;
+
   /** True during initial request and polling */
   isLoading: boolean;
 
@@ -69,6 +72,7 @@ interface UseClusterDiscoveryResult {
  */
 export function useClusterDiscovery(): UseClusterDiscoveryResult {
   const [clusters, setClusters] = useState<TargetResponse[] | null>(null);
+  const [discoveryUuid, setDiscoveryUuid] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,6 +234,8 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
         console.log('[useClusterDiscovery] Created target request:', response.uuid);
       }
 
+      // Store UUID for later cleanup
+      setDiscoveryUuid(response.uuid);
       setIsPolling(true);
 
       // Step 2: Poll until ready, then fetch clusters
@@ -254,6 +260,7 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
   const reset = useCallback(() => {
     cleanup();
     setClusters(null);
+    setDiscoveryUuid(null);
     setIsLoading(false);
     setIsPolling(false);
     setError(null);
@@ -270,6 +277,7 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
 
   return {
     clusters,
+    discoveryUuid,
     isLoading,
     isPolling,
     error,

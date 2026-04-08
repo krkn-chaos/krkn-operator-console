@@ -503,11 +503,13 @@ export interface CreateGroupRequest {
   name: string;
   description?: string;
   clusterPermissions: ClusterPermissions;
+  discoveryUuid?: string; // UUID of cluster discovery request for cleanup
 }
 
 export interface UpdateGroupRequest {
   description?: string;
   clusterPermissions?: ClusterPermissions;
+  discoveryUuid?: string; // UUID of cluster discovery request for cleanup
 }
 
 export interface ListGroupsResponse {

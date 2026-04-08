@@ -101,6 +101,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
   // Cluster discovery hook
   const {
     clusters: discoveredClusters,
+    discoveryUuid,
     isLoading: loadingClusters,
     error: clustersError,
     startDiscovery,
@@ -251,6 +252,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
       await groupsApi.updateGroup(groupName, {
         description: description.trim() || undefined,
         clusterPermissions,
+        discoveryUuid: discoveryUuid || undefined, // Pass UUID for backend cleanup
       });
 
       setSuccessMessage('Group updated successfully');
