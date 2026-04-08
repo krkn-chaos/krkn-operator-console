@@ -47,6 +47,7 @@ export interface TargetResponse {
   secretType: string;
   ready: boolean;
   createdAt?: string;
+  operatorSource?: string; // Source operator (krkn-operator, krkn-operator-acm, etc.) - only for discovered clusters
 }
 
 export interface ListTargetsResponse {

@@ -88,6 +88,8 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
   const [successMessage, setSuccessMessage] = useState('');
   const [showRunWithoutViewWarning, setShowRunWithoutViewWarning] = useState(false);
   const [missingViewPermissions, setMissingViewPermissions] = useState<string[]>([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateClusters, setDuplicateClusters] = useState<string[]>([]);
 
   // Form state
   const [description, setDescription] = useState('');
@@ -187,10 +189,45 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     };
   };
 
+  const checkDuplicateClusters = (): { hasDuplicates: boolean; duplicates: string[] } => {
+    const duplicates: string[] = [];
+    const selectedUrls = Object.keys(clusterPermissions).filter(
+      (url) => clusterPermissions[url].actions.length > 0
+    );
+
+    // Check if the same API URL is selected more than once (from different sources)
+    selectedUrls.forEach((url) => {
+      // Find all clusters with this URL
+      const clustersWithUrl = targets.filter((t) => t.clusterAPIURL === url);
+
+      if (clustersWithUrl.length > 1) {
+        // Same cluster from multiple sources
+        const clusterNames = clustersWithUrl
+          .map((c) => `${c.clusterName} (${c.operatorSource || 'unknown'})`)
+          .join(', ');
+
+        duplicates.push(`${url}: ${clusterNames}`);
+      }
+    });
+
+    return {
+      hasDuplicates: duplicates.length > 0,
+      duplicates
+    };
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!validateForm()) {
+      return;
+    }
+
+    // Check for duplicate clusters (same API URL from different sources)
+    const { hasDuplicates, duplicates } = checkDuplicateClusters();
+    if (hasDuplicates) {
+      setDuplicateClusters(duplicates);
+      setShowDuplicateWarning(true);
       return;
     }
 
@@ -228,6 +265,20 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleConfirmDuplicates = async () => {
+    setShowDuplicateWarning(false);
+
+    // Check for "run" or "cancel" without "view" warning after duplicates confirmed
+    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView();
+    if (hasIssue) {
+      setMissingViewPermissions(missingPermissions);
+      setShowRunWithoutViewWarning(true);
+      return;
+    }
+
+    await performSubmit();
   };
 
   const handleConfirmRunWithoutView = () => {
@@ -366,6 +417,43 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
             </ActionGroup>
           </Form>
         )}
+      </Modal>
+
+      {/* Warning Modal for duplicate clusters */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Duplicate Clusters Detected"
+        isOpen={showDuplicateWarning}
+        onClose={() => setShowDuplicateWarning(false)}
+        actions={[
+          <Button
+            key="confirm"
+            variant="warning"
+            onClick={handleConfirmDuplicates}
+          >
+            Continue Anyway
+          </Button>,
+          <Button
+            key="cancel"
+            variant="link"
+            onClick={() => setShowDuplicateWarning(false)}
+          >
+            Go Back
+          </Button>,
+        ]}
+      >
+        <p>The following clusters have been selected multiple times from different operators:</p>
+        <ul style={{ marginTop: '1rem', marginLeft: '1.5rem' }}>
+          {duplicateClusters.map((duplicate, index) => (
+            <li key={index} style={{ marginBottom: '0.5rem' }}>
+              <strong>{duplicate}</strong>
+            </li>
+          ))}
+        </ul>
+        <p style={{ marginTop: '1rem' }}>
+          This means the same cluster will receive permissions from multiple operator sources.
+          Are you sure you want to continue?
+        </p>
       </Modal>
 
       {/* Warning Modal for "run" or "cancel" without "view" */}
