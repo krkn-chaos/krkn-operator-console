@@ -328,13 +328,20 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
               isRequired
               fieldId="edit-group-permissions"
             >
-              <ClusterPermissionsTable
-                targets={targets}
-                clusterPermissions={clusterPermissions}
-                onChange={setClusterPermissions}
-                showOrphanedWarning
-                showBulkActions={false}
-              />
+              {loadingClusters ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Spinner size="lg" />
+                  <div style={{ marginTop: '1rem' }}>Discovering clusters...</div>
+                </div>
+              ) : (
+                <ClusterPermissionsTable
+                  targets={targets}
+                  clusterPermissions={clusterPermissions}
+                  onChange={setClusterPermissions}
+                  showOrphanedWarning
+                  showBulkActions={false}
+                />
+              )}
               <FormHelperText>
                 <HelperText>
                   <HelperTextItem icon={<ExclamationCircleIcon />}>

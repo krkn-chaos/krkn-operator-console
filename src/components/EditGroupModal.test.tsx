@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EditGroupModal } from './EditGroupModal';
 import { groupsApi } from '../services/groupsApi';
 import { operatorApi } from '../services/operatorApi';
-import type { GroupDetails, TargetResponse, ClustersResponse } from '../types/api';
+import type { GroupDetails, ClustersResponse } from '../types/api';
 
 // Mock the API modules
 vi.mock('../services/groupsApi');
