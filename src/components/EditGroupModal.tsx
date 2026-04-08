@@ -36,8 +36,8 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
-import { targetsApi } from '../services/targetsApi';
-import type { GroupDetails, ClusterPermissions, TargetResponse } from '../types/api';
+import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
+import type { GroupDetails, ClusterPermissions } from '../types/api';
 import { ClusterPermissionsTable } from './ClusterPermissionsTable';
 
 interface EditGroupModalProps {
@@ -95,19 +95,31 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
 
   // Data fetching state
   const [groupData, setGroupData] = useState<GroupDetails | null>(null);
-  const [targets, setTargets] = useState<TargetResponse[]>([]);
 
-  // Fetch group data and targets when modal opens
+  // Cluster discovery hook
+  const {
+    clusters: discoveredClusters,
+    isLoading: loadingClusters,
+    error: clustersError,
+    startDiscovery,
+    retry: retryDiscovery,
+    reset: resetDiscovery,
+  } = useClusterDiscovery();
+
+  // Transform to array for compatibility with ClusterPermissionsTable
+  const targets = discoveredClusters || [];
+
+  // Fetch group data and start cluster discovery when modal opens
   useEffect(() => {
     if (!isOpen) {
       // Reset state when modal closes
       setDescription('');
       setClusterPermissions({});
       setGroupData(null);
-      setTargets([]);
       setError('');
       setValidationError('');
       setSuccessMessage('');
+      resetDiscovery();
       return;
     }
 
@@ -116,16 +128,15 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
       setError('');
 
       try {
-        // Fetch group data and targets in parallel
-        const [group, targetsData] = await Promise.all([
-          groupsApi.getGroup(groupName),
-          targetsApi.listTargets(),
-        ]);
+        // Fetch group data and start cluster discovery in parallel
+        const groupPromise = groupsApi.getGroup(groupName);
+        const discoveryPromise = startDiscovery();
+
+        const [group] = await Promise.all([groupPromise, discoveryPromise]);
 
         setGroupData(group);
         setDescription(group.description || '');
         setClusterPermissions(group.clusterPermissions || {});
-        setTargets(targetsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load group data');
       } finally {
@@ -134,7 +145,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     };
 
     fetchData();
-  }, [isOpen, groupName]);
+  }, [isOpen, groupName, startDiscovery, resetDiscovery]);
 
   const validateForm = (): boolean => {
     // Check if at least one cluster has at least one action
@@ -228,6 +239,10 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     onClose();
   };
 
+  // Combined loading state
+  const isFullyLoading = isLoading || loadingClusters;
+  const combinedError = error || clustersError;
+
   return (
     <>
       <Modal
@@ -236,20 +251,35 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
         isOpen={isOpen}
         onClose={handleCancel}
       >
-        {isLoading ? (
+        {isFullyLoading && !groupData ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <Spinner size="xl" />
-            <div style={{ marginTop: '1rem' }}>Loading group data...</div>
+            <div style={{ marginTop: '1rem' }}>
+              {isLoading && loadingClusters
+                ? 'Loading group and discovering clusters...'
+                : isLoading
+                ? 'Loading group data...'
+                : 'Discovering clusters...'}
+            </div>
           </div>
-        ) : error && !groupData ? (
-          <Alert variant="danger" title="Failed to Load Group" isInline>
-            {error}
+        ) : combinedError && !groupData ? (
+          <Alert variant="danger" title="Failed to Load" isInline>
+            {combinedError}
           </Alert>
         ) : (
           <Form onSubmit={handleSubmit}>
             {error && !successMessage && (
               <Alert variant="danger" title="Update Failed" isInline style={{ marginBottom: '1rem' }}>
                 {error}
+              </Alert>
+            )}
+
+            {clustersError && (
+              <Alert variant="warning" title="Cluster Discovery Failed" isInline style={{ marginBottom: '1rem' }}>
+                {clustersError}
+                <Button variant="link" onClick={retryDiscovery} style={{ marginLeft: '1rem' }}>
+                  Retry Discovery
+                </Button>
               </Alert>
             )}
 

@@ -53,10 +53,10 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
-import { targetsApi } from '../services/targetsApi';
 import { useNotifications } from '../hooks/useNotifications';
+import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { ClusterPermissionsTable } from './ClusterPermissionsTable';
-import type { TargetResponse, ClusterPermissions } from '../types/api';
+import type { ClusterPermissions } from '../types/api';
 
 interface CreateGroupModalProps {
   /**
@@ -81,10 +81,20 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   const [description, setDescription] = useState('');
 
   // Cluster data
-  const [targets, setTargets] = useState<TargetResponse[]>([]);
   const [clusterPermissions, setClusterPermissions] = useState<ClusterPermissions>({});
-  const [loadingTargets, setLoadingTargets] = useState(false);
-  const [targetsError, setTargetsError] = useState<string | null>(null);
+
+  // Cluster discovery hook
+  const {
+    clusters: discoveredClusters,
+    isLoading: loadingTargets,
+    error: targetsError,
+    startDiscovery,
+    retry: retryDiscovery,
+    reset: resetDiscovery,
+  } = useClusterDiscovery();
+
+  // Transform to array for compatibility with ClusterPermissionsTable
+  const targets = discoveredClusters || [];
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -92,36 +102,19 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
   const [showRunWithoutViewWarning, setShowRunWithoutViewWarning] = useState(false);
   const [missingViewPermissions, setMissingViewPermissions] = useState<string[]>([]);
 
-  // Fetch targets when modal opens
+  // Start cluster discovery when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchTargets();
+      startDiscovery();
     } else {
       // Reset form when modal closes
       setName('');
       setDescription('');
       setClusterPermissions({});
       setErrors({});
-      setTargets([]);
-      setTargetsError(null);
+      resetDiscovery();
     }
-  }, [isOpen]);
-
-  const fetchTargets = async () => {
-    setLoadingTargets(true);
-    setTargetsError(null);
-
-    try {
-      const data = await targetsApi.listTargets();
-      setTargets(data);
-      setClusterPermissions({});
-    } catch (error) {
-      console.error('Failed to fetch targets:', error);
-      setTargetsError(error instanceof Error ? error.message : 'Failed to load clusters');
-    } finally {
-      setLoadingTargets(false);
-    }
-  };
+  }, [isOpen, startDiscovery, resetDiscovery]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -237,7 +230,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           <EmptyStateBody>
             {targetsError}
           </EmptyStateBody>
-          <Button variant="primary" onClick={fetchTargets}>
+          <Button variant="primary" onClick={retryDiscovery}>
             Retry
           </Button>
         </EmptyState>
