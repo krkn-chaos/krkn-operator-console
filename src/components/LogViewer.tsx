@@ -42,7 +42,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
   const reconnectAttemptsRef = useRef<number>(0);
   const isCleanedUpRef = useRef<boolean>(false);
   const isFirstMessageRef = useRef<boolean>(true);
-  const userScrolledRef = useRef<boolean>(false); // Track if user manually scrolled
 
   const maxReconnectAttempts = 3; // Ridotto per fallire prima e provare HTTP
 
@@ -83,36 +82,14 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
   // Auto-scroll to bottom when new logs arrive (only if following)
   useEffect(() => {
-    if (isFollowing && !userScrolledRef.current) {
+    if (isFollowing) {
       logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs, isFollowing]);
 
-  // Handle manual scroll - disable follow if user scrolls up
-  const handleScroll = () => {
-    if (!logsContainerRef.current) return;
-
-    const container = logsContainerRef.current;
-    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50; // 50px threshold
-
-    // If user scrolled up, disable follow
-    if (!isAtBottom && isFollowing) {
-      userScrolledRef.current = true;
-      setIsFollowing(false);
-    }
-
-    // If user scrolled to bottom, could auto-enable follow (optional)
-    // Uncomment if you want this behavior:
-    // if (isAtBottom && !isFollowing) {
-    //   setIsFollowing(true);
-    //   userScrolledRef.current = false;
-    // }
-  };
-
-  // Reset userScrolledRef when follow is manually toggled on
+  // Handle follow toggle
   const handleFollowToggle = (checked: boolean) => {
     setIsFollowing(checked);
-    userScrolledRef.current = !checked;
 
     // If enabling follow, scroll to bottom immediately
     if (checked) {
@@ -362,7 +339,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         <CardBody>
           <div
             ref={logsContainerRef}
-            onScroll={handleScroll}
             style={{
               backgroundColor: '#000000',
               color: '#ffffff',
