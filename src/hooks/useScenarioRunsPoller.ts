@@ -13,41 +13,34 @@ export function useScenarioRunsPoller() {
   const { state, dispatch } = useAppContext();
 
   useEffect(() => {
-    // Filter only active scenario runs, excluding those with paused polling (accordion open)
-    const activeRuns = state.scenarioRuns.filter(
-      (run) => !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) &&
-      !state.pausedPollingRunIds.has(run.scenarioRunName)
-    );
-
-    console.log('All scenario runs:', state.scenarioRuns);
-    console.log('Paused polling runs:', Array.from(state.pausedPollingRunIds));
-    console.log('Active runs to poll:', activeRuns);
-
-    if (activeRuns.length === 0) {
-      console.log('No active runs to poll');
-      return;
-    }
-
-    console.log(`Polling ${activeRuns.length} active scenario runs (${state.pausedPollingRunIds.size} paused)...`);
+    console.log('[useScenarioRunsPoller] Starting polling interval');
 
     const intervalId = setInterval(async () => {
+      // Filter active runs dynamically inside the interval (not in deps)
+      const activeRuns = state.scenarioRuns.filter(
+        (run) => !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) &&
+        !state.pausedPollingRunIds.has(run.scenarioRunName)
+      );
+
+      if (activeRuns.length === 0) {
+        return;
+      }
+
       for (const run of activeRuns) {
         try {
-          console.log(`Polling scenario run: ${run.scenarioRunName}`);
           const updated = await operatorApi.getScenarioRunStatus(run.scenarioRunName);
-          console.log(`Received update for ${run.scenarioRunName}:`, updated);
 
           const updatedState: ScenarioRunState = {
             scenarioRunName: updated.scenarioRunName,
-            scenarioName: run.scenarioName, // Keep from original
+            scenarioName: run.scenarioName,
             phase: updated.phase,
             totalTargets: updated.totalTargets,
             successfulJobs: updated.successfulJobs,
             failedJobs: updated.failedJobs,
             runningJobs: updated.runningJobs,
-            clusterJobs: updated.clusterJobs || [], // Fallback
+            clusterJobs: updated.clusterJobs || [],
             createdAt: run.createdAt,
-            ownerUserId: updated.ownerUserId || run.ownerUserId, // Preserve owner from backend or fallback to original
+            ownerUserId: updated.ownerUserId || run.ownerUserId,
           };
 
           // Only update if there are changes
@@ -61,13 +54,14 @@ export function useScenarioRunsPoller() {
           console.error(`Failed to poll scenario run ${run.scenarioRunName}:`, error);
         }
       }
-    }, 5000); // Poll every 5 seconds (per spec)
+    }, 5000); // Poll every 5 seconds
 
     return () => {
-      console.log('Stopping scenario run polling');
+      console.log('[useScenarioRunsPoller] Stopping polling interval');
       clearInterval(intervalId);
     };
-  }, [state.scenarioRuns, state.pausedPollingRunIds, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch]);
 
   // Handle manual refresh trigger
   useEffect(() => {
