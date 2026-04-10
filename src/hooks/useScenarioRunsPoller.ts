@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioRunState } from '../types/api';
@@ -12,14 +12,20 @@ import type { ScenarioRunState } from '../types/api';
 export function useScenarioRunsPoller() {
   const { state, dispatch } = useAppContext();
 
+  // Use refs to always access fresh state values inside interval closure
+  const scenarioRunsRef = useRef(state.scenarioRuns);
+  const pausedPollingRunIdsRef = useRef(state.pausedPollingRunIds);
+  scenarioRunsRef.current = state.scenarioRuns;
+  pausedPollingRunIdsRef.current = state.pausedPollingRunIds;
+
   useEffect(() => {
     console.log('[useScenarioRunsPoller] Starting polling interval');
 
     const intervalId = setInterval(async () => {
       // Filter active runs dynamically inside the interval (not in deps)
-      const activeRuns = state.scenarioRuns.filter(
+      const activeRuns = scenarioRunsRef.current.filter(
         (run) => !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) &&
-        !state.pausedPollingRunIds.has(run.scenarioRunName)
+        !pausedPollingRunIdsRef.current.has(run.scenarioRunName)
       );
 
       if (activeRuns.length === 0) {
@@ -60,7 +66,6 @@ export function useScenarioRunsPoller() {
       console.log('[useScenarioRunsPoller] Stopping polling interval');
       clearInterval(intervalId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   // Handle manual refresh trigger
