@@ -27,7 +27,7 @@ import {
   DataListItemCells,
   DataListCell,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications } from '../hooks';
 import { CreateGroupModal } from './CreateGroupModal';
@@ -88,6 +88,7 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [filteredGroups, setFilteredGroups] = useState<GroupDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchValue, setSearchValue] = useState('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGroupName, setEditingGroupName] = useState<string | null>(null);
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<{ name: string } | null>(null);
@@ -113,7 +114,7 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
     loadGroups();
   }, [loadGroups]);
 
-  // Filter and sort groups based on search value
+  // Filter and sort groups based on search value and sort direction
   useEffect(() => {
     let result = groups;
 
@@ -126,11 +127,14 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
       );
     }
 
-    // Sort alphabetically by name (ascending)
-    result = [...result].sort((a, b) => a.name.localeCompare(b.name));
+    // Sort alphabetically by name
+    result = [...result].sort((a, b) => {
+      const compareValue = a.name.localeCompare(b.name);
+      return sortDirection === 'asc' ? compareValue : -compareValue;
+    });
 
     setFilteredGroups(result);
-  }, [groups, searchValue]);
+  }, [groups, searchValue, sortDirection]);
 
   const handleCreate = () => {
     setIsCreateModalOpen(true);
@@ -210,6 +214,15 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
                     onChange={(_event, value) => setSearchValue(value)}
                     onClear={() => setSearchValue('')}
                   />
+                </ToolbarItem>
+                <ToolbarItem>
+                  <Button
+                    variant="plain"
+                    aria-label={`Sort ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+                    onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  >
+                    {sortDirection === 'asc' ? <SortAmountUpIcon /> : <SortAmountDownIcon />}
+                  </Button>
                 </ToolbarItem>
               </ToolbarContent>
             </Toolbar>
