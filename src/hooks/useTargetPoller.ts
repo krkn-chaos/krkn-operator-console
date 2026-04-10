@@ -117,6 +117,7 @@ export function useTargetPoller() {
   // Uses new API - no adapter needed
   // Polls every 10 seconds to detect new runs and refresh the list
   // Also triggers immediate refresh when scenarioRunsRefreshTrigger changes
+  // IMPORTANT: Skips full refresh when accordion is open (pausedPollingRunIds has items)
   useEffect(() => {
     if (state.phase !== 'jobs_list') {
       return;
@@ -125,6 +126,12 @@ export function useTargetPoller() {
     console.log('[useTargetPoller] Scenario runs refresh triggered (trigger:', state.scenarioRunsRefreshTrigger, ')');
 
     async function loadScenarioRuns() {
+      // Skip full list refresh if any accordion is open to prevent log interruptions
+      if (state.pausedPollingRunIds.size > 0) {
+        console.log('[useTargetPoller] Skipping full refresh - accordion open:', Array.from(state.pausedPollingRunIds));
+        return;
+      }
+
       try {
         const scenarioRuns = await operatorApi.listScenarioRuns();
 
@@ -210,7 +217,7 @@ export function useTargetPoller() {
       console.log('[useTargetPoller] Stopping scenario runs list polling');
       clearInterval(intervalId);
     };
-  }, [state.phase, state.scenarioRunsRefreshTrigger, dispatch]);
+  }, [state.phase, state.scenarioRunsRefreshTrigger, state.pausedPollingRunIds, dispatch]);
 
   // NOTE: Polling is now handled by useScenarioRunsPoller (hybrid approach)
   // This hook only handles initial load - ongoing polling is done per scenario run

@@ -13,12 +13,14 @@ export function useScenarioRunsPoller() {
   const { state, dispatch } = useAppContext();
 
   useEffect(() => {
-    // Filter only active scenario runs
+    // Filter only active scenario runs, excluding those with paused polling (accordion open)
     const activeRuns = state.scenarioRuns.filter(
-      (run) => !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
+      (run) => !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) &&
+      !state.pausedPollingRunIds.has(run.scenarioRunName)
     );
 
     console.log('All scenario runs:', state.scenarioRuns);
+    console.log('Paused polling runs:', Array.from(state.pausedPollingRunIds));
     console.log('Active runs to poll:', activeRuns);
 
     if (activeRuns.length === 0) {
@@ -26,7 +28,7 @@ export function useScenarioRunsPoller() {
       return;
     }
 
-    console.log(`Polling ${activeRuns.length} active scenario runs...`);
+    console.log(`Polling ${activeRuns.length} active scenario runs (${state.pausedPollingRunIds.size} paused)...`);
 
     const intervalId = setInterval(async () => {
       for (const run of activeRuns) {
@@ -65,7 +67,67 @@ export function useScenarioRunsPoller() {
       console.log('Stopping scenario run polling');
       clearInterval(intervalId);
     };
-  }, [state.scenarioRuns, dispatch]);
+  }, [state.scenarioRuns, state.pausedPollingRunIds, dispatch]);
+
+  // Handle manual refresh trigger
+  useEffect(() => {
+    // This effect runs when scenarioRunsRefreshTrigger changes
+    // Used for manual refresh of specific paused run
+    if (state.scenarioRunsRefreshTrigger === 0) {
+      return; // Skip initial render
+    }
+
+    // Find the specific run to refresh
+    const runToRefresh = state.scenarioRunToRefresh;
+    if (!runToRefresh) {
+      console.log('No specific run to refresh');
+      return;
+    }
+
+    const run = state.scenarioRuns.find(r => r.scenarioRunName === runToRefresh);
+    if (!run) {
+      console.log(`Run ${runToRefresh} not found`);
+      return;
+    }
+
+    // Only refresh if it's paused and not in terminal state
+    if (!state.pausedPollingRunIds.has(runToRefresh) ||
+        ['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)) {
+      console.log(`Run ${runToRefresh} is not paused or already in terminal state`);
+      return;
+    }
+
+    console.log(`Manual refresh triggered for run: ${runToRefresh}`);
+
+    (async () => {
+      try {
+        const updated = await operatorApi.getScenarioRunStatus(runToRefresh);
+
+        const updatedState: ScenarioRunState = {
+          scenarioRunName: updated.scenarioRunName,
+          scenarioName: run.scenarioName,
+          phase: updated.phase,
+          totalTargets: updated.totalTargets,
+          successfulJobs: updated.successfulJobs,
+          failedJobs: updated.failedJobs,
+          runningJobs: updated.runningJobs,
+          clusterJobs: updated.clusterJobs || [],
+          createdAt: run.createdAt,
+          ownerUserId: updated.ownerUserId || run.ownerUserId,
+        };
+
+        if (hasChanges(run, updatedState)) {
+          dispatch({
+            type: 'UPDATE_SCENARIO_RUN',
+            payload: { run: updatedState },
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to manually refresh scenario run ${runToRefresh}:`, error);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.scenarioRunsRefreshTrigger, dispatch]);
 }
 
 function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {

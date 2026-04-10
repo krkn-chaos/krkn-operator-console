@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardTitle, CardBody, Button, Alert, AlertGroup, AlertActionCloseButton, Flex, FlexItem } from '@patternfly/react-core';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { Card, CardTitle, CardBody, Button, Alert, AlertGroup, AlertActionCloseButton, Flex, FlexItem, Checkbox } from '@patternfly/react-core';
 import { CopyIcon } from '@patternfly/react-icons';
 import Anser from 'anser';
 import { authService } from '../services/authService';
@@ -34,7 +34,8 @@ function getCloseCodeMeaning(code: number): string {
 export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status, compact = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const logsContainerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
@@ -78,10 +79,24 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
     );
   };
 
-  // Scroll to bottom when new logs arrive
-  useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
+  // Auto-scroll to bottom when new logs arrive (only if following)
+  // useLayoutEffect runs synchronously after DOM mutations but before paint
+  useLayoutEffect(() => {
+    if (isFollowing && logsContainerRef.current && logs.length > 0) {
+      // Scroll to bottom immediately after DOM update
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  }, [logs, isFollowing]);
+
+  // Handle follow toggle
+  const handleFollowToggle = (checked: boolean) => {
+    setIsFollowing(checked);
+
+    // If enabling follow, scroll to bottom immediately
+    if (checked && logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  };
 
   // WebSocket connection management
   useEffect(() => {
@@ -298,7 +313,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       </AlertGroup>
       <Card>
         <CardTitle>
-          <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
+          <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
             <FlexItem>
               <b>Scenario Logs</b> - {podName}
             </FlexItem>
@@ -311,6 +326,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         </CardTitle>
         <CardBody>
           <div
+            ref={logsContainerRef}
             style={{
               backgroundColor: '#000000',
               color: '#ffffff',
@@ -325,7 +341,15 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
             }}
           >
             {logs.map((log, index) => renderAnsiLog(log, index))}
-            <div ref={logsEndRef} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+            <Checkbox
+              id={`follow-logs-${jobId}`}
+              label="Follow"
+              isChecked={isFollowing}
+              onChange={(_event, checked) => handleFollowToggle(checked)}
+              description="Auto-scroll to latest logs"
+            />
           </div>
         </CardBody>
       </Card>
