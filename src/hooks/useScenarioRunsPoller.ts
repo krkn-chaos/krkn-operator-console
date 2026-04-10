@@ -72,23 +72,36 @@ export function useScenarioRunsPoller() {
   // Handle manual refresh trigger
   useEffect(() => {
     // This effect runs when scenarioRunsRefreshTrigger changes
-    // Used for manual refresh of paused runs
+    // Used for manual refresh of specific paused run
     if (state.scenarioRunsRefreshTrigger === 0) {
       return; // Skip initial render
     }
 
-    console.log('Manual refresh triggered for paused runs');
+    // Find the specific run to refresh
+    const runToRefresh = state.scenarioRunToRefresh;
+    if (!runToRefresh) {
+      console.log('No specific run to refresh');
+      return;
+    }
 
-    // Refresh all paused runs immediately
-    const pausedRuns = state.scenarioRuns.filter(
-      (run) => state.pausedPollingRunIds.has(run.scenarioRunName) &&
-      !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
-    );
+    const run = state.scenarioRuns.find(r => r.scenarioRunName === runToRefresh);
+    if (!run) {
+      console.log(`Run ${runToRefresh} not found`);
+      return;
+    }
 
-    pausedRuns.forEach(async (run) => {
+    // Only refresh if it's paused and not in terminal state
+    if (!state.pausedPollingRunIds.has(runToRefresh) ||
+        ['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)) {
+      console.log(`Run ${runToRefresh} is not paused or already in terminal state`);
+      return;
+    }
+
+    console.log(`Manual refresh triggered for run: ${runToRefresh}`);
+
+    (async () => {
       try {
-        console.log(`Manual refresh for paused run: ${run.scenarioRunName}`);
-        const updated = await operatorApi.getScenarioRunStatus(run.scenarioRunName);
+        const updated = await operatorApi.getScenarioRunStatus(runToRefresh);
 
         const updatedState: ScenarioRunState = {
           scenarioRunName: updated.scenarioRunName,
@@ -110,9 +123,9 @@ export function useScenarioRunsPoller() {
           });
         }
       } catch (error) {
-        console.error(`Failed to manually refresh scenario run ${run.scenarioRunName}:`, error);
+        console.error(`Failed to manually refresh scenario run ${runToRefresh}:`, error);
       }
-    });
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.scenarioRunsRefreshTrigger, dispatch]);
 }

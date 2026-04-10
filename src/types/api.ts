@@ -368,6 +368,7 @@ export interface AppState {
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: ScenarioRunState[];
   scenarioRunsRefreshTrigger: number; // Increment to force immediate refresh
+  scenarioRunToRefresh: string | null; // Specific run name to refresh (null = refresh all)
   pollingRunNames: Set<string>;
   pausedPollingRunIds: Set<string>; // Runs with polling paused (accordion open)
   expandedRunIds: Set<string>;

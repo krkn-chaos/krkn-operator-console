@@ -12,6 +12,7 @@ const initialState: AppState = {
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: [],
   scenarioRunsRefreshTrigger: 0,
+  scenarioRunToRefresh: null,
   pollingRunNames: new Set<string>(),
   pausedPollingRunIds: new Set<string>(), // Runs with polling paused (accordion open)
   expandedRunIds: new Set<string>(),
@@ -157,6 +158,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         scenarioRunsRefreshTrigger: state.scenarioRunsRefreshTrigger + 1,
+        scenarioRunToRefresh: action.payload.scenarioRunName,
       };
 
     case 'LOAD_SCENARIO_RUNS_SUCCESS': {
