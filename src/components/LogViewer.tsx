@@ -87,13 +87,18 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       // Check if these are real logs (not loading messages)
       const hasRealLogs = logs[0] !== 'Connecting to log stream...' && logs[0] !== 'Waiting for pod to start...';
 
-      // First time seeing real logs - instant scroll
-      if (hasRealLogs && !hasScrolledToBottomRef.current) {
-        hasScrolledToBottomRef.current = true;
-        logsEndRef.current?.scrollIntoView({ behavior: 'instant' });
-      } else if (hasRealLogs) {
-        // Subsequent updates - smooth scroll
-        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (hasRealLogs) {
+        // Use setTimeout to ensure DOM is ready
+        setTimeout(() => {
+          // First time seeing real logs - instant scroll
+          if (!hasScrolledToBottomRef.current) {
+            hasScrolledToBottomRef.current = true;
+            logsEndRef.current?.scrollIntoView({ behavior: 'instant' });
+          } else {
+            // Subsequent updates - smooth scroll
+            logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 0);
       }
     }
   }, [logs, isFollowing]);
