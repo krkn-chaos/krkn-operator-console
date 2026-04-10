@@ -496,21 +496,26 @@ export function JobsList({
                     isHidden={!isRunExpanded}
                   >
                     {/* Show banner when polling is paused for this run */}
-                    {pausedPollingRunIds.has(run.scenarioRunName) && !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) && (
+                    {pausedPollingRunIds.has(run.scenarioRunName) && (
                       <Alert
                         variant="info"
                         isInline
-                        title="Live updates paused"
+                        title={['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
+                          ? "View mode"
+                          : "Live updates paused"}
                         actionLinks={
-                          <AlertActionLink onClick={() => onRefreshScenarioRun(run.scenarioRunName)}>
-                            Refresh now
-                          </AlertActionLink>
+                          !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) && (
+                            <AlertActionLink onClick={() => onRefreshScenarioRun(run.scenarioRunName)}>
+                              Refresh now
+                            </AlertActionLink>
+                          )
                         }
                         style={{ marginBottom: '1rem' }}
                       >
                         <p>
-                          Automatic updates are paused while viewing this run to prevent log interruptions.
-                          Close this view to resume automatic updates, or click "Refresh now" for a manual update.
+                          {['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
+                            ? "This run has completed. Close this view to resume monitoring active runs."
+                            : "Automatic updates are paused while viewing this run to prevent log interruptions. Close this view to resume automatic updates, or click \"Refresh now\" for a manual update."}
                         </p>
                       </Alert>
                     )}
