@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Card, CardTitle, CardBody, Button, Alert, AlertGroup, AlertActionCloseButton, Flex, FlexItem, Checkbox } from '@patternfly/react-core';
 import { CopyIcon } from '@patternfly/react-icons';
 import Anser from 'anser';
@@ -80,9 +80,10 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
   };
 
   // Auto-scroll to bottom when new logs arrive (only if following)
-  useEffect(() => {
+  // useLayoutEffect runs synchronously after DOM mutations but before paint
+  useLayoutEffect(() => {
     if (isFollowing && logsContainerRef.current && logs.length > 0) {
-      // Scroll to bottom immediately
+      // Scroll to bottom immediately after DOM update
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
   }, [logs, isFollowing]);
