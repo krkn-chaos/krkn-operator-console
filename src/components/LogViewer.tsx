@@ -34,7 +34,7 @@ function getCloseCodeMeaning(code: number): string {
 export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status, compact = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(true); // Auto-scroll enabled by default
+  const [isFollowing, setIsFollowing] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
