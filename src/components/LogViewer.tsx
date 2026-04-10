@@ -42,6 +42,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
   const reconnectAttemptsRef = useRef<number>(0);
   const isCleanedUpRef = useRef<boolean>(false);
   const isFirstMessageRef = useRef<boolean>(true);
+  const hasScrolledToBottomRef = useRef<boolean>(false);
 
   const maxReconnectAttempts = 3; // Ridotto per fallire prima e provare HTTP
 
@@ -82,8 +83,18 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
   // Auto-scroll to bottom when new logs arrive (only if following)
   useEffect(() => {
-    if (isFollowing) {
-      logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isFollowing && logs.length > 0) {
+      // Check if these are real logs (not loading messages)
+      const hasRealLogs = logs[0] !== 'Connecting to log stream...' && logs[0] !== 'Waiting for pod to start...';
+
+      // First time seeing real logs - instant scroll
+      if (hasRealLogs && !hasScrolledToBottomRef.current) {
+        hasScrolledToBottomRef.current = true;
+        logsEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      } else if (hasRealLogs) {
+        // Subsequent updates - smooth scroll
+        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   }, [logs, isFollowing]);
 
@@ -317,22 +328,9 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
               <b>Scenario Logs</b> - {podName}
             </FlexItem>
             <FlexItem>
-              <Flex spaceItems={{ default: 'spaceItemsMd' }} alignItems={{ default: 'alignItemsCenter' }}>
-                <FlexItem>
-                  <Checkbox
-                    id={`follow-logs-${jobId}`}
-                    label="Follow"
-                    isChecked={isFollowing}
-                    onChange={(_event, checked) => handleFollowToggle(checked)}
-                    description="Auto-scroll to latest logs"
-                  />
-                </FlexItem>
-                <FlexItem>
-                  <Button variant="secondary" icon={<CopyIcon />} onClick={handleCopyLogs} size="sm">
-                    Copy Logs
-                  </Button>
-                </FlexItem>
-              </Flex>
+              <Button variant="secondary" icon={<CopyIcon />} onClick={handleCopyLogs} size="sm">
+                Copy Logs
+              </Button>
             </FlexItem>
           </Flex>
         </CardTitle>
@@ -354,6 +352,15 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
           >
             {logs.map((log, index) => renderAnsiLog(log, index))}
             <div ref={logsEndRef} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+            <Checkbox
+              id={`follow-logs-${jobId}`}
+              label="Follow"
+              isChecked={isFollowing}
+              onChange={(_event, checked) => handleFollowToggle(checked)}
+              description="Auto-scroll to latest logs"
+            />
           </div>
         </CardBody>
       </Card>
