@@ -113,7 +113,8 @@ export function useScenarioRunsPoller() {
         console.error(`Failed to manually refresh scenario run ${run.scenarioRunName}:`, error);
       }
     });
-  }, [state.scenarioRunsRefreshTrigger, state.scenarioRuns, state.pausedPollingRunIds, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.scenarioRunsRefreshTrigger, dispatch]);
 }
 
 function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
