@@ -28,8 +28,11 @@ import {
   Toolbar,
   ToolbarContent,
   ToolbarItem,
+  Select,
+  SelectOption,
+  SelectList,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, EyeIcon, EllipsisVIcon, KeyIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, EyeIcon, EllipsisVIcon, KeyIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { usersApi } from '../services/usersApi';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications, useRole } from '../hooks';
@@ -107,6 +110,9 @@ export function UsersCard({ groups }: UsersCardProps) {
   const [apiAvailable, setApiAvailable] = useState(true);
   const [changingPasswordFor, setChangingPasswordFor] = useState<UserDetails | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<'name' | 'organization' | 'lastLogin'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [isSortColumnSelectOpen, setIsSortColumnSelectOpen] = useState(false);
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const { state } = useAuth();
@@ -115,22 +121,46 @@ export function UsersCard({ groups }: UsersCardProps) {
     loadUsers();
   }, []);
 
-  // Filter users based on search value
+  // Filter and sort users based on search value and sort settings
   useEffect(() => {
-    if (!searchValue) {
-      setFilteredUsers(users);
-    } else {
+    let result = users;
+
+    // Apply search filter
+    if (searchValue) {
       const searchLower = searchValue.toLowerCase();
-      const filtered = users.filter(
+      result = result.filter(
         (user) =>
           user.userId.toLowerCase().includes(searchLower) ||
           user.name.toLowerCase().includes(searchLower) ||
           user.surname.toLowerCase().includes(searchLower) ||
           (user.organization && user.organization.toLowerCase().includes(searchLower))
       );
-      setFilteredUsers(filtered);
     }
-  }, [users, searchValue]);
+
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let compareValue = 0;
+
+      switch (sortColumn) {
+        case 'name':
+          compareValue = `${a.name} ${a.surname}`.localeCompare(`${b.name} ${b.surname}`);
+          break;
+        case 'organization':
+          compareValue = (a.organization || '').localeCompare(b.organization || '');
+          break;
+        case 'lastLogin': {
+          const dateA = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
+          const dateB = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
+          compareValue = dateA - dateB;
+          break;
+        }
+      }
+
+      return sortDirection === 'asc' ? compareValue : -compareValue;
+    });
+
+    setFilteredUsers(result);
+  }, [users, searchValue, sortColumn, sortDirection]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -330,6 +360,40 @@ export function UsersCard({ groups }: UsersCardProps) {
                     onChange={(_event, value) => setSearchValue(value)}
                     onClear={() => setSearchValue('')}
                   />
+                </ToolbarItem>
+                <ToolbarItem>
+                  <Select
+                    isOpen={isSortColumnSelectOpen}
+                    onOpenChange={(isOpen) => setIsSortColumnSelectOpen(isOpen)}
+                    onSelect={(_event, value) => {
+                      setSortColumn(value as 'name' | 'organization' | 'lastLogin');
+                      setIsSortColumnSelectOpen(false);
+                    }}
+                    toggle={(toggleRef) => (
+                      <MenuToggle
+                        ref={toggleRef}
+                        onClick={() => setIsSortColumnSelectOpen(!isSortColumnSelectOpen)}
+                        style={{ minWidth: '150px' }}
+                      >
+                        Sort by: {sortColumn === 'name' ? 'Name' : sortColumn === 'organization' ? 'Organization' : 'Last Login'}
+                      </MenuToggle>
+                    )}
+                  >
+                    <SelectList>
+                      <SelectOption value="name">Name</SelectOption>
+                      <SelectOption value="organization">Organization</SelectOption>
+                      <SelectOption value="lastLogin">Last Login</SelectOption>
+                    </SelectList>
+                  </Select>
+                </ToolbarItem>
+                <ToolbarItem>
+                  <Button
+                    variant="plain"
+                    aria-label={`Sort ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+                    onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  >
+                    {sortDirection === 'asc' ? <SortAmountUpIcon /> : <SortAmountDownIcon />}
+                  </Button>
                 </ToolbarItem>
               </ToolbarContent>
             </Toolbar>

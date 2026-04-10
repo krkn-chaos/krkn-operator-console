@@ -182,6 +182,13 @@ export function JobsList({
     return true;
   });
 
+  // Sort scenario runs by createdAt ascending (oldest first)
+  const sortedScenarioRuns = [...filteredScenarioRuns].sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return dateA - dateB;
+  });
+
   return (
     <Card>
       <CardTitle>
@@ -355,7 +362,7 @@ export function JobsList({
           </EmptyState>
         ) : (
           <DataList aria-label="Scenario runs list" isCompact>
-            {filteredScenarioRuns.map((run) => {
+            {sortedScenarioRuns.map((run) => {
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
 

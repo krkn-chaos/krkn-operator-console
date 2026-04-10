@@ -113,18 +113,23 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
     loadGroups();
   }, [loadGroups]);
 
-  // Filter groups based on search value
+  // Filter and sort groups based on search value
   useEffect(() => {
-    if (!searchValue) {
-      setFilteredGroups(groups);
-    } else {
+    let result = groups;
+
+    // Apply search filter
+    if (searchValue) {
       const searchLower = searchValue.toLowerCase();
-      const filtered = groups.filter((group) =>
+      result = result.filter((group) =>
         group.name.toLowerCase().includes(searchLower) ||
         (group.description && group.description.toLowerCase().includes(searchLower))
       );
-      setFilteredGroups(filtered);
     }
+
+    // Sort alphabetically by name (ascending)
+    result = [...result].sort((a, b) => a.name.localeCompare(b.name));
+
+    setFilteredGroups(result);
   }, [groups, searchValue]);
 
   const handleCreate = () => {
