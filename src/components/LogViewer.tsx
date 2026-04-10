@@ -35,14 +35,12 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
   const [logs, setLogs] = useState<string[]>([]);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
   const [isFollowing, setIsFollowing] = useState(true); // Auto-scroll enabled by default
-  const logsEndRef = useRef<HTMLDivElement>(null);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
   const isCleanedUpRef = useRef<boolean>(false);
   const isFirstMessageRef = useRef<boolean>(true);
-  const hasScrolledToBottomRef = useRef<boolean>(false);
 
   const maxReconnectAttempts = 3; // Ridotto per fallire prima e provare HTTP
 
@@ -83,23 +81,9 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
   // Auto-scroll to bottom when new logs arrive (only if following)
   useEffect(() => {
-    if (isFollowing && logs.length > 0) {
-      // Check if these are real logs (not loading messages)
-      const hasRealLogs = logs[0] !== 'Connecting to log stream...' && logs[0] !== 'Waiting for pod to start...';
-
-      if (hasRealLogs) {
-        // Use setTimeout to ensure DOM is ready
-        setTimeout(() => {
-          // First time seeing real logs - instant scroll
-          if (!hasScrolledToBottomRef.current) {
-            hasScrolledToBottomRef.current = true;
-            logsEndRef.current?.scrollIntoView({ behavior: 'instant' });
-          } else {
-            // Subsequent updates - smooth scroll
-            logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 0);
-      }
+    if (isFollowing && logsContainerRef.current && logs.length > 0) {
+      // Scroll to bottom immediately
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
   }, [logs, isFollowing]);
 
@@ -108,8 +92,8 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
     setIsFollowing(checked);
 
     // If enabling follow, scroll to bottom immediately
-    if (checked) {
-      logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (checked && logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
   };
 
@@ -356,7 +340,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
             }}
           >
             {logs.map((log, index) => renderAnsiLog(log, index))}
-            <div ref={logsEndRef} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
             <Checkbox
