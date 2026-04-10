@@ -25,6 +25,8 @@ import {
   SelectOption,
   SelectList,
   MenuToggle,
+  Alert,
+  AlertActionLink,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -45,22 +47,26 @@ interface JobsListProps {
   scenarioRuns: ScenarioRunState[];
   expandedRunIds: Set<string>;
   expandedJobIds: Set<string>;
+  pausedPollingRunIds: Set<string>;
   onToggleRunAccordion: (scenarioRunName: string) => void;
   onToggleJobAccordion: (jobId: string) => void;
   onDeleteScenarioRun: (scenarioRunName: string) => Promise<void>;
   onDeleteJob: (jobId: string) => Promise<void>;
   onCreateJob: () => void;
+  onRefreshScenarioRun: (scenarioRunName: string) => void;
 }
 
 export function JobsList({
   scenarioRuns,
   expandedRunIds,
   expandedJobIds,
+  pausedPollingRunIds,
   onToggleRunAccordion,
   onToggleJobAccordion,
   onDeleteScenarioRun,
   onDeleteJob,
   onCreateJob,
+  onRefreshScenarioRun,
 }: JobsListProps) {
   const { isAdmin } = useRole();
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
@@ -489,6 +495,26 @@ export function JobsList({
                     id={`expand-run-${run.scenarioRunName}`}
                     isHidden={!isRunExpanded}
                   >
+                    {/* Show banner when polling is paused for this run */}
+                    {pausedPollingRunIds.has(run.scenarioRunName) && !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) && (
+                      <Alert
+                        variant="info"
+                        isInline
+                        title="Live updates paused"
+                        actionLinks={
+                          <AlertActionLink onClick={() => onRefreshScenarioRun(run.scenarioRunName)}>
+                            Refresh now
+                          </AlertActionLink>
+                        }
+                        style={{ marginBottom: '1rem' }}
+                      >
+                        <p>
+                          Automatic updates are paused while viewing this run to prevent log interruptions.
+                          Close this view to resume automatic updates, or click "Refresh now" for a manual update.
+                        </p>
+                      </Alert>
+                    )}
+
                     {run.clusterJobs && run.clusterJobs.length > 0 ? (
                       <div style={{ paddingLeft: '2rem' }}>
                         <DataList aria-label="Cluster jobs list" isCompact>

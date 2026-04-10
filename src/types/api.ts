@@ -369,6 +369,7 @@ export interface AppState {
   scenarioRuns: ScenarioRunState[];
   scenarioRunsRefreshTrigger: number; // Increment to force immediate refresh
   pollingRunNames: Set<string>;
+  pausedPollingRunIds: Set<string>; // Runs with polling paused (accordion open)
   expandedRunIds: Set<string>;
   expandedClusterJobs: Set<string>; // jobId
 
@@ -417,6 +418,7 @@ export type AppAction =
   | { type: 'SCENARIO_RUN_CREATED'; payload: { scenarioRunName: string; targetClusters: { [providerName: string]: string[] }; totalTargets: number; scenarioName: string } }
   | { type: 'ADD_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
   | { type: 'UPDATE_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
+  | { type: 'REFRESH_SCENARIO_RUN'; payload: { scenarioRunName: string } } // Manual refresh for paused run
   | { type: 'LOAD_SCENARIO_RUNS_SUCCESS'; payload: { runs: ScenarioRunState[] } }
   | { type: 'TOGGLE_RUN_ACCORDION'; payload: { scenarioRunName: string } }
   | { type: 'TOGGLE_CLUSTER_JOB_ACCORDION'; payload: { jobId: string } }

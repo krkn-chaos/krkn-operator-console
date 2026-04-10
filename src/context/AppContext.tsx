@@ -13,6 +13,7 @@ const initialState: AppState = {
   scenarioRuns: [],
   scenarioRunsRefreshTrigger: 0,
   pollingRunNames: new Set<string>(),
+  pausedPollingRunIds: new Set<string>(), // Runs with polling paused (accordion open)
   expandedRunIds: new Set<string>(),
   expandedClusterJobs: new Set<string>(),
 
@@ -140,6 +141,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
+    case 'REFRESH_SCENARIO_RUN':
+      // Trigger manual refresh for a specific run (used when polling paused)
+      // The actual refresh is handled by useScenarioRunsPoller watching this trigger
+      return {
+        ...state,
+        scenarioRunsRefreshTrigger: state.scenarioRunsRefreshTrigger + 1,
+      };
+
     case 'LOAD_SCENARIO_RUNS_SUCCESS':
       return {
         ...state,
@@ -149,14 +158,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'TOGGLE_RUN_ACCORDION': {
       const newExpandedRuns = new Set(state.expandedRunIds);
+      const newPausedPolling = new Set(state.pausedPollingRunIds);
+
       if (newExpandedRuns.has(action.payload.scenarioRunName)) {
+        // Closing accordion - remove from expanded and paused
         newExpandedRuns.delete(action.payload.scenarioRunName);
+        newPausedPolling.delete(action.payload.scenarioRunName);
       } else {
+        // Opening accordion - add to expanded and paused
         newExpandedRuns.add(action.payload.scenarioRunName);
+        newPausedPolling.add(action.payload.scenarioRunName);
       }
+
       return {
         ...state,
         expandedRunIds: newExpandedRuns,
+        pausedPollingRunIds: newPausedPolling,
       };
     }
 
