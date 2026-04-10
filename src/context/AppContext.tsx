@@ -135,9 +135,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
           ? action.payload.run
           : run
       );
+
+      // Clean up expandedClusterJobs to remove deleted jobs
+      const allJobIds = new Set(
+        updatedRuns.flatMap(run => run.clusterJobs.map(job => job.jobId))
+      );
+      const cleanedExpandedJobs = new Set(
+        Array.from(state.expandedClusterJobs).filter(id => allJobIds.has(id))
+      );
+
       return {
         ...state,
         scenarioRuns: updatedRuns,
+        expandedClusterJobs: cleanedExpandedJobs,
       };
     }
 
@@ -149,12 +159,33 @@ function appReducer(state: AppState, action: AppAction): AppState {
         scenarioRunsRefreshTrigger: state.scenarioRunsRefreshTrigger + 1,
       };
 
-    case 'LOAD_SCENARIO_RUNS_SUCCESS':
+    case 'LOAD_SCENARIO_RUNS_SUCCESS': {
+      // Clean up pausedPollingRunIds and expandedRunIds to remove deleted runs
+      const currentRunIds = new Set(action.payload.runs.map(run => run.scenarioRunName));
+      const cleanedPausedPolling = new Set(
+        Array.from(state.pausedPollingRunIds).filter(id => currentRunIds.has(id))
+      );
+      const cleanedExpandedRuns = new Set(
+        Array.from(state.expandedRunIds).filter(id => currentRunIds.has(id))
+      );
+
+      // Clean up expandedClusterJobs to remove deleted jobs
+      const allJobIds = new Set(
+        action.payload.runs.flatMap(run => run.clusterJobs.map(job => job.jobId))
+      );
+      const cleanedExpandedJobs = new Set(
+        Array.from(state.expandedClusterJobs).filter(id => allJobIds.has(id))
+      );
+
       return {
         ...state,
         scenarioRuns: action.payload.runs,
+        pausedPollingRunIds: cleanedPausedPolling,
+        expandedRunIds: cleanedExpandedRuns,
+        expandedClusterJobs: cleanedExpandedJobs,
         error: null,
       };
+    }
 
     case 'TOGGLE_RUN_ACCORDION': {
       const newExpandedRuns = new Set(state.expandedRunIds);
