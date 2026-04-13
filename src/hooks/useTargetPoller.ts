@@ -116,26 +116,28 @@ export function useTargetPoller() {
   // Load existing scenario runs: GET /api/v1/scenarios/run
   // Uses new API - no adapter needed
   // Polls every 10 seconds to detect new runs and refresh the list
-  // Also triggers immediate refresh when scenarioRunsRefreshTrigger changes
   // IMPORTANT: Skips full refresh when accordion is open (pausedPollingRunIds has items)
+
+  // Use ref to always access fresh state values inside interval closure
+  const pausedPollingRunIdsRef = useRef(state.pausedPollingRunIds);
+  pausedPollingRunIdsRef.current = state.pausedPollingRunIds;
+
   useEffect(() => {
     if (state.phase !== 'jobs_list') {
       return;
     }
 
-    console.log('[useTargetPoller] Scenario runs refresh triggered (trigger:', state.scenarioRunsRefreshTrigger, ')');
+    console.log('[useTargetPoller] Starting scenario runs polling interval');
 
     async function loadScenarioRuns() {
       // Skip full list refresh if any accordion is open to prevent log interruptions
-      if (state.pausedPollingRunIds.size > 0) {
-        console.log('[useTargetPoller] Skipping full refresh - accordion open:', Array.from(state.pausedPollingRunIds));
+      if (pausedPollingRunIdsRef.current.size > 0) {
+        console.log('[useTargetPoller] Skipping full refresh - accordion open');
         return;
       }
 
       try {
         const scenarioRuns = await operatorApi.listScenarioRuns();
-
-        console.log('[useTargetPoller] Raw API response:', scenarioRuns);
 
         // Convert ScenarioRunStatusResponse[] to ScenarioRunState[]
         const scenarioRunStates: ScenarioRunState[] = scenarioRuns.map((run) => {
@@ -157,8 +159,6 @@ export function useTargetPoller() {
           };
         });
 
-        console.log('[useTargetPoller] Mapped scenario runs:', scenarioRunStates);
-
         dispatch({
           type: 'LOAD_SCENARIO_RUNS_SUCCESS',
           payload: { runs: scenarioRunStates }
@@ -171,8 +171,6 @@ export function useTargetPoller() {
         );
 
         if (runsWithoutJobs.length > 0) {
-          console.log(`[useTargetPoller] Fetching details for ${runsWithoutJobs.length} runs without clusterJobs...`);
-
           for (const run of runsWithoutJobs) {
             try {
               const details = await operatorApi.getScenarioRunStatus(run.scenarioRunName);
@@ -184,10 +182,8 @@ export function useTargetPoller() {
                 successfulJobs: details.successfulJobs,
                 failedJobs: details.failedJobs,
                 runningJobs: details.runningJobs,
-                ownerUserId: details.ownerUserId || run.ownerUserId, // Preserve owner from backend or fallback to original
+                ownerUserId: details.ownerUserId || run.ownerUserId,
               };
-
-              console.log(`[useTargetPoller] Fetched details for ${run.scenarioRunName}:`, updatedRun);
 
               dispatch({
                 type: 'UPDATE_SCENARIO_RUN',
@@ -200,8 +196,6 @@ export function useTargetPoller() {
         }
       } catch (error) {
         console.error('[useTargetPoller] Failed to load scenario runs:', error);
-        // Don't transition to error phase, just log it
-        // Scenario runs list can be empty on first load
       }
     }
 
@@ -217,7 +211,7 @@ export function useTargetPoller() {
       console.log('[useTargetPoller] Stopping scenario runs list polling');
       clearInterval(intervalId);
     };
-  }, [state.phase, state.scenarioRunsRefreshTrigger, state.pausedPollingRunIds, dispatch]);
+  }, [state.phase, dispatch]);
 
   // NOTE: Polling is now handled by useScenarioRunsPoller (hybrid approach)
   // This hook only handles initial load - ongoing polling is done per scenario run

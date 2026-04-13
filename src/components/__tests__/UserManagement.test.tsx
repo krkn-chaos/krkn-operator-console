@@ -336,9 +336,9 @@ describe('UserManagement', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // Open first user's action menu
+      // Open second user's action menu (after sorting, John Doe is second)
       const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
-      await user.click(actionMenus[0]);
+      await user.click(actionMenus[1]);
 
       // Click Edit Profile
       await waitFor(() => {
@@ -361,9 +361,9 @@ describe('UserManagement', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // Open first user's action menu and click Edit Profile
+      // Open second user's action menu and click Edit Profile (after sorting, John Doe is second)
       const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
-      await user.click(actionMenus[0]);
+      await user.click(actionMenus[1]);
       await waitFor(() => {
         expect(screen.getByText('Edit Profile')).toBeInTheDocument();
       });
@@ -425,9 +425,9 @@ describe('UserManagement', () => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      // Open second user's action menu (Jane Smith)
+      // Open first user's action menu (after sorting, Jane Smith is first)
       const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
-      await user.click(actionMenus[1]);
+      await user.click(actionMenus[0]);
 
       // Click Delete User
       await waitFor(() => {
@@ -463,9 +463,9 @@ describe('UserManagement', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // Open first user's action menu (yourself)
+      // Open second user's action menu (after sorting, John Doe is second - yourself)
       const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
-      await user.click(actionMenus[0]);
+      await user.click(actionMenus[1]);
 
       // Click Delete User
       await waitFor(() => {
@@ -566,9 +566,9 @@ describe('UserManagement', () => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      // Open second user's action menu
+      // Open first user's action menu (after sorting, Jane Smith is first)
       const actionMenus = screen.getAllByRole('button', { name: /user actions/i });
-      await user.click(actionMenus[1]);
+      await user.click(actionMenus[0]);
 
       // Click Delete User
       await waitFor(() => {
@@ -576,7 +576,7 @@ describe('UserManagement', () => {
       });
       await user.click(screen.getByText('Delete User'));
 
-      const modal = screen.getByRole('dialog');
+      const modal = await screen.findByRole('dialog');
       const confirmButton = within(modal).getByRole('button', { name: /delete/i });
       await user.click(confirmButton);
 

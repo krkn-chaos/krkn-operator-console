@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardTitle,
@@ -182,6 +182,15 @@ export function JobsList({
     return true;
   });
 
+  // Sort scenario runs by createdAt ascending (oldest first)
+  // Memoized to avoid recomputing on every render (polling updates scenarioRuns frequently)
+  const sortedScenarioRuns = useMemo(() => {
+    return [...filteredScenarioRuns].sort((a, b) => {
+      // ISO 8601 strings are lexicographically sortable, no need to parse to Date
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+  }, [filteredScenarioRuns]);
+
   return (
     <Card>
       <CardTitle>
@@ -355,7 +364,7 @@ export function JobsList({
           </EmptyState>
         ) : (
           <DataList aria-label="Scenario runs list" isCompact>
-            {filteredScenarioRuns.map((run) => {
+            {sortedScenarioRuns.map((run) => {
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
 
