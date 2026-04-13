@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardTitle,
@@ -183,11 +183,13 @@ export function JobsList({
   });
 
   // Sort scenario runs by createdAt ascending (oldest first)
-  const sortedScenarioRuns = [...filteredScenarioRuns].sort((a, b) => {
-    const dateA = new Date(a.createdAt).getTime();
-    const dateB = new Date(b.createdAt).getTime();
-    return dateA - dateB;
-  });
+  // Memoized to avoid recomputing on every render (polling updates scenarioRuns frequently)
+  const sortedScenarioRuns = useMemo(() => {
+    return [...filteredScenarioRuns].sort((a, b) => {
+      // ISO 8601 strings are lexicographically sortable, no need to parse to Date
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+  }, [filteredScenarioRuns]);
 
   return (
     <Card>
