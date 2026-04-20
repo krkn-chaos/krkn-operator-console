@@ -499,221 +499,225 @@ export function JobsList({
                   </DataListItemRow>
 
                   {/* Scenario Run Details - Jobs List (expanded) */}
-                  {isRunExpanded && (
-                    <DataListContent
-                      aria-label={`Jobs for scenario run ${run.scenarioRunName}`}
-                      id={`expand-run-${run.scenarioRunName}`}
-                    >
-                      {/* Show banner when polling is paused for this run */}
-                      {pausedPollingRunIds.has(run.scenarioRunName) && (
-                        <Alert
-                          variant="info"
-                          isInline
-                          title={['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
-                            ? "View mode"
-                            : "Live updates paused"}
-                          actionLinks={
-                            !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) && (
-                              <AlertActionLink onClick={() => onRefreshScenarioRun(run.scenarioRunName)}>
-                                Refresh now
-                              </AlertActionLink>
-                            )
-                          }
-                          style={{ marginBottom: '1rem' }}
-                        >
-                          <p>
-                            {['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
-                              ? "This run has completed. Close this view to resume monitoring active runs."
-                              : "Automatic updates are paused while viewing this run to prevent log interruptions. Close this view to resume automatic updates, or click \"Refresh now\" for a manual update."}
-                          </p>
-                        </Alert>
-                      )}
+                  <DataListContent
+                    aria-label={`Jobs for scenario run ${run.scenarioRunName}`}
+                    id={`expand-run-${run.scenarioRunName}`}
+                    isHidden={!isRunExpanded}
+                  >
+                    {isRunExpanded && (
+                      <>
+                        {/* Show banner when polling is paused for this run */}
+                        {pausedPollingRunIds.has(run.scenarioRunName) && (
+                          <Alert
+                            variant="info"
+                            isInline
+                            title={['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
+                              ? "View mode"
+                              : "Live updates paused"}
+                            actionLinks={
+                              !['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase) && (
+                                <AlertActionLink onClick={() => onRefreshScenarioRun(run.scenarioRunName)}>
+                                  Refresh now
+                                </AlertActionLink>
+                              )
+                            }
+                            style={{ marginBottom: '1rem' }}
+                          >
+                            <p>
+                              {['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)
+                                ? "This run has completed. Close this view to resume monitoring active runs."
+                                : "Automatic updates are paused while viewing this run to prevent log interruptions. Close this view to resume automatic updates, or click \"Refresh now\" for a manual update."}
+                            </p>
+                          </Alert>
+                        )}
 
-                      {run.clusterJobs && run.clusterJobs.length > 0 ? (
-                        <div style={{ paddingLeft: '2rem' }}>
-                          <DataList aria-label="Cluster jobs list" isCompact>
-                            {run.clusterJobs.map((job) => {
-                              const isJobExpanded = expandedJobIds.has(job.jobId);
-                              const jobPhaseDisplay = getJobPhaseDisplay(job.phase);
-                              const isDeleting = deletingJob === job.jobId;
+                        {run.clusterJobs && run.clusterJobs.length > 0 ? (
+                          <div style={{ paddingLeft: '2rem' }}>
+                            <DataList aria-label="Cluster jobs list" isCompact>
+                              {run.clusterJobs.map((job) => {
+                                const isJobExpanded = expandedJobIds.has(job.jobId);
+                                const jobPhaseDisplay = getJobPhaseDisplay(job.phase);
+                                const isDeleting = deletingJob === job.jobId;
 
-                              return (
-                                <DataListItem key={job.jobId} isExpanded={isJobExpanded}>
-                                  {/* Job Summary Row */}
-                                  <DataListItemRow>
-                                    <DataListToggle
-                                      onClick={() => onToggleJobAccordion(job.jobId)}
-                                      isExpanded={isJobExpanded}
-                                      id={`toggle-job-${job.jobId}`}
-                                      aria-controls={`expand-job-${job.jobId}`}
-                                      style={{ display: 'flex', alignItems: 'center' }}
-                                    />
-                                    <DataListItemCells
-                                      dataListCells={[
-                                        <DataListCell key="status" width={2}>
-                                          <div>
-                                            <div style={{ marginBottom: '0.25rem' }}>
-                                              <strong>Status:</strong>
-                                            </div>
-                                            <Label color={jobPhaseDisplay.color} icon={jobPhaseDisplay.icon}>
-                                              {jobPhaseDisplay.label}
-                                            </Label>
-                                          </div>
-                                        </DataListCell>,
-                                        <DataListCell key="cluster" width={3}>
-                                          <div>
-                                            <div style={{ marginBottom: '0.25rem' }}>
-                                              <strong>Cluster:</strong>
-                                            </div>
-                                            <code
-                                              style={{
-                                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                                padding: '0.125rem 0.5rem',
-                                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                                display: 'inline-block',
-                                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                              }}
-                                            >
-                                              {job.providerName}/{job.clusterName}
-                                            </code>
-                                          </div>
-                                        </DataListCell>,
-                                        <DataListCell key="times" width={4}>
-                                          <div style={{ display: 'flex', gap: '2rem' }}>
-                                            {job.startTime && (
-                                              <div>
-                                                <div style={{ marginBottom: '0.25rem' }}>
-                                                  <strong>Started:</strong>
-                                                </div>
-                                                <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
-                                                  {formatTimestamp(job.startTime)}
-                                                </div>
+                                return (
+                                  <DataListItem key={job.jobId} isExpanded={isJobExpanded}>
+                                    {/* Job Summary Row */}
+                                    <DataListItemRow>
+                                      <DataListToggle
+                                        onClick={() => onToggleJobAccordion(job.jobId)}
+                                        isExpanded={isJobExpanded}
+                                        id={`toggle-job-${job.jobId}`}
+                                        aria-controls={`expand-job-${job.jobId}`}
+                                        style={{ display: 'flex', alignItems: 'center' }}
+                                      />
+                                      <DataListItemCells
+                                        dataListCells={[
+                                          <DataListCell key="status" width={2}>
+                                            <div>
+                                              <div style={{ marginBottom: '0.25rem' }}>
+                                                <strong>Status:</strong>
                                               </div>
-                                            )}
-                                            {job.completionTime && (
-                                              <div>
-                                                <div style={{ marginBottom: '0.25rem' }}>
-                                                  <strong>Completed:</strong>
-                                                </div>
-                                                <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
-                                                  {formatTimestamp(job.completionTime)}
-                                                </div>
+                                              <Label color={jobPhaseDisplay.color} icon={jobPhaseDisplay.icon}>
+                                                {jobPhaseDisplay.label}
+                                              </Label>
+                                            </div>
+                                          </DataListCell>,
+                                          <DataListCell key="cluster" width={3}>
+                                            <div>
+                                              <div style={{ marginBottom: '0.25rem' }}>
+                                                <strong>Cluster:</strong>
                                               </div>
-                                            )}
-                                          </div>
-                                        </DataListCell>,
-                                        <DataListCell key="actions" width={1}>
-                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                            {job.phase === 'Running' && (
-                                              <Button
-                                                variant="plain"
-                                                aria-label="Delete job"
-                                                onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
-                                                isDisabled={deletingJob === job.jobId}
-                                                icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
-                                                style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
-                                              />
-                                            )}
-                                          </div>
-                                        </DataListCell>,
-                                      ]}
-                                    />
-                                  </DataListItemRow>
+                                              <code
+                                                style={{
+                                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                                  padding: '0.125rem 0.5rem',
+                                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                                  display: 'inline-block',
+                                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                                }}
+                                              >
+                                                {job.providerName}/{job.clusterName}
+                                              </code>
+                                            </div>
+                                          </DataListCell>,
+                                          <DataListCell key="times" width={4}>
+                                            <div style={{ display: 'flex', gap: '2rem' }}>
+                                              {job.startTime && (
+                                                <div>
+                                                  <div style={{ marginBottom: '0.25rem' }}>
+                                                    <strong>Started:</strong>
+                                                  </div>
+                                                  <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                                                    {formatTimestamp(job.startTime)}
+                                                  </div>
+                                                </div>
+                                              )}
+                                              {job.completionTime && (
+                                                <div>
+                                                  <div style={{ marginBottom: '0.25rem' }}>
+                                                    <strong>Completed:</strong>
+                                                  </div>
+                                                  <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                                                    {formatTimestamp(job.completionTime)}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </DataListCell>,
+                                          <DataListCell key="actions" width={1}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                              {job.phase === 'Running' && (
+                                                <Button
+                                                  variant="plain"
+                                                  aria-label="Delete job"
+                                                  onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
+                                                  isDisabled={deletingJob === job.jobId}
+                                                  icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
+                                                  style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                                                />
+                                              )}
+                                            </div>
+                                          </DataListCell>,
+                                        ]}
+                                      />
+                                    </DataListItemRow>
 
-                                  {/* Job Details (expanded) */}
-                                  {isJobExpanded && (
+                                    {/* Job Details (expanded) */}
                                     <DataListContent
                                       aria-label={`Details for job ${job.jobId}`}
                                       id={`expand-job-${job.jobId}`}
+                                      isHidden={!isJobExpanded}
                                     >
-                                      <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
-                                        {/* Job Details */}
-                                        <FlexItem>
-                                          <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
-                                            <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 }}>
-                                              <dt style={{ fontWeight: 'bold' }}>Provider:</dt>
-                                              <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.providerName}</dd>
-
-                                              <dt style={{ fontWeight: 'bold' }}>Cluster:</dt>
-                                              <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.clusterName}</dd>
-
-                                              <dt style={{ fontWeight: 'bold' }}>Pod Name:</dt>
-                                              <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.podName}</dd>
-
-                                              <dt style={{ fontWeight: 'bold' }}>Job ID:</dt>
-                                              <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.jobId}</dd>
-
-                                              <dt style={{ fontWeight: 'bold' }}>Phase:</dt>
-                                              <dd style={{ margin: 0 }}>{job.phase}</dd>
-
-                                              {job.startTime && (
-                                                <>
-                                                  <dt style={{ fontWeight: 'bold' }}>Start Time:</dt>
-                                                  <dd style={{ margin: 0 }}>{formatTimestamp(job.startTime)}</dd>
-                                                </>
-                                              )}
-
-                                              {job.completionTime && (
-                                                <>
-                                                  <dt style={{ fontWeight: 'bold' }}>Completion Time:</dt>
-                                                  <dd style={{ margin: 0 }}>{formatTimestamp(job.completionTime)}</dd>
-                                                </>
-                                              )}
-
-                                              {job.message && (
-                                                <>
-                                                  <dt style={{ fontWeight: 'bold' }}>Message:</dt>
-                                                  <dd style={{ margin: 0, color: 'var(--pf-v5-global--danger-color--100)' }}>{job.message}</dd>
-                                                </>
-                                              )}
-                                            </dl>
-                                          </div>
-                                        </FlexItem>
-
-                                        {/* Logs for running, succeeded, and failed jobs */}
-                                        {['Running', 'Succeeded', 'Failed'].includes(job.phase) && (
+                                      {isJobExpanded && (
+                                        <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
+                                          {/* Job Details */}
                                           <FlexItem>
-                                            <LogViewer
-                                              scenarioRunName={run.scenarioRunName}
-                                              jobId={job.jobId}
-                                              clusterName={job.clusterName}
-                                              podName={job.podName}
-                                              status={job.phase}
-                                              compact={true}
-                                            />
-                                          </FlexItem>
-                                        )}
+                                            <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+                                              <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 }}>
+                                                <dt style={{ fontWeight: 'bold' }}>Provider:</dt>
+                                                <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.providerName}</dd>
 
-                                        {/* Delete button for non-terminal jobs */}
-                                        {!['Succeeded', 'Failed'].includes(job.phase) && (
-                                          <FlexItem>
-                                            <Button
-                                              variant="danger"
-                                              onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
-                                              isDisabled={isDeleting}
-                                              isLoading={isDeleting}
-                                            >
-                                              {isDeleting ? 'Deleting...' : 'Delete Job'}
-                                            </Button>
+                                                <dt style={{ fontWeight: 'bold' }}>Cluster:</dt>
+                                                <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.clusterName}</dd>
+
+                                                <dt style={{ fontWeight: 'bold' }}>Pod Name:</dt>
+                                                <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.podName}</dd>
+
+                                                <dt style={{ fontWeight: 'bold' }}>Job ID:</dt>
+                                                <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.jobId}</dd>
+
+                                                <dt style={{ fontWeight: 'bold' }}>Phase:</dt>
+                                                <dd style={{ margin: 0 }}>{job.phase}</dd>
+
+                                                {job.startTime && (
+                                                  <>
+                                                    <dt style={{ fontWeight: 'bold' }}>Start Time:</dt>
+                                                    <dd style={{ margin: 0 }}>{formatTimestamp(job.startTime)}</dd>
+                                                  </>
+                                                )}
+
+                                                {job.completionTime && (
+                                                  <>
+                                                    <dt style={{ fontWeight: 'bold' }}>Completion Time:</dt>
+                                                    <dd style={{ margin: 0 }}>{formatTimestamp(job.completionTime)}</dd>
+                                                  </>
+                                                )}
+
+                                                {job.message && (
+                                                  <>
+                                                    <dt style={{ fontWeight: 'bold' }}>Message:</dt>
+                                                    <dd style={{ margin: 0, color: 'var(--pf-v5-global--danger-color--100)' }}>{job.message}</dd>
+                                                  </>
+                                                )}
+                                              </dl>
+                                            </div>
                                           </FlexItem>
-                                        )}
-                                      </Flex>
+
+                                          {/* Logs for running, succeeded, and failed jobs */}
+                                          {['Running', 'Succeeded', 'Failed'].includes(job.phase) && (
+                                            <FlexItem>
+                                              <LogViewer
+                                                scenarioRunName={run.scenarioRunName}
+                                                jobId={job.jobId}
+                                                clusterName={job.clusterName}
+                                                podName={job.podName}
+                                                status={job.phase}
+                                                compact={true}
+                                              />
+                                            </FlexItem>
+                                          )}
+
+                                          {/* Delete button for non-terminal jobs */}
+                                          {!['Succeeded', 'Failed'].includes(job.phase) && (
+                                            <FlexItem>
+                                              <Button
+                                                variant="danger"
+                                                onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
+                                                isDisabled={isDeleting}
+                                                isLoading={isDeleting}
+                                              >
+                                                {isDeleting ? 'Deleting...' : 'Delete Job'}
+                                              </Button>
+                                            </FlexItem>
+                                          )}
+                                        </Flex>
+                                      )}
                                     </DataListContent>
-                                  )}
-                                </DataListItem>
-                              );
-                            })}
-                          </DataList>
-                        </div>
-                      ) : (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
-                          No jobs available for this scenario run
-                        </div>
-                      )}
-                    </DataListContent>
-                  )}
+                                  </DataListItem>
+                                );
+                              })}
+                            </DataList>
+                          </div>
+                        ) : (
+                          <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
+                            No jobs available for this scenario run
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </DataListContent>
                 </DataListItem>
               );
             })}
