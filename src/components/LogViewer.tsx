@@ -107,6 +107,13 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       return;
     }
 
+    // React StrictMode guard: prevent duplicate connections during double-mount in dev mode
+    // If WebSocket already exists and is connecting/open, don't create another one
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
+      console.log('WebSocket already active (StrictMode guard), skipping duplicate connection');
+      return;
+    }
+
     // If job is in terminal state, don't follow (get static logs)
     const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
 
