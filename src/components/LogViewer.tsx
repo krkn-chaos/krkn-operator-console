@@ -228,13 +228,20 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         };
 
         ws.onclose = (event) => {
-          console.log('=== WebSocket Close Event ===');
+          console.log(`[LogViewer ${jobId}] === WebSocket Close Event ===`);
           console.log('Close code:', event.code);
           console.log('Close reason:', event.reason || '(no reason provided)');
           console.log('Was clean:', event.wasClean);
           console.log('Terminal state:', isTerminal);
           console.log('Cleaned up:', isCleanedUpRef.current);
           console.log('ReadyState:', ws.readyState);
+
+          // Remove from global map only if this is still the active connection
+          // This prevents removing a newer connection if StrictMode created one
+          if (activeConnections.get(jobId) === ws) {
+            activeConnections.delete(jobId);
+            console.log(`[LogViewer ${jobId}] WebSocket removed from global map (onclose)`);
+          }
 
           // Common close codes reference:
           // 1000: Normal closure
@@ -310,9 +317,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
       if (wsRef.current) {
         wsRef.current.close(1000, 'Component unmounted');
-        // Remove from global map
-        activeConnections.delete(jobId);
-        console.log(`[LogViewer ${jobId}] WebSocket removed from global map`);
+        // Note: removal from Map happens in ws.onclose to handle async close timing
         wsRef.current = null;
       }
     };
