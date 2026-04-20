@@ -623,84 +623,85 @@ export function JobsList({
                                 </DataListItemRow>
 
                                 {/* Job Details (expanded) */}
-                                <DataListContent
-                                  aria-label={`Details for job ${job.jobId}`}
-                                  id={`expand-job-${job.jobId}`}
-                                  isHidden={!isJobExpanded}
-                                >
-                                  <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
-                                    {/* Job Details */}
-                                    <FlexItem>
-                                      <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
-                                        <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 }}>
-                                          <dt style={{ fontWeight: 'bold' }}>Provider:</dt>
-                                          <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.providerName}</dd>
-
-                                          <dt style={{ fontWeight: 'bold' }}>Cluster:</dt>
-                                          <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.clusterName}</dd>
-
-                                          <dt style={{ fontWeight: 'bold' }}>Pod Name:</dt>
-                                          <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.podName}</dd>
-
-                                          <dt style={{ fontWeight: 'bold' }}>Job ID:</dt>
-                                          <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.jobId}</dd>
-
-                                          <dt style={{ fontWeight: 'bold' }}>Phase:</dt>
-                                          <dd style={{ margin: 0 }}>{job.phase}</dd>
-
-                                          {job.startTime && (
-                                            <>
-                                              <dt style={{ fontWeight: 'bold' }}>Start Time:</dt>
-                                              <dd style={{ margin: 0 }}>{formatTimestamp(job.startTime)}</dd>
-                                            </>
-                                          )}
-
-                                          {job.completionTime && (
-                                            <>
-                                              <dt style={{ fontWeight: 'bold' }}>Completion Time:</dt>
-                                              <dd style={{ margin: 0 }}>{formatTimestamp(job.completionTime)}</dd>
-                                            </>
-                                          )}
-
-                                          {job.message && (
-                                            <>
-                                              <dt style={{ fontWeight: 'bold' }}>Message:</dt>
-                                              <dd style={{ margin: 0, color: 'var(--pf-v5-global--danger-color--100)' }}>{job.message}</dd>
-                                            </>
-                                          )}
-                                        </dl>
-                                      </div>
-                                    </FlexItem>
-
-                                    {/* Logs for running, succeeded, and failed jobs */}
-                                    {['Running', 'Succeeded', 'Failed'].includes(job.phase) && (
+                                {isJobExpanded && (
+                                  <DataListContent
+                                    aria-label={`Details for job ${job.jobId}`}
+                                    id={`expand-job-${job.jobId}`}
+                                  >
+                                    <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
+                                      {/* Job Details */}
                                       <FlexItem>
-                                        <LogViewer
-                                          scenarioRunName={run.scenarioRunName}
-                                          jobId={job.jobId}
-                                          clusterName={job.clusterName}
-                                          podName={job.podName}
-                                          status={job.phase}
-                                          compact={true}
-                                        />
-                                      </FlexItem>
-                                    )}
+                                        <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+                                          <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 }}>
+                                            <dt style={{ fontWeight: 'bold' }}>Provider:</dt>
+                                            <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.providerName}</dd>
 
-                                    {/* Delete button for non-terminal jobs */}
-                                    {!['Succeeded', 'Failed'].includes(job.phase) && (
-                                      <FlexItem>
-                                        <Button
-                                          variant="danger"
-                                          onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
-                                          isDisabled={isDeleting}
-                                          isLoading={isDeleting}
-                                        >
-                                          {isDeleting ? 'Deleting...' : 'Delete Job'}
-                                        </Button>
+                                            <dt style={{ fontWeight: 'bold' }}>Cluster:</dt>
+                                            <dd style={{ margin: 0, fontFamily: 'monospace' }}>{job.clusterName}</dd>
+
+                                            <dt style={{ fontWeight: 'bold' }}>Pod Name:</dt>
+                                            <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.podName}</dd>
+
+                                            <dt style={{ fontWeight: 'bold' }}>Job ID:</dt>
+                                            <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.jobId}</dd>
+
+                                            <dt style={{ fontWeight: 'bold' }}>Phase:</dt>
+                                            <dd style={{ margin: 0 }}>{job.phase}</dd>
+
+                                            {job.startTime && (
+                                              <>
+                                                <dt style={{ fontWeight: 'bold' }}>Start Time:</dt>
+                                                <dd style={{ margin: 0 }}>{formatTimestamp(job.startTime)}</dd>
+                                              </>
+                                            )}
+
+                                            {job.completionTime && (
+                                              <>
+                                                <dt style={{ fontWeight: 'bold' }}>Completion Time:</dt>
+                                                <dd style={{ margin: 0 }}>{formatTimestamp(job.completionTime)}</dd>
+                                              </>
+                                            )}
+
+                                            {job.message && (
+                                              <>
+                                                <dt style={{ fontWeight: 'bold' }}>Message:</dt>
+                                                <dd style={{ margin: 0, color: 'var(--pf-v5-global--danger-color--100)' }}>{job.message}</dd>
+                                              </>
+                                            )}
+                                          </dl>
+                                        </div>
                                       </FlexItem>
-                                    )}
-                                  </Flex>
-                                </DataListContent>
+
+                                      {/* Logs for running, succeeded, and failed jobs */}
+                                      {['Running', 'Succeeded', 'Failed'].includes(job.phase) && (
+                                        <FlexItem>
+                                          <LogViewer
+                                            scenarioRunName={run.scenarioRunName}
+                                            jobId={job.jobId}
+                                            clusterName={job.clusterName}
+                                            podName={job.podName}
+                                            status={job.phase}
+                                            compact={true}
+                                          />
+                                        </FlexItem>
+                                      )}
+
+                                      {/* Delete button for non-terminal jobs */}
+                                      {!['Succeeded', 'Failed'].includes(job.phase) && (
+                                        <FlexItem>
+                                          <Button
+                                            variant="danger"
+                                            onClick={() => setConfirmDeleteJob({ jobId: job.jobId, jobName: `${run.scenarioRunName} - ${job.providerName}/${job.clusterName}` })}
+                                            isDisabled={isDeleting}
+                                            isLoading={isDeleting}
+                                          >
+                                            {isDeleting ? 'Deleting...' : 'Delete Job'}
+                                          </Button>
+                                        </FlexItem>
+                                      )}
+                                    </Flex>
+                                  </DataListContent>
+                                )}
                               </DataListItem>
                             );
                           })}
