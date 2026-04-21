@@ -32,7 +32,7 @@
 /* Backdrop - dark opaque overlay */
 .quake-terminal-backdrop {
   position: fixed;
-  top: 0;
+  top: 81px; /* Start below masthead + strip - don't cover topbar */
   left: 0;
   right: 0;
   bottom: 0;
@@ -49,7 +49,7 @@
 /* Terminal Panel - slides down from top */
 .quake-terminal-panel {
   position: fixed;
-  top: 64px; /* Below trigger strip */
+  top: 81px; /* Below masthead (73px) + trigger strip (8px) */
   left: 0;
   right: 0;
   background: rgba(20, 20, 20, 0.95); /* Dark with slight transparency */
