@@ -359,31 +359,32 @@ function App() {
   );
 
   return (
-    <Page header={header}>
-      {/* Quake-style dropdown terminal */}
+    <>
+      {/* Quake-style dropdown terminal - rendered OUTSIDE Page to avoid layout conflicts */}
       <QuakeTerminal heightPercent={25} />
 
-      {/* Global notifications - appears right below header */}
-      {state.notifications.length > 0 && (
-        <div style={{ padding: '1rem 1rem 0 1rem' }}>
-          <AlertGroup>
-            {state.notifications.map((notification) => (
-              <Alert
-                key={notification.id}
-                variant={notification.variant}
-                title={notification.title}
-                actionClose={
-                  <AlertActionCloseButton onClose={() => handleHideNotification(notification.id)} />
-                }
-                isInline
-              >
-                {notification.message}
-              </Alert>
-            ))}
-          </AlertGroup>
-        </div>
-      )}
-      <PageSection isFilled>{renderContent()}</PageSection>
+      <Page header={header}>
+        {/* Global notifications - appears right below header */}
+        {state.notifications.length > 0 && (
+          <div style={{ padding: '1rem 1rem 0 1rem' }}>
+            <AlertGroup>
+              {state.notifications.map((notification) => (
+                <Alert
+                  key={notification.id}
+                  variant={notification.variant}
+                  title={notification.title}
+                  actionClose={
+                    <AlertActionCloseButton onClose={() => handleHideNotification(notification.id)} />
+                  }
+                  isInline
+                >
+                  {notification.message}
+                </Alert>
+              ))}
+            </AlertGroup>
+          </div>
+        )}
+        <PageSection isFilled>{renderContent()}</PageSection>
 
       {/* Edit Profile Modal */}
       <Modal
@@ -420,7 +421,8 @@ function App() {
           onCancel={() => setIsChangePasswordOpen(false)}
         />
       </Modal>
-    </Page>
+      </Page>
+    </>
   );
 }
 

@@ -1,20 +1,22 @@
 /* Trigger Strip - positioned below masthead */
 .quake-terminal-trigger {
   position: fixed;
-  top: 60px; /* Below PatternFly masthead (typically 60px) */
+  top: 73px; /* Below PatternFly masthead + toolbar (updated after inspection) */
   left: 0;
   right: 0;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  height: 8px; /* Increased for better visibility */
+  background: rgba(0, 255, 0, 0.3); /* More visible green during development */
   cursor: pointer;
-  z-index: 9998;
+  z-index: 10001; /* Higher than terminal panel to always be clickable */
   transition: all 0.2s ease;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(0, 255, 0, 0.5);
+  box-shadow: 0 2px 4px rgba(0, 255, 0, 0.2);
 }
 
 .quake-terminal-trigger:hover {
-  height: 6px;
-  background: rgba(255, 255, 255, 0.2);
+  height: 12px;
+  background: rgba(0, 255, 0, 0.5);
+  box-shadow: 0 3px 8px rgba(0, 255, 0, 0.4);
 }
 
 .quake-terminal-trigger-icon {
