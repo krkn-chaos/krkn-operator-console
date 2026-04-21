@@ -16,8 +16,8 @@
 .quake-terminal-trigger {
   position: fixed;
   top: 73px; /* Below PatternFly masthead + toolbar (updated after inspection) */
-  left: 0;
-  right: 0;
+  left: 3px; /* Small spacing on left */
+  right: 18px; /* Leave space for scrollbar */
   height: 8px; /* Increased for better visibility */
   background: rgba(0, 255, 0, 0.3); /* More visible green during development */
   cursor: pointer;
@@ -64,8 +64,8 @@
 .quake-terminal-panel {
   position: fixed;
   top: 81px; /* Below masthead (73px) + trigger strip (8px) */
-  left: 0;
-  right: 0;
+  left: 3px; /* Small spacing on left */
+  right: 18px; /* Match trigger strip width - leave space for scrollbar */
   background: rgba(20, 20, 20, 0.95); /* Dark with slight transparency */
   backdrop-filter: blur(10px); /* Glassmorphism effect */
   border-bottom: 2px solid rgba(0, 255, 0, 0.3);
