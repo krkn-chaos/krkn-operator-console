@@ -1,3 +1,10 @@
+/* Z-index fix for PatternFly dropdowns to appear above terminal */
+/* PatternFly Masthead dropdowns (user menu, etc.) need higher z-index than terminal backdrop */
+.pf-v5-c-masthead .pf-v5-c-dropdown__menu,
+.pf-v5-c-masthead .pf-v5-c-menu {
+  z-index: 10002 !important; /* Above terminal backdrop (9999), panel (10000), trigger (10001) */
+}
+
 /* Trigger Strip - positioned below masthead */
 .quake-terminal-trigger {
   position: fixed;
