@@ -13,6 +13,10 @@ interface LogViewerProps {
   compact?: boolean;
 }
 
+// Global connection tracking to prevent StrictMode duplicates
+// Maps jobId -> WebSocket instance
+const activeConnections = new Map<string, WebSocket>();
+
 // Helper function to interpret WebSocket close codes
 function getCloseCodeMeaning(code: number): string {
   switch (code) {
@@ -107,10 +111,20 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       return;
     }
 
+    // StrictMode guard: check global connection map
+    // This persists across StrictMode's double-mount, preventing duplicates
+    const existingConnection = activeConnections.get(jobId);
+    if (existingConnection && (existingConnection.readyState === WebSocket.CONNECTING || existingConnection.readyState === WebSocket.OPEN)) {
+      console.log(`[LogViewer ${jobId}] WebSocket already active (global guard), skipping duplicate connection`);
+      // Reuse existing connection
+      wsRef.current = existingConnection;
+      return;
+    }
+
     // If job is in terminal state, don't follow (get static logs)
     const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
 
-    console.log('Starting WebSocket log stream for run:', scenarioRunName, 'cluster:', clusterName, 'status:', status);
+    console.log(`[LogViewer ${jobId}] Starting WebSocket log stream for run:`, scenarioRunName, 'cluster:', clusterName, 'status:', status);
 
     if (!isTerminal) {
       setLogs(['Connecting to log stream...']);
@@ -169,8 +183,9 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
         const ws = new WebSocket(wsUrl, wsProtocol);
         wsRef.current = ws;
-
-        console.log('WebSocket created. ReadyState:', ws.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)');
+        // Register in global map to prevent StrictMode duplicates
+        activeConnections.set(jobId, ws);
+        console.log(`[LogViewer ${jobId}] WebSocket created and registered. ReadyState:`, ws.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)');
 
         ws.onopen = () => {
           console.log('=== WebSocket Connection Established ===');
@@ -213,13 +228,20 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         };
 
         ws.onclose = (event) => {
-          console.log('=== WebSocket Close Event ===');
+          console.log(`[LogViewer ${jobId}] === WebSocket Close Event ===`);
           console.log('Close code:', event.code);
           console.log('Close reason:', event.reason || '(no reason provided)');
           console.log('Was clean:', event.wasClean);
           console.log('Terminal state:', isTerminal);
           console.log('Cleaned up:', isCleanedUpRef.current);
           console.log('ReadyState:', ws.readyState);
+
+          // Remove from global map only if this is still the active connection
+          // This prevents removing a newer connection if StrictMode created one
+          if (activeConnections.get(jobId) === ws) {
+            activeConnections.delete(jobId);
+            console.log(`[LogViewer ${jobId}] WebSocket removed from global map (onclose)`);
+          }
 
           // Common close codes reference:
           // 1000: Normal closure
@@ -285,7 +307,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
     // Cleanup on unmount or when dependencies change
     return () => {
-      console.log('Cleaning up WebSocket');
+      console.log(`[LogViewer ${jobId}] Cleaning up WebSocket`);
       isCleanedUpRef.current = true;
 
       if (reconnectTimeoutRef.current) {
@@ -295,6 +317,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
       if (wsRef.current) {
         wsRef.current.close(1000, 'Component unmounted');
+        // Note: removal from Map happens in ws.onclose to handle async close timing
         wsRef.current = null;
       }
     };
