@@ -6,6 +6,12 @@
   z-index: 10002 !important; /* Above terminal backdrop (9999), panel (10000), trigger (10001) */
 }
 
+/* Page content offset to account for trigger strip */
+/* Strip is part of "topbar area", so page content should start below it (81px) not just below masthead (73px) */
+.pf-v5-c-page__main {
+  padding-top: 8px; /* Additional padding for trigger strip height */
+}
+
 /* Trigger Strip - positioned below masthead */
 .quake-terminal-trigger {
   position: fixed;
