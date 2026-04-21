@@ -1,0 +1,130 @@
+/* Trigger Strip - positioned below masthead */
+.quake-terminal-trigger {
+  position: fixed;
+  top: 60px; /* Below PatternFly masthead (typically 60px) */
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  z-index: 9998;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.quake-terminal-trigger:hover {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.quake-terminal-trigger-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  user-select: none;
+}
+
+/* Backdrop - dark opaque overlay */
+.quake-terminal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85); /* Very opaque like macOS/Linux terminals */
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Terminal Panel - slides down from top */
+.quake-terminal-panel {
+  position: fixed;
+  top: 64px; /* Below trigger strip */
+  left: 0;
+  right: 0;
+  background: rgba(20, 20, 20, 0.95); /* Dark with slight transparency */
+  backdrop-filter: blur(10px); /* Glassmorphism effect */
+  border-bottom: 2px solid rgba(0, 255, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  transform: translateY(-100%);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth ease-out */
+  overflow: hidden;
+}
+
+.quake-terminal-panel.is-open {
+  transform: translateY(0);
+}
+
+/* Terminal Content */
+.quake-terminal-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: #00ff00; /* Classic terminal green */
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Courier New', monospace;
+}
+
+/* Terminal Header */
+.quake-terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+  font-size: 0.875rem;
+  user-select: none;
+}
+
+.quake-terminal-close {
+  background: transparent;
+  border: none;
+  color: #00ff00;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  transition: all 0.2s;
+  border-radius: 4px;
+}
+
+.quake-terminal-close:hover {
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff4444;
+}
+
+/* Terminal Body - scrollable content area */
+.quake-terminal-body {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Custom scrollbar for terminal */
+.quake-terminal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.quake-terminal-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.quake-terminal-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 0, 0.3);
+  border-radius: 4px;
+}
+
+.quake-terminal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 0, 0.5);
+}

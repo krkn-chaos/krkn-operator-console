@@ -7,7 +7,7 @@ import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly, QuakeTerminal } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { UserForm } from './components/UserForm';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
@@ -360,6 +360,9 @@ function App() {
 
   return (
     <Page header={header}>
+      {/* Quake-style dropdown terminal */}
+      <QuakeTerminal heightPercent={25} />
+
       {/* Global notifications - appears right below header */}
       {state.notifications.length > 0 && (
         <div style={{ padding: '1rem 1rem 0 1rem' }}>
