@@ -57,12 +57,14 @@
   border-bottom: 2px solid rgba(0, 255, 0, 0.3);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   z-index: 10000;
-  transform: translateY(-100%);
+  /* When closed: move up by (100% of height + 81px) to go completely off-screen above masthead */
+  transform: translateY(calc(-100% - 81px));
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth ease-out */
   overflow: hidden;
 }
 
 .quake-terminal-panel.is-open {
+  /* When open: reset to natural position (top: 81px) */
   transform: translateY(0);
 }
 
