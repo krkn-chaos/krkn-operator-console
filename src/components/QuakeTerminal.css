@@ -117,15 +117,18 @@
   /* When closed: move up by (100% of height + 88px) to go completely off-screen above masthead */
   transform: translateY(calc(-100% - 88px));
   opacity: 0; /* Start invisible */
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; /* Smooth ease-out with fade */
+  /* Closing: fade out first (no delay), then slide up (0.6s delay) */
+  transition: opacity 0.6s ease 0s, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.6s;
   overflow: hidden;
 }
 
 .quake-terminal-panel.is-open {
-  /* When open: reset to natural position, add border at bottom, and fade in */
+  /* When open: reset to natural position and fade in after slide completes */
   transform: translateY(0);
   opacity: 1; /* Fade in */
   border-bottom: 1px solid var(--pf-v5-global--primary-color--100);
+  /* Opening: slide down first (no delay), then fade in (0.3s delay) */
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0s, opacity 0.6s ease 0.3s;
 }
 
 /* Terminal Content */
