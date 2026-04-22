@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TerminalIcon } from '@patternfly/react-icons';
+import { TerminalContent } from './TerminalContent';
 import './QuakeTerminal.css';
 
 interface QuakeTerminalProps {
@@ -48,11 +49,7 @@ export function QuakeTerminal({ heightPercent = 40 }: QuakeTerminalProps) {
       >
         <div className="quake-terminal-content">
           <div className="quake-terminal-body">
-            {/* Placeholder for terminal UI */}
-            <pre style={{ fontFamily: 'monospace' }}>
-              $ Welcome to Krkn Terminal{'\n'}
-              $ Ready...
-            </pre>
+            <TerminalContent isOpen={isOpen} />
           </div>
         </div>
       </div>

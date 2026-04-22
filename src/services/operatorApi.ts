@@ -44,6 +44,18 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
+   * DELETE /targets/{uuid}
+   * Delete a target request (cleanup)
+   * @param uuid - Target request UUID
+   * @returns Promise that resolves when deleted
+   */
+  async deleteTargetRequest(uuid: string): Promise<void> {
+    await this.fetch(`/targets/${uuid}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
    * GET /clusters?id={uuid}
    * Get list of available target clusters
    * @param uuid - Target request UUID

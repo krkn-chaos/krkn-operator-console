@@ -19,3 +19,4 @@ export { ClusterPermissionsTable } from './ClusterPermissionsTable';
 export { ViewGroupMembersModal } from './ViewGroupMembersModal';
 export { AddMembersModal } from './AddMembersModal';
 export { QuakeTerminal } from './QuakeTerminal';
+export { TerminalContent } from './TerminalContent';
