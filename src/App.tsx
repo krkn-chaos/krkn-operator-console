@@ -361,7 +361,7 @@ function App() {
   return (
     <>
       {/* Quake-style dropdown terminal - rendered OUTSIDE Page to avoid layout conflicts */}
-      <QuakeTerminal heightPercent={25} />
+      <QuakeTerminal heightPercent={40} />
 
       <Page header={header}>
         {/* Global notifications - appears right below header */}

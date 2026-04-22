@@ -7,7 +7,7 @@
 }
 
 /* Page content offset to account for trigger strip */
-/* Strip is part of "topbar area", so page content should start below it (81px) not just below masthead (73px) */
+/* Strip is part of "topbar area", so page content should start below it (88px) not just below masthead (70px) */
 .pf-v5-c-page__main {
   padding-top: 8px; /* Additional padding for trigger strip height */
 }
@@ -15,42 +15,87 @@
 /* Trigger Strip - positioned below masthead */
 .quake-terminal-trigger {
   position: fixed;
-  top: 73px; /* Below PatternFly masthead + toolbar (updated after inspection) */
+  top: 70px; /* Below PatternFly masthead + toolbar */
   left: 3px; /* Small spacing on left */
   right: 18px; /* Leave space for scrollbar */
-  height: 8px; /* Increased for better visibility */
-  background: rgba(0, 255, 0, 0.3); /* More visible green during development */
+  height: 18px; /* Flat design height */
+  background: var(--pf-v5-global--BackgroundColor--200);
   cursor: pointer;
   z-index: 10001; /* Higher than terminal panel to always be clickable */
   transition: all 0.2s ease;
-  border-bottom: 1px solid rgba(0, 255, 0, 0.5);
-  box-shadow: 0 2px 4px rgba(0, 255, 0, 0.2);
+  border-bottom: 1px solid var(--pf-v5-global--primary-color--100);
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
 }
 
+/* When terminal is open, remove border from stripe */
+.quake-terminal-trigger.is-open {
+  border-bottom: none;
+}
+
+/* Hover for light theme */
 .quake-terminal-trigger:hover {
-  height: 12px;
-  background: rgba(0, 255, 0, 0.5);
-  box-shadow: 0 3px 8px rgba(0, 255, 0, 0.4);
+  background: #d0d0d0;
+  border-bottom-color: var(--pf-v5-global--primary-color--200);
 }
 
-.quake-terminal-trigger-icon {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
+/* Hover for dark theme */
+.pf-v5-theme-dark .quake-terminal-trigger:hover {
+  background: #1a1a1a;
+  border-bottom-color: var(--pf-v5-global--primary-color--200);
+}
+
+.quake-terminal-trigger-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pf-v5-global--Color--100);
   user-select: none;
 }
 
-/* Backdrop - dark opaque overlay */
+.quake-terminal-trigger-icon {
+  font-size: 1rem;
+}
+
+.quake-terminal-trigger-label {
+  line-height: 1;
+  font-family: 'Courier New', 'Courier', monospace;
+  font-size: 0.8125rem; /* Slightly smaller */
+}
+
+.quake-terminal-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  50.01%, 100% {
+    opacity: 0;
+  }
+}
+
+.quake-terminal-trigger-arrow {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.625rem;
+  color: var(--pf-v5-global--Color--200);
+  user-select: none;
+}
+
+/* Backdrop - no overlay, completely transparent */
 .quake-terminal-backdrop {
   position: fixed;
-  top: 81px; /* Start below masthead + strip - don't cover topbar */
+  top: 88px; /* Start below masthead (70px) + strip (18px) - don't cover topbar */
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85); /* Very opaque like macOS/Linux terminals */
+  background: transparent; /* No dark overlay */
   z-index: 9999;
   animation: fadeIn 0.3s ease;
 }
@@ -63,23 +108,24 @@
 /* Terminal Panel - slides down from top */
 .quake-terminal-panel {
   position: fixed;
-  top: 81px; /* Below masthead (73px) + trigger strip (8px) */
+  top: 88px; /* Below masthead (70px) + trigger strip (18px) */
   left: 3px; /* Small spacing on left */
   right: 18px; /* Match trigger strip width - leave space for scrollbar */
-  background: rgba(20, 20, 20, 0.95); /* Dark with slight transparency */
+  background: transparent; /* Completely transparent panel */
   backdrop-filter: blur(10px); /* Glassmorphism effect */
-  border-bottom: 2px solid rgba(0, 255, 0, 0.3);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   z-index: 10000;
-  /* When closed: move up by (100% of height + 81px) to go completely off-screen above masthead */
-  transform: translateY(calc(-100% - 81px));
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth ease-out */
+  /* When closed: move up by (100% of height + 88px) to go completely off-screen above masthead */
+  transform: translateY(calc(-100% - 88px));
+  opacity: 0; /* Start invisible */
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; /* Smooth ease-out with fade */
   overflow: hidden;
 }
 
 .quake-terminal-panel.is-open {
-  /* When open: reset to natural position (top: 81px) */
+  /* When open: reset to natural position, add border at bottom, and fade in */
   transform: translateY(0);
+  opacity: 1; /* Fade in */
+  border-bottom: 1px solid var(--pf-v5-global--primary-color--100);
 }
 
 /* Terminal Content */
@@ -87,36 +133,17 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  color: #00ff00; /* Classic terminal green */
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Courier New', monospace;
+  opacity: 0.9; /* Slight transparency for see-through effect */
 }
 
-/* Terminal Header */
-.quake-terminal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  background: rgba(0, 0, 0, 0.5);
-  border-bottom: 1px solid rgba(0, 255, 0, 0.2);
-  font-size: 0.875rem;
-  user-select: none;
+/* Text color - dark gray for light theme, very light gray for dark theme */
+.quake-terminal-content {
+  color: #2a2a2a; /* Very dark gray for light theme */
 }
 
-.quake-terminal-close {
-  background: transparent;
-  border: none;
-  color: #00ff00;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  transition: all 0.2s;
-  border-radius: 4px;
-}
-
-.quake-terminal-close:hover {
-  background: rgba(255, 0, 0, 0.2);
-  color: #ff4444;
+.pf-v5-theme-dark .quake-terminal-content {
+  color: #e8e8e8; /* Very light gray for dark theme */
 }
 
 /* Terminal Body - scrollable content area */

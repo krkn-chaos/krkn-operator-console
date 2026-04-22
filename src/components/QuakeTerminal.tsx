@@ -1,12 +1,13 @@
 import { useState } from 'react';
+import { TerminalIcon } from '@patternfly/react-icons';
 import './QuakeTerminal.css';
 
 interface QuakeTerminalProps {
-  /** Height of terminal as percentage of viewport (default: 25) */
+  /** Height of terminal as percentage of viewport (default: 40) */
   heightPercent?: number;
 }
 
-export function QuakeTerminal({ heightPercent = 25 }: QuakeTerminalProps) {
+export function QuakeTerminal({ heightPercent = 40 }: QuakeTerminalProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleToggle = () => {
@@ -17,11 +18,17 @@ export function QuakeTerminal({ heightPercent = 25 }: QuakeTerminalProps) {
     <>
       {/* Trigger Strip - positioned below masthead */}
       <div
-        className="quake-terminal-trigger"
+        className={`quake-terminal-trigger ${isOpen ? 'is-open' : ''}`}
         onClick={handleToggle}
         title={isOpen ? 'Close terminal' : 'Open terminal'}
       >
-        <div className="quake-terminal-trigger-icon">
+        <div className="quake-terminal-trigger-content">
+          <TerminalIcon className="quake-terminal-trigger-icon" />
+          <span className="quake-terminal-trigger-label">
+            cluster terminal<span className="quake-terminal-cursor">_</span>
+          </span>
+        </div>
+        <div className="quake-terminal-trigger-arrow">
           {isOpen ? '▲' : '▼'}
         </div>
       </div>
@@ -40,19 +47,9 @@ export function QuakeTerminal({ heightPercent = 25 }: QuakeTerminalProps) {
         style={{ height: `${heightPercent}vh` }}
       >
         <div className="quake-terminal-content">
-          {/* Terminal content will go here */}
-          <div className="quake-terminal-header">
-            <span>Terminal</span>
-            <button
-              className="quake-terminal-close"
-              onClick={handleToggle}
-            >
-              ✕
-            </button>
-          </div>
           <div className="quake-terminal-body">
             {/* Placeholder for terminal UI */}
-            <pre style={{ color: '#00ff00', fontFamily: 'monospace' }}>
+            <pre style={{ fontFamily: 'monospace' }}>
               $ Welcome to Krkn Terminal{'\n'}
               $ Ready...
             </pre>
