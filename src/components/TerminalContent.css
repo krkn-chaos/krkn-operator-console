@@ -3,10 +3,14 @@
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Courier New', monospace;
   font-size: 0.875rem;
   line-height: 1.5;
+  tab-size: 4; /* Preserve tab spacing */
 }
 
 .terminal-line {
   margin-bottom: 0.5rem;
+  white-space: pre-wrap; /* Preserve whitespace and line breaks */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .terminal-error {
@@ -28,7 +32,8 @@
 /* Loading dots animation */
 .loading-dots {
   display: inline-block;
-  width: 20px;
+  width: 30px; /* Fixed width to prevent layout shift */
+  text-align: left;
 }
 
 .loading-dots::after {
@@ -37,10 +42,10 @@
 }
 
 @keyframes loadingDots {
-  0% { content: ''; }
-  25% { content: '.'; }
-  50% { content: '..'; }
-  75% { content: '...'; }
+  0% { content: '.\u00A0\u00A0'; } /* Non-breaking spaces to maintain width */
+  25% { content: '..\u00A0'; }
+  50% { content: '...'; }
+  75% { content: '.\u00A0\u00A0'; }
 }
 
 /* Clusters grid */
@@ -87,6 +92,12 @@
 .prompt-symbol {
   color: var(--pf-v5-global--primary-color--100);
   font-weight: bold;
+  white-space: nowrap;
+}
+
+.k8s-wheel {
+  font-size: 1.5em;
+  margin-right: 0.25rem;
 }
 
 .terminal-input-wrapper {

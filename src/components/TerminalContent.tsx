@@ -6,19 +6,92 @@ import './TerminalContent.css';
 
 interface TerminalContentProps {
   isOpen: boolean;
+  onClose: () => void;
 }
 
-export function TerminalContent({ isOpen }: TerminalContentProps) {
-  const { clusters, discoveryUuid, isLoading, error, startDiscovery, retry, reset } = useClusterDiscovery();
+export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
+  const { clusters, discoveryUuid, isLoading, error, startDiscovery, reset } = useClusterDiscovery();
   const [currentPage, setCurrentPage] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [outputLines, setOutputLines] = useState<string[]>([]);
+  const [selectedCluster, setSelectedCluster] = useState<TargetResponse | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
   const previousIsOpenRef = useRef(isOpen);
   const inputRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const CLUSTERS_PER_PAGE = 50;
   const COLUMNS = 5;
   const ROWS_PER_COLUMN = 10;
+
+  // Execute command on selected cluster
+  const executeCommand = async (command: string) => {
+    if (!selectedCluster || !discoveryUuid) return;
+
+    setIsExecuting(true);
+
+    // Add command to output immediately (with executing indicator)
+    const newOutputLines = [
+      ...outputLines,
+      `☸ ${selectedCluster.clusterName} $ ${command}`,
+      'Executing...',
+    ];
+    setOutputLines(newOutputLines);
+
+    try {
+      const result = await operatorApi.executeTerminalCommand({
+        cluster_id: selectedCluster.clusterName,
+        uuid: discoveryUuid,
+        command,
+      });
+
+      // Add stdout and stderr to output
+      const output: string[] = [];
+
+      if (result.stdout) {
+        // Split by newline to preserve multi-line output, filter trailing empty lines
+        const stdoutLines = result.stdout.split('\n');
+        // Remove empty string at the end if stdout ends with \n
+        if (stdoutLines[stdoutLines.length - 1] === '') {
+          stdoutLines.pop();
+        }
+        output.push(...stdoutLines);
+      }
+
+      if (result.stderr) {
+        // Split by newline to preserve multi-line output, filter trailing empty lines
+        const stderrLines = result.stderr.split('\n');
+        // Remove empty string at the end if stderr ends with \n
+        if (stderrLines[stderrLines.length - 1] === '') {
+          stderrLines.pop();
+        }
+        output.push(...stderrLines);
+      }
+
+      // Add exit code if non-zero
+      if (result.exitCode !== 0) {
+        output.push(`[Exit code: ${result.exitCode}]`);
+      }
+
+      // Replace "Executing..." with actual output
+      setOutputLines([
+        ...outputLines,
+        `☸ ${selectedCluster.clusterName} $ ${command}`,
+        ...output,
+      ]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Command execution failed';
+      // Replace "Executing..." with error
+      setOutputLines([
+        ...outputLines,
+        `☸ ${selectedCluster.clusterName} $ ${command}`,
+        `Error: ${errorMessage}`,
+      ]);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
 
   // Start discovery when terminal opens
   useEffect(() => {
@@ -27,6 +100,16 @@ export function TerminalContent({ isOpen }: TerminalContentProps) {
       setIsInitialized(true);
     }
   }, [isOpen, isInitialized, clusters, isLoading, error, startDiscovery]);
+
+  // Keep scroll at top during loading
+  useEffect(() => {
+    if (isLoading) {
+      const terminalBody = document.getElementById('terminal-body');
+      if (terminalBody) {
+        terminalBody.scrollTop = 0;
+      }
+    }
+  }, [isLoading]);
 
   // Auto-focus input when terminal opens and clusters are loaded
   useEffect(() => {
@@ -37,6 +120,16 @@ export function TerminalContent({ isOpen }: TerminalContentProps) {
       }, 100);
     }
   }, [isOpen, clusters]);
+
+  // Auto-scroll to bottom when output changes (only when clusters are loaded)
+  useEffect(() => {
+    if (bottomRef.current && clusters && clusters.length > 0) {
+      // Use setTimeout to ensure DOM is updated before scrolling
+      setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 50);
+    }
+  }, [outputLines, clusters]);
 
   // Cleanup when terminal closes
   useEffect(() => {
@@ -56,21 +149,76 @@ export function TerminalContent({ isOpen }: TerminalContentProps) {
       reset();
       setCurrentPage(0);
       setInputValue('');
+      setOutputLines([]);
+      setSelectedCluster(null);
       setIsInitialized(false);
     }
   }, [isOpen, discoveryUuid, reset]);
 
   // Handle Enter key
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle Ctrl+D to close terminal
+    if (e.key === 'd' && e.ctrlKey) {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+
     if (e.key === 'Enter') {
       if (!inputValue.trim()) {
-        // Empty input - go to next page if available
-        if (clusters && (currentPage + 1) * CLUSTERS_PER_PAGE < clusters.length) {
+        // Empty input
+        const totalPages = clusters ? Math.ceil(clusters.length / CLUSTERS_PER_PAGE) : 0;
+        const hasNextPage = currentPage < totalPages - 1;
+
+        if (hasNextPage) {
+          // Go to next page if available
           setCurrentPage(currentPage + 1);
+        } else {
+          // No next page - add empty line to output (like real terminal)
+          const promptSymbol = selectedCluster ? `☸ ${selectedCluster.clusterName} $` : '$';
+          setOutputLines([...outputLines, `${promptSymbol} `]);
+        }
+      } else if (!selectedCluster) {
+        // Cluster selection mode
+        const command = inputValue.trim();
+
+        // Handle 'exit' command to close terminal
+        if (command === 'exit') {
+          onClose();
+          return;
+        }
+
+        // Parse cluster number
+        const clusterNumber = parseInt(command, 10);
+        if (clusters && clusterNumber >= 1 && clusterNumber <= clusters.length) {
+          const cluster = clusters[clusterNumber - 1];
+          setSelectedCluster(cluster);
+          setOutputLines([
+            ...outputLines,
+            `$ ${command}`,
+            `Connected to cluster: ${cluster.clusterName}`,
+            '',
+          ]);
+        } else {
+          setOutputLines([
+            ...outputLines,
+            `$ ${command}`,
+            `Error: Invalid cluster number. Please select 1-${clusters?.length || 0}`,
+          ]);
         }
       } else {
-        // TODO: Handle cluster selection
-        console.log('Selected cluster number:', inputValue);
+        // Command execution mode
+        const command = inputValue.trim();
+
+        // Handle 'exit' command to close terminal
+        if (command === 'exit') {
+          onClose();
+          return;
+        }
+
+        // Execute command on selected cluster
+        console.log('Executing command:', command, 'cluster:', selectedCluster?.clusterName, 'uuid:', discoveryUuid);
+        executeCommand(command);
       }
       setInputValue('');
     }
@@ -95,12 +243,12 @@ export function TerminalContent({ isOpen }: TerminalContentProps) {
     return columns;
   };
 
-  // Loading state with animated dots
+  // Loading state - static (no animation to prevent layout shift)
   if (isLoading) {
     return (
-      <div className="terminal-content">
-        <div className="terminal-line">
-          Loading clusters<span className="loading-dots">...</span>
+      <div className="terminal-content" style={{ minHeight: '100px' }}>
+        <div className="terminal-line" style={{ padding: '1rem 0' }}>
+          Loading clusters...
         </div>
       </div>
     );
@@ -118,63 +266,6 @@ export function TerminalContent({ isOpen }: TerminalContentProps) {
     );
   }
 
-  // Clusters loaded
-  if (clusters && clusters.length > 0) {
-    const columns = formatClustersGrid(clusters);
-    const totalPages = Math.ceil(clusters.length / CLUSTERS_PER_PAGE);
-    const hasNextPage = currentPage < totalPages - 1;
-
-    return (
-      <div className="terminal-content">
-        <div className="terminal-line">
-          Select a cluster (showing {currentPage * CLUSTERS_PER_PAGE + 1}-
-          {Math.min((currentPage + 1) * CLUSTERS_PER_PAGE, clusters.length)} of {clusters.length}):
-        </div>
-
-        <div className="clusters-grid">
-          {columns.map((column, colIndex) => (
-            <div key={colIndex} className="cluster-column">
-              {column.map((cluster, rowIndex) => {
-                const globalIndex = currentPage * CLUSTERS_PER_PAGE + colIndex * ROWS_PER_COLUMN + rowIndex;
-                return (
-                  <div key={cluster.uuid} className="cluster-item">
-                    <span className="cluster-number">{globalIndex + 1}.</span>{' '}
-                    <span className="cluster-name">{cluster.clusterName}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
-        {hasNextPage && (
-          <div className="terminal-line terminal-hint">
-            Press <span className="terminal-key">Enter</span> for next page
-          </div>
-        )}
-
-        <div className="terminal-prompt">
-          <span className="prompt-symbol">$</span>{' '}
-          <div className="terminal-input-wrapper">
-            <input
-              ref={inputRef}
-              type="text"
-              className="terminal-input"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder=""
-            />
-            <div className="terminal-display">
-              <span className="terminal-display-text">{inputValue}</span>
-              <span className="terminal-cursor-block">_</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // No clusters found
   if (clusters && clusters.length === 0) {
     return (
@@ -185,9 +276,90 @@ export function TerminalContent({ isOpen }: TerminalContentProps) {
   }
 
   // Initial state (should not happen due to useEffect)
+  if (!clusters) {
+    return (
+      <div className="terminal-content">
+        <div className="terminal-line">Ready...</div>
+      </div>
+    );
+  }
+
+  // Clusters loaded - render interactive terminal
+  const columns = formatClustersGrid(clusters);
+  const totalPages = Math.ceil(clusters.length / CLUSTERS_PER_PAGE);
+  const hasNextPage = currentPage < totalPages - 1;
+
   return (
     <div className="terminal-content">
-      <div className="terminal-line">Ready...</div>
+      {/* Show cluster selection header and grid only if no cluster is selected */}
+      {!selectedCluster && (
+        <>
+          <div className="terminal-line">
+            Select a cluster (showing {currentPage * CLUSTERS_PER_PAGE + 1}-
+            {Math.min((currentPage + 1) * CLUSTERS_PER_PAGE, clusters.length)} of {clusters.length}):
+          </div>
+
+          <div className="clusters-grid">
+            {columns.map((column, colIndex) => (
+              <div key={colIndex} className="cluster-column">
+                {column.map((cluster, rowIndex) => {
+                  const globalIndex = currentPage * CLUSTERS_PER_PAGE + colIndex * ROWS_PER_COLUMN + rowIndex;
+                  return (
+                    <div key={cluster.uuid} className="cluster-item">
+                      <span className="cluster-number">{globalIndex + 1}.</span>{' '}
+                      <span className="cluster-name">{cluster.clusterName}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Output history */}
+      {outputLines.map((line, index) => (
+        <div key={index} className="terminal-line terminal-output">
+          {line}
+        </div>
+      ))}
+
+      <div className="terminal-line terminal-hint">
+        {hasNextPage && !selectedCluster && (
+          <>Press <span className="terminal-key">Enter</span> for next page &middot; </>
+        )}
+        Press <span className="terminal-key">Ctrl+D</span> or type <span className="terminal-key">exit</span> to close
+      </div>
+
+      <div className="terminal-prompt">
+        {selectedCluster ? (
+          <span className="prompt-symbol">
+            <span className="k8s-wheel">☸</span> {selectedCluster.clusterName} $
+          </span>
+        ) : (
+          <span className="prompt-symbol">$</span>
+        )}{' '}
+        <div className="terminal-input-wrapper">
+          <input
+            ref={inputRef}
+            type="text"
+            className="terminal-input"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder=""
+            disabled={isExecuting}
+          />
+          <div className="terminal-display">
+            <span className="terminal-display-text">{inputValue}</span>
+            {!isExecuting && <span className="terminal-cursor-block">_</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Invisible element at the bottom for auto-scroll */}
+      <div ref={bottomRef} style={{ height: '1px' }} />
     </div>
   );
 }
+

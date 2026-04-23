@@ -13,7 +13,9 @@ import type {
   ScenarioRunStatusResponse,
   JobStatusResponse,
   JobsListResponse,
-  ActiveRunsResponse
+  ActiveRunsResponse,
+  TerminalRequest,
+  TerminalResponse
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -53,6 +55,38 @@ class OperatorApiClient extends BaseApiClient {
     await this.fetch(`/targets/${uuid}`, {
       method: 'DELETE',
     });
+  }
+
+  /**
+   * POST /terminal
+   * Execute a command on a remote cluster via kubectl/oc
+   * @param request - Terminal request with cluster_id, uuid, and command
+   * @returns Promise with decoded stdout, stderr, and exit code
+   */
+  async executeTerminalCommand(request: TerminalRequest): Promise<{
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  }> {
+    const response = await this.fetchJson<TerminalResponse>('/terminal', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+
+    // Decode base64 stdout and stderr
+    const stdout = response.stdout_base64 ? atob(response.stdout_base64) : '';
+    const stderr = response.stderr_base64 ? atob(response.stderr_base64) : '';
+
+    // If there's an error, throw with the message
+    if (response.error) {
+      throw new Error(response.message || response.error);
+    }
+
+    return {
+      stdout,
+      stderr,
+      exitCode: response.exit_code,
+    };
   }
 
   /**

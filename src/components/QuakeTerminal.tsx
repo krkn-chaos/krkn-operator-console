@@ -48,8 +48,8 @@ export function QuakeTerminal({ heightPercent = 40 }: QuakeTerminalProps) {
         style={{ height: `${heightPercent}vh` }}
       >
         <div className="quake-terminal-content">
-          <div className="quake-terminal-body">
-            <TerminalContent isOpen={isOpen} />
+          <div className="quake-terminal-body" id="terminal-body">
+            <TerminalContent isOpen={isOpen} onClose={handleToggle} />
           </div>
         </div>
       </div>
