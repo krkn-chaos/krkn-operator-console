@@ -17,6 +17,9 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const [outputLines, setOutputLines] = useState<string[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<TargetResponse | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [currentInput, setCurrentInput] = useState(''); // Store current input when navigating history
   const previousIsOpenRef = useRef(isOpen);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -24,6 +27,16 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const CLUSTERS_PER_PAGE = 50;
   const COLUMNS = 5;
   const ROWS_PER_COLUMN = 10;
+
+  // Handle click anywhere in terminal to restore focus and scroll to bottom
+  const handleTerminalClick = () => {
+    // Focus input
+    inputRef.current?.focus();
+    // Scroll to bottom
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  };
 
   // Execute command on selected cluster
   const executeCommand = async (command: string) => {
@@ -90,6 +103,10 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       ]);
     } finally {
       setIsExecuting(false);
+      // Restore focus to input after command execution
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   };
 
@@ -152,6 +169,9 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       setOutputLines([]);
       setSelectedCluster(null);
       setIsInitialized(false);
+      setCommandHistory([]);
+      setHistoryIndex(-1);
+      setCurrentInput('');
     }
   }, [isOpen, discoveryUuid, reset]);
 
@@ -161,6 +181,43 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     if (e.key === 'd' && e.ctrlKey) {
       e.preventDefault();
       onClose();
+      return;
+    }
+
+    // Handle Arrow Up - navigate to previous command
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (commandHistory.length === 0) return;
+
+      // Save current input if we're starting to navigate history
+      if (historyIndex === -1) {
+        setCurrentInput(inputValue);
+      }
+
+      const newIndex = historyIndex === -1
+        ? commandHistory.length - 1
+        : Math.max(0, historyIndex - 1);
+
+      setHistoryIndex(newIndex);
+      setInputValue(commandHistory[newIndex]);
+      return;
+    }
+
+    // Handle Arrow Down - navigate to next command (or back to current input)
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex === -1) return; // Already at current input
+
+      const newIndex = historyIndex + 1;
+
+      if (newIndex >= commandHistory.length) {
+        // Back to current input
+        setHistoryIndex(-1);
+        setInputValue(currentInput);
+      } else {
+        setHistoryIndex(newIndex);
+        setInputValue(commandHistory[newIndex]);
+      }
       return;
     }
 
@@ -216,11 +273,18 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           return;
         }
 
+        // Add command to history (avoid duplicates of last command)
+        if (command && (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command)) {
+          setCommandHistory([...commandHistory, command]);
+        }
+
         // Execute command on selected cluster
         console.log('Executing command:', command, 'cluster:', selectedCluster?.clusterName, 'uuid:', discoveryUuid);
         executeCommand(command);
       }
       setInputValue('');
+      setHistoryIndex(-1); // Reset history navigation
+      setCurrentInput(''); // Clear stored input
     }
   };
 
@@ -290,7 +354,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const hasNextPage = currentPage < totalPages - 1;
 
   return (
-    <div className="terminal-content">
+    <div className="terminal-content" onClick={handleTerminalClick}>
       {/* Show cluster selection header and grid only if no cluster is selected */}
       {!selectedCluster && (
         <>
