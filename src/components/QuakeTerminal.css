@@ -15,6 +15,12 @@
 
 /* Trigger Strip - positioned below masthead */
 .quake-terminal-trigger {
+  /* Reset button defaults */
+  border: none;
+  border-radius: 0;
+  font: inherit;
+  text-align: left;
+
   position: fixed;
   top: 70px; /* Below PatternFly masthead + toolbar */
   left: 3px; /* Small spacing on left */
@@ -28,6 +34,11 @@
   display: flex;
   align-items: center;
   padding: 0 0.75rem;
+}
+
+.quake-terminal-trigger:focus {
+  outline: 2px solid var(--pf-v5-global--primary-color--100);
+  outline-offset: -2px;
 }
 
 /* When terminal is open, remove border from stripe */
@@ -91,6 +102,11 @@
 
 /* Backdrop - no overlay, completely transparent */
 .quake-terminal-backdrop {
+  /* Reset button defaults */
+  border: none;
+  padding: 0;
+  cursor: default;
+
   position: fixed;
   top: 88px; /* Start below masthead (70px) + strip (18px) - don't cover topbar */
   left: 0;
@@ -99,6 +115,10 @@
   background: transparent; /* No dark overlay */
   z-index: 500; /* Above trigger (400), below modals (9100+) */
   animation: fadeIn 0.3s ease;
+}
+
+.quake-terminal-backdrop:focus {
+  outline: none; /* Backdrop doesn't need focus outline */
 }
 
 @keyframes fadeIn {

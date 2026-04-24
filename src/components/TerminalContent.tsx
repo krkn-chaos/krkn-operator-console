@@ -5,11 +5,73 @@ import { operatorApi } from '../services/operatorApi';
 import type { TargetResponse, AvailableCommandsResponse } from '../types/api';
 import './TerminalContent.css';
 
+/**
+ * Props for the TerminalContent component
+ */
 interface TerminalContentProps {
+  /** Whether the terminal is currently open/visible */
   isOpen: boolean;
+  /** Callback to close the terminal */
   onClose: () => void;
 }
 
+/**
+ * TerminalContent - Interactive terminal UI for executing kubectl/oc commands on remote clusters
+ *
+ * @description
+ * Provides a terminal-like interface for users to:
+ * - Discover and select target Kubernetes clusters
+ * - Execute read-only kubectl/oc commands on selected clusters
+ * - View command output with proper formatting (stdout/stderr)
+ * - Navigate command history with arrow keys
+ * - Copy command output to clipboard
+ * - View available commands with the '?' help command
+ *
+ * @behavior
+ * **Cluster Discovery:**
+ * - Automatically initiates cluster discovery when terminal opens
+ * - Displays clusters in a paginated grid (50 per page, 5 columns)
+ * - Clusters are sorted alphabetically by name
+ *
+ * **Command Execution:**
+ * - User selects cluster by number
+ * - Executes commands via POST /api/v1/terminal endpoint
+ * - Displays stdout/stderr in terminal output
+ * - Shows "Command failed" indicator for non-zero exit codes
+ * - Provides copy button for stdout output
+ *
+ * **Keyboard Shortcuts:**
+ * - Enter: Execute command or select cluster
+ * - Arrow Up/Down: Navigate command history
+ * - Ctrl+D: Close terminal
+ * - Type 'exit': Close terminal
+ * - Type '?': Show available commands
+ *
+ * **Error Handling:**
+ * - 404: Command not found
+ * - 403: Permission denied
+ * - 500: Server error executing command
+ * - 400: Command executed but failed (exit code > 0)
+ *
+ * @edge_cases
+ * - Discovery timeout: Shows error message, no automatic retry
+ * - No clusters found: Displays "No clusters found" message
+ * - Command with empty output: Displays empty line
+ * - Failed to load available commands: User can still execute commands, '?' shows "Loading..."
+ *
+ * @cleanup
+ * - Deletes target request (DELETE /api/v1/targets/{uuid}) when terminal closes
+ * - Resets all state (selected cluster, output, history) on close
+ * - Cleans up available commands cache
+ *
+ * @example
+ * ```tsx
+ * <TerminalContent
+ *   isOpen={isTerminalOpen}
+ *   onClose={() => setIsTerminalOpen(false)}
+ * />
+ * ```
+ */
 export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const { clusters, discoveryUuid, isLoading, error, startDiscovery, reset } = useClusterDiscovery();
   const [currentPage, setCurrentPage] = useState(0);
@@ -401,6 +463,55 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           return;
         }
 
+        // Client-side validation if available commands are loaded
+        if (availableCommands) {
+          const commandParts = command.split(/\s+/);
+          const mainCommand = commandParts[0];
+          const subCommand = commandParts[1];
+
+          // Check if main command is allowed (kubectl or oc)
+          const allowedCommand = availableCommands.commands.find(cmd => cmd.name === mainCommand);
+          if (!allowedCommand) {
+            setOutputLines([
+              ...outputLines,
+              `☸ ${selectedCluster.clusterName} $ ${command}`,
+              `ksh: command not found: ${mainCommand}`,
+              'Type ? for available commands',
+            ]);
+            setInputValue('');
+            return;
+          }
+
+          // Check if subcommand is in allowed list
+          if (subCommand) {
+            const allowedSubcommand = allowedCommand.subcommands.find(sub => sub.name === subCommand);
+            if (!allowedSubcommand) {
+              setOutputLines([
+                ...outputLines,
+                `☸ ${selectedCluster.clusterName} $ ${command}`,
+                `ksh: ${mainCommand}: ${subCommand}: command not found`,
+                'Type ? for available commands',
+              ]);
+              setInputValue('');
+              return;
+            }
+          }
+
+          // Check for blocked flags
+          const blockedFlags = ['--watch', '-w', '--follow', '-f', '--watch-only'];
+          const hasBlockedFlag = blockedFlags.some(flag => command.includes(flag));
+          if (hasBlockedFlag) {
+            setOutputLines([
+              ...outputLines,
+              `☸ ${selectedCluster.clusterName} $ ${command}`,
+              'Error: Streaming flags (--watch, --follow) are not supported',
+              'These flags require WebSocket/SSE which is not available in v1',
+            ]);
+            setInputValue('');
+            return;
+          }
+        }
+
         // Add command to history (avoid duplicates of last command)
         if (command && (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command)) {
           setCommandHistory([...commandHistory, command]);
@@ -444,6 +555,23 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       </div>
     );
   }
+
+  // Handle retry on 'r' key press when in error state
+  useEffect(() => {
+    if (!error || !isOpen) return;
+
+    const handleRetry = (e: KeyboardEvent) => {
+      if (e.key === 'r' || e.key === 'R') {
+        // Reset error state and restart discovery
+        reset();
+        setIsInitialized(false);
+        startDiscovery();
+      }
+    };
+
+    window.addEventListener('keydown', handleRetry);
+    return () => window.removeEventListener('keydown', handleRetry);
+  }, [error, isOpen, reset, startDiscovery]);
 
   // Error state
   if (error) {

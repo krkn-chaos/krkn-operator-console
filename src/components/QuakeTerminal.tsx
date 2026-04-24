@@ -18,10 +18,12 @@ export function QuakeTerminal({ heightPercent = 40 }: QuakeTerminalProps) {
   return (
     <>
       {/* Trigger Strip - positioned below masthead */}
-      <div
+      <button
+        type="button"
         className={`quake-terminal-trigger ${isOpen ? 'is-open' : ''}`}
         onClick={handleToggle}
-        title={isOpen ? 'Close terminal' : 'Open terminal'}
+        aria-label={isOpen ? 'Close terminal' : 'Open terminal'}
+        aria-expanded={isOpen}
       >
         <div className="quake-terminal-trigger-content">
           <TerminalIcon className="quake-terminal-trigger-icon" />
@@ -32,13 +34,16 @@ export function QuakeTerminal({ heightPercent = 40 }: QuakeTerminalProps) {
         <div className="quake-terminal-trigger-arrow">
           {isOpen ? '▲' : '▼'}
         </div>
-      </div>
+      </button>
 
       {/* Backdrop - dark overlay when terminal is open */}
       {isOpen && (
-        <div
+        <button
+          type="button"
           className="quake-terminal-backdrop"
           onClick={handleToggle}
+          aria-label="Close terminal"
+          tabIndex={-1}
         />
       )}
 
