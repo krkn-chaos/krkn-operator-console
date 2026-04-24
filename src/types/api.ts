@@ -23,6 +23,27 @@ export interface TerminalResponse {
   message?: string;    // Error message if failed
 }
 
+export interface TerminalSubcommand {
+  name: string;
+  description: string;
+}
+
+export interface TerminalCommand {
+  name: string;
+  description: string;
+  subcommands: TerminalSubcommand[];
+}
+
+export interface TerminalBlockedFlag {
+  name: string;
+  description: string;
+}
+
+export interface AvailableCommandsResponse {
+  commands: TerminalCommand[];
+  blocked_flags: TerminalBlockedFlag[];
+}
+
 export interface Cluster {
   'cluster-name': string;
   'cluster-api-url': string;

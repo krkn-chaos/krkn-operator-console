@@ -15,7 +15,8 @@ import type {
   JobsListResponse,
   ActiveRunsResponse,
   TerminalRequest,
-  TerminalResponse
+  TerminalResponse,
+  AvailableCommandsResponse
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -108,6 +109,15 @@ class OperatorApiClient extends BaseApiClient {
       stderr,
       exitCode: data.exit_code,
     };
+  }
+
+  /**
+   * GET /terminal/available-commands
+   * Get list of available terminal commands and blocked flags
+   * @returns Promise with available commands and blocked flags
+   */
+  async getAvailableTerminalCommands(): Promise<AvailableCommandsResponse> {
+    return this.fetchJson<AvailableCommandsResponse>('/terminal/available-commands');
   }
 
   /**

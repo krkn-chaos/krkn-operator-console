@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { CopyIcon } from '@patternfly/react-icons';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { operatorApi } from '../services/operatorApi';
-import type { TargetResponse } from '../types/api';
+import type { TargetResponse, AvailableCommandsResponse } from '../types/api';
 import './TerminalContent.css';
 
 interface TerminalContentProps {
@@ -23,6 +23,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const [currentInput, setCurrentInput] = useState(''); // Store current input when navigating history
   const [commandOutputs, setCommandOutputs] = useState<Map<number, string>>(new Map()); // Store stdout for each command
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [availableCommands, setAvailableCommands] = useState<AvailableCommandsResponse | null>(null);
   const previousIsOpenRef = useRef(isOpen);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -183,6 +184,17 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     }
   }, [isOpen, isInitialized, clusters, isLoading, error, startDiscovery]);
 
+  // Load available commands when terminal opens
+  useEffect(() => {
+    if (isOpen && !availableCommands) {
+      operatorApi.getAvailableTerminalCommands()
+        .then(setAvailableCommands)
+        .catch((error) => {
+          console.error('Failed to load available commands:', error);
+        });
+    }
+  }, [isOpen, availableCommands]);
+
   // Keep scroll at top during loading
   useEffect(() => {
     if (isLoading) {
@@ -239,6 +251,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       setCurrentInput('');
       setCommandOutputs(new Map());
       setCopiedIndex(null);
+      setAvailableCommands(null);
     }
   }, [isOpen, discoveryUuid, reset]);
 
@@ -315,12 +328,41 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           return;
         }
 
+        // Handle '?' command to show available commands
+        if (command === '?') {
+          const helpLines = ['$ ?', 'Available commands:'];
+
+          if (availableCommands) {
+            availableCommands.commands.forEach(cmd => {
+              helpLines.push('');
+              helpLines.push(`${cmd.name} - ${cmd.description}`);
+              cmd.subcommands.forEach(sub => {
+                helpLines.push(`  ${sub.name} - ${sub.description}`);
+              });
+            });
+
+            if (availableCommands.blocked_flags.length > 0) {
+              helpLines.push('');
+              helpLines.push('Blocked flags (not supported):');
+              availableCommands.blocked_flags.forEach(flag => {
+                helpLines.push(`  --${flag.name} - ${flag.description}`);
+              });
+            }
+          } else {
+            helpLines.push('Loading available commands...');
+          }
+
+          setOutputLines([...outputLines, ...helpLines]);
+          setInputValue('');
+          return;
+        }
+
         // Parse cluster number (use sorted clusters)
         const clusterNumber = parseInt(command, 10);
-        const sortedClusters = [...clusters].sort((a, b) =>
+        const sortedClusters = clusters ? [...clusters].sort((a, b) =>
           a.clusterName.localeCompare(b.clusterName)
-        );
-        if (sortedClusters && clusterNumber >= 1 && clusterNumber <= sortedClusters.length) {
+        ) : [];
+        if (sortedClusters.length > 0 && clusterNumber >= 1 && clusterNumber <= sortedClusters.length) {
           const cluster = sortedClusters[clusterNumber - 1];
           setSelectedCluster(cluster);
           setOutputLines([
@@ -343,6 +385,35 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         // Handle 'exit' command to close terminal
         if (command === 'exit') {
           onClose();
+          return;
+        }
+
+        // Handle '?' command to show available commands
+        if (command === '?') {
+          const helpLines = [`☸ ${selectedCluster.clusterName} $ ?`, 'Available commands:'];
+
+          if (availableCommands) {
+            availableCommands.commands.forEach(cmd => {
+              helpLines.push('');
+              helpLines.push(`${cmd.name} - ${cmd.description}`);
+              cmd.subcommands.forEach(sub => {
+                helpLines.push(`  ${sub.name} - ${sub.description}`);
+              });
+            });
+
+            if (availableCommands.blocked_flags.length > 0) {
+              helpLines.push('');
+              helpLines.push('Blocked flags (not supported):');
+              availableCommands.blocked_flags.forEach(flag => {
+                helpLines.push(`  --${flag.name} - ${flag.description}`);
+              });
+            }
+          } else {
+            helpLines.push('Loading available commands...');
+          }
+
+          setOutputLines([...outputLines, ...helpLines]);
+          setInputValue('');
           return;
         }
 
@@ -492,7 +563,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         {hasNextPage && !selectedCluster && (
           <>Press <span className="terminal-key">Enter</span> for next page &middot; </>
         )}
-        Press <span className="terminal-key">Ctrl+D</span> or type <span className="terminal-key">exit</span> to close
+        Type <span className="terminal-key">?</span> for available commands &middot; Press <span className="terminal-key">Ctrl+D</span> or type <span className="terminal-key">exit</span> to close
       </div>
 
       <div className="terminal-prompt">
