@@ -14,19 +14,10 @@ vi.mock('../services/operatorApi', () => ({
   },
 }));
 
-// Mock useClusterDiscovery hook
+// Mock useClusterDiscovery hook with a factory function
+const mockUseClusterDiscovery = vi.fn();
 vi.mock('../hooks/useClusterDiscovery', () => ({
-  useClusterDiscovery: () => ({
-    clusters: [
-      { uuid: '1', clusterName: 'cluster-a', clusterAPIURL: 'https://api-a', ready: true },
-      { uuid: '2', clusterName: 'cluster-b', clusterAPIURL: 'https://api-b', ready: true },
-    ],
-    discoveryUuid: 'test-uuid',
-    isLoading: false,
-    error: null,
-    startDiscovery: vi.fn(),
-    reset: vi.fn(),
-  }),
+  useClusterDiscovery: () => mockUseClusterDiscovery(),
 }));
 
 describe('TerminalContent', () => {
@@ -47,10 +38,34 @@ describe('TerminalContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getAvailableTerminalCommands).mockResolvedValue(mockAvailableCommands);
+    vi.mocked(operatorApi.deleteTargetRequest).mockResolvedValue(undefined);
+
+    // Default mock: clusters loaded
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: [
+        { uuid: '1', clusterName: 'cluster-a', clusterAPIURL: 'https://api-a', ready: true },
+        { uuid: '2', clusterName: 'cluster-b', clusterAPIURL: 'https://api-b', ready: true },
+      ],
+      discoveryUuid: 'test-uuid',
+      isLoading: false,
+      error: null,
+      startDiscovery: vi.fn(),
+      reset: vi.fn(),
+    });
   });
 
   it('should render loading state initially', () => {
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: null,
+      discoveryUuid: null,
+      isLoading: true,
+      error: null,
+      startDiscovery: vi.fn(),
+      reset: vi.fn(),
+    });
+
     render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+
     expect(screen.getByText('Loading clusters...')).toBeInTheDocument();
   });
 
@@ -97,10 +112,15 @@ describe('TerminalContent', () => {
   });
 
   it('should show hint for available commands', async () => {
-    render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+    const { container } = render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Type.*\?.*for available commands/)).toBeInTheDocument();
+      // Text is split by <span> elements in the terminal-hint div
+      const hint = container.querySelector('.terminal-hint');
+      expect(hint).toBeInTheDocument();
+      expect(hint?.textContent).toContain('Type');
+      expect(hint?.textContent).toContain('?');
+      expect(hint?.textContent).toContain('for available commands');
     });
   });
 

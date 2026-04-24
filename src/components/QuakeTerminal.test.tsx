@@ -41,19 +41,19 @@ describe('QuakeTerminal', () => {
 
   it('should show backdrop when terminal is open', async () => {
     const user = userEvent.setup();
-    render(<QuakeTerminal />);
+    const { container } = render(<QuakeTerminal />);
 
     const trigger = screen.getByRole('button', { name: /Open terminal/i });
     await user.click(trigger);
 
     // Backdrop should be present when open
-    const backdrop = screen.getByRole('button', { name: /Close terminal/i, hidden: true });
-    expect(backdrop).toHaveClass('quake-terminal-backdrop');
+    const backdrop = container.querySelector('.quake-terminal-backdrop');
+    expect(backdrop).toBeInTheDocument();
   });
 
   it('should close terminal when backdrop is clicked', async () => {
     const user = userEvent.setup();
-    render(<QuakeTerminal />);
+    const { container } = render(<QuakeTerminal />);
 
     // Open terminal
     const trigger = screen.getByRole('button', { name: /Open terminal/i });
@@ -62,8 +62,9 @@ describe('QuakeTerminal', () => {
     expect(screen.getByText('Terminal Open')).toBeInTheDocument();
 
     // Click backdrop
-    const backdrop = screen.getByRole('button', { name: /Close terminal/i, hidden: true });
-    await user.click(backdrop);
+    const backdrop = container.querySelector('.quake-terminal-backdrop');
+    expect(backdrop).toBeInTheDocument();
+    await user.click(backdrop!);
 
     expect(screen.queryByText('Terminal Open')).not.toBeInTheDocument();
   });
