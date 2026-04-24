@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { CopyIcon } from '@patternfly/react-icons';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { operatorApi } from '../services/operatorApi';
 import type { TargetResponse } from '../types/api';
@@ -20,6 +21,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [currentInput, setCurrentInput] = useState(''); // Store current input when navigating history
+  const [commandOutputs, setCommandOutputs] = useState<Map<number, string>>(new Map()); // Store stdout for each command
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const previousIsOpenRef = useRef(isOpen);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -38,6 +41,20 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     }
   };
 
+  // Copy output to clipboard
+  const handleCopyOutput = async (index: number) => {
+    const output = commandOutputs.get(index);
+    if (output) {
+      try {
+        await navigator.clipboard.writeText(output);
+        setCopiedIndex(index);
+        setTimeout(() => setCopiedIndex(null), 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    }
+  };
+
   // Execute command on selected cluster
   const executeCommand = async (command: string) => {
     if (!selectedCluster || !discoveryUuid) return;
@@ -51,6 +68,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       'Executing...',
     ];
     setOutputLines(newOutputLines);
+
+    const commandIndex = outputLines.length; // Index for this command's output
 
     try {
       const result = await operatorApi.executeTerminalCommand({
@@ -82,24 +101,57 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         output.push(...stderrLines);
       }
 
-      // Add exit code if non-zero
-      if (result.exitCode !== 0) {
-        output.push(`[Exit code: ${result.exitCode}]`);
+      // Add exit code if non-zero (with red indicator for failure)
+      const exitCodeLine = result.exitCode !== 0
+        ? `EXITCODE_ERROR:${result.exitCode}`
+        : null;
+
+      const finalOutput = exitCodeLine ? [...output, exitCodeLine] : output;
+
+      // Store stdout for copying
+      if (result.stdout) {
+        setCommandOutputs(new Map(commandOutputs).set(commandIndex, result.stdout));
       }
 
-      // Replace "Executing..." with actual output
+      // Replace "Executing..." with actual output + copy button marker
+      const outputWithCopyMarker = result.stdout
+        ? [...finalOutput, `COPY_BUTTON:${commandIndex}`]
+        : finalOutput;
+
       setOutputLines([
         ...outputLines,
         `☸ ${selectedCluster.clusterName} $ ${command}`,
-        ...output,
+        ...outputWithCopyMarker,
       ]);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Command execution failed';
+      let errorMessage = 'Command execution failed';
+
+      if (error instanceof Error) {
+        // Check for custom terminal errors
+        if (error.message.startsWith('TERMINAL_ERROR:')) {
+          const parts = error.message.split(':');
+          const statusCode = parts[1];
+          const commandName = parts[2];
+
+          if (statusCode === '404') {
+            errorMessage = `ksh: command not found: ${commandName}`;
+          } else if (statusCode === '401') {
+            errorMessage = `ksh: permission denied: ${commandName}`;
+          } else if (statusCode === '500') {
+            const clusterName = parts[2];
+            const cmd = parts[3];
+            errorMessage = `ksh: impossible to execute command on cluster ${clusterName}: ${cmd}`;
+          }
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       // Replace "Executing..." with error
       setOutputLines([
         ...outputLines,
         `☸ ${selectedCluster.clusterName} $ ${command}`,
-        `Error: ${errorMessage}`,
+        errorMessage,
       ]);
     } finally {
       setIsExecuting(false);
@@ -172,6 +224,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       setCommandHistory([]);
       setHistoryIndex(-1);
       setCurrentInput('');
+      setCommandOutputs(new Map());
+      setCopiedIndex(null);
     }
   }, [isOpen, discoveryUuid, reset]);
 
@@ -224,7 +278,10 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     if (e.key === 'Enter') {
       if (!inputValue.trim()) {
         // Empty input
-        const totalPages = clusters ? Math.ceil(clusters.length / CLUSTERS_PER_PAGE) : 0;
+        const sortedClusters = clusters ? [...clusters].sort((a, b) =>
+          a.clusterName.localeCompare(b.clusterName)
+        ) : [];
+        const totalPages = sortedClusters.length > 0 ? Math.ceil(sortedClusters.length / CLUSTERS_PER_PAGE) : 0;
         const hasNextPage = currentPage < totalPages - 1;
 
         if (hasNextPage) {
@@ -245,10 +302,13 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           return;
         }
 
-        // Parse cluster number
+        // Parse cluster number (use sorted clusters)
         const clusterNumber = parseInt(command, 10);
-        if (clusters && clusterNumber >= 1 && clusterNumber <= clusters.length) {
-          const cluster = clusters[clusterNumber - 1];
+        const sortedClusters = [...clusters].sort((a, b) =>
+          a.clusterName.localeCompare(b.clusterName)
+        );
+        if (sortedClusters && clusterNumber >= 1 && clusterNumber <= sortedClusters.length) {
+          const cluster = sortedClusters[clusterNumber - 1];
           setSelectedCluster(cluster);
           setOutputLines([
             ...outputLines,
@@ -260,7 +320,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           setOutputLines([
             ...outputLines,
             `$ ${command}`,
-            `Error: Invalid cluster number. Please select 1-${clusters?.length || 0}`,
+            `Error: Invalid cluster number. Please select 1-${sortedClusters?.length || 0}`,
           ]);
         }
       } else {
@@ -348,9 +408,12 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     );
   }
 
-  // Clusters loaded - render interactive terminal
-  const columns = formatClustersGrid(clusters);
-  const totalPages = Math.ceil(clusters.length / CLUSTERS_PER_PAGE);
+  // Clusters loaded - sort alphabetically by name and render interactive terminal
+  const sortedClusters = [...clusters].sort((a, b) =>
+    a.clusterName.localeCompare(b.clusterName)
+  );
+  const columns = formatClustersGrid(sortedClusters);
+  const totalPages = Math.ceil(sortedClusters.length / CLUSTERS_PER_PAGE);
   const hasNextPage = currentPage < totalPages - 1;
 
   return (
@@ -360,7 +423,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         <>
           <div className="terminal-line">
             Select a cluster (showing {currentPage * CLUSTERS_PER_PAGE + 1}-
-            {Math.min((currentPage + 1) * CLUSTERS_PER_PAGE, clusters.length)} of {clusters.length}):
+            {Math.min((currentPage + 1) * CLUSTERS_PER_PAGE, sortedClusters.length)} of {sortedClusters.length}):
           </div>
 
           <div className="clusters-grid">
@@ -382,11 +445,36 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       )}
 
       {/* Output history */}
-      {outputLines.map((line, index) => (
-        <div key={index} className="terminal-line terminal-output">
-          {line}
-        </div>
-      ))}
+      {outputLines.map((line, index) => {
+        // Check for special markers
+        if (line.startsWith('EXITCODE_ERROR:')) {
+          const exitCode = line.split(':')[1];
+          return (
+            <div key={index} className="terminal-line terminal-error">
+              Command failed with exit code: {exitCode}
+            </div>
+          );
+        }
+        if (line.startsWith('COPY_BUTTON:')) {
+          const cmdIndex = parseInt(line.split(':')[1], 10);
+          return (
+            <div key={index} className="terminal-line terminal-copy-container">
+              <button
+                className="terminal-copy-button"
+                onClick={() => handleCopyOutput(cmdIndex)}
+                title="Copy output to clipboard"
+              >
+                <CopyIcon /> {copiedIndex === cmdIndex ? 'Copied!' : 'Copy output'}
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div key={index} className="terminal-line terminal-output">
+            {line}
+          </div>
+        );
+      })}
 
       <div className="terminal-line terminal-hint">
         {hasNextPage && !selectedCluster && (

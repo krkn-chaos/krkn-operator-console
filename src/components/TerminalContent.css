@@ -15,6 +15,38 @@
 
 .terminal-error {
   color: #ff4444;
+  font-weight: bold;
+}
+
+.terminal-copy-container {
+  margin: 0.5rem 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.terminal-copy-button {
+  background: transparent;
+  border: 1px solid var(--pf-v5-global--BorderColor--100);
+  color: var(--pf-v5-global--Color--100);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s;
+}
+
+.terminal-copy-button:hover {
+  background: var(--pf-v5-global--BackgroundColor--dark-100);
+  border-color: var(--pf-v5-global--primary-color--100);
+}
+
+.terminal-copy-button svg {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .terminal-hint {

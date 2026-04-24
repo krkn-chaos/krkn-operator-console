@@ -68,24 +68,45 @@ class OperatorApiClient extends BaseApiClient {
     stderr: string;
     exitCode: number;
   }> {
-    const response = await this.fetchJson<TerminalResponse>('/terminal', {
+    // Use fetch directly to access status codes
+    const response = await this.fetch('/terminal', {
       method: 'POST',
       body: JSON.stringify(request),
     });
 
-    // Decode base64 stdout and stderr
-    const stdout = response.stdout_base64 ? atob(response.stdout_base64) : '';
-    const stderr = response.stderr_base64 ? atob(response.stderr_base64) : '';
-
-    // If there's an error, throw with the message
-    if (response.error) {
-      throw new Error(response.message || response.error);
+    // Handle HTTP error status codes with custom messages
+    if (response.status === 404) {
+      // Command not found
+      throw new Error(`TERMINAL_ERROR:404:${request.command}`);
+    }
+    if (response.status === 401 || response.status === 403) {
+      // Unauthorized/Forbidden
+      throw new Error(`TERMINAL_ERROR:401:${request.command}`);
+    }
+    if (response.status === 500) {
+      // Server error
+      throw new Error(`TERMINAL_ERROR:500:${request.cluster_id}:${request.command}`);
     }
 
+    // 400 means command executed but exited with non-zero code - this is OK, process normally
+    // 200 means command executed successfully
+    if (response.status !== 200 && response.status !== 400) {
+      // Other HTTP errors
+      throw new Error(`HTTP error ${response.status}`);
+    }
+
+    const data = await response.json() as TerminalResponse;
+
+    // Decode base64 stdout and stderr
+    const stdout = data.stdout_base64 ? atob(data.stdout_base64) : '';
+    const stderr = data.stderr_base64 ? atob(data.stderr_base64) : '';
+
+    // For 400 status, the command failed but we still return the output
+    // The exit_code will be > 0 and we'll show it in the terminal
     return {
       stdout,
       stderr,
-      exitCode: response.exit_code,
+      exitCode: data.exit_code,
     };
   }
 
