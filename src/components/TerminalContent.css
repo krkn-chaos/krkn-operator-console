@@ -138,7 +138,7 @@
   margin-right: 0.25rem;
   line-height: 1; /* Prevent extra height */
   display: inline-block;
-  vertical-align: 0.1em; /* Slightly raise to align with surrounding text */
+  transform: translateY(0.1em); /* Adjust vertical position */
 }
 
 .terminal-input-wrapper {
