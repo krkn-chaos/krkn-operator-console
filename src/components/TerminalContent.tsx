@@ -340,14 +340,6 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
                 helpLines.push(`  ${sub.name} - ${sub.description}`);
               });
             });
-
-            if (availableCommands.blocked_flags.length > 0) {
-              helpLines.push('');
-              helpLines.push('Blocked flags (not supported):');
-              availableCommands.blocked_flags.forEach(flag => {
-                helpLines.push(`  --${flag.name} - ${flag.description}`);
-              });
-            }
           } else {
             helpLines.push('Loading available commands...');
           }
@@ -400,14 +392,6 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
                 helpLines.push(`  ${sub.name} - ${sub.description}`);
               });
             });
-
-            if (availableCommands.blocked_flags.length > 0) {
-              helpLines.push('');
-              helpLines.push('Blocked flags (not supported):');
-              availableCommands.blocked_flags.forEach(flag => {
-                helpLines.push(`  --${flag.name} - ${flag.description}`);
-              });
-            }
           } else {
             helpLines.push('Loading available commands...');
           }

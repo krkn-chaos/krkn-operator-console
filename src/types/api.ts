@@ -34,14 +34,8 @@ export interface TerminalCommand {
   subcommands: TerminalSubcommand[];
 }
 
-export interface TerminalBlockedFlag {
-  name: string;
-  description: string;
-}
-
 export interface AvailableCommandsResponse {
   commands: TerminalCommand[];
-  blocked_flags: TerminalBlockedFlag[];
 }
 
 export interface Cluster {
