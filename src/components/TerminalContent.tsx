@@ -63,8 +63,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         setTimeout(() => {
           inputRef.current?.focus();
         }, 100);
-      } catch (err) {
-        console.error('Failed to copy:', err);
+      } catch {
+        // Silently handle copy failures
       }
     }
   };
@@ -189,8 +189,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     if (isOpen && !availableCommands) {
       operatorApi.getAvailableTerminalCommands()
         .then(setAvailableCommands)
-        .catch((error) => {
-          console.error('Failed to load available commands:', error);
+        .catch(() => {
+          // Silently handle failures - user can still use terminal without help
         });
     }
   }, [isOpen, availableCommands]);
@@ -234,8 +234,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     if (wasOpen && !isOpen) {
       // Delete the target request if exists
       if (discoveryUuid) {
-        operatorApi.deleteTargetRequest(discoveryUuid).catch((error) => {
-          console.error('Failed to delete target request:', error);
+        operatorApi.deleteTargetRequest(discoveryUuid).catch(() => {
+          // Silently handle cleanup failures
         });
       }
 
@@ -407,7 +407,6 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         }
 
         // Execute command on selected cluster
-        console.log('Executing command:', command, 'cluster:', selectedCluster?.clusterName, 'uuid:', discoveryUuid);
         executeCommand(command);
       }
       setInputValue('');
