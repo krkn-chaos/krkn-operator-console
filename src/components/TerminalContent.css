@@ -119,7 +119,7 @@
 /* Terminal prompt */
 .terminal-prompt {
   display: flex;
-  align-items: center;
+  align-items: baseline; /* Align text on baseline instead of center */
   margin-top: 1rem;
   gap: 0.5rem;
   position: relative;
@@ -129,11 +129,16 @@
   color: var(--pf-v5-global--primary-color--100);
   font-weight: bold;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline; /* Align icon and text on baseline */
 }
 
 .k8s-wheel {
   font-size: 1.5em;
   margin-right: 0.25rem;
+  line-height: 1; /* Prevent extra height */
+  display: inline-block;
+  vertical-align: baseline; /* Align with text baseline */
 }
 
 .terminal-input-wrapper {
