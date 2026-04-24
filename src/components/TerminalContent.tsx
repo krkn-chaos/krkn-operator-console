@@ -101,12 +101,12 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         output.push(...stderrLines);
       }
 
-      // Add exit code if non-zero (with red indicator for failure)
-      const exitCodeLine = result.exitCode !== 0
-        ? `EXITCODE_ERROR:${result.exitCode}`
+      // Add failure marker if command failed (exit code non-zero)
+      const failureMarker = result.exitCode !== 0 && result.exitCode !== undefined
+        ? 'COMMAND_FAILED'
         : null;
 
-      const finalOutput = exitCodeLine ? [...output, exitCodeLine] : output;
+      const finalOutput = failureMarker ? [...output, failureMarker] : output;
 
       // Store stdout for copying
       if (result.stdout) {
@@ -447,11 +447,10 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       {/* Output history */}
       {outputLines.map((line, index) => {
         // Check for special markers
-        if (line.startsWith('EXITCODE_ERROR:')) {
-          const exitCode = line.split(':')[1];
+        if (line === 'COMMAND_FAILED') {
           return (
             <div key={index} className="terminal-line terminal-error">
-              Command failed with exit code: {exitCode}
+              Command failed
             </div>
           );
         }
