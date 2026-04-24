@@ -135,7 +135,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
 
           if (statusCode === '404') {
             errorMessage = `ksh: command not found: ${commandName}`;
-          } else if (statusCode === '401') {
+          } else if (statusCode === '403') {
             errorMessage = `ksh: permission denied: ${commandName}`;
           } else if (statusCode === '500') {
             const clusterName = parts[2];

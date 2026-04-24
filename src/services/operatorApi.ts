@@ -79,9 +79,9 @@ class OperatorApiClient extends BaseApiClient {
       // Command not found
       throw new Error(`TERMINAL_ERROR:404:${request.command}`);
     }
-    if (response.status === 401 || response.status === 403) {
-      // Unauthorized/Forbidden
-      throw new Error(`TERMINAL_ERROR:401:${request.command}`);
+    if (response.status === 403) {
+      // Forbidden - user not authorized to execute this command
+      throw new Error(`TERMINAL_ERROR:403:${request.command}`);
     }
     if (response.status === 500) {
       // Server error
