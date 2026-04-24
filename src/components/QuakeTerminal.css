@@ -1,10 +1,11 @@
-/* Z-index fix for PatternFly dropdowns to appear above terminal */
-/* PatternFly dropdowns use appendTo: document.body, so they're not inside masthead */
-/* Need to target them directly with higher specificity */
-.pf-v5-c-dropdown__menu,
-.pf-v5-c-menu {
-  z-index: 10002 !important; /* Above terminal backdrop (9999), panel (10000), trigger (10001) */
-}
+/* Z-index layering:
+ * - Masthead (PatternFly default): 300
+ * - Terminal trigger stripe: 400 (above masthead)
+ * - Terminal backdrop: 500 (above trigger)
+ * - Terminal panel: 600 (above backdrop)
+ * - Dropdowns (PatternFly): 1000+ (above terminal)
+ * - Modals (PatternFly): 9100-9200 (above everything)
+ */
 
 /* Page content offset to account for trigger strip */
 /* Strip is part of "topbar area", so page content should start below it (88px) not just below masthead (70px) */
@@ -21,7 +22,7 @@
   height: 18px; /* Flat design height */
   background: var(--pf-v5-global--BackgroundColor--200);
   cursor: pointer;
-  z-index: 10001; /* Higher than terminal panel to always be clickable */
+  z-index: 400; /* Above masthead (300), below modals (9100+) */
   transition: all 0.2s ease;
   border-bottom: 1px solid var(--pf-v5-global--primary-color--100);
   display: flex;
@@ -96,7 +97,7 @@
   right: 0;
   bottom: 0;
   background: transparent; /* No dark overlay */
-  z-index: 9999;
+  z-index: 500; /* Above trigger (400), below modals (9100+) */
   animation: fadeIn 0.3s ease;
 }
 
@@ -113,7 +114,7 @@
   right: 18px; /* Match trigger strip width - leave space for scrollbar */
   background: transparent; /* Completely transparent panel */
   backdrop-filter: blur(10px); /* Glassmorphism effect */
-  z-index: 10000;
+  z-index: 600; /* Above backdrop (500), below modals (9100+) */
   /* When closed: move up by (100% of height + 88px) to go completely off-screen above masthead */
   transform: translateY(calc(-100% - 88px));
   opacity: 0; /* Start invisible */
