@@ -40,8 +40,12 @@
 }
 
 .terminal-copy-button:hover {
-  background: var(--pf-v5-global--BackgroundColor--dark-100);
+  background: #e0e0e0; /* Light gray for light theme */
   border-color: var(--pf-v5-global--primary-color--100);
+}
+
+.pf-v5-theme-dark .terminal-copy-button:hover {
+  background: var(--pf-v5-global--BackgroundColor--dark-100);
 }
 
 .terminal-copy-button svg {
