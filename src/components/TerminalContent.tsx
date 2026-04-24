@@ -317,6 +317,23 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     }
   }, [isOpen, discoveryUuid, reset]);
 
+  // Handle retry on 'r' key press when in error state
+  useEffect(() => {
+    if (!error || !isOpen) return;
+
+    const handleRetry = (e: KeyboardEvent) => {
+      if (e.key === 'r' || e.key === 'R') {
+        // Reset error state and restart discovery
+        reset();
+        setIsInitialized(false);
+        startDiscovery();
+      }
+    };
+
+    window.addEventListener('keydown', handleRetry);
+    return () => window.removeEventListener('keydown', handleRetry);
+  }, [error, isOpen, reset, startDiscovery]);
+
   // Handle Enter key
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // Handle Ctrl+D to close terminal
@@ -555,23 +572,6 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       </div>
     );
   }
-
-  // Handle retry on 'r' key press when in error state
-  useEffect(() => {
-    if (!error || !isOpen) return;
-
-    const handleRetry = (e: KeyboardEvent) => {
-      if (e.key === 'r' || e.key === 'R') {
-        // Reset error state and restart discovery
-        reset();
-        setIsInitialized(false);
-        startDiscovery();
-      }
-    };
-
-    window.addEventListener('keydown', handleRetry);
-    return () => window.removeEventListener('keydown', handleRetry);
-  }, [error, isOpen, reset, startDiscovery]);
 
   // Error state
   if (error) {
