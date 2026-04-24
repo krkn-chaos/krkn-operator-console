@@ -166,6 +166,7 @@
 .terminal-display {
   position: relative;
   display: flex;
+  align-items: baseline; /* Align text and cursor on baseline */
   pointer-events: none;
   z-index: 1;
 }
@@ -177,6 +178,7 @@
 .terminal-cursor-block {
   /* Cursor always visible, no animation */
   opacity: 1;
+  line-height: 1; /* Match text line height */
 }
 
 /* Theme-specific colors */
