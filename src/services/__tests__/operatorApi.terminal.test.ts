@@ -3,7 +3,7 @@ import { operatorApi } from '../operatorApi';
 import type { AvailableCommandsResponse, TerminalResponse } from '../../types/api';
 
 // Mock the fetch function
-global.fetch = vi.fn();
+globalThis.fetch = vi.fn();
 
 describe('operatorApi - Terminal Methods', () => {
   beforeEach(() => {
