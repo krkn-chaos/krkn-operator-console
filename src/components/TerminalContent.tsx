@@ -32,9 +32,18 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const ROWS_PER_COLUMN = 10;
 
   // Handle click anywhere in terminal to restore focus and scroll to bottom
-  const handleTerminalClick = () => {
-    // Focus input
-    inputRef.current?.focus();
+  const handleTerminalClick = (e: React.MouseEvent) => {
+    // Don't steal focus if clicking on buttons or interactive elements
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.closest('button')) {
+      return;
+    }
+
+    // Focus input (use setTimeout to ensure it happens after any other events)
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+
     // Scroll to bottom
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -49,6 +58,10 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         await navigator.clipboard.writeText(output);
         setCopiedIndex(index);
         setTimeout(() => setCopiedIndex(null), 2000);
+        // Restore focus to input after copy
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 100);
       } catch (err) {
         console.error('Failed to copy:', err);
       }
