@@ -78,7 +78,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         command,
       });
 
-      // Add stdout and stderr to output
+      // Add stdout to output
       const output: string[] = [];
 
       if (result.stdout) {
@@ -91,19 +91,9 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         output.push(...stdoutLines);
       }
 
-      if (result.stderr) {
-        // Split by newline to preserve multi-line output, filter trailing empty lines
-        const stderrLines = result.stderr.split('\n');
-        // Remove empty string at the end if stderr ends with \n
-        if (stderrLines[stderrLines.length - 1] === '') {
-          stderrLines.pop();
-        }
-        output.push(...stderrLines);
-      }
-
-      // Add failure marker if command failed (exit code non-zero)
+      // If command failed, add "Command failed: stderr" marker
       const failureMarker = result.exitCode !== 0 && result.exitCode !== undefined
-        ? 'COMMAND_FAILED'
+        ? `COMMAND_FAILED:${result.stderr || ''}`
         : null;
 
       const finalOutput = failureMarker ? [...output, failureMarker] : output;
@@ -447,10 +437,11 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       {/* Output history */}
       {outputLines.map((line, index) => {
         // Check for special markers
-        if (line === 'COMMAND_FAILED') {
+        if (line.startsWith('COMMAND_FAILED:')) {
+          const stderr = line.substring('COMMAND_FAILED:'.length);
           return (
             <div key={index} className="terminal-line terminal-error">
-              Command failed
+              Command failed{stderr ? `: ${stderr}` : ''}
             </div>
           );
         }
