@@ -138,14 +138,16 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     setIsExecuting(true);
 
     // Add command to output immediately (with executing indicator)
-    const newOutputLines = [
-      ...outputLines,
-      `☸ ${selectedCluster.clusterName} $ ${command}`,
-      'Executing...',
-    ];
-    setOutputLines(newOutputLines);
-
-    const commandIndex = outputLines.length; // Index for this command's output
+    // Use functional update to avoid race conditions
+    let commandIndex = 0;
+    setOutputLines(prev => {
+      commandIndex = prev.length; // Capture the index before adding
+      return [
+        ...prev,
+        `☸ ${selectedCluster.clusterName} $ ${command}`,
+        'Executing...',
+      ];
+    });
 
     try {
       const result = await operatorApi.executeTerminalCommand({
@@ -184,9 +186,9 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
 
       const finalOutput = failureMarker ? [...output, failureMarker] : output;
 
-      // Store stdout for copying
+      // Store stdout for copying (use functional update)
       if (result.stdout) {
-        setCommandOutputs(new Map(commandOutputs).set(commandIndex, result.stdout));
+        setCommandOutputs(prev => new Map(prev).set(commandIndex, result.stdout));
       }
 
       // Replace "Executing..." with actual output + copy button marker
@@ -194,11 +196,13 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         ? [...finalOutput, `COPY_BUTTON:${commandIndex}`]
         : finalOutput;
 
-      setOutputLines([
-        ...outputLines,
-        `☸ ${selectedCluster.clusterName} $ ${command}`,
-        ...outputWithCopyMarker,
-      ]);
+      // Replace the "Executing..." line with actual output (functional update)
+      setOutputLines(prev => {
+        const newLines = [...prev];
+        // Remove the "Executing..." line (it's at commandIndex + 1)
+        newLines.splice(commandIndex + 1, 1, ...outputWithCopyMarker);
+        return newLines;
+      });
     } catch (error) {
       let errorMessage = 'Command execution failed';
 
@@ -223,12 +227,13 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         }
       }
 
-      // Replace "Executing..." with error
-      setOutputLines([
-        ...outputLines,
-        `☸ ${selectedCluster.clusterName} $ ${command}`,
-        errorMessage,
-      ]);
+      // Replace "Executing..." with error (functional update)
+      setOutputLines(prev => {
+        const newLines = [...prev];
+        // Remove the "Executing..." line (it's at commandIndex + 1)
+        newLines.splice(commandIndex + 1, 1, errorMessage);
+        return newLines;
+      });
     } finally {
       setIsExecuting(false);
       // Restore focus to input after command execution
@@ -395,7 +400,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         } else {
           // No next page - add empty line to output (like real terminal)
           const promptSymbol = selectedCluster ? `☸ ${selectedCluster.clusterName} $` : '$';
-          setOutputLines([...outputLines, `${promptSymbol} `]);
+          setOutputLines(prev => [...prev, `${promptSymbol} `]);
         }
       } else if (!selectedCluster) {
         // Cluster selection mode
@@ -423,7 +428,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
             helpLines.push('Loading available commands...');
           }
 
-          setOutputLines([...outputLines, ...helpLines]);
+          setOutputLines(prev => [...prev, ...helpLines]);
           setInputValue('');
           return;
         }
@@ -436,15 +441,15 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         if (sortedClusters.length > 0 && clusterNumber >= 1 && clusterNumber <= sortedClusters.length) {
           const cluster = sortedClusters[clusterNumber - 1];
           setSelectedCluster(cluster);
-          setOutputLines([
-            ...outputLines,
+          setOutputLines(prev => [
+            ...prev,
             `$ ${command}`,
             `Connected to cluster: ${cluster.clusterName}`,
             '',
           ]);
         } else {
-          setOutputLines([
-            ...outputLines,
+          setOutputLines(prev => [
+            ...prev,
             `$ ${command}`,
             `Error: Invalid cluster number. Please select 1-${sortedClusters?.length || 0}`,
           ]);
@@ -475,7 +480,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
             helpLines.push('Loading available commands...');
           }
 
-          setOutputLines([...outputLines, ...helpLines]);
+          setOutputLines(prev => [...prev, ...helpLines]);
           setInputValue('');
           return;
         }
@@ -489,8 +494,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           // Check if main command is allowed (kubectl or oc)
           const allowedCommand = availableCommands.commands.find(cmd => cmd.name === mainCommand);
           if (!allowedCommand) {
-            setOutputLines([
-              ...outputLines,
+            setOutputLines(prev => [
+              ...prev,
               `☸ ${selectedCluster.clusterName} $ ${command}`,
               `ksh: command not found: ${mainCommand}`,
               'Type ? for available commands',
@@ -503,8 +508,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           if (subCommand) {
             const allowedSubcommand = allowedCommand.subcommands.find(sub => sub.name === subCommand);
             if (!allowedSubcommand) {
-              setOutputLines([
-                ...outputLines,
+              setOutputLines(prev => [
+                ...prev,
                 `☸ ${selectedCluster.clusterName} $ ${command}`,
                 `ksh: ${mainCommand}: ${subCommand}: command not found`,
                 'Type ? for available commands',
@@ -518,8 +523,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           const blockedFlags = ['--watch', '-w', '--follow', '-f', '--watch-only'];
           const hasBlockedFlag = blockedFlags.some(flag => command.includes(flag));
           if (hasBlockedFlag) {
-            setOutputLines([
-              ...outputLines,
+            setOutputLines(prev => [
+              ...prev,
               `☸ ${selectedCluster.clusterName} $ ${command}`,
               'Error: Streaming flags (--watch, --follow) are not supported',
               'These flags require WebSocket/SSE which is not available in v1',
