@@ -47,7 +47,6 @@ export function TargetsList() {
       setTargets([]);
       setApiAvailable(false);
       // Don't show error notification on initial load - the empty state will handle it
-      console.error('Failed to load targets:', error);
     } finally {
       setLoading(false);
     }

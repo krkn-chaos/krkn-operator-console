@@ -13,7 +13,10 @@ import type {
   ScenarioRunStatusResponse,
   JobStatusResponse,
   JobsListResponse,
-  ActiveRunsResponse
+  ActiveRunsResponse,
+  TerminalRequest,
+  TerminalResponse,
+  AvailableCommandsResponse
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -41,6 +44,80 @@ class OperatorApiClient extends BaseApiClient {
   async getTargetStatus(uuid: string): Promise<number> {
     const response = await this.fetch(`/targets/${uuid}`);
     return response.status;
+  }
+
+  /**
+   * DELETE /targets/{uuid}
+   * Delete a target request (cleanup)
+   * @param uuid - Target request UUID
+   * @returns Promise that resolves when deleted
+   */
+  async deleteTargetRequest(uuid: string): Promise<void> {
+    await this.fetch(`/targets/${uuid}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * POST /terminal
+   * Execute a command on a remote cluster via kubectl/oc
+   * @param request - Terminal request with cluster_id, uuid, and command
+   * @returns Promise with decoded stdout, stderr, and exit code
+   */
+  async executeTerminalCommand(request: TerminalRequest): Promise<{
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  }> {
+    // Use fetch directly to access status codes
+    const response = await this.fetch('/terminal', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+
+    // Handle HTTP error status codes with custom messages
+    if (response.status === 404) {
+      // Command not found
+      throw new Error(`TERMINAL_ERROR:404:${request.command}`);
+    }
+    if (response.status === 403) {
+      // Forbidden - user not authorized to execute this command
+      throw new Error(`TERMINAL_ERROR:403:${request.command}`);
+    }
+    if (response.status === 500) {
+      // Server error
+      throw new Error(`TERMINAL_ERROR:500:${request.cluster_id}:${request.command}`);
+    }
+
+    // 400 means command executed but exited with non-zero code - this is OK, process normally
+    // 200 means command executed successfully
+    if (response.status !== 200 && response.status !== 400) {
+      // Other HTTP errors
+      throw new Error(`HTTP error ${response.status}`);
+    }
+
+    const data = await response.json() as TerminalResponse;
+
+    // Decode base64 stdout and stderr
+    const stdout = data.stdout_base64 ? atob(data.stdout_base64) : '';
+    const stderr = data.stderr_base64 ? atob(data.stderr_base64) : '';
+
+    // For 400 status, the command failed but we still return the output
+    // The exit_code will be > 0 and we'll show it in the terminal
+    return {
+      stdout,
+      stderr,
+      exitCode: data.exit_code,
+    };
+  }
+
+  /**
+   * GET /terminal/available-commands
+   * Get list of available terminal commands and blocked flags
+   * @returns Promise with available commands and blocked flags
+   */
+  async getAvailableTerminalCommands(): Promise<AvailableCommandsResponse> {
+    return this.fetchJson<AvailableCommandsResponse>('/terminal/available-commands');
   }
 
   /**
@@ -235,15 +312,12 @@ class OperatorApiClient extends BaseApiClient {
   async listScenarioRuns(): Promise<ScenarioRunStatusResponse[]> {
     try {
       const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[] }>('/scenarios/run');
-      console.log('listScenarioRuns raw response:', JSON.stringify(data, null, 2));
 
       const runs = data.scenarioRuns || data.runs || [];
-      console.log('Extracted runs:', runs);
       return runs;
     } catch (error) {
       // Fallback: if backend doesn't support list yet, return empty array
       if (error instanceof Error && error.message.includes('404')) {
-        console.warn('List endpoint not implemented yet, using empty list');
         return [];
       }
       throw error;

@@ -127,12 +127,9 @@ export function useTargetPoller() {
       return;
     }
 
-    console.log('[useTargetPoller] Starting scenario runs polling interval');
-
     async function loadScenarioRuns() {
       // Skip full list refresh if any accordion is open to prevent log interruptions
       if (pausedPollingRunIdsRef.current.size > 0) {
-        console.log('[useTargetPoller] Skipping full refresh - accordion open');
         return;
       }
 
@@ -190,12 +187,12 @@ export function useTargetPoller() {
                 payload: { run: updatedRun }
               });
             } catch (error) {
-              console.error(`[useTargetPoller] Failed to fetch details for ${run.scenarioRunName}:`, error);
+              // Silently handle error
             }
           }
         }
       } catch (error) {
-        console.error('[useTargetPoller] Failed to load scenario runs:', error);
+        // Silently handle error
       }
     }
 
@@ -208,7 +205,6 @@ export function useTargetPoller() {
     const intervalId = setInterval(loadScenarioRuns, 10000);
 
     return () => {
-      console.log('[useTargetPoller] Stopping scenario runs list polling');
       clearInterval(intervalId);
     };
   }, [state.phase, dispatch]);

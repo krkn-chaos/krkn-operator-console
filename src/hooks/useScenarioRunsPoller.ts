@@ -19,8 +19,6 @@ export function useScenarioRunsPoller() {
   pausedPollingRunIdsRef.current = state.pausedPollingRunIds;
 
   useEffect(() => {
-    console.log('[useScenarioRunsPoller] Starting polling interval');
-
     const intervalId = setInterval(async () => {
       // Filter active runs dynamically inside the interval (not in deps)
       const activeRuns = scenarioRunsRef.current.filter(
@@ -57,13 +55,12 @@ export function useScenarioRunsPoller() {
             });
           }
         } catch (error) {
-          console.error(`Failed to poll scenario run ${run.scenarioRunName}:`, error);
+          // Silently handle error
         }
       }
     }, 5000); // Poll every 5 seconds
 
     return () => {
-      console.log('[useScenarioRunsPoller] Stopping polling interval');
       clearInterval(intervalId);
     };
   }, [dispatch]);
@@ -79,24 +76,19 @@ export function useScenarioRunsPoller() {
     // Find the specific run to refresh
     const runToRefresh = state.scenarioRunToRefresh;
     if (!runToRefresh) {
-      console.log('No specific run to refresh');
       return;
     }
 
     const run = state.scenarioRuns.find(r => r.scenarioRunName === runToRefresh);
     if (!run) {
-      console.log(`Run ${runToRefresh} not found`);
       return;
     }
 
     // Only refresh if it's paused and not in terminal state
     if (!state.pausedPollingRunIds.has(runToRefresh) ||
         ['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)) {
-      console.log(`Run ${runToRefresh} is not paused or already in terminal state`);
       return;
     }
-
-    console.log(`Manual refresh triggered for run: ${runToRefresh}`);
 
     (async () => {
       try {
@@ -122,7 +114,7 @@ export function useScenarioRunsPoller() {
           });
         }
       } catch (error) {
-        console.error(`Failed to manually refresh scenario run ${runToRefresh}:`, error);
+        // Silently handle error
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

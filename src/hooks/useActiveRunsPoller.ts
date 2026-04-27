@@ -21,11 +21,9 @@ export function useActiveRunsPoller() {
     const shouldPoll = state.phase === 'jobs_list';
 
     if (!shouldPoll) {
-      console.log('[useActiveRunsPoller] Not on jobs_list page, skipping polling');
       return;
     }
 
-    console.log('[useActiveRunsPoller] Starting active runs polling (on jobs_list page)');
     let mounted = true;
 
     const fetchActiveRuns = async () => {
@@ -38,7 +36,6 @@ export function useActiveRunsPoller() {
         }
       } catch (err) {
         if (mounted) {
-          console.error('Failed to fetch active runs:', err);
           setError(err instanceof Error ? err.message : 'Failed to fetch active runs');
           setLoading(false);
         }
@@ -52,7 +49,6 @@ export function useActiveRunsPoller() {
     const intervalId = setInterval(fetchActiveRuns, 2000);
 
     return () => {
-      console.log('[useActiveRunsPoller] Stopping active runs polling (cleanup)');
       mounted = false;
       clearInterval(intervalId);
     };

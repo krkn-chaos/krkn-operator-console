@@ -126,7 +126,6 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
 
         // Validate that enum field has required properties
         if (!enumField.allowed_values || !enumField.separator) {
-          console.error('Enum field missing required properties:', field);
           return (
             <FormGroup
               key={field.variable}

@@ -61,18 +61,12 @@ export function useProviderConfigPoller() {
               throw new Error('No config data received from status check');
             }
 
-            console.log('Provider config response:', configResponse);
-
             // Parse and normalize schemas
             const normalizedData: { [providerName: string]: ProviderSchema } = {};
 
             for (const [providerName, configData] of Object.entries(configResponse.config_data)) {
-              console.log(`Parsing schema for provider: ${providerName}`);
-              console.log('Config data:', configData);
-
               // Parse the config-schema JSON string
               const fields = parseSchema(configData['config-schema']);
-              console.log(`Parsed ${fields.length} fields for ${providerName}:`, fields);
 
               normalizedData[providerName] = {
                 configMap: configData['config-map'],
@@ -81,17 +75,11 @@ export function useProviderConfigPoller() {
               };
             }
 
-            console.log('Normalized provider data:', normalizedData);
-
             dispatch({
               type: 'PROVIDER_CONFIG_READY',
               payload: { data: normalizedData }
             });
-
-            console.log('PROVIDER_CONFIG_READY dispatched successfully');
           } catch (error) {
-            console.error('Failed to parse provider config:', error);
-            console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
             dispatch({
               type: 'PROVIDER_CONFIG_ERROR',
               payload: {

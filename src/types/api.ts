@@ -7,6 +7,37 @@ export interface CreateTargetResponse {
   uuid: string;
 }
 
+// Terminal API Types
+
+export interface TerminalRequest {
+  cluster_id: string;  // Cluster name from KrknTargetRequest
+  uuid: string;        // KrknTargetRequest UUID
+  command: string;     // Full command (e.g., 'kubectl get pods -n default')
+}
+
+export interface TerminalResponse {
+  stdout_base64: string;
+  stderr_base64: string;
+  exit_code: number;
+  error?: string;      // Error type if failed
+  message?: string;    // Error message if failed
+}
+
+export interface TerminalSubcommand {
+  name: string;
+  description: string;
+}
+
+export interface TerminalCommand {
+  name: string;
+  description: string;
+  subcommands: TerminalSubcommand[];
+}
+
+export interface AvailableCommandsResponse {
+  commands: TerminalCommand[];
+}
+
 export interface Cluster {
   'cluster-name': string;
   'cluster-api-url': string;

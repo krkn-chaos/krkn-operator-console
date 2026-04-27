@@ -171,7 +171,6 @@ export function UsersCard({ groups }: UsersCardProps) {
     } catch (error) {
       setUsers([]);
       setApiAvailable(false);
-      console.error('Failed to load users:', error);
     } finally {
       setLoading(false);
     }

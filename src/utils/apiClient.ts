@@ -48,18 +48,10 @@ export async function authenticatedFetch(
   // Get token from authService
   const token = authService.getToken();
 
-  console.log('[authenticatedFetch] Request:', {
-    url,
-    method: options.method || 'GET',
-    hasToken: !!token,
-    tokenPreview: token ? `${token.substring(0, 20)}...` : null
-  });
-
   // Add Authorization header if token exists
   const headers = new Headers(options.headers);
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
-    console.log('[authenticatedFetch] Authorization header set:', `Bearer ${token.substring(0, 20)}...`);
   }
 
   // Ensure Content-Type is set for JSON requests
@@ -73,15 +65,8 @@ export async function authenticatedFetch(
     headers,
   });
 
-  console.log('[authenticatedFetch] Response:', {
-    url,
-    status: response.status,
-    ok: response.ok
-  });
-
   // Handle 401 Unauthorized - token expired or invalid
   if (response.status === 401 && onUnauthorized) {
-    console.warn('[authenticatedFetch] Received 401 Unauthorized - triggering logout');
     onUnauthorized();
     throw new Error('Session expired. Please login again.');
   }

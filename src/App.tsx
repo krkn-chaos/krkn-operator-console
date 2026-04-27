@@ -7,7 +7,7 @@ import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly, QuakeTerminal } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { UserForm } from './components/UserForm';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
@@ -79,7 +79,6 @@ function App() {
       });
       showSuccess('Scenario run deleted', `Successfully deleted ${scenarioRunName}`);
     } catch (error) {
-      console.error('Failed to delete scenario run:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete scenario run';
 
       // Check if it's a 403 Forbidden error
@@ -98,7 +97,6 @@ function App() {
       // which will reflect the job deletion
       showSuccess('Job deleted', `Successfully deleted job ${jobId}`);
     } catch (error) {
-      console.error('Failed to delete job:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete job';
 
       // Check if it's a 403 Forbidden error
@@ -359,28 +357,32 @@ function App() {
   );
 
   return (
-    <Page header={header}>
-      {/* Global notifications - appears right below header */}
-      {state.notifications.length > 0 && (
-        <div style={{ padding: '1rem 1rem 0 1rem' }}>
-          <AlertGroup>
-            {state.notifications.map((notification) => (
-              <Alert
-                key={notification.id}
-                variant={notification.variant}
-                title={notification.title}
-                actionClose={
-                  <AlertActionCloseButton onClose={() => handleHideNotification(notification.id)} />
-                }
-                isInline
-              >
-                {notification.message}
-              </Alert>
-            ))}
-          </AlertGroup>
-        </div>
-      )}
-      <PageSection isFilled>{renderContent()}</PageSection>
+    <>
+      {/* Quake-style dropdown terminal - rendered OUTSIDE Page to avoid layout conflicts */}
+      <QuakeTerminal heightPercent={40} />
+
+      <Page header={header}>
+        {/* Global notifications - appears right below header */}
+        {state.notifications.length > 0 && (
+          <div style={{ padding: '1rem 1rem 0 1rem' }}>
+            <AlertGroup>
+              {state.notifications.map((notification) => (
+                <Alert
+                  key={notification.id}
+                  variant={notification.variant}
+                  title={notification.title}
+                  actionClose={
+                    <AlertActionCloseButton onClose={() => handleHideNotification(notification.id)} />
+                  }
+                  isInline
+                >
+                  {notification.message}
+                </Alert>
+              ))}
+            </AlertGroup>
+          </div>
+        )}
+        <PageSection isFilled>{renderContent()}</PageSection>
 
       {/* Edit Profile Modal */}
       <Modal
@@ -417,7 +419,8 @@ function App() {
           onCancel={() => setIsChangePasswordOpen(false)}
         />
       </Modal>
-    </Page>
+      </Page>
+    </>
   );
 }
 

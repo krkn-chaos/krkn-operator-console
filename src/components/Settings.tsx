@@ -53,7 +53,6 @@ export function Settings() {
 
     // If we're switching TO tab 2 (from any other tab)
     if (activeTabKey === 2 && previousTabKey !== 2) {
-      console.log('Provider Configuration tab accessed, resetting state');
       dispatch({ type: 'PROVIDER_CONFIG_RESET' });
     }
 
@@ -69,7 +68,7 @@ export function Settings() {
         const providers = await providersApi.listProviders();
         dispatch({ type: 'PROVIDERS_LOADED', payload: { providers } });
       } catch (error) {
-        console.error('Failed to load providers:', error);
+        // Silent failure
       } finally {
         setIsLoadingProviders(false);
       }
@@ -96,7 +95,6 @@ export function Settings() {
           const uuid = await providersApi.createProviderConfigRequest();
           dispatch({ type: 'PROVIDER_CONFIG_CREATE_SUCCESS', payload: { uuid } });
         } catch (error) {
-          console.error('Failed to create provider config request:', error);
           dispatch({
             type: 'PROVIDER_CONFIG_ERROR',
             payload: { error: error instanceof Error ? error.message : 'Failed to create config request' }

@@ -37,7 +37,6 @@ class AuthService {
       const data: IsRegisteredResponse = await response.json();
       return data.registered;
     } catch (error) {
-      console.error('Failed to check registration status:', error);
       throw error instanceof Error ? error : new Error('Failed to check registration status');
     }
   }
@@ -67,7 +66,6 @@ class AuthService {
 
       return await response.json();
     } catch (error) {
-      console.error('Registration error:', error);
       throw error instanceof Error ? error : new Error('Registration failed');
     }
   }
@@ -78,18 +76,11 @@ class AuthService {
    * @returns Login response with token and user info
    */
   async login(request: LoginRequest): Promise<LoginResponse> {
-    console.log('[authService.login] Sending login request to:', `${API_BASE}/login`);
     try {
       const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
-      });
-
-      console.log('[authService.login] Login API response:', {
-        status: response.status,
-        ok: response.ok,
-        contentType: response.headers.get('content-type')
       });
 
       const contentType = response.headers.get('content-type');
@@ -109,8 +100,6 @@ class AuthService {
       }
 
       const data: LoginResponse = await response.json();
-      console.log('[authService.login] Login successful, storing session data');
-      console.log('[authService.login] Token received:', data.token.substring(0, 30) + '...');
 
       // Store auth data in sessionStorage
       this.setToken(data.token);
@@ -123,12 +112,8 @@ class AuthService {
       });
       sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, data.expiresAt);
 
-      console.log('[authService.login] Session data stored in sessionStorage');
-      console.log('[authService.login] Token in storage:', sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)?.substring(0, 30) + '...');
-
       return data;
     } catch (error) {
-      console.error('[authService.login] Login error:', error);
       throw error instanceof Error ? error : new Error('Login failed');
     }
   }

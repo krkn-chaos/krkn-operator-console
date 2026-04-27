@@ -17,24 +17,6 @@ interface LogViewerProps {
 // Maps jobId -> WebSocket instance
 const activeConnections = new Map<string, WebSocket>();
 
-// Helper function to interpret WebSocket close codes
-function getCloseCodeMeaning(code: number): string {
-  switch (code) {
-    case 1000: return 'Normal closure';
-    case 1001: return 'Going away (server shutdown or browser navigation)';
-    case 1002: return 'Protocol error (likely auth/subprotocol issue)';
-    case 1003: return 'Unsupported data';
-    case 1006: return 'Abnormal closure (connection dropped, no close frame)';
-    case 1007: return 'Invalid frame payload data';
-    case 1008: return 'Policy violation (likely authentication failure)';
-    case 1009: return 'Message too big';
-    case 1010: return 'Missing extension';
-    case 1011: return 'Internal server error';
-    case 1015: return 'TLS handshake failure';
-    default: return `Unknown code (${code})`;
-  }
-}
-
 export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status, compact = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
@@ -57,7 +39,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       setShowCopyAlert(true);
       setTimeout(() => setShowCopyAlert(false), 3000);
     } catch (err) {
-      console.error('Failed to copy logs:', err);
+      // Silent failure
     }
   };
 
@@ -106,7 +88,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
   useEffect(() => {
     // Don't start streaming if job hasn't started yet
     if (status === 'Pending') {
-      console.log('Job is pending, waiting for it to start before streaming logs');
       setLogs(['Waiting for pod to start...']);
       return;
     }
@@ -115,7 +96,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
     // This persists across StrictMode's double-mount, preventing duplicates
     const existingConnection = activeConnections.get(jobId);
     if (existingConnection && (existingConnection.readyState === WebSocket.CONNECTING || existingConnection.readyState === WebSocket.OPEN)) {
-      console.log(`[LogViewer ${jobId}] WebSocket already active (global guard), skipping duplicate connection`);
       // Reuse existing connection
       wsRef.current = existingConnection;
       return;
@@ -123,8 +103,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
     // If job is in terminal state, don't follow (get static logs)
     const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
-
-    console.log(`[LogViewer ${jobId}] Starting WebSocket log stream for run:`, scenarioRunName, 'cluster:', clusterName, 'status:', status);
 
     if (!isTerminal) {
       setLogs(['Connecting to log stream...']);
@@ -141,11 +119,8 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
       // Don't reconnect terminal jobs (but allow initial connection)
       if (isTerminal && reconnectAttemptsRef.current > 0) {
-        console.log('Terminal job - skipping reconnect');
         return;
       }
-
-      console.log(`Attempting to connect to WebSocket (attempt ${reconnectAttemptsRef.current + 1})`);
 
       // Build WebSocket URL - NEW: uses scenarioRunName + clusterName
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -155,19 +130,12 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       // Get JWT token for authentication
       const token = authService.getToken();
       if (!token) {
-        console.error('No authentication token available for WebSocket connection');
         setLogs(['⚠️  Authentication required. Please login again.']);
         return;
       }
 
       // NEW URL structure: /scenarios/run/{scenarioRunName}/jobs/{jobId}/logs
       const wsUrl = `${protocol}//${host}/api/v1/scenarios/run/${encodeURIComponent(scenarioRunName)}/jobs/${encodeURIComponent(jobId)}/logs?follow=${follow}`;
-
-      console.log('=== WebSocket Connection Attempt ===');
-      console.log('URL:', wsUrl);
-      console.log('Token available:', !!token);
-      console.log('Token length:', token.length);
-      console.log('Token preview (first 30 chars):', token.substring(0, 30) + '...');
 
       try {
         // Use WebSocket subprotocol to pass JWT token securely
@@ -177,23 +145,13 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         // 2. Validate the token part
         // 3. Accept connection with Sec-WebSocket-Protocol: access_token
         const wsProtocol = `access_token.${token}`;
-        console.log('Full protocol length:', wsProtocol.length);
-        console.log('Protocol format check:', wsProtocol.substring(0, 13), '(should be "access_token.")');
-        console.log('Creating WebSocket with subprotocol...');
 
         const ws = new WebSocket(wsUrl, wsProtocol);
         wsRef.current = ws;
         // Register in global map to prevent StrictMode duplicates
         activeConnections.set(jobId, ws);
-        console.log(`[LogViewer ${jobId}] WebSocket created and registered. ReadyState:`, ws.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)');
 
         ws.onopen = () => {
-          console.log('=== WebSocket Connection Established ===');
-          console.log('✅ Connected successfully!');
-          console.log('Accepted protocol:', ws.protocol);
-          console.log('Expected protocol: "access_token"');
-          console.log('Protocol match:', ws.protocol === 'access_token' ? '✅ YES' : '❌ NO');
-          console.log('ReadyState:', ws.readyState, '(should be 1=OPEN)');
           reconnectAttemptsRef.current = 0; // Reset on successful connection
         };
 
@@ -202,13 +160,11 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
           // Check if it's an error message
           if (message.startsWith('ERROR:')) {
-            console.error('WebSocket error message:', message);
             setLogs(prev => [...prev, `⚠️  ${message}`]);
             return;
           }
 
           // Regular log line
-          console.log('Received log line, length:', message.length);
           setLogs(prev => {
             // Replace "Connecting..." message on first data
             if (isFirstMessageRef.current && prev[0] === 'Connecting to log stream...') {
@@ -219,61 +175,34 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
           });
         };
 
-        ws.onerror = (error) => {
-          console.error('=== WebSocket Error Event ===');
-          console.error('Error object:', error);
-          console.error('ReadyState at error:', ws.readyState);
-          console.error('Error type:', error.type);
+        ws.onerror = () => {
           // Error handling is done in onclose
         };
 
         ws.onclose = (event) => {
-          console.log(`[LogViewer ${jobId}] === WebSocket Close Event ===`);
-          console.log('Close code:', event.code);
-          console.log('Close reason:', event.reason || '(no reason provided)');
-          console.log('Was clean:', event.wasClean);
-          console.log('Terminal state:', isTerminal);
-          console.log('Cleaned up:', isCleanedUpRef.current);
-          console.log('ReadyState:', ws.readyState);
-
           // Remove from global map only if this is still the active connection
           // This prevents removing a newer connection if StrictMode created one
           if (activeConnections.get(jobId) === ws) {
             activeConnections.delete(jobId);
-            console.log(`[LogViewer ${jobId}] WebSocket removed from global map (onclose)`);
           }
-
-          // Common close codes reference:
-          // 1000: Normal closure
-          // 1001: Going away
-          // 1002: Protocol error
-          // 1006: Abnormal closure (no close frame received)
-          // 1008: Policy violation
-          // 1009: Message too big
-          // 1011: Server error
-          console.log('Close code meaning:', getCloseCodeMeaning(event.code));
 
           // Authentication failure (code 1002 = protocol error, 1008 = policy violation)
           if (event.code === 1002 || event.code === 1008) {
-            console.error('WebSocket authentication failed. Backend may not support subprotocol auth.');
             setLogs(prev => [...prev, '', '⚠️  Authentication failed. Please check backend WebSocket implementation.']);
             return;
           }
 
           // Normal closure (code 1000)
           if (event.code === 1000) {
-            console.log('WebSocket closed normally');
             return;
           }
 
           // Unexpected closure - attempt reconnect if not terminal and not cleaned up
           if (!isTerminal && !isCleanedUpRef.current) {
-            console.log('WebSocket closed unexpectedly, attempting to reconnect...');
             scheduleReconnect(2000);
           }
         };
       } catch (error) {
-        console.error('Error creating WebSocket:', error);
         if (!isTerminal && !isCleanedUpRef.current) {
           scheduleReconnect(2000);
         }
@@ -288,14 +217,12 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       reconnectAttemptsRef.current++;
 
       if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-        console.log('Max reconnection attempts reached');
         setLogs(prev => [...prev, '', '⚠️  Max reconnection attempts reached. Please refresh the page.']);
         return;
       }
 
       // Exponential backoff: delay * 1.5^(attempts-1), capped at 30 seconds
       const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttemptsRef.current - 1), 30000);
-      console.log(`Scheduling reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
 
       reconnectTimeoutRef.current = window.setTimeout(() => {
         connectWebSocket();
@@ -307,7 +234,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
     // Cleanup on unmount or when dependencies change
     return () => {
-      console.log(`[LogViewer ${jobId}] Cleaning up WebSocket`);
       isCleanedUpRef.current = true;
 
       if (reconnectTimeoutRef.current) {
