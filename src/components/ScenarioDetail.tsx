@@ -184,10 +184,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           .map((j) => `${j.clusterName}: ${j.message || 'Unknown error'}`)
           .join('\n');
 
-        console.warn(
-          `Partial failure: ${statusResponse.failedJobs}/${statusResponse.totalTargets} jobs failed\n${failedErrors}`
-        );
-
         // Set validation errors to show the failures
         setValidationErrors([
           `${statusResponse.failedJobs} of ${statusResponse.totalTargets} jobs failed:`,
@@ -207,7 +203,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         0 // Don't auto-dismiss - user must close manually
       );
     } catch (error) {
-      console.error('Failed to run scenario:', error);
       setValidationErrors([
         error instanceof Error ? error.message : 'Failed to run scenario',
       ]);

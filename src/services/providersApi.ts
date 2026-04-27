@@ -69,7 +69,7 @@ class ProvidersApi extends BaseApiClient {
           return { status, data };
         }
       } catch (error) {
-        console.error('Failed to parse provider config data from status check:', error);
+        // Failed to parse provider config data from status check
       }
     }
 
@@ -84,9 +84,6 @@ class ProvidersApi extends BaseApiClient {
   async getProviderConfig(uuid: string): Promise<GetProviderConfigResponse> {
     const response = await this.fetch(`/provider-config/${encodeURIComponent(uuid)}`);
 
-    console.log('getProviderConfig response status:', response.status);
-    console.log('getProviderConfig response headers:', Object.fromEntries(response.headers.entries()));
-
     if (!response.ok) {
       try {
         const error: ProviderErrorResponse = await response.json();
@@ -97,12 +94,7 @@ class ProvidersApi extends BaseApiClient {
     }
 
     // Check if response has content
-    const contentType = response.headers.get('content-type');
-    console.log('Response content-type:', contentType);
-
     const text = await response.text();
-    console.log('Response body (raw text):', text);
-    console.log('Response body length:', text.length);
 
     if (!text || text.trim().length === 0) {
       throw new Error('Empty response body from provider config API');
@@ -110,11 +102,8 @@ class ProvidersApi extends BaseApiClient {
 
     try {
       const data = JSON.parse(text);
-      console.log('Parsed provider config data:', data);
       return data;
     } catch (parseError) {
-      console.error('Failed to parse response as JSON:', parseError);
-      console.error('Response text was:', text);
       throw new Error('Invalid JSON in provider config response');
     }
   }

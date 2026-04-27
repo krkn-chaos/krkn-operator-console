@@ -79,7 +79,6 @@ function App() {
       });
       showSuccess('Scenario run deleted', `Successfully deleted ${scenarioRunName}`);
     } catch (error) {
-      console.error('Failed to delete scenario run:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete scenario run';
 
       // Check if it's a 403 Forbidden error
@@ -98,7 +97,6 @@ function App() {
       // which will reflect the job deletion
       showSuccess('Job deleted', `Successfully deleted job ${jobId}`);
     } catch (error) {
-      console.error('Failed to delete job:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete job';
 
       // Check if it's a 403 Forbidden error

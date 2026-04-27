@@ -59,7 +59,6 @@ export function UserManagement() {
       const data = await groupsApi.listGroups();
       setGroups(data);
     } catch (error) {
-      console.error('Failed to load groups:', error);
       setGroups([]);
     } finally {
       setLoading(false);

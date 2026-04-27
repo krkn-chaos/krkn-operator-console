@@ -231,7 +231,6 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
       showSuccess('Group created', `Group "${name}" was created successfully`);
       onSuccess();
     } catch (error) {
-      console.error('Failed to create group:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create group';
       setErrors({ submit: errorMessage });
       showError('Group creation failed', errorMessage);

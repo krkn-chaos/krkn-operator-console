@@ -18,16 +18,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { state } = useAuth();
   const location = useLocation();
 
-  console.log('[ProtectedRoute] Checking access:', {
-    pathname: location.pathname,
-    isAuthenticated: state.isAuthenticated,
-    loading: state.loading,
-    hasUser: !!state.user
-  });
-
   // Show loading spinner while checking authentication
   if (state.loading) {
-    console.log('[ProtectedRoute] Still loading, showing spinner');
     return (
       <Bullseye>
         <EmptyState>
@@ -42,11 +34,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Redirect to login if not authenticated
   if (!state.isAuthenticated) {
-    console.log('[ProtectedRoute] Not authenticated, redirecting to login');
     return <Navigate to={`/login?returnUrl=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
   // User is authenticated - render children
-  console.log('[ProtectedRoute] Authenticated, rendering protected content');
   return <>{children}</>;
 }

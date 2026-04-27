@@ -80,21 +80,15 @@ function flattenJsonSchemaProperties(
  */
 export function parseJsonSchema(schemaString: string): ScenarioField[] {
   try {
-    console.log('Parsing JSON Schema, input length:', schemaString.length);
     const schema: JsonSchema = JSON.parse(schemaString);
-    console.log('Parsed JSON Schema:', schema);
 
     if (!schema.properties || typeof schema.properties !== 'object') {
-      console.warn('JSON Schema missing properties object');
       return [];
     }
 
     const fields = flattenJsonSchemaProperties(schema.properties);
-    console.log('Flattened JSON Schema fields:', fields);
     return fields;
   } catch (error) {
-    console.error('Failed to parse JSON Schema:', error);
-    console.error('Schema string was:', schemaString);
     return [];
   }
 }
@@ -120,7 +114,6 @@ function mapCustomSchemaType(type: number | string): FieldType {
       case 'boolean':
         return 'boolean';
       default:
-        console.warn(`Unknown custom schema type string: ${type}, defaulting to string`);
         return 'string';
     }
   }
@@ -136,7 +129,6 @@ function mapCustomSchemaType(type: number | string): FieldType {
     case 4:
       return 'boolean';
     default:
-      console.warn(`Unknown custom schema type number: ${type}, defaulting to string`);
       return 'string';
   }
 }
@@ -148,25 +140,14 @@ function mapCustomSchemaType(type: number | string): FieldType {
  */
 export function parseCustomSchema(schemaString: string): ScenarioField[] {
   try {
-    console.log('Parsing custom schema, input length:', schemaString.length);
     const customFields: CustomSchemaField[] = JSON.parse(schemaString);
-    console.log('Parsed custom schema:', customFields);
 
     if (!Array.isArray(customFields)) {
-      console.warn('Custom schema is not an array');
       return [];
     }
 
     const fields = customFields.map(customField => {
-      console.log(`Mapping custom field "${customField.variable}":`, {
-        inputType: customField.type,
-        typeOf: typeof customField.type,
-        separator: customField.separator,
-        allowed_values: customField.allowed_values
-      });
-
       const fieldType = mapCustomSchemaType(customField.type);
-      console.log(`  → Mapped to fieldType: ${fieldType}`);
 
       const scenarioField: ScenarioField = {
         name: customField.name,
@@ -184,23 +165,14 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
           const enumField = scenarioField as EnumField;
           enumField.separator = customField.separator;
           enumField.allowed_values = customField.allowed_values;
-          console.log(`  → Enum field configured with separator="${customField.separator}", allowed_values="${customField.allowed_values}"`);
-        } else {
-          console.error(`  → ERROR: Enum field missing separator or allowed_values!`, {
-            separator: customField.separator,
-            allowed_values: customField.allowed_values
-          });
         }
       }
 
       return scenarioField;
     });
 
-    console.log('Mapped custom schema fields:', fields);
     return fields;
   } catch (error) {
-    console.error('Failed to parse custom schema:', error);
-    console.error('Schema string was:', schemaString);
     return [];
   }
 }
@@ -212,27 +184,19 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
  */
 export function parseSchema(schemaString: string): ScenarioField[] {
   try {
-    console.log('Auto-detecting schema format...');
     const parsed = JSON.parse(schemaString);
-    console.log('Parsed schema object:', parsed);
 
     // Detect format by structure
     if (Array.isArray(parsed)) {
       // Custom format (array of fields)
-      console.log('Detected custom schema format (array)');
       return parseCustomSchema(schemaString);
     } else if (parsed.type === 'object' && parsed.properties) {
       // JSON Schema format
-      console.log('Detected JSON Schema format');
       return parseJsonSchema(schemaString);
     } else {
-      console.warn('Unknown schema format, attempting JSON Schema parsing');
-      console.warn('Parsed object:', parsed);
       return parseJsonSchema(schemaString);
     }
   } catch (error) {
-    console.error('Failed to auto-detect schema format:', error);
-    console.error('Schema string was:', schemaString);
     return [];
   }
 }

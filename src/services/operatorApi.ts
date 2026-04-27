@@ -312,15 +312,12 @@ class OperatorApiClient extends BaseApiClient {
   async listScenarioRuns(): Promise<ScenarioRunStatusResponse[]> {
     try {
       const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[] }>('/scenarios/run');
-      console.log('listScenarioRuns raw response:', JSON.stringify(data, null, 2));
 
       const runs = data.scenarioRuns || data.runs || [];
-      console.log('Extracted runs:', runs);
       return runs;
     } catch (error) {
       // Fallback: if backend doesn't support list yet, return empty array
       if (error instanceof Error && error.message.includes('404')) {
-        console.warn('List endpoint not implemented yet, using empty list');
         return [];
       }
       throw error;
