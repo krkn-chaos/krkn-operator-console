@@ -338,4 +338,79 @@ describe('registriesApi', () => {
       await expect(registriesApi.deleteRegistry('some-registry')).rejects.toThrow(errorMessage);
     });
   });
+
+  describe('getAvailableRegistries', () => {
+    it('should return registries accessible by current user', async () => {
+      const mockAvailableRegistries = [
+        {
+          name: 'team-registry',
+          registryUrl: 'https://registry.example.com',
+          scenarioRepository: 'team/scenarios',
+          description: 'Team private registry',
+        },
+        {
+          name: 'public-registry',
+          registryUrl: 'https://public.registry.com',
+          scenarioRepository: 'public/scenarios',
+        },
+      ];
+
+      const mockResponse = { registries: mockAvailableRegistries };
+      mockFetchJson.mockResolvedValue(mockResponse);
+
+      const result = await registriesApi.getAvailableRegistries();
+
+      expect(mockFetchJson).toHaveBeenCalledWith('/registries/available');
+      expect(result).toEqual(mockAvailableRegistries);
+    });
+
+    it('should return empty array when no registries available', async () => {
+      mockFetchJson.mockResolvedValue({ registries: [] });
+
+      const result = await registriesApi.getAvailableRegistries();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when registries field is missing', async () => {
+      mockFetchJson.mockResolvedValue({});
+
+      const result = await registriesApi.getAvailableRegistries();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw 401 error when not authenticated', async () => {
+      const errorMessage = 'Unauthorized';
+      mockFetchJson.mockRejectedValue(new Error(errorMessage));
+
+      await expect(registriesApi.getAvailableRegistries()).rejects.toThrow(errorMessage);
+    });
+
+    it('should only return registry metadata without credentials', async () => {
+      const mockResponse = {
+        registries: [
+          {
+            name: 'secure-registry',
+            registryUrl: 'https://secure.example.com',
+            scenarioRepository: 'org/scenarios',
+            description: 'Secure registry',
+            // Should NOT include: authType, token, username, password, groups
+          },
+        ],
+      };
+
+      mockFetchJson.mockResolvedValue(mockResponse);
+
+      const result = await registriesApi.getAvailableRegistries();
+
+      expect(result[0]).toHaveProperty('name');
+      expect(result[0]).toHaveProperty('registryUrl');
+      expect(result[0]).toHaveProperty('scenarioRepository');
+      expect(result[0]).not.toHaveProperty('authType');
+      expect(result[0]).not.toHaveProperty('token');
+      expect(result[0]).not.toHaveProperty('username');
+      expect(result[0]).not.toHaveProperty('groups');
+    });
+  });
 });

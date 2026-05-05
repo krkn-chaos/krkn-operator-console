@@ -623,3 +623,14 @@ export interface RegistryOperationResponse {
   name: string;
   message?: string;
 }
+
+export interface AvailableRegistry {
+  name: string;
+  registryUrl: string;
+  scenarioRepository: string;
+  description?: string;
+}
+
+export interface AvailableRegistriesResponse {
+  registries: AvailableRegistry[];
+}

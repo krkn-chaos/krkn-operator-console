@@ -5,6 +5,8 @@ import type {
   RegistryDetails,
   ListRegistriesResponse,
   RegistryOperationResponse,
+  AvailableRegistry,
+  AvailableRegistriesResponse,
 } from '../types/api';
 
 const API_BASE = '/api/v1';
@@ -280,6 +282,39 @@ class RegistriesApi extends BaseApiClient {
     return this.fetchJson<RegistryOperationResponse>(`/registries/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     });
+  }
+
+  /**
+   * Get registries available to the current user
+   *
+   * Retrieves registries that the current user can access based on:
+   * - Group membership
+   * - availableToAll flag
+   * - Admin role (admins see all registries)
+   *
+   * **Authorization:** Authenticated users
+   *
+   * **HTTP Method:** GET
+   *
+   * **Endpoint:** `/api/v1/registries/available`
+   *
+   * **Security:** Does not include credentials, authType, or group membership in response
+   *
+   * @returns Promise resolving to an array of available registry summaries
+   * @throws {Error} 401 if not authenticated
+   * @throws {Error} 500 on server error
+   *
+   * @example
+   * ```typescript
+   * const available = await registriesApi.getAvailableRegistries();
+   * available.forEach(registry => {
+   *   console.log(`${registry.name}: ${registry.registryUrl}/${registry.scenarioRepository}`);
+   * });
+   * ```
+   */
+  async getAvailableRegistries(): Promise<AvailableRegistry[]> {
+    const data = await this.fetchJson<AvailableRegistriesResponse>('/registries/available');
+    return data.registries || [];
   }
 }
 

@@ -21,7 +21,7 @@ import { RegistryIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import { registriesApi } from '../services/registriesApi';
-import type { ScenariosRequest, RegistryDetails } from '../types/api';
+import type { ScenariosRequest, AvailableRegistry } from '../types/api';
 
 /**
  * RegistrySelector component
@@ -45,7 +45,7 @@ export function RegistrySelector() {
   const { dispatch } = useAppContext();
   const [registryType, setRegistryType] = useState<'public' | 'private'>('public');
   const [selectedRegistryName, setSelectedRegistryName] = useState<string>('');
-  const [availableRegistries, setAvailableRegistries] = useState<RegistryDetails[]>([]);
+  const [availableRegistries, setAvailableRegistries] = useState<AvailableRegistry[]>([]);
   const [loadingRegistries, setLoadingRegistries] = useState(false);
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +56,7 @@ export function RegistrySelector() {
       setLoadingRegistries(true);
       setRegistryError(null);
       try {
-        const registries = await registriesApi.listRegistries();
+        const registries = await registriesApi.getAvailableRegistries();
         setAvailableRegistries(registries);
 
         // Auto-select first registry if available
