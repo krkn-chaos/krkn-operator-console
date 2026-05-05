@@ -4,10 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { RegistrySelector } from './RegistrySelector';
 import { AppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
-import type { AppState, AppAction } from '../context/AppContext';
-import type { ScenariosResponse } from '../types/api';
+import { registriesApi } from '../services/registriesApi';
+import type { AppState } from '../context/AppContext';
+import type { ScenariosResponse, AvailableRegistry } from '../types/api';
 
 vi.mock('../services/operatorApi');
+vi.mock('../services/registriesApi');
 
 describe('RegistrySelector', () => {
   const mockDispatch = vi.fn();
@@ -29,6 +31,21 @@ describe('RegistrySelector', () => {
     error: null,
   };
 
+  const mockRegistries: AvailableRegistry[] = [
+    {
+      name: 'corp-registry',
+      registryUrl: 'https://registry.corp.com',
+      scenarioRepository: 'chaos/scenarios',
+      description: 'Corporate registry for chaos scenarios',
+    },
+    {
+      name: 'dev-registry',
+      registryUrl: 'https://dev.registry.io',
+      scenarioRepository: 'dev/krkn',
+      description: 'Development registry',
+    },
+  ];
+
   const renderWithContext = (state: Partial<AppState> = {}) => {
     const fullState = { ...initialState, ...state };
     return render(
@@ -40,47 +57,71 @@ describe('RegistrySelector', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock: return empty registries list
+    vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue([]);
   });
 
   describe('Initial Rendering', () => {
-    it('should render the registry configuration card', () => {
+    it('should render the registry configuration card', async () => {
       renderWithContext();
-
       expect(screen.getByText('Configure Chaos Scenarios Registry')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
     });
 
-    it('should render public registry option by default', () => {
+    it('should render public registry option by default', async () => {
       renderWithContext();
-
       const publicRadio = screen.getByLabelText(/Public Registry/i);
       expect(publicRadio).toBeInTheDocument();
       expect(publicRadio).toBeChecked();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
     });
 
-    it('should render private registry option', () => {
+    it('should render private registry option', async () => {
       renderWithContext();
-
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       expect(privateRadio).toBeInTheDocument();
       expect(privateRadio).not.toBeChecked();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
     });
 
-    it('should render load scenarios button', () => {
+    it('should render load scenarios button', async () => {
       renderWithContext();
-
       expect(screen.getByRole('button', { name: /Load Scenarios/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
     });
 
-    it('should render cancel button', () => {
+    it('should render cancel button', async () => {
+      renderWithContext();
+      expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
+    });
+
+    it('should fetch available registries on mount', async () => {
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue(mockRegistries);
       renderWithContext();
 
-      expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalledTimes(1);
+      });
     });
   });
 
   describe('Public Registry Selection', () => {
-    it('should enable load button for public registry without extra fields', () => {
+    it('should enable load button for public registry without extra fields', async () => {
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       expect(loadButton).not.toBeDisabled();
@@ -97,6 +138,9 @@ describe('RegistrySelector', () => {
       vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce(mockResponse);
 
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       await user.click(loadButton);
@@ -129,6 +173,9 @@ describe('RegistrySelector', () => {
       vi.mocked(operatorApi.getScenarios).mockRejectedValueOnce(new Error(errorMessage));
 
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       await user.click(loadButton);
@@ -146,125 +193,54 @@ describe('RegistrySelector', () => {
   });
 
   describe('Private Registry Selection', () => {
-    it('should show private registry fields when private option selected', async () => {
+    it('should show registry dropdown when private option selected and registries available', async () => {
       const user = userEvent.setup();
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue(mockRegistries);
+
       renderWithContext();
-
-      const privateRadio = screen.getByLabelText(/Private Registry/i);
-      await user.click(privateRadio);
-
-      expect(screen.getByLabelText(/Registry URL/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Scenario Repository/i)).toBeInTheDocument();
-    });
-
-    it('should show authentication method options for private registry', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
-
-      const privateRadio = screen.getByLabelText(/Private Registry/i);
-      await user.click(privateRadio);
-
-      expect(screen.getByLabelText(/Username & Password/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Token/i)).toBeInTheDocument();
-    });
-
-    it('should show username and password fields by default for private registry', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
-
-      const privateRadio = screen.getByLabelText(/Private Registry/i);
-      await user.click(privateRadio);
-
       await waitFor(() => {
-        expect(screen.getByLabelText('Username')).toBeInTheDocument();
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
       });
-      expect(screen.getByLabelText('Password')).toBeInTheDocument();
-    });
-
-    it('should show token field when token auth method selected', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
 
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
 
-      const tokenRadio = screen.getByLabelText(/^Token$/);
-      await user.click(tokenRadio);
-
-      expect(screen.getByLabelText('Token')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Username')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Select private registry')).toBeInTheDocument();
     });
 
-    it('should show TLS options for private registry', async () => {
+    it('should show empty state when no registries configured', async () => {
       const user = userEvent.setup();
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue([]);
+
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
 
-      expect(screen.getByLabelText(/Skip TLS Verification/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Allow Insecure Connections/i)).toBeInTheDocument();
+      expect(screen.getByText('No private registries configured')).toBeInTheDocument();
+      expect(screen.getByText(/Ask your administrator to configure/i)).toBeInTheDocument();
     });
 
-    it('should disable load button when private registry fields incomplete', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
+    it('should auto-select first registry when available', async () => {
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue(mockRegistries);
 
+      renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
+
+      const user = userEvent.setup();
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
 
-      const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
-      expect(loadButton).toBeDisabled();
+      const select = screen.getByLabelText('Select private registry') as HTMLSelectElement;
+      expect(select.value).toBe('corp-registry');
     });
 
-    it('should enable load button when all private registry fields complete with credentials', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
-
-      const privateRadio = screen.getByLabelText(/Private Registry/i);
-      await user.click(privateRadio);
-
-      const registryUrlInput = screen.getByLabelText(/Registry URL/i);
-      await user.type(registryUrlInput, 'https://registry.example.com');
-
-      const repoInput = screen.getByLabelText(/Scenario Repository/i);
-      await user.type(repoInput, 'myorg/scenarios');
-
-      const usernameInput = screen.getByLabelText('Username');
-      await user.type(usernameInput, 'testuser');
-
-      const passwordInput = screen.getByLabelText('Password');
-      await user.type(passwordInput, 'testpass');
-
-      const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
-      expect(loadButton).not.toBeDisabled();
-    });
-
-    it('should enable load button when all private registry fields complete with token', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
-
-      const privateRadio = screen.getByLabelText(/Private Registry/i);
-      await user.click(privateRadio);
-
-      const tokenRadio = screen.getByLabelText(/^Token$/);
-      await user.click(tokenRadio);
-
-      const registryUrlInput = screen.getByLabelText(/Registry URL/i);
-      await user.type(registryUrlInput, 'https://registry.example.com');
-
-      const repoInput = screen.getByLabelText(/Scenario Repository/i);
-      await user.type(repoInput, 'myorg/scenarios');
-
-      const tokenInput = screen.getByLabelText('Token');
-      await user.type(tokenInput, 'my-token-12345');
-
-      const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
-      expect(loadButton).not.toBeDisabled();
-    });
-
-    it('should load scenarios from private registry with credentials', async () => {
+    it('should load scenarios from selected private registry', async () => {
       const user = userEvent.setup();
       const mockResponse: ScenariosResponse = {
         scenarios: [
@@ -272,29 +248,23 @@ describe('RegistrySelector', () => {
         ],
       };
 
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue(mockRegistries);
       vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce(mockResponse);
 
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
-
-      await user.type(screen.getByLabelText(/Registry URL/i), 'https://registry.example.com');
-      await user.type(screen.getByLabelText(/Scenario Repository/i), 'myorg/scenarios');
-      await user.type(screen.getByLabelText('Username'), 'testuser');
-      await user.type(screen.getByLabelText('Password'), 'testpass');
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       await user.click(loadButton);
 
       await waitFor(() => {
         expect(operatorApi.getScenarios).toHaveBeenCalledWith({
-          username: 'testuser',
-          password: 'testpass',
-          registryUrl: 'https://registry.example.com',
-          scenarioRepository: 'myorg/scenarios',
-          skipTls: false,
-          insecure: false,
+          registryName: 'corp-registry',
         });
       });
 
@@ -306,138 +276,103 @@ describe('RegistrySelector', () => {
       });
     });
 
-    it('should load scenarios from private registry with token', async () => {
+    it('should allow selecting different registry from dropdown', async () => {
       const user = userEvent.setup();
-      const mockResponse: ScenariosResponse = {
-        scenarios: [
-          { name: 'token-scenario', tags: ['v1.0.0'], digest: 'sha256:token' },
-        ],
-      };
-
-      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce(mockResponse);
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue(mockRegistries);
+      vi.mocked(operatorApi.getScenarios).mockResolvedValue({ scenarios: [] });
 
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
 
-      const tokenRadio = screen.getByLabelText(/^Token$/);
-      await user.click(tokenRadio);
-
-      await user.type(screen.getByLabelText(/Registry URL/i), 'https://private.registry.io');
-      await user.type(screen.getByLabelText(/Scenario Repository/i), 'org/chaos');
-      await user.type(screen.getByLabelText('Token'), 'Bearer abc123xyz');
+      const select = screen.getByLabelText('Select private registry');
+      await user.selectOptions(select, 'dev-registry');
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       await user.click(loadButton);
 
       await waitFor(() => {
         expect(operatorApi.getScenarios).toHaveBeenCalledWith({
-          token: 'Bearer abc123xyz',
-          registryUrl: 'https://private.registry.io',
-          scenarioRepository: 'org/chaos',
-          skipTls: false,
-          insecure: false,
+          registryName: 'dev-registry',
         });
       });
     });
 
-    it('should include TLS options when enabled', async () => {
-      const user = userEvent.setup();
-      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce({ scenarios: [] });
+    it('should show loading spinner while fetching registries', async () => {
+      vi.mocked(registriesApi.getAvailableRegistries).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(mockRegistries), 100))
+      );
 
       renderWithContext();
+
+      const user = userEvent.setup();
+      const privateRadio = screen.getByLabelText(/Private Registry/i);
+      await user.click(privateRadio);
+
+      expect(screen.getByText('Loading available registries...')).toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading available registries...')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should show error when fetching registries fails', async () => {
+      const user = userEvent.setup();
+      vi.mocked(registriesApi.getAvailableRegistries).mockRejectedValue(
+        new Error('Network error')
+      );
+
+      renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
 
-      await user.type(screen.getByLabelText(/Registry URL/i), 'http://insecure.local');
-      await user.type(screen.getByLabelText(/Scenario Repository/i), 'scenarios');
-      await user.type(screen.getByLabelText('Username'), 'user');
-      await user.type(screen.getByLabelText('Password'), 'pass');
-
-      const skipTlsCheckbox = screen.getByLabelText(/Skip TLS Verification/i);
-      await user.click(skipTlsCheckbox);
-
-      const insecureCheckbox = screen.getByLabelText(/Allow Insecure Connections/i);
-      await user.click(insecureCheckbox);
-
-      const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
-      await user.click(loadButton);
-
-      await waitFor(() => {
-        expect(operatorApi.getScenarios).toHaveBeenCalledWith(
-          expect.objectContaining({
-            skipTls: true,
-            insecure: true,
-          })
-        );
-      });
+      expect(screen.getByText('Failed to load registries')).toBeInTheDocument();
+      expect(screen.getByText('Network error')).toBeInTheDocument();
     });
   });
 
   describe('Form Validation', () => {
-    it('should not allow empty username with credentials auth', async () => {
+    it('should disable load button when private selected but no registries available', async () => {
       const user = userEvent.setup();
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue([]);
+
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
-
-      await user.type(screen.getByLabelText(/Registry URL/i), 'https://registry.example.com');
-      await user.type(screen.getByLabelText(/Scenario Repository/i), 'myorg/scenarios');
-      await user.type(screen.getByLabelText('Password'), 'testpass');
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       expect(loadButton).toBeDisabled();
     });
 
-    it('should not allow empty password with credentials auth', async () => {
+    it('should disable load button while loading registries', async () => {
       const user = userEvent.setup();
+      vi.mocked(registriesApi.getAvailableRegistries).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(mockRegistries), 100))
+      );
+
       renderWithContext();
 
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
 
-      await user.type(screen.getByLabelText(/Registry URL/i), 'https://registry.example.com');
-      await user.type(screen.getByLabelText(/Scenario Repository/i), 'myorg/scenarios');
-      await user.type(screen.getByLabelText('Username'), 'testuser');
-
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       expect(loadButton).toBeDisabled();
-    });
 
-    it('should not allow empty token with token auth', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
-
-      const privateRadio = screen.getByLabelText(/Private Registry/i);
-      await user.click(privateRadio);
-
-      const tokenRadio = screen.getByLabelText(/^Token$/);
-      await user.click(tokenRadio);
-
-      await user.type(screen.getByLabelText(/Registry URL/i), 'https://registry.example.com');
-      await user.type(screen.getByLabelText(/Scenario Repository/i), 'myorg/scenarios');
-
-      const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
-      expect(loadButton).toBeDisabled();
-    });
-
-    it('should not allow whitespace-only credentials', async () => {
-      const user = userEvent.setup();
-      renderWithContext();
-
-      const privateRadio = screen.getByLabelText(/Private Registry/i);
-      await user.click(privateRadio);
-
-      await user.type(screen.getByLabelText(/Registry URL/i), 'https://registry.example.com');
-      await user.type(screen.getByLabelText(/Scenario Repository/i), 'myorg/scenarios');
-      await user.type(screen.getByLabelText('Username'), '   ');
-      await user.type(screen.getByLabelText('Password'), '   ');
-
-      const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
-      expect(loadButton).toBeDisabled();
+      await waitFor(() => {
+        expect(loadButton).not.toBeDisabled();
+      });
     });
   });
 
@@ -445,10 +380,13 @@ describe('RegistrySelector', () => {
     it('should show loading state while fetching scenarios', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.getScenarios).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ scenarios: [] }), 100))
+        () => new Promise((resolve) => setTimeout(() => resolve({ scenarios: [] }), 100))
       );
 
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       await user.click(loadButton);
@@ -467,10 +405,13 @@ describe('RegistrySelector', () => {
     it('should disable load button while loading', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.getScenarios).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ scenarios: [] }), 100))
+        () => new Promise((resolve) => setTimeout(() => resolve({ scenarios: [] }), 100))
       );
 
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const loadButton = screen.getByRole('button', { name: /Load Scenarios/i });
       await user.click(loadButton);
@@ -484,6 +425,9 @@ describe('RegistrySelector', () => {
     it('should dispatch cancel action when cancel button clicked', async () => {
       const user = userEvent.setup();
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
       const cancelButton = screen.getByRole('button', { name: /Cancel/i });
       await user.click(cancelButton);
@@ -493,26 +437,27 @@ describe('RegistrySelector', () => {
   });
 
   describe('Registry Type Toggle', () => {
-    it('should clear private registry fields when switching to public', async () => {
+    it('should hide registry dropdown when switching from private to public', async () => {
       const user = userEvent.setup();
-      vi.mocked(operatorApi.getScenarios).mockResolvedValue({ scenarios: [] });
+      vi.mocked(registriesApi.getAvailableRegistries).mockResolvedValue(mockRegistries);
 
       renderWithContext();
+      await waitFor(() => {
+        expect(registriesApi.getAvailableRegistries).toHaveBeenCalled();
+      });
 
-      // Switch to private and fill fields
+      // Switch to private
       const privateRadio = screen.getByLabelText(/Private Registry/i);
       await user.click(privateRadio);
 
-      await user.type(screen.getByLabelText(/Registry URL/i), 'https://registry.example.com');
-      await user.type(screen.getByLabelText('Username'), 'testuser');
+      expect(screen.getByLabelText('Select private registry')).toBeInTheDocument();
 
       // Switch back to public
       const publicRadio = screen.getByLabelText(/Public Registry/i);
       await user.click(publicRadio);
 
-      // Private fields should not be visible
-      expect(screen.queryByLabelText(/Registry URL/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Username')).not.toBeInTheDocument();
+      // Dropdown should not be visible
+      expect(screen.queryByLabelText('Select private registry')).not.toBeInTheDocument();
     });
   });
 });

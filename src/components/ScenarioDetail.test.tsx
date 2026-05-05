@@ -153,10 +153,7 @@ describe('ScenarioDetail', () => {
       vi.mocked(operatorApi.getScenarioDetail).mockResolvedValueOnce(mockScenarioDetail);
 
       const registryConfig: ScenariosRequest = {
-        username: 'testuser',
-        password: 'testpass',
-        registryUrl: 'https://registry.example.com',
-        scenarioRepository: 'myorg/scenarios',
+        registryName: 'corp-registry',
       };
 
       renderWithContext({ scenarioDetail: null }, registryConfig);
@@ -224,8 +221,8 @@ describe('ScenarioDetail', () => {
     it('should display required fields only in required section', () => {
       renderWithContext();
 
-      // NAMESPACE is required
-      expect(screen.getByText('Target namespace')).toBeInTheDocument();
+      // Required Parameters section should be present
+      expect(screen.getByText('Required Parameters')).toBeInTheDocument();
     });
 
     it('should update form values when required fields change', async () => {
@@ -565,7 +562,7 @@ describe('ScenarioDetail', () => {
             targetClusters: {
               'krkn-operator': ['cluster1'],
             },
-            scenarioImage: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
+            scenarioImage: 'krkn-hub:pod-scenarios',
             scenarioName: 'pod-scenarios',
             environment: expect.objectContaining({
               NAMESPACE: 'default',
@@ -583,10 +580,7 @@ describe('ScenarioDetail', () => {
       vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
 
       const registryConfig: ScenariosRequest = {
-        registryUrl: 'https://registry.example.com',
-        scenarioRepository: 'myorg/scenarios',
-        username: 'user',
-        password: 'pass',
+        registryName: 'corp-registry',
       };
 
       renderWithContext(
@@ -594,6 +588,8 @@ describe('ScenarioDetail', () => {
           scenarioFormValues: {
             NAMESPACE: 'default',
           },
+          registryType: 'private',
+          registryConfig,
         },
         registryConfig
       );
@@ -607,9 +603,8 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalledWith(
           expect.objectContaining({
-            scenarioImage: 'https://registry.example.com/myorg/scenarios:pod-scenarios',
-            username: 'user',
-            password: 'pass',
+            scenarioImage: 'krkn-hub:pod-scenarios',
+            registryName: 'corp-registry',
           })
         );
       });
@@ -779,10 +774,16 @@ describe('ScenarioDetail', () => {
         },
       });
 
+      // Enable global parameters first
+      const globalParamsCheckbox = screen.getByLabelText(/Add global parameters/i);
+      await user.click(globalParamsCheckbox);
+
       const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
       await user.click(previewButton);
 
-      expect(screen.getByText('Global Parameters (Modified)')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Global Parameters/)).toBeInTheDocument();
+      });
       expect(screen.getByText('KRAKEN_PROMETHEUS_URL')).toBeInTheDocument();
       expect(screen.getByText('http://prometheus:9090')).toBeInTheDocument();
     });

@@ -142,10 +142,10 @@ describe('TerminalContent', () => {
     });
 
     // Try invalid command
-    await user.type(input, 'invalid command{Enter}');
+    await user.type(input, 'kubectl invalid{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText(/command not found: invalid/)).toBeInTheDocument();
+      expect(screen.getByText(/not recognized or not allowed/)).toBeInTheDocument();
     });
   });
 
@@ -169,7 +169,7 @@ describe('TerminalContent', () => {
     await user.type(input, 'kubectl get pods --watch{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText(/Streaming flags.*not supported/)).toBeInTheDocument();
+      expect(screen.getByText(/Streaming commands.*not supported/)).toBeInTheDocument();
     });
   });
 
