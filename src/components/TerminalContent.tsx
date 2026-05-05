@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { CopyIcon } from '@patternfly/react-icons';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { operatorApi } from '../services/operatorApi';
+import { validateCommand } from '../utils/terminalValidation';
 import type { TargetResponse, AvailableCommandsResponse } from '../types/api';
 import './TerminalContent.css';
 
@@ -608,53 +609,21 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
           return;
         }
 
-        // Client-side validation if available commands are loaded
-        if (availableCommands) {
-          const commandParts = command.split(/\s+/);
-          const mainCommand = commandParts[0];
-          const subCommand = commandParts[1];
+        // Client-side validation using terminalValidation utility
+        const validation = validateCommand(command);
+        if (!validation.valid) {
+          const errorLines = [
+            `☸ ${selectedCluster.clusterName} $ ${command}`,
+            `Error: ${validation.error}`,
+          ];
 
-          // Check if main command is allowed (kubectl or oc)
-          const allowedCommand = availableCommands.commands.find(cmd => cmd.name === mainCommand);
-          if (!allowedCommand) {
-            setOutputLines(prev => [
-              ...prev,
-              `☸ ${selectedCluster.clusterName} $ ${command}`,
-              `ksh: command not found: ${mainCommand}`,
-              'Type ? for available commands',
-            ]);
-            setInputValue('');
-            return;
+          if (validation.suggestion) {
+            errorLines.push(`Suggestion: ${validation.suggestion}`);
           }
 
-          // Check if subcommand is in allowed list
-          if (subCommand) {
-            const allowedSubcommand = allowedCommand.subcommands.find(sub => sub.name === subCommand);
-            if (!allowedSubcommand) {
-              setOutputLines(prev => [
-                ...prev,
-                `☸ ${selectedCluster.clusterName} $ ${command}`,
-                `ksh: ${mainCommand}: ${subCommand}: command not found`,
-                'Type ? for available commands',
-              ]);
-              setInputValue('');
-              return;
-            }
-          }
-
-          // Check for blocked flags
-          const blockedFlags = ['--watch', '-w', '--follow', '-f', '--watch-only'];
-          const hasBlockedFlag = blockedFlags.some(flag => command.includes(flag));
-          if (hasBlockedFlag) {
-            setOutputLines(prev => [
-              ...prev,
-              `☸ ${selectedCluster.clusterName} $ ${command}`,
-              'Error: Streaming flags (--watch, --follow) are not supported',
-              'These flags require WebSocket/SSE which is not available in v1',
-            ]);
-            setInputValue('');
-            return;
-          }
+          setOutputLines(prev => [...prev, ...errorLines]);
+          setInputValue('');
+          return;
         }
 
         // Add command to history (avoid duplicates of last command)
