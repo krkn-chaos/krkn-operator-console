@@ -244,11 +244,14 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         };
 
         // Add credentials only if provided
+        if (username.trim()) {
+          data.username = username.trim(); // Include username if provided
+        }
+
         if (authType === 'token' && token.trim()) {
           data.token = token.trim();
-        } else if (authType === 'password') {
-          if (username.trim()) data.username = username.trim();
-          if (password.trim()) data.password = password.trim();
+        } else if (authType === 'password' && password.trim()) {
+          data.password = password.trim();
         }
 
         await registriesApi.updateRegistry(registryName, data);
@@ -260,6 +263,7 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
           registryUrl: registryUrl.trim(),
           scenarioRepository: scenarioRepository.trim(),
           authType,
+          username: username.trim(), // Always include username
           description: description.trim() || undefined,
           skipTls,
           insecure,
@@ -271,7 +275,6 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         if (authType === 'token') {
           data.token = token.trim();
         } else if (authType === 'password') {
-          data.username = username.trim();
           data.password = password.trim();
         }
 
