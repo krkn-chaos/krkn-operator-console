@@ -1,0 +1,563 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { operatorApi } from '../operatorApi';
+import type {
+  ScenariosRequest,
+  ScenariosResponse,
+  ScenarioDetail,
+  ScenarioGlobals,
+} from '../../types/api';
+
+describe('OperatorApi - Registry Methods', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  describe('getScenarios', () => {
+    it('should fetch scenarios with public registry (empty request)', async () => {
+      const mockResponse: ScenariosResponse = {
+        scenarios: [
+          {
+            name: 'pod-scenarios',
+            tags: ['v1.0.0'],
+            digest: 'sha256:abc123',
+          },
+          {
+            name: 'node-scenarios',
+            tags: ['v1.0.0'],
+            digest: 'sha256:def456',
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const request: ScenariosRequest = {};
+      const result = await operatorApi.getScenarios(request);
+
+      // Verify fetch was called with scenarios endpoint
+      expect(global.fetch).toHaveBeenCalled();
+      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(fetchCall[0]).toContain('/scenarios');
+      expect(fetchCall[1].method).toBe('POST');
+      expect(fetchCall[1].body).toBe(JSON.stringify(request));
+
+      expect(result).toEqual(mockResponse);
+      expect(result.scenarios).toHaveLength(2);
+    });
+
+    it('should fetch scenarios with private registry credentials', async () => {
+      const mockResponse: ScenariosResponse = {
+        scenarios: [
+          {
+            name: 'custom-scenario',
+            tags: ['v2.0.0'],
+            digest: 'sha256:xyz789',
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const request: ScenariosRequest = {
+        username: 'testuser',
+        password: 'testpass',
+        registryUrl: 'https://registry.example.com',
+        scenarioRepository: 'myorg/chaos-scenarios',
+        skipTls: false,
+        insecure: false,
+      };
+
+      const result = await operatorApi.getScenarios(request);
+
+      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(fetchCall[0]).toContain('/scenarios');
+      expect(fetchCall[1].method).toBe('POST');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should fetch scenarios with private registry token', async () => {
+      const mockResponse: ScenariosResponse = {
+        scenarios: [
+          {
+            name: 'token-scenario',
+            tags: ['v1.0.0'],
+            digest: 'sha256:token123',
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const request: ScenariosRequest = {
+        token: 'my-registry-token',
+        registryUrl: 'https://private-registry.io',
+        scenarioRepository: 'org/scenarios',
+      };
+
+      const result = await operatorApi.getScenarios(request);
+
+      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(fetchCall[0]).toContain('/scenarios');
+      expect(fetchCall[1].method).toBe('POST');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should handle skipTls and insecure flags', async () => {
+      const mockResponse: ScenariosResponse = {
+        scenarios: [],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const request: ScenariosRequest = {
+        username: 'testuser',
+        password: 'testpass',
+        registryUrl: 'http://insecure-registry.local',
+        scenarioRepository: 'scenarios',
+        skipTls: true,
+        insecure: true,
+      };
+
+      await operatorApi.getScenarios(request);
+
+      const callBody = JSON.parse(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+      );
+      expect(callBody.skipTls).toBe(true);
+      expect(callBody.insecure).toBe(true);
+    });
+
+    it('should handle API errors when fetching scenarios', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        json: async () => ({ error: 'Authentication failed' }),
+      });
+
+      const request: ScenariosRequest = {
+        username: 'wrong',
+        password: 'credentials',
+        registryUrl: 'https://registry.example.com',
+        scenarioRepository: 'org/scenarios',
+      };
+
+      await expect(operatorApi.getScenarios(request)).rejects.toThrow();
+    });
+
+    it('should handle empty scenarios list', async () => {
+      const mockResponse: ScenariosResponse = {
+        scenarios: [],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const result = await operatorApi.getScenarios({});
+
+      expect(result.scenarios).toHaveLength(0);
+    });
+  });
+
+  describe('getScenarioDetail', () => {
+    it('should fetch scenario detail with public registry', async () => {
+      const mockDetail: ScenarioDetail = {
+        title: 'Pod Scenarios',
+        description: 'Kill random pods',
+        digest: 'sha256:abc123',
+        fields: [
+          {
+            variable: 'NAMESPACE',
+            short_description: 'Target namespace',
+            type: 'text',
+            required: true,
+          },
+          {
+            variable: 'KILL_COUNT',
+            short_description: 'Number of pods to kill',
+            type: 'number',
+            required: false,
+            default: '1',
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDetail,
+      });
+
+      const result = await operatorApi.getScenarioDetail('pod-scenarios', {});
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/scenarios/detail/pod-scenarios'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({}),
+        })
+      );
+      expect(result).toEqual(mockDetail);
+      expect(result.fields).toHaveLength(2);
+    });
+
+    it('should fetch scenario detail with private registry credentials', async () => {
+      const mockDetail: ScenarioDetail = {
+        title: 'Custom Scenario',
+        description: 'Custom chaos scenario',
+        digest: 'sha256:custom123',
+        fields: [
+          {
+            variable: 'TARGET',
+            short_description: 'Target resource',
+            type: 'text',
+            required: true,
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDetail,
+      });
+
+      const request: ScenariosRequest = {
+        username: 'user',
+        password: 'pass',
+        registryUrl: 'https://registry.example.com',
+        scenarioRepository: 'org/scenarios',
+      };
+
+      const result = await operatorApi.getScenarioDetail('custom-scenario', request);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/scenarios/detail/custom-scenario'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(request),
+        })
+      );
+      expect(result).toEqual(mockDetail);
+    });
+
+    it('should encode scenario name in URL', async () => {
+      const mockDetail: ScenarioDetail = {
+        title: 'Test',
+        description: 'Test',
+        digest: 'sha256:test',
+        fields: [],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDetail,
+      });
+
+      await operatorApi.getScenarioDetail('scenario/with/slashes', {});
+
+      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(fetchCall).toContain(encodeURIComponent('scenario/with/slashes'));
+    });
+
+    it('should handle different field types', async () => {
+      const mockDetail: ScenarioDetail = {
+        title: 'Complex Scenario',
+        description: 'Scenario with various field types',
+        digest: 'sha256:complex',
+        fields: [
+          {
+            variable: 'TEXT_FIELD',
+            short_description: 'Text input',
+            type: 'text',
+            required: true,
+          },
+          {
+            variable: 'NUMBER_FIELD',
+            short_description: 'Number input',
+            type: 'number',
+            required: false,
+            default: '10',
+          },
+          {
+            variable: 'BOOLEAN_FIELD',
+            short_description: 'Boolean toggle',
+            type: 'boolean',
+            required: false,
+            default: 'false',
+          },
+          {
+            variable: 'SECRET_FIELD',
+            short_description: 'Secret value',
+            type: 'text',
+            required: true,
+            secret: true,
+          },
+          {
+            variable: 'DROPDOWN_FIELD',
+            short_description: 'Select option',
+            type: 'dropdown',
+            required: true,
+            options: ['option1', 'option2'],
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDetail,
+      });
+
+      const result = await operatorApi.getScenarioDetail('complex-scenario', {});
+
+      expect(result.fields).toHaveLength(5);
+      expect(result.fields[0].type).toBe('text');
+      expect(result.fields[1].type).toBe('number');
+      expect(result.fields[2].type).toBe('boolean');
+      expect(result.fields[3].secret).toBe(true);
+      expect(result.fields[4].type).toBe('dropdown');
+      expect(result.fields[4].options).toEqual(['option1', 'option2']);
+    });
+
+    it('should handle API errors when fetching scenario detail', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({ error: 'Scenario not found' }),
+      });
+
+      await expect(
+        operatorApi.getScenarioDetail('nonexistent-scenario', {})
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('getScenarioGlobals', () => {
+    it('should fetch global parameters with public registry', async () => {
+      const mockGlobals: ScenarioGlobals = {
+        title: 'Global Parameters',
+        description: 'Common parameters for all scenarios',
+        fields: [
+          {
+            variable: 'KRAKEN_PROMETHEUS_URL',
+            short_description: 'Prometheus URL',
+            type: 'text',
+            required: false,
+            default: '',
+          },
+          {
+            variable: 'ENABLE_ALERTS',
+            short_description: 'Enable alerting',
+            type: 'boolean',
+            required: false,
+            default: 'false',
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockGlobals,
+      });
+
+      const result = await operatorApi.getScenarioGlobals('pod-scenarios', {});
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/scenarios/globals/pod-scenarios'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({}),
+        })
+      );
+      expect(result).toEqual(mockGlobals);
+      expect(result.fields).toHaveLength(2);
+    });
+
+    it('should fetch global parameters with private registry', async () => {
+      const mockGlobals: ScenarioGlobals = {
+        title: 'Custom Globals',
+        description: 'Custom global parameters',
+        fields: [
+          {
+            variable: 'CUSTOM_PARAM',
+            short_description: 'Custom parameter',
+            type: 'text',
+            required: false,
+          },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockGlobals,
+      });
+
+      const request: ScenariosRequest = {
+        token: 'registry-token',
+        registryUrl: 'https://private-registry.io',
+        scenarioRepository: 'org/scenarios',
+      };
+
+      const result = await operatorApi.getScenarioGlobals('custom-scenario', request);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/scenarios/globals/custom-scenario'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(request),
+        })
+      );
+      expect(result).toEqual(mockGlobals);
+    });
+
+    it('should encode scenario name in URL for globals', async () => {
+      const mockGlobals: ScenarioGlobals = {
+        title: 'Globals',
+        description: 'Global params',
+        fields: [],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockGlobals,
+      });
+
+      await operatorApi.getScenarioGlobals('scenario:with:colons', {});
+
+      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(fetchCall).toContain(encodeURIComponent('scenario:with:colons'));
+    });
+
+    it('should handle empty global parameters', async () => {
+      const mockGlobals: ScenarioGlobals = {
+        title: 'No Globals',
+        description: 'Scenario with no global parameters',
+        fields: [],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockGlobals,
+      });
+
+      const result = await operatorApi.getScenarioGlobals('simple-scenario', {});
+
+      expect(result.fields).toHaveLength(0);
+    });
+
+    it('should handle API errors when fetching globals', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: async () => ({ error: 'Server error' }),
+      });
+
+      await expect(
+        operatorApi.getScenarioGlobals('scenario', {})
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('Registry authentication scenarios', () => {
+    it('should handle scenarios with username and password', async () => {
+      const mockResponse: ScenariosResponse = {
+        scenarios: [{ name: 'test', tags: ['v1'], digest: 'sha256:test' }],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const request: ScenariosRequest = {
+        username: 'myuser',
+        password: 'mypassword',
+        registryUrl: 'https://registry.example.com',
+        scenarioRepository: 'myorg/scenarios',
+      };
+
+      await operatorApi.getScenarios(request);
+
+      const callBody = JSON.parse(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+      );
+      expect(callBody.username).toBe('myuser');
+      expect(callBody.password).toBe('mypassword');
+      expect(callBody.token).toBeUndefined();
+    });
+
+    it('should handle scenarios with token authentication', async () => {
+      const mockResponse: ScenariosResponse = {
+        scenarios: [{ name: 'test', tags: ['v1'], digest: 'sha256:test' }],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const request: ScenariosRequest = {
+        token: 'Bearer abc123xyz',
+        registryUrl: 'https://registry.example.com',
+        scenarioRepository: 'myorg/scenarios',
+      };
+
+      await operatorApi.getScenarios(request);
+
+      const callBody = JSON.parse(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+      );
+      expect(callBody.token).toBe('Bearer abc123xyz');
+      expect(callBody.username).toBeUndefined();
+      expect(callBody.password).toBeUndefined();
+    });
+  });
+
+  describe('Network error handling', () => {
+    it('should handle network errors when fetching scenarios', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error('Network error')
+      );
+
+      await expect(operatorApi.getScenarios({})).rejects.toThrow('Network error');
+    });
+
+    it('should handle timeout errors', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error('Request timeout')
+      );
+
+      await expect(
+        operatorApi.getScenarioDetail('pod-scenarios', {})
+      ).rejects.toThrow('Request timeout');
+    });
+
+    it('should handle connection refused errors', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error('Connection refused')
+      );
+
+      await expect(
+        operatorApi.getScenarioGlobals('pod-scenarios', {})
+      ).rejects.toThrow('Connection refused');
+    });
+  });
+});
