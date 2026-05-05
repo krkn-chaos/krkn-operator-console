@@ -188,12 +188,6 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
     // Registry URL validation
     if (!registryUrl.trim()) {
       newErrors.registryUrl = 'Registry URL is required';
-    } else {
-      try {
-        new URL(registryUrl);
-      } catch {
-        newErrors.registryUrl = 'Invalid URL format';
-      }
     }
 
     // Scenario repository validation
@@ -351,7 +345,7 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
           onChange={(_event, value) => setRegistryUrl(value)}
           isRequired
           validated={errors.registryUrl ? 'error' : 'default'}
-          placeholder="https://registry.example.com"
+          placeholder="registry.example.com"
         />
         {errors.registryUrl && (
           <FormHelperText>

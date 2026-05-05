@@ -71,7 +71,7 @@ describe('OperatorApi - Registry Methods', () => {
       const request: ScenariosRequest = {
         username: 'testuser',
         password: 'testpass',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'myorg/chaos-scenarios',
         skipTls: false,
         insecure: false,
@@ -154,7 +154,7 @@ describe('OperatorApi - Registry Methods', () => {
       const request: ScenariosRequest = {
         username: 'wrong',
         password: 'credentials',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'org/scenarios',
       };
 
@@ -241,7 +241,7 @@ describe('OperatorApi - Registry Methods', () => {
       const request: ScenariosRequest = {
         username: 'user',
         password: 'pass',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'org/scenarios',
       };
 
@@ -490,7 +490,7 @@ describe('OperatorApi - Registry Methods', () => {
       const request: ScenariosRequest = {
         username: 'myuser',
         password: 'mypassword',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'myorg/scenarios',
       };
 
@@ -516,7 +516,7 @@ describe('OperatorApi - Registry Methods', () => {
 
       const request: ScenariosRequest = {
         token: 'Bearer abc123xyz',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'myorg/scenarios',
       };
 

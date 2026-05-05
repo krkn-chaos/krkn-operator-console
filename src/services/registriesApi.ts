@@ -43,7 +43,7 @@ const API_BASE = '/api/v1';
  * // Create a new registry
  * await registriesApi.createRegistry({
  *   name: 'my-registry',
- *   registryUrl: 'https://registry.example.com',
+ *   registryUrl: 'registry.example.com',
  *   scenarioRepository: 'myorg/scenarios',
  *   authType: 'token',
  *   token: 'my-secret-token',
@@ -157,7 +157,7 @@ class RegistriesApi extends BaseApiClient {
    * // Create registry with token auth
    * await registriesApi.createRegistry({
    *   name: 'my-private-registry',
-   *   registryUrl: 'https://registry.example.com',
+   *   registryUrl: 'registry.example.com',
    *   scenarioRepository: 'myorg/chaos-scenarios',
    *   authType: 'token',
    *   token: 'my-secret-token',
@@ -171,7 +171,7 @@ class RegistriesApi extends BaseApiClient {
    * // Create registry with password auth
    * await registriesApi.createRegistry({
    *   name: 'dockerhub-private',
-   *   registryUrl: 'https://registry.hub.docker.com',
+   *   registryUrl: 'registry.hub.docker.com',
    *   scenarioRepository: 'myusername/scenarios',
    *   authType: 'password',
    *   username: 'myusername',

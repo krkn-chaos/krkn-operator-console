@@ -37,7 +37,7 @@ describe('registriesApi', () => {
       const mockRegistries: RegistryDetails[] = [
         {
           name: 'registry1',
-          registryUrl: 'https://registry1.example.com',
+          registryUrl: 'registry1.example.com',
           scenarioRepository: 'org1/scenarios',
           authType: 'token',
           description: 'Test registry 1',
@@ -50,7 +50,7 @@ describe('registriesApi', () => {
         },
         {
           name: 'registry2',
-          registryUrl: 'https://registry2.example.com',
+          registryUrl: 'registry2.example.com',
           scenarioRepository: 'org2/scenarios',
           authType: 'password',
           skipTls: false,
@@ -89,7 +89,7 @@ describe('registriesApi', () => {
     it('should fetch specific registry by name', async () => {
       const mockRegistry: RegistryDetails = {
         name: 'my-registry',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'myorg/scenarios',
         authType: 'token',
         description: 'My private registry',
@@ -110,7 +110,7 @@ describe('registriesApi', () => {
     it('should encode special characters in registry name', async () => {
       const mockRegistry: RegistryDetails = {
         name: 'my.registry',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'myorg/scenarios',
         authType: 'token',
         skipTls: false,
@@ -137,7 +137,7 @@ describe('registriesApi', () => {
     it('should create registry with token auth successfully', async () => {
       const createRequest: CreateRegistryRequest = {
         name: 'new-registry',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'myorg/chaos-scenarios',
         authType: 'token',
         token: 'secret-token',
@@ -167,7 +167,7 @@ describe('registriesApi', () => {
     it('should create registry with password auth successfully', async () => {
       const createRequest: CreateRegistryRequest = {
         name: 'dockerhub-private',
-        registryUrl: 'https://registry.hub.docker.com',
+        registryUrl: 'registry.hub.docker.com',
         scenarioRepository: 'myuser/scenarios',
         authType: 'password',
         username: 'myusername',
@@ -200,7 +200,7 @@ describe('registriesApi', () => {
 
       const createRequest: CreateRegistryRequest = {
         name: 'INVALID_NAME',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'org/repo',
         authType: 'token',
         token: 'token',
@@ -215,7 +215,7 @@ describe('registriesApi', () => {
 
       const createRequest: CreateRegistryRequest = {
         name: 'existing-registry',
-        registryUrl: 'https://registry.example.com',
+        registryUrl: 'registry.example.com',
         scenarioRepository: 'org/repo',
         authType: 'token',
         token: 'token',
@@ -344,7 +344,7 @@ describe('registriesApi', () => {
       const mockAvailableRegistries = [
         {
           name: 'team-registry',
-          registryUrl: 'https://registry.example.com',
+          registryUrl: 'registry.example.com',
           scenarioRepository: 'team/scenarios',
           description: 'Team private registry',
         },

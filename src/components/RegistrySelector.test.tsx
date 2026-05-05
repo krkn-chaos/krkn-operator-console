@@ -34,7 +34,7 @@ describe('RegistrySelector', () => {
   const mockRegistries: AvailableRegistry[] = [
     {
       name: 'corp-registry',
-      registryUrl: 'https://registry.corp.com',
+      registryUrl: 'registry.corp.com',
       scenarioRepository: 'chaos/scenarios',
       description: 'Corporate registry for chaos scenarios',
     },

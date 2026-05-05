@@ -56,7 +56,7 @@ Authorization: Bearer <JWT_TOKEN>
   "registries": [
     {
       "name": "production-registry",
-      "registryUrl": "https://registry.example.com",
+      "registryUrl": "registry.example.com",
       "scenarioRepository": "myorg/chaos-scenarios",
       "authType": "token",
       "description": "Production private registry for team scenarios",
@@ -120,7 +120,7 @@ Creates a new private registry configuration.
 ```json
 {
   "name": "my-registry",
-  "registryUrl": "https://registry.example.com",
+  "registryUrl": "registry.example.com",
   "scenarioRepository": "myorg/scenarios",
   "authType": "token",
   "token": "my-secret-token",
@@ -136,7 +136,7 @@ Creates a new private registry configuration.
 ```json
 {
   "name": "dockerhub-private",
-  "registryUrl": "https://registry.hub.docker.com",
+  "registryUrl": "registry.hub.docker.com",
   "scenarioRepository": "myuser/scenarios",
   "authType": "password",
   "username": "myusername",
@@ -253,7 +253,7 @@ Retrieves registries accessible to the current user based on group membership.
   "registries": [
     {
       "name": "team-registry",
-      "registryUrl": "https://registry.example.com",
+      "registryUrl": "registry.example.com",
       "scenarioRepository": "team/scenarios",
       "description": "Team private registry"
     }
