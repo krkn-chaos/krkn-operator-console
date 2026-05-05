@@ -67,10 +67,19 @@ describe('terminalValidation', () => {
         expect(result.error).toContain('--follow');
       });
 
-      it('should block -f short flag', () => {
+      it('should block -f short flag in logs command', () => {
         const result = validateCommand('kubectl logs nginx -f');
         expect(result.valid).toBe(false);
         expect(result.error).toContain('-f');
+      });
+
+      it('should NOT block -f flag in apply command (file argument)', () => {
+        // -f in 'kubectl apply -f' means file, not follow
+        // But apply is still blocked as write command
+        const result = validateCommand('kubectl apply -f deployment.yaml');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('Write operations');
+        expect(result.error).toContain('apply');
       });
 
       it('should block --watch-only flag', () => {

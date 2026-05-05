@@ -24,6 +24,14 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    // Compact, readable test output - 'dot' for CI, 'verbose' for local debugging
+    reporters: process.env.CI ? ['dot', 'json'] : ['verbose'],
+    // Output JSON summary for programmatic parsing
+    outputFile: {
+      json: './test-results.json',
+    },
+    // Hide passing tests, show only failures and summary
+    hideSkippedTests: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'json-summary', 'html'],
