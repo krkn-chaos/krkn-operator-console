@@ -591,9 +591,8 @@ export interface CreateRegistryRequest {
   registryUrl: string;
   scenarioRepository: string;
   authType: AuthType;
-  token?: string;
   username?: string;
-  password?: string;
+  password?: string; // Contains either token (if authType=token) or password (if authType=password)
   description?: string;
   skipTls?: boolean;
   insecure?: boolean;
@@ -605,9 +604,8 @@ export interface UpdateRegistryRequest {
   registryUrl?: string;
   scenarioRepository?: string;
   authType?: AuthType;
-  token?: string;
   username?: string;
-  password?: string;
+  password?: string; // Contains either token (if authType=token) or password (if authType=password)
   description?: string;
   skipTls?: boolean;
   insecure?: boolean;

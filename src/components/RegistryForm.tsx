@@ -248,8 +248,9 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
           data.username = username.trim(); // Include username if provided
         }
 
+        // Password field contains either token or password depending on authType
         if (authType === 'token' && token.trim()) {
-          data.token = token.trim();
+          data.password = token.trim();
         } else if (authType === 'password' && password.trim()) {
           data.password = password.trim();
         }
@@ -264,18 +265,13 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
           scenarioRepository: scenarioRepository.trim(),
           authType,
           username: username.trim(), // Always include username
+          // Password field contains either token or password depending on authType
+          password: authType === 'token' ? token.trim() : password.trim(),
           description: description.trim() || undefined,
           skipTls,
           insecure,
           groups: Array.from(selectedGroups),
           availableToAll,
-        };
-
-        // Add credentials based on auth type
-        if (authType === 'token') {
-          data.token = token.trim();
-        } else if (authType === 'password') {
-          data.password = password.trim();
         }
 
         await registriesApi.createRegistry(data);

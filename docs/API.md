@@ -124,7 +124,7 @@ Creates a new private registry configuration.
   "scenarioRepository": "myorg/scenarios",
   "authType": "token",
   "username": "myusername",
-  "token": "my-secret-token",
+  "password": "my-secret-token",
   "description": "Private registry for team A",
   "skipTls": false,
   "insecure": false,
@@ -146,14 +146,15 @@ Creates a new private registry configuration.
 }
 ```
 
+**Note:** The `password` field is used for both authentication types. When `authType` is "token", the `password` field contains the registry token. When `authType` is "password", it contains the actual password.
+
 **Request Fields:**
 - `name` (string, required) - Registry name (RFC 1123: lowercase alphanumeric, -, .)
 - `registryUrl` (string, required) - Valid URL
 - `scenarioRepository` (string, required) - Format: org/repo
 - `authType` (string, required) - "token" or "password"
 - `username` (string, required) - Username (required for both token and password auth)
-- `token` (string, required if authType=token) - Registry token
-- `password` (string, required if authType=password) - Password
+- `password` (string, required) - Contains either token (if authType=token) or password (if authType=password)
 - `description` (string, optional) - Description
 - `skipTls` (boolean, optional) - Skip TLS verification (default: false)
 - `insecure` (boolean, optional) - Allow HTTP (default: false)
