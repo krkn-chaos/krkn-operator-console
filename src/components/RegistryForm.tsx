@@ -64,7 +64,6 @@ interface RegistryFormProps {
  *
  * **Registry URL:**
  * - Required
- * - Must be valid URL format
  *
  * **Scenario Repository:**
  * - Required
@@ -74,8 +73,9 @@ interface RegistryFormProps {
  * - Required (radio selection: 'token' or 'password')
  *
  * **Credentials:**
+ * - Username: always required (create mode) or optional (edit mode)
  * - If authType='token': token field required (create mode) or optional (edit mode)
- * - If authType='password': username and password required (create mode) or optional (edit mode)
+ * - If authType='password': password field required (create mode) or optional (edit mode)
  *
  * **Groups:**
  * - Optional
@@ -198,18 +198,18 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
     }
 
     // Credentials validation
+    // Username is always required (for both token and password auth)
+    if (!isEditMode && !username.trim()) {
+      newErrors.username = 'Username is required';
+    }
+
     if (authType === 'token') {
       if (!isEditMode && !token.trim()) {
         newErrors.token = 'Token is required';
       }
     } else if (authType === 'password') {
-      if (!isEditMode) {
-        if (!username.trim()) {
-          newErrors.username = 'Username is required';
-        }
-        if (!password.trim()) {
-          newErrors.password = 'Password is required';
-        }
+      if (!isEditMode && !password.trim()) {
+        newErrors.password = 'Password is required';
       }
     }
 
@@ -396,7 +396,7 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         <Radio
           id="authType-token"
           name="authType"
-          label="Token"
+          label="Username & Token"
           isChecked={authType === 'token'}
           onChange={() => setAuthType('token')}
         />
@@ -407,6 +407,25 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
           isChecked={authType === 'password'}
           onChange={() => setAuthType('password')}
         />
+      </FormGroup>
+
+      {/* Username - Always shown */}
+      <FormGroup label="Username" isRequired={!isEditMode} fieldId="username">
+        <TextInput
+          id="username"
+          value={username}
+          onChange={(_event, value) => setUsername(value)}
+          isRequired={!isEditMode}
+          validated={errors.username ? 'error' : 'default'}
+          placeholder={isEditMode ? 'Leave blank to keep existing username' : undefined}
+        />
+        {errors.username && (
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem variant="error">{errors.username}</HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+        )}
       </FormGroup>
 
       {/* Credentials - Token */}
@@ -438,53 +457,33 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         </FormGroup>
       )}
 
-      {/* Credentials - Username & Password */}
+      {/* Credentials - Password */}
       {authType === 'password' && (
-        <>
-          <FormGroup label="Username" isRequired={!isEditMode} fieldId="username">
-            <TextInput
-              id="username"
-              value={username}
-              onChange={(_event, value) => setUsername(value)}
-              isRequired={!isEditMode}
-              validated={errors.username ? 'error' : 'default'}
-              placeholder={isEditMode ? 'Leave blank to keep existing username' : undefined}
-            />
-            {errors.username && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.username}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-
-          <FormGroup label="Password" isRequired={!isEditMode} fieldId="password">
-            <TextInput
-              type="password"
-              id="password"
-              value={password}
-              onChange={(_event, value) => setPassword(value)}
-              isRequired={!isEditMode}
-              validated={errors.password ? 'error' : 'default'}
-              placeholder={isEditMode ? 'Leave blank to keep existing password' : undefined}
-            />
-            {isEditMode && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem>Leave blank to keep the existing password</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-            {errors.password && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.password}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-        </>
+        <FormGroup label="Password" isRequired={!isEditMode} fieldId="password">
+          <TextInput
+            type="password"
+            id="password"
+            value={password}
+            onChange={(_event, value) => setPassword(value)}
+            isRequired={!isEditMode}
+            validated={errors.password ? 'error' : 'default'}
+            placeholder={isEditMode ? 'Leave blank to keep existing password' : undefined}
+          />
+          {isEditMode && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>Leave blank to keep the existing password</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+          {errors.password && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem variant="error">{errors.password}</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </FormGroup>
       )}
 
       {/* TLS Options */}

@@ -123,6 +123,7 @@ Creates a new private registry configuration.
   "registryUrl": "registry.example.com",
   "scenarioRepository": "myorg/scenarios",
   "authType": "token",
+  "username": "myusername",
   "token": "my-secret-token",
   "description": "Private registry for team A",
   "skipTls": false,
@@ -150,8 +151,8 @@ Creates a new private registry configuration.
 - `registryUrl` (string, required) - Valid URL
 - `scenarioRepository` (string, required) - Format: org/repo
 - `authType` (string, required) - "token" or "password"
+- `username` (string, required) - Username (required for both token and password auth)
 - `token` (string, required if authType=token) - Registry token
-- `username` (string, required if authType=password) - Username
 - `password` (string, required if authType=password) - Password
 - `description` (string, optional) - Description
 - `skipTls` (boolean, optional) - Skip TLS verification (default: false)
