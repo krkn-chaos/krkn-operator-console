@@ -575,3 +575,61 @@ export interface GroupMemberOperationResponse {
   userId: string;
   message?: string;
 }
+
+// Registry Management Types
+
+export type AuthType = 'token' | 'password';
+
+export interface RegistryDetails {
+  name: string;
+  registryUrl: string;
+  scenarioRepository: string;
+  authType: AuthType;
+  description?: string;
+  skipTls: boolean;
+  insecure: boolean;
+  groups: string[];
+  availableToAll: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface CreateRegistryRequest {
+  name: string;
+  registryUrl: string;
+  scenarioRepository: string;
+  authType: AuthType;
+  token?: string;
+  username?: string;
+  password?: string;
+  description?: string;
+  skipTls?: boolean;
+  insecure?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
+}
+
+export interface UpdateRegistryRequest {
+  registryUrl?: string;
+  scenarioRepository?: string;
+  authType?: AuthType;
+  token?: string;
+  username?: string;
+  password?: string;
+  description?: string;
+  skipTls?: boolean;
+  insecure?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
+}
+
+export interface ListRegistriesResponse {
+  registries: RegistryDetails[];
+}
+
+export interface RegistryOperationResponse {
+  name: string;
+  message?: string;
+}
