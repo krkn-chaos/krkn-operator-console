@@ -297,12 +297,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       }
 
       // Build scenario image
-      let scenarioImage: string;
-      if (registryConfig && registryConfig.registryUrl && registryConfig.scenarioRepository) {
-        scenarioImage = `${registryConfig.registryUrl}/${registryConfig.scenarioRepository}:${scenarioName}`;
-      } else {
-        scenarioImage = `quay.io/krkn-chaos/krkn-hub:${scenarioName}`;
-      }
+      // Note: Backend will resolve the full image path based on registryName
+      // If registryName is not provided, backend defaults to quay.io
+      const scenarioImage = `krkn-hub:${scenarioName}`;
 
       // Build targetClusters map from selectedClusters
       const targetClusters: { [providerName: string]: string[] } = {};
@@ -322,13 +319,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         kubeconfigPath: '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
-        registryUrl: registryConfig?.registryUrl,
-        scenarioRepository: registryConfig?.scenarioRepository,
-        username: registryConfig?.username,
-        password: registryConfig?.password,
-        token: registryConfig?.token,
-        skipTls: registryConfig?.skipTls,
-        insecure: registryConfig?.insecure,
+        registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
       };
 
       // Check for cluster conflicts before running

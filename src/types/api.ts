@@ -96,13 +96,8 @@ export interface ErrorResponse {
 }
 
 export interface ScenariosRequest {
-  username?: string;
-  password?: string;
-  token?: string;
-  registryUrl?: string;
-  scenarioRepository?: string;
-  skipTls?: boolean;
-  insecure?: boolean;
+  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
+  registryName?: string;
 }
 
 export interface ScenarioTag {
@@ -212,13 +207,8 @@ export interface ScenarioRunRequest {
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
-  registryUrl?: string;
-  scenarioRepository?: string;
-  username?: string;
-  password?: string;
-  token?: string;
-  skipTls?: boolean;
-  insecure?: boolean;
+  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
+  registryName?: string;
 }
 
 export interface TargetJobResult {
