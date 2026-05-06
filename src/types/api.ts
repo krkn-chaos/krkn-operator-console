@@ -261,6 +261,7 @@ export interface ClusterJob {
   startTime?: string;
   completionTime?: string;
   message?: string; // Only on errors
+  containerImage?: string; // Full container image path (e.g., 'quay.io/user/repo:tag')
 }
 
 // Response from POST /api/v1/scenarios/run
@@ -282,6 +283,7 @@ export interface ScenarioRunStatusResponse {
   clusterJobs: ClusterJob[];
   createdAt?: string; // Optional - backend may include it in the future
   ownerUserId?: string; // Email of the user who created the run
+  registryName?: string; // Name of private registry used (null for public Quay registry)
 }
 
 // Internal state for tracking scenario runs
