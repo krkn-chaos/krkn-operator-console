@@ -35,6 +35,7 @@ import {
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
   TrashIcon,
+  LockIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase } from '../types/api';
@@ -408,6 +409,12 @@ export function JobsList({
                                 whiteSpace: 'nowrap',
                               }}
                             >
+                              {run.registryName && (
+                                <LockIcon
+                                  style={{ marginRight: '8px', color: 'var(--pf-v5-global--palette--black-600)' }}
+                                  title={`Private Registry: ${run.registryName}`}
+                                />
+                              )}
                               {run.scenarioName}
                             </code>
                           </div>
