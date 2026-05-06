@@ -7,18 +7,16 @@ import type {
   ScenarioGlobals,
 } from '../../types/api';
 
-// Declare global fetch mock
-declare global {
-  // eslint-disable-next-line no-var
-  var fetch: ReturnType<typeof vi.fn>;
-}
+const mockFetch = vi.fn();
 
 describe('OperatorApi - Registry Methods', () => {
   beforeEach(() => {
-    global.fetch = vi.fn();
+    mockFetch.mockClear();
+    vi.stubGlobal('fetch', mockFetch);
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.resetAllMocks();
   });
 
@@ -37,7 +35,7 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -46,8 +44,8 @@ describe('OperatorApi - Registry Methods', () => {
       const result = await operatorApi.getScenarios(request);
 
       // Verify fetch was called with scenarios endpoint
-      expect(global.fetch).toHaveBeenCalled();
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(mockFetch).toHaveBeenCalled();
+      const fetchCall = mockFetch.mock.calls[0];
       expect(fetchCall[0]).toContain('/scenarios');
       expect(fetchCall[1].method).toBe('POST');
       expect(fetchCall[1].body).toBe(JSON.stringify(request));
@@ -66,7 +64,7 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -77,7 +75,7 @@ describe('OperatorApi - Registry Methods', () => {
 
       const result = await operatorApi.getScenarios(request);
 
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const fetchCall = mockFetch.mock.calls[0];
       expect(fetchCall[0]).toContain('/scenarios');
       expect(fetchCall[1].method).toBe('POST');
       expect(result).toEqual(mockResponse);
@@ -93,7 +91,7 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -104,7 +102,7 @@ describe('OperatorApi - Registry Methods', () => {
 
       const result = await operatorApi.getScenarios(request);
 
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const fetchCall = mockFetch.mock.calls[0];
       expect(fetchCall[0]).toContain('/scenarios');
       expect(fetchCall[1].method).toBe('POST');
       expect(result).toEqual(mockResponse);
@@ -115,7 +113,7 @@ describe('OperatorApi - Registry Methods', () => {
         scenarios: [],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -128,7 +126,7 @@ describe('OperatorApi - Registry Methods', () => {
     });
 
     it('should handle API errors when fetching scenarios', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
@@ -147,7 +145,7 @@ describe('OperatorApi - Registry Methods', () => {
         scenarios: [],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -188,14 +186,14 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockDetail,
       });
 
       const result = await operatorApi.getScenarioDetail('pod-scenarios', {});
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/scenarios/detail/pod-scenarios'),
         expect.objectContaining({
           method: 'POST',
@@ -225,7 +223,7 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockDetail,
       });
@@ -236,7 +234,7 @@ describe('OperatorApi - Registry Methods', () => {
 
       const result = await operatorApi.getScenarioDetail('custom-scenario', request);
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/scenarios/detail/custom-scenario'),
         expect.objectContaining({
           method: 'POST',
@@ -255,14 +253,14 @@ describe('OperatorApi - Registry Methods', () => {
         fields: [],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockDetail,
       });
 
       await operatorApi.getScenarioDetail('scenario/with/slashes', {});
 
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const fetchCall = mockFetch.mock.calls[0][0];
       expect(fetchCall).toContain(encodeURIComponent('scenario/with/slashes'));
     });
 
@@ -326,7 +324,7 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockDetail,
       });
@@ -345,7 +343,7 @@ describe('OperatorApi - Registry Methods', () => {
     });
 
     it('should handle API errors when fetching scenario detail', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',
@@ -388,14 +386,14 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockGlobals,
       });
 
       const result = await operatorApi.getScenarioGlobals('pod-scenarios', {});
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/scenarios/globals/pod-scenarios'),
         expect.objectContaining({
           method: 'POST',
@@ -424,7 +422,7 @@ describe('OperatorApi - Registry Methods', () => {
         ],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockGlobals,
       });
@@ -435,7 +433,7 @@ describe('OperatorApi - Registry Methods', () => {
 
       const result = await operatorApi.getScenarioGlobals('custom-scenario', request);
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/scenarios/globals/custom-scenario'),
         expect.objectContaining({
           method: 'POST',
@@ -453,14 +451,14 @@ describe('OperatorApi - Registry Methods', () => {
         fields: [],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockGlobals,
       });
 
       await operatorApi.getScenarioGlobals('scenario:with:colons', {});
 
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const fetchCall = mockFetch.mock.calls[0][0];
       expect(fetchCall).toContain(encodeURIComponent('scenario:with:colons'));
     });
 
@@ -472,7 +470,7 @@ describe('OperatorApi - Registry Methods', () => {
         fields: [],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockGlobals,
       });
@@ -483,7 +481,7 @@ describe('OperatorApi - Registry Methods', () => {
     });
 
     it('should handle API errors when fetching globals', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
@@ -502,7 +500,7 @@ describe('OperatorApi - Registry Methods', () => {
         scenarios: [{ name: 'test', digest: 'sha256:test' }],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -514,7 +512,7 @@ describe('OperatorApi - Registry Methods', () => {
       await operatorApi.getScenarios(request);
 
       const callBody = JSON.parse(
-        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+        mockFetch.mock.calls[0][1].body
       );
       expect(callBody.registryName).toBe('my-private-registry');
     });
@@ -524,7 +522,7 @@ describe('OperatorApi - Registry Methods', () => {
         scenarios: [{ name: 'test', digest: 'sha256:test' }],
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -534,7 +532,7 @@ describe('OperatorApi - Registry Methods', () => {
       await operatorApi.getScenarios(request);
 
       const callBody = JSON.parse(
-        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+        mockFetch.mock.calls[0][1].body
       );
       expect(callBody.registryName).toBeUndefined();
     });
@@ -542,7 +540,7 @@ describe('OperatorApi - Registry Methods', () => {
 
   describe('Network error handling', () => {
     it('should handle network errors when fetching scenarios', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      mockFetch.mockRejectedValueOnce(
         new Error('Network error')
       );
 
@@ -550,7 +548,7 @@ describe('OperatorApi - Registry Methods', () => {
     });
 
     it('should handle timeout errors', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      mockFetch.mockRejectedValueOnce(
         new Error('Request timeout')
       );
 
@@ -560,7 +558,7 @@ describe('OperatorApi - Registry Methods', () => {
     });
 
     it('should handle connection refused errors', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      mockFetch.mockRejectedValueOnce(
         new Error('Connection refused')
       );
 
