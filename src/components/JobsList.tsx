@@ -397,26 +397,28 @@ export function JobsList({
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Scenario:</strong>
                             </div>
-                            <code
-                              style={{
-                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                padding: '0.125rem 0.5rem',
-                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                display: 'inline-block',
-                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               {run.registryName && (
                                 <LockIcon
-                                  style={{ marginRight: '8px', color: 'var(--pf-v5-global--palette--black-600)' }}
+                                  style={{ color: 'var(--pf-v5-global--palette--gold-400)', fontSize: '1rem' }}
                                   title={`Private Registry: ${run.registryName}`}
                                 />
                               )}
-                              {run.scenarioName}
-                            </code>
+                              <code
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {run.scenarioName}
+                              </code>
+                            </div>
                           </div>
                         </DataListCell>,
                         <DataListCell key="owner" width={2}>
