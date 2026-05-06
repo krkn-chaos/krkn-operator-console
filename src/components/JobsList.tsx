@@ -27,6 +27,7 @@ import {
   MenuToggle,
   Alert,
   AlertActionLink,
+  Tooltip,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -398,12 +399,6 @@ export function JobsList({
                               <strong>Scenario:</strong>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              {run.registryName && (
-                                <LockIcon
-                                  style={{ color: 'var(--pf-v5-global--palette--gold-400)', fontSize: '1rem' }}
-                                  title={`Private Registry: ${run.registryName}`}
-                                />
-                              )}
                               <code
                                 style={{
                                   fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
@@ -418,6 +413,13 @@ export function JobsList({
                               >
                                 {run.scenarioName}
                               </code>
+                              {run.registryName && (
+                                <Tooltip content={<>Scenario running on <strong><em>{run.registryName}</em></strong> private registry</>}>
+                                  <LockIcon
+                                    style={{ color: 'var(--pf-v5-global--palette--gold-400)', fontSize: '1rem' }}
+                                  />
+                                </Tooltip>
+                              )}
                             </div>
                           </div>
                         </DataListCell>,
@@ -657,7 +659,7 @@ export function JobsList({
                                                 {job.containerImage && (
                                                   <>
                                                     <dt style={{ fontWeight: 'bold' }}>Container Image:</dt>
-                                                    <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all' }}>{job.containerImage}</dd>
+                                                    <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)', wordBreak: 'break-all' }}>{job.containerImage}</dd>
                                                   </>
                                                 )}
 

@@ -158,6 +158,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         runningJobs: statusResponse.runningJobs,
         clusterJobs: statusResponse.clusterJobs,
         createdAt: new Date().toISOString(),
+        ownerUserId: statusResponse.ownerUserId,
+        registryName: statusResponse.registryName,
       };
 
       // Dispatch creation event
