@@ -25,26 +25,36 @@ describe('ScenarioDetail', () => {
   const mockShowSuccess = vi.fn();
 
   const mockScenarioDetail: ScenarioDetailType = {
+    name: 'pod-scenarios',
     title: 'Pod Scenarios',
     description: 'Kill random pods in a namespace',
     digest: 'sha256:abc123def456',
     fields: [
       {
+        name: 'namespace',
         variable: 'NAMESPACE',
         short_description: 'Target namespace',
-        type: 'text',
+        title: 'Target namespace',
+        description: 'Namespace where pods will be killed',
+        type: 'string',
         required: true,
       },
       {
+        name: 'kill_count',
         variable: 'KILL_COUNT',
         short_description: 'Number of pods to kill',
+        title: 'Kill count',
+        description: 'Number of pods to kill',
         type: 'number',
         required: false,
         default: '1',
       },
       {
+        name: 'enable_alerts',
         variable: 'ENABLE_ALERTS',
         short_description: 'Enable alerting',
+        title: 'Enable alerts',
+        description: 'Enable alerting for this scenario',
         type: 'boolean',
         required: false,
         default: 'false',
@@ -53,13 +63,17 @@ describe('ScenarioDetail', () => {
   };
 
   const mockScenarioGlobals: ScenarioGlobals = {
+    name: 'globals',
     title: 'Global Parameters',
     description: 'Common parameters',
     fields: [
       {
+        name: 'prometheus_url',
         variable: 'KRAKEN_PROMETHEUS_URL',
         short_description: 'Prometheus URL',
-        type: 'text',
+        title: 'Prometheus URL',
+        description: 'URL of the Prometheus server',
+        type: 'string',
         required: false,
         default: '',
       },
@@ -67,10 +81,10 @@ describe('ScenarioDetail', () => {
   };
 
   const baseState: AppState = {
-    phase: 'scenario_detail',
+    phase: 'configuring_scenario',
     uuid: 'test-uuid-123',
     selectedClusters: [
-      { operatorName: 'krkn-operator', clusterName: 'cluster1' },
+      { operatorName: 'krkn-operator', clusterName: 'cluster1', clusterApiUrl: 'https://api.cluster1.example.com:6443' },
     ],
     scenarioDetail: mockScenarioDetail,
     scenarioFormValues: {
@@ -109,7 +123,6 @@ describe('ScenarioDetail', () => {
       showError: vi.fn(),
       showWarning: vi.fn(),
       showInfo: vi.fn(),
-      dismissNotification: vi.fn(),
     });
 
     return render(
@@ -226,7 +239,6 @@ describe('ScenarioDetail', () => {
     });
 
     it('should update form values when required fields change', async () => {
-      const _user = userEvent.setup();
       renderWithContext();
 
       // The DynamicFormBuilder will render the input field
@@ -438,9 +450,12 @@ describe('ScenarioDetail', () => {
         ...mockScenarioDetail,
         fields: [
           {
+            name: 'api_key',
             variable: 'API_KEY',
             short_description: 'API Key',
-            type: 'text',
+            title: 'API Key',
+            description: 'Secret API key for authentication',
+            type: 'string',
             required: true,
             secret: true,
           },
@@ -495,8 +510,10 @@ describe('ScenarioDetail', () => {
       runningJobs: 1,
       clusterJobs: [
         {
-          jobId: 'job-123',
+          providerName: 'krkn-operator',
           clusterName: 'cluster1',
+          jobId: 'job-123',
+          podName: 'krkn-job-pod-123',
           phase: 'Running',
           message: '',
         },
