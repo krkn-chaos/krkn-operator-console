@@ -119,10 +119,12 @@ describe('ScenarioDetail', () => {
     const fullState = { ...baseState, ...state };
 
     vi.mocked(useNotifications).mockReturnValue({
+      showNotification: vi.fn(() => 'notification-id'),
       showSuccess: mockShowSuccess,
       showError: vi.fn(),
       showWarning: vi.fn(),
       showInfo: vi.fn(),
+      hideNotification: vi.fn(),
     });
 
     return render(
