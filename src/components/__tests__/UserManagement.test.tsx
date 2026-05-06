@@ -100,12 +100,17 @@ describe('UserManagement', () => {
   });
 
   describe('Loading and Display', () => {
-    it('should render loading state initially', () => {
+    it('should render loading state initially', async () => {
       mockListUsers.mockImplementation(() => new Promise(() => {})); // Never resolves
 
       render(<UserManagement />);
 
       expect(screen.getByRole('progressbar')).toBeInTheDocument();
+
+      // Wait for the component to finish any pending state updates
+      await waitFor(() => {
+        expect(screen.getByRole('progressbar')).toBeInTheDocument();
+      });
     });
 
     it('should display user list after loading', async () => {
