@@ -69,12 +69,7 @@ describe('OperatorApi - Registry Methods', () => {
       });
 
       const request: ScenariosRequest = {
-        username: 'testuser',
-        password: 'testpass',
-        registryUrl: 'registry.example.com',
-        scenarioRepository: 'myorg/chaos-scenarios',
-        skipTls: false,
-        insecure: false,
+        registryName: 'test-registry',
       };
 
       const result = await operatorApi.getScenarios(request);
@@ -102,9 +97,7 @@ describe('OperatorApi - Registry Methods', () => {
       });
 
       const request: ScenariosRequest = {
-        token: 'my-registry-token',
-        registryUrl: 'https://private-registry.io',
-        scenarioRepository: 'org/scenarios',
+        registryName: 'private-registry',
       };
 
       const result = await operatorApi.getScenarios(request);
@@ -126,21 +119,10 @@ describe('OperatorApi - Registry Methods', () => {
       });
 
       const request: ScenariosRequest = {
-        username: 'testuser',
-        password: 'testpass',
-        registryUrl: 'http://insecure-registry.local',
-        scenarioRepository: 'scenarios',
-        skipTls: true,
-        insecure: true,
+        registryName: 'insecure-registry',
       };
 
       await operatorApi.getScenarios(request);
-
-      const callBody = JSON.parse(
-        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
-      );
-      expect(callBody.skipTls).toBe(true);
-      expect(callBody.insecure).toBe(true);
     });
 
     it('should handle API errors when fetching scenarios', async () => {
@@ -152,10 +134,7 @@ describe('OperatorApi - Registry Methods', () => {
       });
 
       const request: ScenariosRequest = {
-        username: 'wrong',
-        password: 'credentials',
-        registryUrl: 'registry.example.com',
-        scenarioRepository: 'org/scenarios',
+        registryName: 'wrong-registry',
       };
 
       await expect(operatorApi.getScenarios(request)).rejects.toThrow();
@@ -180,19 +159,26 @@ describe('OperatorApi - Registry Methods', () => {
   describe('getScenarioDetail', () => {
     it('should fetch scenario detail with public registry', async () => {
       const mockDetail: ScenarioDetail = {
+        name: 'pod-scenarios',
         title: 'Pod Scenarios',
         description: 'Kill random pods',
         digest: 'sha256:abc123',
         fields: [
           {
+            name: 'NAMESPACE',
             variable: 'NAMESPACE',
             short_description: 'Target namespace',
-            type: 'text',
+            description: 'Target namespace',
+            title: 'Namespace',
+            type: 'string',
             required: true,
           },
           {
+            name: 'KILL_COUNT',
             variable: 'KILL_COUNT',
             short_description: 'Number of pods to kill',
+            description: 'Number of pods to kill',
+            title: 'Kill Count',
             type: 'number',
             required: false,
             default: '1',
@@ -220,14 +206,18 @@ describe('OperatorApi - Registry Methods', () => {
 
     it('should fetch scenario detail with private registry credentials', async () => {
       const mockDetail: ScenarioDetail = {
+        name: 'custom-scenario',
         title: 'Custom Scenario',
         description: 'Custom chaos scenario',
         digest: 'sha256:custom123',
         fields: [
           {
+            name: 'TARGET',
             variable: 'TARGET',
             short_description: 'Target resource',
-            type: 'text',
+            description: 'Target resource',
+            title: 'Target',
+            type: 'string',
             required: true,
           },
         ],
@@ -239,10 +229,7 @@ describe('OperatorApi - Registry Methods', () => {
       });
 
       const request: ScenariosRequest = {
-        username: 'user',
-        password: 'pass',
-        registryUrl: 'registry.example.com',
-        scenarioRepository: 'org/scenarios',
+        registryName: 'custom-registry',
       };
 
       const result = await operatorApi.getScenarioDetail('custom-scenario', request);
@@ -259,6 +246,7 @@ describe('OperatorApi - Registry Methods', () => {
 
     it('should encode scenario name in URL', async () => {
       const mockDetail: ScenarioDetail = {
+        name: 'scenario/with/slashes',
         title: 'Test',
         description: 'Test',
         digest: 'sha256:test',
@@ -278,43 +266,60 @@ describe('OperatorApi - Registry Methods', () => {
 
     it('should handle different field types', async () => {
       const mockDetail: ScenarioDetail = {
+        name: 'complex-scenario',
         title: 'Complex Scenario',
         description: 'Scenario with various field types',
         digest: 'sha256:complex',
         fields: [
           {
+            name: 'TEXT_FIELD',
             variable: 'TEXT_FIELD',
             short_description: 'Text input',
-            type: 'text',
+            description: 'Text input',
+            title: 'Text Field',
+            type: 'string',
             required: true,
           },
           {
+            name: 'NUMBER_FIELD',
             variable: 'NUMBER_FIELD',
             short_description: 'Number input',
+            description: 'Number input',
+            title: 'Number Field',
             type: 'number',
             required: false,
             default: '10',
           },
           {
+            name: 'BOOLEAN_FIELD',
             variable: 'BOOLEAN_FIELD',
             short_description: 'Boolean toggle',
+            description: 'Boolean toggle',
+            title: 'Boolean Field',
             type: 'boolean',
             required: false,
             default: 'false',
           },
           {
+            name: 'SECRET_FIELD',
             variable: 'SECRET_FIELD',
             short_description: 'Secret value',
-            type: 'text',
+            description: 'Secret value',
+            title: 'Secret Field',
+            type: 'string',
             required: true,
             secret: true,
           },
           {
+            name: 'DROPDOWN_FIELD',
             variable: 'DROPDOWN_FIELD',
             short_description: 'Select option',
-            type: 'dropdown',
+            description: 'Select option',
+            title: 'Dropdown Field',
+            type: 'enum',
             required: true,
-            options: ['option1', 'option2'],
+            separator: ',',
+            allowed_values: 'option1,option2',
           },
         ],
       };
@@ -327,12 +332,14 @@ describe('OperatorApi - Registry Methods', () => {
       const result = await operatorApi.getScenarioDetail('complex-scenario', {});
 
       expect(result.fields).toHaveLength(5);
-      expect(result.fields[0].type).toBe('text');
+      expect(result.fields[0].type).toBe('string');
       expect(result.fields[1].type).toBe('number');
       expect(result.fields[2].type).toBe('boolean');
       expect(result.fields[3].secret).toBe(true);
-      expect(result.fields[4].type).toBe('dropdown');
-      expect(result.fields[4].options).toEqual(['option1', 'option2']);
+      expect(result.fields[4].type).toBe('enum');
+      if (result.fields[4].type === 'enum') {
+        expect(result.fields[4].allowed_values).toBe('option1,option2');
+      }
     });
 
     it('should handle API errors when fetching scenario detail', async () => {
@@ -352,19 +359,26 @@ describe('OperatorApi - Registry Methods', () => {
   describe('getScenarioGlobals', () => {
     it('should fetch global parameters with public registry', async () => {
       const mockGlobals: ScenarioGlobals = {
+        name: 'pod-scenarios',
         title: 'Global Parameters',
         description: 'Common parameters for all scenarios',
         fields: [
           {
+            name: 'KRAKEN_PROMETHEUS_URL',
             variable: 'KRAKEN_PROMETHEUS_URL',
             short_description: 'Prometheus URL',
-            type: 'text',
+            description: 'Prometheus URL',
+            title: 'Prometheus URL',
+            type: 'string',
             required: false,
             default: '',
           },
           {
+            name: 'ENABLE_ALERTS',
             variable: 'ENABLE_ALERTS',
             short_description: 'Enable alerting',
+            description: 'Enable alerting',
+            title: 'Enable Alerts',
             type: 'boolean',
             required: false,
             default: 'false',
@@ -392,13 +406,17 @@ describe('OperatorApi - Registry Methods', () => {
 
     it('should fetch global parameters with private registry', async () => {
       const mockGlobals: ScenarioGlobals = {
+        name: 'custom-scenario',
         title: 'Custom Globals',
         description: 'Custom global parameters',
         fields: [
           {
+            name: 'CUSTOM_PARAM',
             variable: 'CUSTOM_PARAM',
             short_description: 'Custom parameter',
-            type: 'text',
+            description: 'Custom parameter',
+            title: 'Custom Param',
+            type: 'string',
             required: false,
           },
         ],
@@ -410,9 +428,7 @@ describe('OperatorApi - Registry Methods', () => {
       });
 
       const request: ScenariosRequest = {
-        token: 'registry-token',
-        registryUrl: 'https://private-registry.io',
-        scenarioRepository: 'org/scenarios',
+        registryName: 'private-registry',
       };
 
       const result = await operatorApi.getScenarioGlobals('custom-scenario', request);
@@ -429,6 +445,7 @@ describe('OperatorApi - Registry Methods', () => {
 
     it('should encode scenario name in URL for globals', async () => {
       const mockGlobals: ScenarioGlobals = {
+        name: 'scenario:with:colons',
         title: 'Globals',
         description: 'Global params',
         fields: [],
@@ -447,6 +464,7 @@ describe('OperatorApi - Registry Methods', () => {
 
     it('should handle empty global parameters', async () => {
       const mockGlobals: ScenarioGlobals = {
+        name: 'simple-scenario',
         title: 'No Globals',
         description: 'Scenario with no global parameters',
         fields: [],
@@ -477,9 +495,9 @@ describe('OperatorApi - Registry Methods', () => {
   });
 
   describe('Registry authentication scenarios', () => {
-    it('should handle scenarios with username and password', async () => {
+    it('should handle scenarios with private registry name', async () => {
       const mockResponse: ScenariosResponse = {
-        scenarios: [{ name: 'test', tags: ['v1'], digest: 'sha256:test' }],
+        scenarios: [{ name: 'test', digest: 'sha256:test' }],
       };
 
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -488,10 +506,7 @@ describe('OperatorApi - Registry Methods', () => {
       });
 
       const request: ScenariosRequest = {
-        username: 'myuser',
-        password: 'mypassword',
-        registryUrl: 'registry.example.com',
-        scenarioRepository: 'myorg/scenarios',
+        registryName: 'my-private-registry',
       };
 
       await operatorApi.getScenarios(request);
@@ -499,14 +514,12 @@ describe('OperatorApi - Registry Methods', () => {
       const callBody = JSON.parse(
         (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
       );
-      expect(callBody.username).toBe('myuser');
-      expect(callBody.password).toBe('mypassword');
-      expect(callBody.token).toBeUndefined();
+      expect(callBody.registryName).toBe('my-private-registry');
     });
 
-    it('should handle scenarios with token authentication', async () => {
+    it('should handle scenarios with public registry (no registryName)', async () => {
       const mockResponse: ScenariosResponse = {
-        scenarios: [{ name: 'test', tags: ['v1'], digest: 'sha256:test' }],
+        scenarios: [{ name: 'test', digest: 'sha256:test' }],
       };
 
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -514,20 +527,14 @@ describe('OperatorApi - Registry Methods', () => {
         json: async () => mockResponse,
       });
 
-      const request: ScenariosRequest = {
-        token: 'Bearer abc123xyz',
-        registryUrl: 'registry.example.com',
-        scenarioRepository: 'myorg/scenarios',
-      };
+      const request: ScenariosRequest = {};
 
       await operatorApi.getScenarios(request);
 
       const callBody = JSON.parse(
         (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
       );
-      expect(callBody.token).toBe('Bearer abc123xyz');
-      expect(callBody.username).toBeUndefined();
-      expect(callBody.password).toBeUndefined();
+      expect(callBody.registryName).toBeUndefined();
     });
   });
 
