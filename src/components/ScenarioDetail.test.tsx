@@ -603,7 +603,7 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalledWith(
           expect.objectContaining({
-            scenarioImage: 'krkn-hub:pod-scenarios',
+            scenarioImage: 'pod-scenarios', // Private registry: no krkn-hub prefix
             registryName: 'corp-registry',
           })
         );

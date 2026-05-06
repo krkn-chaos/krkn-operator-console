@@ -297,9 +297,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       }
 
       // Build scenario image
-      // Note: Backend will resolve the full image path based on registryName
-      // If registryName is not provided, backend defaults to quay.io
-      const scenarioImage = `krkn-hub:${scenarioName}`;
+      // For private registries: use only the tag name (e.g., 'node-cpu-hog')
+      // For public registry: use krkn-hub prefix (e.g., 'krkn-hub:node-cpu-hog')
+      // Backend will resolve the full image path based on registryName
+      const isPrivateRegistry = !!registryConfig?.registryName;
+      const scenarioImage = isPrivateRegistry ? scenarioName : `krkn-hub:${scenarioName}`;
 
       // Build targetClusters map from selectedClusters
       const targetClusters: { [providerName: string]: string[] } = {};
