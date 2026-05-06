@@ -140,7 +140,7 @@ describe('registriesApi', () => {
         registryUrl: 'registry.example.com',
         scenarioRepository: 'myorg/chaos-scenarios',
         authType: 'token',
-        token: 'secret-token',
+        password: 'secret-token',
         description: 'Production registry',
         skipTls: false,
         insecure: false,
@@ -203,7 +203,7 @@ describe('registriesApi', () => {
         registryUrl: 'registry.example.com',
         scenarioRepository: 'org/repo',
         authType: 'token',
-        token: 'token',
+        password: 'token',
       };
 
       await expect(registriesApi.createRegistry(createRequest)).rejects.toThrow(errorMessage);
@@ -218,7 +218,7 @@ describe('registriesApi', () => {
         registryUrl: 'registry.example.com',
         scenarioRepository: 'org/repo',
         authType: 'token',
-        token: 'token',
+        password: 'token',
       };
 
       await expect(registriesApi.createRegistry(createRequest)).rejects.toThrow(errorMessage);
@@ -251,7 +251,7 @@ describe('registriesApi', () => {
     it('should update registry auth type and credentials', async () => {
       const updateRequest: UpdateRegistryRequest = {
         authType: 'token',
-        token: 'new-secret-token',
+        password: 'new-secret-token',
       };
 
       const mockResponse: RegistryOperationResponse = {
