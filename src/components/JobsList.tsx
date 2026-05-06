@@ -645,6 +645,13 @@ export function JobsList({
                                                 <dt style={{ fontWeight: 'bold' }}>Pod Name:</dt>
                                                 <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.podName}</dd>
 
+                                                {job.containerImage && (
+                                                  <>
+                                                    <dt style={{ fontWeight: 'bold' }}>Container Image:</dt>
+                                                    <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all' }}>{job.containerImage}</dd>
+                                                  </>
+                                                )}
+
                                                 <dt style={{ fontWeight: 'bold' }}>Job ID:</dt>
                                                 <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.jobId}</dd>
 
