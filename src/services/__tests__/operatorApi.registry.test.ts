@@ -7,6 +7,12 @@ import type {
   ScenarioGlobals,
 } from '../../types/api';
 
+// Declare global fetch mock
+declare global {
+  // eslint-disable-next-line no-var
+  var fetch: ReturnType<typeof vi.fn>;
+}
+
 describe('OperatorApi - Registry Methods', () => {
   beforeEach(() => {
     global.fetch = vi.fn();
@@ -22,12 +28,10 @@ describe('OperatorApi - Registry Methods', () => {
         scenarios: [
           {
             name: 'pod-scenarios',
-            tags: ['v1.0.0'],
             digest: 'sha256:abc123',
           },
           {
             name: 'node-scenarios',
-            tags: ['v1.0.0'],
             digest: 'sha256:def456',
           },
         ],
@@ -57,7 +61,6 @@ describe('OperatorApi - Registry Methods', () => {
         scenarios: [
           {
             name: 'custom-scenario',
-            tags: ['v2.0.0'],
             digest: 'sha256:xyz789',
           },
         ],
@@ -85,7 +88,6 @@ describe('OperatorApi - Registry Methods', () => {
         scenarios: [
           {
             name: 'token-scenario',
-            tags: ['v1.0.0'],
             digest: 'sha256:token123',
           },
         ],

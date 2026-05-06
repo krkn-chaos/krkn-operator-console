@@ -145,7 +145,7 @@ describe('RegistrySelector', () => {
       const user = userEvent.setup();
       const mockResponse: ScenariosResponse = {
         scenarios: [
-          { name: 'pod-scenarios', tags: ['v1.0.0'], digest: 'sha256:abc123' },
+          { name: 'pod-scenarios', digest: 'sha256:abc123' },
         ],
       };
 
@@ -258,7 +258,7 @@ describe('RegistrySelector', () => {
       const user = userEvent.setup();
       const mockResponse: ScenariosResponse = {
         scenarios: [
-          { name: 'custom-scenario', tags: ['v2.0.0'], digest: 'sha256:custom' },
+          { name: 'custom-scenario', digest: 'sha256:custom' },
         ],
       };
 
