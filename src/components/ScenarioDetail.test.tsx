@@ -226,7 +226,7 @@ describe('ScenarioDetail', () => {
     });
 
     it('should update form values when required fields change', async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithContext();
 
       // The DynamicFormBuilder will render the input field
