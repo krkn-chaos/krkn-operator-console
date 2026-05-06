@@ -68,7 +68,7 @@ describe('useActiveRunsPoller', () => {
   });
 
   it('should cleanup on unmount', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
 
     const mockData: ActiveRunsResponse = {
       totalActiveRuns: 0,
@@ -78,20 +78,22 @@ describe('useActiveRunsPoller', () => {
 
     vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockData);
 
-    const { unmount } = renderHook(() => useActiveRunsPoller(), {
+    const { result, unmount } = renderHook(() => useActiveRunsPoller(), {
       wrapper: AppProviderWrapper,
     });
 
-    // Wait for initial call
-    await vi.waitFor(() => {
-      expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(1);
+    // Wait for initial fetch to complete with all state updates
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.activeRuns).toEqual(mockData);
     });
 
     const callCountBeforeUnmount = vi.mocked(operatorApi.getActiveRuns).mock.calls.length;
 
+    // Unmount the hook
     unmount();
 
-    // Advance timers after unmount
+    // Advance timers to trigger any scheduled intervals
     await vi.advanceTimersByTimeAsync(5000);
 
     // Should not have called again after unmount
