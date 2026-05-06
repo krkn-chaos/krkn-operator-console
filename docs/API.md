@@ -5,6 +5,8 @@ This document describes the REST API endpoints used by the krkn-operator-console
 ## Table of Contents
 
 - [Authentication](#authentication)
+- [Registry Management Endpoints](#registry-management-endpoints)
+- [Scenario Endpoints](#scenario-endpoints)
 - [User Management Endpoints](#user-management-endpoints)
 - [Error Responses](#error-responses)
 
@@ -22,6 +24,366 @@ Tokens are obtained through the login endpoint and stored in the browser's sessi
 
 **Token Expiration:**
 Tokens have a limited lifetime and should be refreshed before expiration. The frontend automatically handles token refresh where supported.
+
+---
+
+## Registry Management Endpoints
+
+Base URL: `/api/v1/registries`
+
+Private container registry management allows administrators to configure registries for chaos scenario images and control access via group membership.
+
+### List Registries (Admin)
+
+Retrieves all private registries configured in the system.
+
+**Endpoint:** `GET /api/v1/registries`
+
+**Authorization:** Admin only
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:**
+```json
+{
+  "registries": [
+    {
+      "name": "production-registry",
+      "registryUrl": "registry.example.com",
+      "scenarioRepository": "myorg/chaos-scenarios",
+      "authType": "token",
+      "description": "Production private registry for team scenarios",
+      "skipTls": false,
+      "insecure": false,
+      "groups": ["ops-team", "qa-team"],
+      "availableToAll": false,
+      "createdAt": "2024-03-01T10:00:00Z",
+      "createdBy": "admin@example.com"
+    }
+  ]
+}
+```
+
+**Response Fields:**
+- `registries` (array) - List of registry configurations
+  - `name` (string) - Registry identifier (RFC 1123 compliant)
+  - `registryUrl` (string) - Container registry URL
+  - `scenarioRepository` (string) - Repository path (format: org/repo)
+  - `authType` (string) - Authentication type: "token" or "password"
+  - `description` (string, optional) - Registry description
+  - `skipTls` (boolean) - Skip TLS verification flag
+  - `insecure` (boolean) - Allow insecure HTTP connections
+  - `groups` (array of strings) - Groups with access
+  - `availableToAll` (boolean) - If true, all users can access
+  - `createdAt` (string, ISO 8601, optional) - Creation timestamp
+  - `createdBy` (string, optional) - Creator email
+
+**Note:** Credentials (token, username, password) are never returned in responses for security.
+
+---
+
+### Get Registry (Admin)
+
+Retrieves a specific registry configuration.
+
+**Endpoint:** `GET /api/v1/registries/{name}`
+
+**Authorization:** Admin only
+
+**URL Parameters:**
+- `name` (required) - Registry name
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:** Same as single registry object from list endpoint
+
+---
+
+### Create Registry (Admin)
+
+Creates a new private registry configuration.
+
+**Endpoint:** `POST /api/v1/registries`
+
+**Authorization:** Admin only
+
+**Request Body (Token Auth):**
+```json
+{
+  "name": "my-registry",
+  "registryUrl": "registry.example.com",
+  "scenarioRepository": "myorg/scenarios",
+  "authType": "token",
+  "username": "myusername",
+  "password": "my-secret-token",
+  "description": "Private registry for team A",
+  "skipTls": false,
+  "insecure": false,
+  "groups": ["team-a"],
+  "availableToAll": false
+}
+```
+
+**Request Body (Password Auth):**
+```json
+{
+  "name": "dockerhub-private",
+  "registryUrl": "registry.hub.docker.com",
+  "scenarioRepository": "myuser/scenarios",
+  "authType": "password",
+  "username": "myusername",
+  "password": "mypassword",
+  "availableToAll": true
+}
+```
+
+**Note:** The `password` field is used for both authentication types. When `authType` is "token", the `password` field contains the registry token. When `authType` is "password", it contains the actual password.
+
+**Request Fields:**
+- `name` (string, required) - Registry name (RFC 1123: lowercase alphanumeric, -, .)
+- `registryUrl` (string, required) - Valid URL
+- `scenarioRepository` (string, required) - Format: org/repo
+- `authType` (string, required) - "token" or "password"
+- `username` (string, required) - Username (required for both token and password auth)
+- `password` (string, required) - Contains either token (if authType=token) or password (if authType=password)
+- `description` (string, optional) - Description
+- `skipTls` (boolean, optional) - Skip TLS verification (default: false)
+- `insecure` (boolean, optional) - Allow HTTP (default: false)
+- `groups` (array of strings, optional) - Groups with access
+- `availableToAll` (boolean, optional) - All users access (default: false)
+
+**Success Response:**
+
+**Status Code:** `201 Created`
+
+**Body:**
+```json
+{
+  "name": "my-registry",
+  "message": "Registry created successfully"
+}
+```
+
+---
+
+### Update Registry (Admin)
+
+Updates an existing registry configuration.
+
+**Endpoint:** `PUT /api/v1/registries/{name}`
+
+**Authorization:** Admin only
+
+**URL Parameters:**
+- `name` (required) - Registry name (immutable)
+
+**Request Body:**
+All fields from create are optional in update. Credentials can be omitted to keep existing values.
+
+```json
+{
+  "description": "Updated description",
+  "groups": ["team-a", "team-b"]
+}
+```
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:**
+```json
+{
+  "name": "my-registry",
+  "message": "Registry updated successfully"
+}
+```
+
+---
+
+### Delete Registry (Admin)
+
+Permanently deletes a registry configuration.
+
+**Endpoint:** `DELETE /api/v1/registries/{name}`
+
+**Authorization:** Admin only
+
+**URL Parameters:**
+- `name` (required) - Registry name
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:**
+```json
+{
+  "name": "my-registry",
+  "message": "Registry deleted successfully"
+}
+```
+
+**Warning:** Deleting a registry may cause active scenario runs using it to fail.
+
+---
+
+### Get Available Registries (User)
+
+Retrieves registries accessible to the current user based on group membership.
+
+**Endpoint:** `GET /api/v1/registries/available`
+
+**Authorization:** All authenticated users
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:**
+```json
+{
+  "registries": [
+    {
+      "name": "team-registry",
+      "registryUrl": "registry.example.com",
+      "scenarioRepository": "team/scenarios",
+      "description": "Team private registry"
+    }
+  ]
+}
+```
+
+**Response Fields:**
+- `name` (string) - Registry name
+- `registryUrl` (string) - Container registry URL
+- `scenarioRepository` (string) - Repository path
+- `description` (string, optional) - Description
+
+**Note:** Response excludes credentials, authType, and group membership for security.
+
+**Access Rules:**
+- Users see registries where they are members of assigned groups
+- Users see all registries with `availableToAll=true`
+- Admins see all registries
+
+---
+
+## Scenario Endpoints
+
+Base URL: `/api/v1/scenarios`
+
+### Load Scenarios
+
+Retrieves available chaos scenarios from a registry.
+
+**Endpoint:** `POST /api/v1/scenarios`
+
+**Authorization:** All authenticated users
+
+**Request Body:**
+```json
+{
+  "registryName": "my-registry"
+}
+```
+
+**Request Fields:**
+- `registryName` (string, optional) - Name of configured private registry. If omitted, defaults to public quay.io
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:**
+```json
+{
+  "scenarios": [
+    {
+      "name": "pod-scenarios",
+      "digest": "sha256:abc123...",
+      "size": 1234567,
+      "lastModified": "2024-03-01T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### Get Scenario Detail
+
+Retrieves detailed schema for a specific scenario.
+
+**Endpoint:** `POST /api/v1/scenarios/detail/{name}`
+
+**URL Parameters:**
+- `name` (required) - Scenario name
+
+**Request Body:**
+```json
+{
+  "registryName": "my-registry"
+}
+```
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:** Scenario field schema (see types/api.ts for full schema)
+
+---
+
+### Run Scenario
+
+Executes a chaos scenario on selected clusters.
+
+**Endpoint:** `POST /api/v1/scenarios/run`
+
+**Request Body:**
+```json
+{
+  "targetRequestId": "uuid",
+  "targetClusters": {
+    "krkn-operator": ["cluster-1", "cluster-2"]
+  },
+  "scenarioImage": "krkn-hub:pod-scenarios",
+  "scenarioName": "pod-scenarios",
+  "kubeconfigPath": "/home/krkn/.kube/config",
+  "environment": {
+    "SCENARIO_TYPE": "pod_delete"
+  },
+  "registryName": "my-registry"
+}
+```
+
+**Request Fields:**
+- `registryName` (string, optional) - Private registry name. If omitted, uses default quay.io
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:**
+```json
+{
+  "scenarioRunName": "run-abc123",
+  "targetClusters": {
+    "krkn-operator": ["cluster-1", "cluster-2"]
+  },
+  "totalTargets": 2
+}
+```
 
 ---
 

@@ -158,6 +158,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         runningJobs: statusResponse.runningJobs,
         clusterJobs: statusResponse.clusterJobs,
         createdAt: new Date().toISOString(),
+        ownerUserId: statusResponse.ownerUserId,
+        registryName: statusResponse.registryName,
       };
 
       // Dispatch creation event
@@ -297,12 +299,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       }
 
       // Build scenario image
-      let scenarioImage: string;
-      if (registryConfig && registryConfig.registryUrl && registryConfig.scenarioRepository) {
-        scenarioImage = `${registryConfig.registryUrl}/${registryConfig.scenarioRepository}:${scenarioName}`;
-      } else {
-        scenarioImage = `quay.io/krkn-chaos/krkn-hub:${scenarioName}`;
-      }
+      // For private registries: use only the tag name (e.g., 'node-cpu-hog')
+      // For public registry: use krkn-hub prefix (e.g., 'krkn-hub:node-cpu-hog')
+      // Backend will resolve the full image path based on registryName
+      const isPrivateRegistry = !!registryConfig?.registryName;
+      const scenarioImage = isPrivateRegistry ? scenarioName : `krkn-hub:${scenarioName}`;
 
       // Build targetClusters map from selectedClusters
       const targetClusters: { [providerName: string]: string[] } = {};
@@ -322,13 +323,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         kubeconfigPath: '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
-        registryUrl: registryConfig?.registryUrl,
-        scenarioRepository: registryConfig?.scenarioRepository,
-        username: registryConfig?.username,
-        password: registryConfig?.password,
-        token: registryConfig?.token,
-        skipTls: registryConfig?.skipTls,
-        insecure: registryConfig?.insecure,
+        registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
       };
 
       // Check for cluster conflicts before running

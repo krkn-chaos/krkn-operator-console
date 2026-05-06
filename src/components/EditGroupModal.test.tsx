@@ -169,8 +169,10 @@ describe('EditGroupModal', () => {
       />
     );
 
-    // Should show loading again (any loading message)
-    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+    // Wait for async state updates to complete
+    await waitFor(() => {
+      expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+    });
   });
 
   it('should handle orphaned clusters (clusters in permissions but not in targets)', async () => {

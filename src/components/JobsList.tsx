@@ -27,6 +27,7 @@ import {
   MenuToggle,
   Alert,
   AlertActionLink,
+  Tooltip,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -35,6 +36,7 @@ import {
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
   TrashIcon,
+  LockIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase } from '../types/api';
@@ -396,20 +398,29 @@ export function JobsList({
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Scenario:</strong>
                             </div>
-                            <code
-                              style={{
-                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                padding: '0.125rem 0.5rem',
-                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                display: 'inline-block',
-                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {run.scenarioName}
-                            </code>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <code
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {run.scenarioName}
+                              </code>
+                              {run.registryName && (
+                                <Tooltip content={<>Scenario running on <strong><em>{run.registryName}</em></strong> private registry</>}>
+                                  <LockIcon
+                                    style={{ color: 'var(--pf-v5-global--palette--gold-400)', fontSize: '1rem' }}
+                                  />
+                                </Tooltip>
+                              )}
+                            </div>
                           </div>
                         </DataListCell>,
                         <DataListCell key="owner" width={2}>
@@ -644,6 +655,13 @@ export function JobsList({
 
                                                 <dt style={{ fontWeight: 'bold' }}>Pod Name:</dt>
                                                 <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.podName}</dd>
+
+                                                {job.containerImage && (
+                                                  <>
+                                                    <dt style={{ fontWeight: 'bold' }}>Container Image:</dt>
+                                                    <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)', wordBreak: 'break-all' }}>{job.containerImage}</dd>
+                                                  </>
+                                                )}
 
                                                 <dt style={{ fontWeight: 'bold' }}>Job ID:</dt>
                                                 <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>{job.jobId}</dd>

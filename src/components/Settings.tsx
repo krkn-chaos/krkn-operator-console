@@ -33,6 +33,7 @@ import { providersApi } from '../services/providersApi';
 import { TargetsList } from './TargetsList';
 import { ProviderConfigTab } from './ProviderConfigTab';
 import { UserManagement } from './UserManagement';
+import { RegistriesCard } from './RegistriesCard';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -47,12 +48,12 @@ export function Settings() {
   // Use provider config poller
   useProviderConfigPoller();
 
-  // Reset provider config when entering Provider Configuration tab (eventKey 2)
+  // Reset provider config when entering Provider Configuration tab (eventKey 3)
   useEffect(() => {
     const previousTabKey = previousTabKeyRef.current;
 
-    // If we're switching TO tab 2 (from any other tab)
-    if (activeTabKey === 2 && previousTabKey !== 2) {
+    // If we're switching TO tab 3 (from any other tab)
+    if (activeTabKey === 3 && previousTabKey !== 3) {
       dispatch({ type: 'PROVIDER_CONFIG_RESET' });
     }
 
@@ -80,11 +81,11 @@ export function Settings() {
   // Create provider config request when Provider Configuration tab is opened
   useEffect(() => {
     // Only create request if:
-    // 1. Provider Configuration tab is active (eventKey 2)
+    // 1. Provider Configuration tab is active (eventKey 3)
     // 2. Providers are loaded
     // 3. Config request hasn't been created yet or is idle
     if (
-      activeTabKey === 2 &&
+      activeTabKey === 3 &&
       state.providers &&
       state.providers.length > 0 &&
       state.providerConfigStatus === 'idle'
@@ -144,7 +145,7 @@ export function Settings() {
     <PageSection isFilled>
       <Card style={{ position: 'relative' }}>
         {/* Loading Overlay - Covers entire Card */}
-        {(isLoadingProviders || state.providerConfigStatus === 'creating' || state.providerConfigStatus === 'polling') && activeTabKey === 2 && (
+        {(isLoadingProviders || state.providerConfigStatus === 'creating' || state.providerConfigStatus === 'polling') && activeTabKey === 3 && (
           <div
             style={{
               position: 'absolute',
@@ -203,9 +204,18 @@ export function Settings() {
               </div>
             </Tab>
 
+            {/* Private Registries Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={2} title={<TabTitleText>Private Registries</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <RegistriesCard />
+                </div>
+              </Tab>
+            )}
+
             {/* Provider Configuration Tab - Admin Only */}
             {isAdmin && (
-              <Tab eventKey={2} title={<TabTitleText>Provider Configuration</TabTitleText>}>
+              <Tab eventKey={3} title={<TabTitleText>Provider Configuration</TabTitleText>}>
               <div style={{ marginTop: '1.5rem' }}>
                 {!isLoadingProviders && (!state.providers || state.providers.length === 0) && (
                   <EmptyState>

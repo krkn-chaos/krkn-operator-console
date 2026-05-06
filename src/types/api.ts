@@ -96,13 +96,8 @@ export interface ErrorResponse {
 }
 
 export interface ScenariosRequest {
-  username?: string;
-  password?: string;
-  token?: string;
-  registryUrl?: string;
-  scenarioRepository?: string;
-  skipTls?: boolean;
-  insecure?: boolean;
+  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
+  registryName?: string;
 }
 
 export interface ScenarioTag {
@@ -212,13 +207,8 @@ export interface ScenarioRunRequest {
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
-  registryUrl?: string;
-  scenarioRepository?: string;
-  username?: string;
-  password?: string;
-  token?: string;
-  skipTls?: boolean;
-  insecure?: boolean;
+  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
+  registryName?: string;
 }
 
 export interface TargetJobResult {
@@ -271,6 +261,7 @@ export interface ClusterJob {
   startTime?: string;
   completionTime?: string;
   message?: string; // Only on errors
+  containerImage?: string; // Full container image path (e.g., 'quay.io/user/repo:tag')
 }
 
 // Response from POST /api/v1/scenarios/run
@@ -292,6 +283,7 @@ export interface ScenarioRunStatusResponse {
   clusterJobs: ClusterJob[];
   createdAt?: string; // Optional - backend may include it in the future
   ownerUserId?: string; // Email of the user who created the run
+  registryName?: string; // Name of private registry used (null for public Quay registry)
 }
 
 // Internal state for tracking scenario runs
@@ -306,6 +298,7 @@ export interface ScenarioRunState {
   clusterJobs: ClusterJob[];
   createdAt: string;
   ownerUserId?: string; // Email of the user who created the run
+  registryName?: string; // Name of private registry used (null for public Quay registry)
 }
 
 // User Management Types
@@ -574,4 +567,71 @@ export interface GroupMemberOperationResponse {
   groupName: string;
   userId: string;
   message?: string;
+}
+
+// Registry Management Types
+
+export type AuthType = 'token' | 'password';
+
+export interface RegistryDetails {
+  name: string;
+  registryUrl: string;
+  scenarioRepository: string;
+  authType: AuthType;
+  description?: string;
+  skipTls: boolean;
+  insecure: boolean;
+  groups: string[];
+  availableToAll: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface CreateRegistryRequest {
+  name: string;
+  registryUrl: string;
+  scenarioRepository: string;
+  authType: AuthType;
+  username?: string;
+  password?: string; // Contains either token (if authType=token) or password (if authType=password)
+  description?: string;
+  skipTls?: boolean;
+  insecure?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
+}
+
+export interface UpdateRegistryRequest {
+  registryUrl?: string;
+  scenarioRepository?: string;
+  authType?: AuthType;
+  username?: string;
+  password?: string; // Contains either token (if authType=token) or password (if authType=password)
+  description?: string;
+  skipTls?: boolean;
+  insecure?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
+}
+
+export interface ListRegistriesResponse {
+  registries: RegistryDetails[];
+}
+
+export interface RegistryOperationResponse {
+  name: string;
+  message?: string;
+}
+
+export interface AvailableRegistry {
+  name: string;
+  registryUrl: string;
+  scenarioRepository: string;
+  description?: string;
+}
+
+export interface AvailableRegistriesResponse {
+  registries: AvailableRegistry[];
 }

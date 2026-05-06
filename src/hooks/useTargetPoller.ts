@@ -153,6 +153,7 @@ export function useTargetPoller() {
             clusterJobs: run.clusterJobs || [], // Fallback to empty array
             createdAt: run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || new Date().toISOString(),
             ownerUserId: run.ownerUserId, // Owner user ID (email)
+            registryName: run.registryName,
           };
         });
 
@@ -180,6 +181,7 @@ export function useTargetPoller() {
                 failedJobs: details.failedJobs,
                 runningJobs: details.runningJobs,
                 ownerUserId: details.ownerUserId || run.ownerUserId,
+                registryName: details.registryName || run.registryName,
               };
 
               dispatch({

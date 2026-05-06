@@ -45,6 +45,7 @@ export function useScenarioRunsPoller() {
             clusterJobs: updated.clusterJobs || [],
             createdAt: run.createdAt,
             ownerUserId: updated.ownerUserId || run.ownerUserId,
+            registryName: updated.registryName || run.registryName,
           };
 
           // Only update if there are changes
@@ -105,6 +106,7 @@ export function useScenarioRunsPoller() {
           clusterJobs: updated.clusterJobs || [],
           createdAt: run.createdAt,
           ownerUserId: updated.ownerUserId || run.ownerUserId,
+          registryName: updated.registryName || run.registryName,
         };
 
         if (hasChanges(run, updatedState)) {

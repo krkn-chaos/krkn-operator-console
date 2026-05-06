@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardBody,
@@ -6,30 +6,72 @@ import {
   Form,
   FormGroup,
   Radio,
-  TextInput,
   Button,
-  Checkbox,
   ActionGroup,
+  Spinner,
+  Alert,
+  FormSelect,
+  FormSelectOption,
+  EmptyState,
+  EmptyStateIcon,
+  EmptyStateBody,
+  Title,
 } from '@patternfly/react-core';
+import { RegistryIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenariosRequest } from '../types/api';
+import { registriesApi } from '../services/registriesApi';
+import type { ScenariosRequest, AvailableRegistry } from '../types/api';
 
+/**
+ * RegistrySelector component
+ *
+ * Allows users to select a container registry for loading chaos scenarios.
+ * Users can choose between the public quay.io registry or a configured private registry.
+ *
+ * **Registry Options:**
+ * - Public Registry: Default quay.io/krkn-chaos repository (no authentication required)
+ * - Private Registry: Select from pre-configured registries (admin must configure first)
+ *
+ * **Workflow:**
+ * 1. User selects registry type (public or private)
+ * 2. If private, user selects from available registries
+ * 3. Component fetches scenarios from the selected registry
+ * 4. Dispatches REGISTRY_CONFIGURED and SCENARIOS_SUCCESS actions
+ *
+ * @component
+ */
 export function RegistrySelector() {
   const { dispatch } = useAppContext();
   const [registryType, setRegistryType] = useState<'public' | 'private'>('public');
-  const [authMethod, setAuthMethod] = useState<'credentials' | 'token'>('credentials');
-
-  // Form fields for private registry
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [token, setToken] = useState('');
-  const [registryUrl, setRegistryUrl] = useState('');
-  const [scenarioRepository, setScenarioRepository] = useState('');
-  const [skipTls, setSkipTls] = useState(false);
-  const [insecure, setInsecure] = useState(false);
-
+  const [selectedRegistryName, setSelectedRegistryName] = useState<string>('');
+  const [availableRegistries, setAvailableRegistries] = useState<AvailableRegistry[]>([]);
+  const [loadingRegistries, setLoadingRegistries] = useState(false);
+  const [registryError, setRegistryError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Load available registries when component mounts
+  useEffect(() => {
+    async function fetchRegistries() {
+      setLoadingRegistries(true);
+      setRegistryError(null);
+      try {
+        const registries = await registriesApi.getAvailableRegistries();
+        setAvailableRegistries(registries);
+
+        // Auto-select first registry if available
+        if (registries.length > 0) {
+          setSelectedRegistryName(registries[0].name);
+        }
+      } catch (error) {
+        setRegistryError(error instanceof Error ? error.message : 'Failed to load registries');
+      } finally {
+        setLoadingRegistries(false);
+      }
+    }
+
+    fetchRegistries();
+  }, []);
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -38,17 +80,13 @@ export function RegistrySelector() {
     const request: ScenariosRequest = {};
 
     if (registryType === 'private') {
-      if (authMethod === 'credentials') {
-        request.username = username || undefined;
-        request.password = password || undefined;
-      } else {
-        request.token = token || undefined;
+      if (!selectedRegistryName) {
+        setIsLoading(false);
+        return;
       }
-      request.registryUrl = registryUrl || undefined;
-      request.scenarioRepository = scenarioRepository || undefined;
-      request.skipTls = skipTls;
-      request.insecure = insecure;
+      request.registryName = selectedRegistryName;
     }
+    // If public, registryName is undefined → backend defaults to quay.io
 
     // Dispatch configuration
     dispatch({
@@ -83,15 +121,7 @@ export function RegistrySelector() {
 
   const isFormValid = () => {
     if (registryType === 'public') return true;
-
-    // Private registry validation
-    if (!registryUrl || !scenarioRepository) return false;
-
-    if (authMethod === 'credentials') {
-      return username.trim() !== '' && password.trim() !== '';
-    } else {
-      return token.trim() !== '';
-    }
+    return selectedRegistryName !== '';
   };
 
   const handleCancel = () => {
@@ -123,7 +153,7 @@ export function RegistrySelector() {
               id="private-registry"
               name="registry-type"
               label="Private Registry"
-              description="Connect to a custom private container registry"
+              description="Use a configured private container registry"
               isChecked={registryType === 'private'}
               onChange={() => setRegistryType('private')}
             />
@@ -131,92 +161,56 @@ export function RegistrySelector() {
 
           {registryType === 'private' && (
             <>
-              <FormGroup label="Registry URL" isRequired fieldId="registry-url">
-                <TextInput
-                  id="registry-url"
-                  type="text"
-                  value={registryUrl}
-                  onChange={(_event, value) => setRegistryUrl(value)}
-                  placeholder="https://registry.example.com"
-                />
-              </FormGroup>
-
-              <FormGroup label="Scenario Repository" isRequired fieldId="scenario-repository">
-                <TextInput
-                  id="scenario-repository"
-                  type="text"
-                  value={scenarioRepository}
-                  onChange={(_event, value) => setScenarioRepository(value)}
-                  placeholder="my-org/chaos-scenarios"
-                />
-              </FormGroup>
-
-              <FormGroup label="Authentication Method" isRequired fieldId="auth-method">
-                <Radio
-                  id="auth-credentials"
-                  name="auth-method"
-                  label="Username & Password"
-                  isChecked={authMethod === 'credentials'}
-                  onChange={() => setAuthMethod('credentials')}
-                />
-                <Radio
-                  id="auth-token"
-                  name="auth-method"
-                  label="Token"
-                  isChecked={authMethod === 'token'}
-                  onChange={() => setAuthMethod('token')}
-                />
-              </FormGroup>
-
-              {authMethod === 'credentials' ? (
-                <>
-                  <FormGroup label="Username" isRequired fieldId="username">
-                    <TextInput
-                      id="username"
-                      type="text"
-                      value={username}
-                      onChange={(_event, value) => setUsername(value)}
-                      placeholder="username"
-                    />
-                  </FormGroup>
-                  <FormGroup label="Password" isRequired fieldId="password">
-                    <TextInput
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(_event, value) => setPassword(value)}
-                      placeholder="password"
-                    />
-                  </FormGroup>
-                </>
-              ) : (
-                <FormGroup label="Token" isRequired fieldId="token">
-                  <TextInput
-                    id="token"
-                    type="password"
-                    value={token}
-                    onChange={(_event, value) => setToken(value)}
-                    placeholder="registry token"
-                  />
-                </FormGroup>
+              {loadingRegistries && (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Spinner size="lg" />
+                  <div style={{ marginTop: '1rem' }}>Loading available registries...</div>
+                </div>
               )}
 
-              <FormGroup fieldId="tls-options">
-                <Checkbox
-                  id="skip-tls"
-                  label="Skip TLS Verification"
-                  description="Skip TLS certificate verification (not recommended for production)"
-                  isChecked={skipTls}
-                  onChange={(_event, checked) => setSkipTls(checked)}
-                />
-                <Checkbox
-                  id="insecure"
-                  label="Allow Insecure Connections"
-                  description="Allow insecure (HTTP) connections to the registry"
-                  isChecked={insecure}
-                  onChange={(_event, checked) => setInsecure(checked)}
-                />
-              </FormGroup>
+              {registryError && (
+                <Alert variant="danger" title="Failed to load registries" isInline>
+                  {registryError}
+                </Alert>
+              )}
+
+              {!loadingRegistries && !registryError && availableRegistries.length === 0 && (
+                <EmptyState>
+                  <EmptyStateIcon icon={RegistryIcon} />
+                  <Title headingLevel="h3" size="lg">
+                    No private registries configured
+                  </Title>
+                  <EmptyStateBody>
+                    Ask your administrator to configure a private registry in Settings → Private Registries before
+                    you can use private scenario repositories.
+                  </EmptyStateBody>
+                </EmptyState>
+              )}
+
+              {!loadingRegistries && availableRegistries.length > 0 && (
+                <FormGroup label="Select Registry" isRequired fieldId="registry-select">
+                  <FormSelect
+                    id="registry-select"
+                    value={selectedRegistryName}
+                    onChange={(_event, value) => setSelectedRegistryName(value as string)}
+                    aria-label="Select private registry"
+                  >
+                    {availableRegistries.map((registry) => (
+                      <FormSelectOption
+                        key={registry.name}
+                        value={registry.name}
+                        label={`${registry.name} (${registry.registryUrl}/${registry.scenarioRepository})`}
+                      />
+                    ))}
+                  </FormSelect>
+                  {selectedRegistryName && (
+                    <div style={{ marginTop: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                      {availableRegistries.find((r) => r.name === selectedRegistryName)?.description ||
+                        'No description'}
+                    </div>
+                  )}
+                </FormGroup>
+              )}
             </>
           )}
 
@@ -224,7 +218,7 @@ export function RegistrySelector() {
             <Button
               variant="primary"
               onClick={handleSubmit}
-              isDisabled={!isFormValid() || isLoading}
+              isDisabled={!isFormValid() || isLoading || (registryType === 'private' && loadingRegistries)}
               isLoading={isLoading}
             >
               {isLoading ? 'Loading Scenarios...' : 'Load Scenarios'}
