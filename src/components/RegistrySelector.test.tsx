@@ -5,7 +5,7 @@ import { RegistrySelector } from './RegistrySelector';
 import { AppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import { registriesApi } from '../services/registriesApi';
-import type { AppState } from '../context/AppContext';
+import type { AppState } from '../types/api';
 import type { ScenariosResponse, AvailableRegistry } from '../types/api';
 
 vi.mock('../services/operatorApi');
@@ -15,20 +15,34 @@ describe('RegistrySelector', () => {
   const mockDispatch = vi.fn();
 
   const initialState: AppState = {
-    step: 'registry_selection',
+    phase: 'configuring_registry',
     uuid: null,
+    pollAttempts: 0,
+    scenarioRuns: [],
+    scenarioRunsRefreshTrigger: 0,
+    scenarioRunToRefresh: null,
+    pollingRunNames: new Set(),
+    pausedPollingRunIds: new Set(),
+    expandedRunIds: new Set(),
+    expandedClusterJobs: new Set(),
+    clusters: null,
     selectedClusters: [],
+    registryType: null,
+    registryConfig: null,
     scenarios: null,
+    selectedScenarios: null,
+    selectedScenario: null,
     scenarioDetail: null,
     scenarioFormValues: null,
     scenarioGlobals: null,
     globalFormValues: null,
     globalTouchedFields: null,
-    scenarioRuns: [],
-    registryType: null,
-    registryConfig: null,
-    isLoading: false,
     error: null,
+    providers: null,
+    providerConfigUuid: null,
+    providerConfigStatus: 'idle',
+    providerConfigData: null,
+    notifications: [],
   };
 
   const mockRegistries: AvailableRegistry[] = [
