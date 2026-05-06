@@ -54,7 +54,7 @@ describe('TerminalContent', () => {
     });
   });
 
-  it('should render loading state initially', () => {
+  it('should render loading state initially', async () => {
     mockUseClusterDiscovery.mockReturnValue({
       clusters: null,
       discoveryUuid: null,
@@ -67,6 +67,11 @@ describe('TerminalContent', () => {
     render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
 
     expect(screen.getByText('Loading clusters...')).toBeInTheDocument();
+
+    // Wait for the component to finish any pending state updates
+    await waitFor(() => {
+      expect(screen.getByText('Loading clusters...')).toBeInTheDocument();
+    });
   });
 
   it('should load available commands when terminal opens', async () => {
