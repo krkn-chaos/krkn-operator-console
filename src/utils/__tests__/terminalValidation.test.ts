@@ -65,6 +65,18 @@ describe('terminalValidation', () => {
         const result = validateCommand('oc get pods -n default -o json');
         expect(result.valid).toBe(true);
       });
+
+      it('should allow bare kubectl command (shows help)', () => {
+        const result = validateCommand('kubectl');
+        expect(result.valid).toBe(true);
+        expect(result.error).toBeUndefined();
+      });
+
+      it('should allow bare oc command (shows help)', () => {
+        const result = validateCommand('oc');
+        expect(result.valid).toBe(true);
+        expect(result.error).toBeUndefined();
+      });
     });
 
     describe('blocked streaming flags', () => {

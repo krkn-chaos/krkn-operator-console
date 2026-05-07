@@ -178,6 +178,13 @@ export function validateCommand(command: string): ValidationResult {
     };
   }
 
+  const trimmed = command.trim();
+
+  // Special case: allow bare 'kubectl' or 'oc' commands (shows help)
+  if (trimmed === 'kubectl' || trimmed === 'oc') {
+    return { valid: true };
+  }
+
   const { subcommand, flags } = parseCommand(command);
 
   if (!subcommand) {
