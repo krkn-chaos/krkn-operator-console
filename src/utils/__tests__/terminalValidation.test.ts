@@ -44,6 +44,27 @@ describe('terminalValidation', () => {
         const result = validateCommand('get pods -n default');
         expect(result.valid).toBe(true);
       });
+
+      it('should allow oc get command', () => {
+        const result = validateCommand('oc get pods');
+        expect(result.valid).toBe(true);
+        expect(result.error).toBeUndefined();
+      });
+
+      it('should allow oc describe command', () => {
+        const result = validateCommand('oc describe pod nginx');
+        expect(result.valid).toBe(true);
+      });
+
+      it('should allow oc logs command', () => {
+        const result = validateCommand('oc logs nginx-pod');
+        expect(result.valid).toBe(true);
+      });
+
+      it('should allow oc commands with flags', () => {
+        const result = validateCommand('oc get pods -n default -o json');
+        expect(result.valid).toBe(true);
+      });
     });
 
     describe('blocked streaming flags', () => {
@@ -100,6 +121,19 @@ describe('terminalValidation', () => {
         // Should catch at least one
         expect(result.error).toMatch(/(-f|--watch)/);
       });
+
+      it('should block --watch flag in oc commands', () => {
+        const result = validateCommand('oc get pods --watch');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('Streaming commands');
+        expect(result.error).toContain('--watch');
+      });
+
+      it('should block --follow flag in oc logs', () => {
+        const result = validateCommand('oc logs nginx --follow');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('--follow');
+      });
     });
 
     describe('blocked write commands', () => {
@@ -151,6 +185,18 @@ describe('terminalValidation', () => {
         const result = validateCommand('kubectl port-forward nginx 8080:80');
         expect(result.valid).toBe(false);
         expect(result.error).toContain('port-forward');
+      });
+
+      it('should block delete in oc commands', () => {
+        const result = validateCommand('oc delete pod nginx');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('delete');
+      });
+
+      it('should block apply in oc commands', () => {
+        const result = validateCommand('oc apply -f deployment.yaml');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('apply');
       });
     });
 
