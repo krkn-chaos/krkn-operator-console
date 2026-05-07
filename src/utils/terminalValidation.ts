@@ -1,7 +1,7 @@
 /**
  * Terminal Command Validation Utility
  *
- * Provides client-side validation for kubectl commands before sending to backend.
+ * Provides client-side validation for kubectl/oc commands before sending to backend.
  * Improves UX by catching errors early instead of waiting for backend rejection.
  *
  * **Validation Rules:**
@@ -13,7 +13,7 @@
  */
 
 /**
- * List of allowed read-only kubectl commands
+ * List of allowed read-only kubectl/oc commands
  */
 const ALLOWED_COMMANDS = new Set([
   'get',
@@ -74,14 +74,17 @@ export interface ValidationResult {
 }
 
 /**
- * Parse kubectl command to extract subcommand and flags
+ * Parse kubectl/oc command to extract subcommand and flags
  *
- * @param command - Full kubectl command string
+ * @param command - Full kubectl or oc command string
  * @returns Object containing subcommand and flags
  *
  * @example
  * ```typescript
  * parseCommand('kubectl get pods -n default')
+ * // Returns: { subcommand: 'get', flags: ['-n', 'default'] }
+ *
+ * parseCommand('oc get pods -n default')
  * // Returns: { subcommand: 'get', flags: ['-n', 'default'] }
  * ```
  */
@@ -89,8 +92,8 @@ function parseCommand(command: string): { subcommand: string | null; flags: stri
   const trimmed = command.trim();
   const parts = trimmed.split(/\s+/);
 
-  // Remove 'kubectl' if present
-  const commandParts = parts[0] === 'kubectl' ? parts.slice(1) : parts;
+  // Remove 'kubectl' or 'oc' if present
+  const commandParts = (parts[0] === 'kubectl' || parts[0] === 'oc') ? parts.slice(1) : parts;
 
   if (commandParts.length === 0) {
     return { subcommand: null, flags: [] };
@@ -135,7 +138,7 @@ function findBlockedFlag(flags: string[], subcommand: string | null): string | n
 }
 
 /**
- * Validate kubectl command
+ * Validate kubectl/oc command
  *
  * Checks if command is allowed based on:
  * 1. Subcommand is in allowed list
@@ -146,13 +149,16 @@ function findBlockedFlag(flags: string[], subcommand: string | null): string | n
  * - Write operations not permitted for security
  * - Improves UX by catching errors early
  *
- * @param command - Full kubectl command string
+ * @param command - Full kubectl or oc command string
  * @returns Validation result with error message if invalid
  *
  * @example
  * ```typescript
- * // Valid command
+ * // Valid commands
  * validateCommand('kubectl get pods -n default')
+ * // Returns: { valid: true }
+ *
+ * validateCommand('oc get pods -n default')
  * // Returns: { valid: true }
  *
  * // Invalid command - blocked flag
@@ -172,13 +178,20 @@ export function validateCommand(command: string): ValidationResult {
     };
   }
 
+  const trimmed = command.trim();
+
+  // Special case: allow bare 'kubectl' or 'oc' commands (shows help)
+  if (trimmed === 'kubectl' || trimmed === 'oc') {
+    return { valid: true };
+  }
+
   const { subcommand, flags } = parseCommand(command);
 
   if (!subcommand) {
     return {
       valid: false,
       error: 'Invalid command format',
-      suggestion: 'Start with a kubectl command (e.g., "kubectl get pods")',
+      suggestion: 'Start with a kubectl or oc command (e.g., "kubectl get pods" or "oc get pods")',
     };
   }
 
