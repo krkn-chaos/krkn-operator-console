@@ -237,7 +237,10 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
   useEffect(() => {
     if (!graphRunDetail) return;
 
-    const nodeStatuses = graphRunDetail.status.nodeStatuses;
+    // Filter out _comment nodes
+    const nodeStatuses = graphRunDetail.status.nodeStatuses.filter(
+      (nodeStatus: NodeStatus) => nodeStatus.nodeId !== '_comment'
+    );
 
     // Create nodes
     const reactFlowNodes: Node[] = nodeStatuses.map((nodeStatus: NodeStatus) => ({
@@ -255,6 +258,9 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
     nodeStatuses.forEach((nodeStatus: NodeStatus) => {
       if (nodeStatus.dependsOn && nodeStatus.dependsOn.length > 0) {
         nodeStatus.dependsOn.forEach((dependencyId: string) => {
+          // Skip edges that reference _comment nodes
+          if (dependencyId === '_comment') return;
+
           reactFlowEdges.push({
             id: `${dependencyId}-${nodeStatus.nodeId}`,
             source: dependencyId,
