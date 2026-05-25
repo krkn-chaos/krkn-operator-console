@@ -263,6 +263,36 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
     };
   }, [graphRunName]);
 
+  // Poll for updates every 2 seconds
+  useEffect(() => {
+    // Don't poll if still loading or if there's an error
+    if (loading || error || !graphRunDetail) return;
+
+    // Check if all nodes are in terminal state
+    const allTerminal = graphRunDetail.status.nodeStatuses
+      .filter((ns: NodeStatus) => ns.nodeId !== '_comment')
+      .every((ns: NodeStatus) =>
+        ns.phase === 'Completed' || ns.phase === 'Failed' || ns.phase === 'Blocked'
+      );
+
+    // Stop polling if all nodes are done
+    if (allTerminal) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const detail = await graphRunsApi.getGraphRun(graphRunName);
+        setGraphRunDetail(detail);
+      } catch (err) {
+        // Silently ignore polling errors to avoid disrupting the UI
+        console.error('Failed to poll graph run status:', err);
+      }
+    }, 2000);
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [graphRunName, loading, error, graphRunDetail]);
+
   // Build ReactFlow nodes and edges from graph run data
   useEffect(() => {
     if (!graphRunDetail) return;
