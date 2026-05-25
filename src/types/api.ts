@@ -635,3 +635,177 @@ export interface AvailableRegistry {
 export interface AvailableRegistriesResponse {
   registries: AvailableRegistry[];
 }
+
+// Graph Run API Types
+
+/**
+ * GraphScenarioNode represents a node in the scenario dependency graph
+ * Compatible with krknctl ScenarioNode structure
+ */
+export interface GraphScenarioNode {
+  /** Optional comment describing the scenario */
+  _comment?: string;
+  /** Container image for the scenario */
+  image?: string;
+  /** Name of the scenario */
+  name?: string;
+  /** Environment variables for the scenario */
+  env?: { [key: string]: string };
+  /** Volume mounts for the scenario */
+  volumes?: { [key: string]: string };
+  /** Node ID that this scenario depends on (parent in the graph) */
+  depends_on?: string;
+}
+
+/**
+ * NodeStatus represents the status of a single node in the dependency graph
+ */
+export interface NodeStatus {
+  /** Unique identifier for this node in the graph */
+  nodeId: string;
+  /** Human-readable name of the scenario */
+  nodeName: string;
+  /** Current phase of this node */
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Blocked';
+  /** Reference to the KrknScenarioRun CR created for this node */
+  scenarioRunRef?: string;
+  /** When this node started execution */
+  startTime?: string;
+  /** When this node completed execution */
+  completionTime?: string;
+  /** List of node IDs that this node depends on */
+  dependsOn?: string[];
+  /** Additional information about the node status */
+  message?: string;
+}
+
+/**
+ * GraphRunSummary contains aggregate statistics about the graph run
+ */
+export interface GraphRunSummary {
+  /** Total number of nodes in the graph */
+  totalNodes: number;
+  /** Number of successfully completed nodes */
+  completedNodes: number;
+  /** Number of currently running nodes */
+  runningNodes: number;
+  /** Number of failed nodes */
+  failedNodes: number;
+  /** Number of pending nodes (including blocked nodes) */
+  pendingNodes: number;
+}
+
+/**
+ * GraphRunSpec represents the specification of a graph run
+ */
+export interface GraphRunSpec {
+  /** Dependency graph of scenarios to execute (maps node ID to scenario node) */
+  graph: { [nodeId: string]: GraphScenarioNode };
+  /** Reference to the KrknTargetRequest CR UUID */
+  targetRequestId: string;
+  /** Map of provider name to list of cluster names */
+  targetClusters: { [providerName: string]: string[] };
+  /** Email address of the user who created this graph run */
+  ownerUserId?: string;
+}
+
+/**
+ * GraphRunStatus represents the status of a graph run
+ */
+export interface GraphRunStatus {
+  /** Overall phase of the graph run */
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'PartiallyFailed';
+  /** Aggregate statistics about the graph run */
+  summary: GraphRunSummary;
+  /** Status of each node in the graph */
+  nodeStatuses: NodeStatus[];
+  /** Pre-computed topological levels for frontend rendering */
+  resolvedLevels: string[][];
+  /** When the graph run started */
+  startTime?: string;
+  /** When the graph run completed */
+  completionTime?: string;
+}
+
+/**
+ * GraphRunListItem represents a single item in the graph runs list
+ * Response from GET /api/v1/graphruns
+ */
+export interface GraphRunListItem {
+  name: string;
+  namespace: string;
+  creationTimestamp: string;
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'PartiallyFailed';
+  ownerUserId: string;
+  targetRequestId: string;
+  summary: GraphRunSummary;
+  startTime?: string;
+  completionTime?: string;
+}
+
+/**
+ * GraphRunDetail represents detailed information about a single graph run
+ * Response from GET /api/v1/graphruns/:name and POST /api/v1/graphruns
+ */
+export interface GraphRunDetail {
+  name: string;
+  namespace: string;
+  creationTimestamp: string;
+  spec: GraphRunSpec;
+  status: GraphRunStatus;
+}
+
+/**
+ * CreateGraphRunRequest is the request body for POST /api/v1/graphruns
+ */
+export interface CreateGraphRunRequest {
+  /** Dependency graph of scenarios to execute */
+  graph: { [nodeId: string]: GraphScenarioNode };
+  /** Reference to the KrknTargetRequest CR UUID */
+  targetRequestId: string;
+  /** Map of provider name to list of cluster names */
+  targetClusters: { [providerName: string]: string[] };
+}
+
+/**
+ * ListGraphRunsFilters for filtering graph runs in GET /api/v1/graphruns
+ */
+export interface ListGraphRunsFilters {
+  /** Filter by owner user ID (email) */
+  ownerUserId?: string;
+}
+
+/**
+ * GraphRunState - Internal state for tracking graph runs in the frontend (list view)
+ * Lightweight version for list display - matches GraphRunListItem from backend
+ * Full details (graph, nodeStatuses, resolvedLevels) fetched on-demand via getGraphRun()
+ */
+export interface GraphRunState {
+  /** Unique name of the graph run (e.g., graphrun-abc123) */
+  name: string;
+  /** Kubernetes namespace */
+  namespace: string;
+  /** When the graph run was created */
+  creationTimestamp: string;
+  /** Overall phase of the graph run */
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'PartiallyFailed';
+  /** Email of the user who created the graph run */
+  ownerUserId: string;
+  /** Reference to the KrknTargetRequest CR UUID */
+  targetRequestId: string;
+  /** Aggregate statistics about the graph run */
+  summary: GraphRunSummary;
+  /** When the graph run started execution */
+  startTime?: string;
+  /** When the graph run completed execution */
+  completionTime?: string;
+}
+
+/**
+ * RunItem - Union type for items displayed in the runs list
+ * Can be either a regular scenario run or a graph run
+ * Both types are lightweight for list performance
+ */
+export type RunItem =
+  | (ScenarioRunState & { runType: 'scenario' })
+  | (GraphRunState & { runType: 'graph' });
