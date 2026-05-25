@@ -200,6 +200,25 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
   const [error, setError] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved === 'dark';
+  });
+
+  // Listen for theme changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const hasDarkClass = document.documentElement.classList.contains('pf-v5-theme-dark');
+      setIsDarkTheme(hasDarkClass);
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   // Fetch graph run details
   useEffect(() => {
@@ -360,6 +379,18 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
 
         {/* ReactFlow graph */}
         <div style={{ height: '600px', border: '1px solid var(--pf-v5-global--BorderColor--100)', borderRadius: '4px' }}>
+          <style>{`
+            .react-flow__controls-button {
+              background-color: ${isDarkTheme ? 'var(--pf-v5-global--BackgroundColor--dark-100)' : 'var(--pf-v5-global--BackgroundColor--100)'} !important;
+              border-color: ${isDarkTheme ? 'var(--pf-v5-global--BorderColor--dark-100)' : 'var(--pf-v5-global--BorderColor--100)'} !important;
+            }
+            .react-flow__controls-button:hover {
+              background-color: ${isDarkTheme ? 'var(--pf-v5-global--BackgroundColor--dark-200)' : 'var(--pf-v5-global--BackgroundColor--200)'} !important;
+            }
+            .react-flow__controls-button svg {
+              fill: ${isDarkTheme ? 'var(--pf-v5-global--Color--light-100)' : 'var(--pf-v5-global--Color--dark-100)'} !important;
+            }
+          `}</style>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -375,6 +406,7 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
             panOnDrag={true}
             fitView
             attributionPosition="bottom-left"
+            colorMode={isDarkTheme ? 'dark' : 'light'}
           >
             <Background />
             <Controls showZoom={false} showInteractive={false} position="top-right" />
