@@ -47,6 +47,7 @@ import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { DebugGraphRunCreate } from './DebugGraphRunCreate';
+import { GraphRunDetail } from './GraphRunDetail';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
@@ -644,96 +645,15 @@ export function JobsList({
                       />
                     </DataListItemRow>
 
-                    {/* GraphRun Expanded Content - Show all nodes */}
+                    {/* GraphRun Expanded Content - Show DAG visualization */}
                     <DataListContent
                       aria-label={`Graph run ${item.graphRunName} details`}
                       id={`expand-graph-${item.graphRunName}`}
                       isHidden={!isGraphExpanded}
                     >
-                      <Card isCompact>
-                        <CardTitle>
-                          <strong>Workflow Nodes ({item.nodes.length})</strong>
-                        </CardTitle>
-                        <CardBody>
-                          <DataList aria-label="Graph nodes list" isCompact>
-                            {item.nodes.map((node) => {
-                              const nodePhaseDisplay = getRunPhaseDisplay(node.phase);
-                              return (
-                                <DataListItem key={node.scenarioRunName}>
-                                  <DataListItemRow>
-                                    <DataListItemCells
-                                      dataListCells={[
-                                        <DataListCell key="node-id" width={2}>
-                                          <div>
-                                            <div style={{ marginBottom: '0.25rem' }}>
-                                              <strong>Node ID:</strong>
-                                            </div>
-                                            <code
-                                              style={{
-                                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                                padding: '0.125rem 0.5rem',
-                                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                                display: 'inline-block',
-                                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                              }}
-                                            >
-                                              {node.graphNodeId}
-                                            </code>
-                                          </div>
-                                        </DataListCell>,
-                                        <DataListCell key="scenario" width={2}>
-                                          <div>
-                                            <div style={{ marginBottom: '0.25rem' }}>
-                                              <strong>Scenario:</strong>
-                                            </div>
-                                            <code
-                                              style={{
-                                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                                padding: '0.125rem 0.5rem',
-                                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                                display: 'inline-block',
-                                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                              }}
-                                            >
-                                              {node.scenarioName}
-                                            </code>
-                                          </div>
-                                        </DataListCell>,
-                                        <DataListCell key="status" width={1}>
-                                          <div>
-                                            <div style={{ marginBottom: '0.25rem' }}>
-                                              <strong>Status:</strong>
-                                            </div>
-                                            <Label color={nodePhaseDisplay.color} icon={nodePhaseDisplay.icon}>
-                                              {nodePhaseDisplay.label}
-                                            </Label>
-                                          </div>
-                                        </DataListCell>,
-                                        <DataListCell key="jobs" width={2}>
-                                          <div>
-                                            <div style={{ marginBottom: '0.25rem' }}>
-                                              <strong>Jobs:</strong>
-                                            </div>
-                                            <div style={{ fontSize: 'var(--pf-v5-global--FontSize--md)', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                                              <span style={{ color: 'var(--pf-v5-global--success-color--100)' }}>✓ {node.successfulJobs}</span>
-                                              <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>✗ {node.failedJobs}</span>
-                                              <span style={{ color: 'var(--pf-v5-global--info-color--100)' }}>⟳ {node.runningJobs}</span>
-                                            </div>
-                                          </div>
-                                        </DataListCell>,
-                                      ]}
-                                    />
-                                  </DataListItemRow>
-                                </DataListItem>
-                              );
-                            })}
-                          </DataList>
-                        </CardBody>
-                      </Card>
+                      {isGraphExpanded && (
+                        <GraphRunDetail graphRunName={item.graphRunName} />
+                      )}
                     </DataListContent>
                   </DataListItem>
                 );
