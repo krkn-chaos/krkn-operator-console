@@ -530,30 +530,29 @@ export function JobsList({
                               </Label>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="graph-name" width={2}>
+                          <DataListCell key="workflow" width={2}>
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>
                                   <TopologyIcon style={{ marginRight: '0.25rem' }} />
-                                  Graph Workflow:
+                                  Workflow:
                                 </strong>
                               </div>
-                              <code
-                                style={{
-                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                  padding: '0.125rem 0.5rem',
-                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                  display: 'inline-block',
-                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {item.graphRunName}
-                              </code>
-                              <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)', marginTop: '0.25rem' }}>
-                                {item.nodes.length} node{item.nodes.length !== 1 ? 's' : ''}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <code
+                                  style={{
+                                    fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                    fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                    padding: '0.125rem 0.5rem',
+                                    borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                    display: 'inline-block',
+                                    border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {item.graphRunName}
+                                </code>
                               </div>
                             </div>
                           </DataListCell>,
@@ -578,7 +577,37 @@ export function JobsList({
                               </code>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="created" width={3}>
+                          <DataListCell key="total-nodes" width={2}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>Total Nodes:</strong>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Label color="blue" icon={<TopologyIcon />}>
+                                  {item.nodes.length} {item.nodes.length === 1 ? 'node' : 'nodes'}
+                                </Label>
+                              </div>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="jobs-summary" width={2}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>Jobs:</strong>
+                              </div>
+                              <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '1.25rem' }}>✓</span> {successfulJobs}
+                                </span>
+                                <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '1.25rem' }}>✗</span> {failedJobs}
+                                </span>
+                                <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '1.25rem' }}>⟳</span> {runningJobs}
+                                </span>
+                              </div>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="created" width={2}>
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Created:</strong>
@@ -597,24 +626,6 @@ export function JobsList({
                               >
                                 {formatTimestamp(item.createdAt)}
                               </code>
-                            </div>
-                          </DataListCell>,
-                          <DataListCell key="jobs-summary" width={2}>
-                            <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Total Jobs:</strong>
-                              </div>
-                              <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>✓</span> {successfulJobs}
-                                </span>
-                                <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>✗</span> {failedJobs}
-                                </span>
-                                <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>⟳</span> {runningJobs}
-                                </span>
-                              </div>
                             </div>
                           </DataListCell>,
                           <DataListCell key="actions" width={1}>
@@ -812,7 +823,7 @@ export function JobsList({
                             </code>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="run-name" width={3}>
+                        <DataListCell key="run-name" width={2}>
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Run Name:</strong>
@@ -856,9 +867,20 @@ export function JobsList({
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Created:</strong>
                             </div>
-                            <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                            <code
+                              style={{
+                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                padding: '0.125rem 0.5rem',
+                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                display: 'inline-block',
+                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
                               {formatTimestamp(run.createdAt)}
-                            </div>
+                            </code>
                           </div>
                         </DataListCell>,
                         <DataListCell key="actions" width={1}>
