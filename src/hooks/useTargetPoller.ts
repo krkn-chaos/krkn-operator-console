@@ -155,6 +155,8 @@ export function useTargetPoller() {
             createdAt: run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || new Date().toISOString(),
             ownerUserId: run.ownerUserId, // Owner user ID (email)
             registryName: run.registryName,
+            graphRunName: run.graphRunName, // Name of parent GraphRun (if part of a graph)
+            graphNodeId: run.graphNodeId, // Node ID within the graph (if part of a graph)
           };
         });
 
@@ -183,6 +185,8 @@ export function useTargetPoller() {
                 runningJobs: details.runningJobs,
                 ownerUserId: details.ownerUserId || run.ownerUserId,
                 registryName: details.registryName || run.registryName,
+                graphRunName: details.graphRunName || run.graphRunName,
+                graphNodeId: details.graphNodeId || run.graphNodeId,
               };
 
               dispatch({

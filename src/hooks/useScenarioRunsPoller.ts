@@ -46,6 +46,8 @@ export function useScenarioRunsPoller() {
             createdAt: run.createdAt,
             ownerUserId: updated.ownerUserId || run.ownerUserId,
             registryName: updated.registryName || run.registryName,
+            graphRunName: updated.graphRunName || run.graphRunName,
+            graphNodeId: updated.graphNodeId || run.graphNodeId,
           };
 
           // Only update if there are changes
@@ -107,6 +109,8 @@ export function useScenarioRunsPoller() {
           createdAt: run.createdAt,
           ownerUserId: updated.ownerUserId || run.ownerUserId,
           registryName: updated.registryName || run.registryName,
+          graphRunName: updated.graphRunName || run.graphRunName,
+          graphNodeId: updated.graphNodeId || run.graphNodeId,
         };
 
         if (hasChanges(run, updatedState)) {
