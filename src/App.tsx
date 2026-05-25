@@ -7,11 +7,13 @@ import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
+import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly, QuakeTerminal } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { UserForm } from './components/UserForm';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
 import { operatorApi } from './services/operatorApi';
+import { graphRunsApi } from './services';
 import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest } from './types/api';
@@ -41,7 +43,8 @@ function App() {
 
   // Initialize and manage the workflow
   useTargetPoller();
-  useScenarioRunsPoller(); // NEW: Poll scenarioRuns instead of individual jobs
+  useScenarioRunsPoller(); // Poll scenario runs for status updates
+  useGraphRunsPoller(); // Poll graph runs for status updates
 
   const handleRetry = () => {
     dispatch({ type: 'RETRY' });
@@ -108,6 +111,27 @@ function App() {
     }
   };
 
+  const handleDeleteGraphRun = async (graphRunName: string) => {
+    try {
+      await graphRunsApi.deleteGraphRun(graphRunName);
+      // Remove the graph run from state immediately
+      dispatch({
+        type: 'DELETE_GRAPH_RUN',
+        payload: { graphRunName }
+      });
+      showSuccess('Graph run deleted', `Successfully deleted ${graphRunName}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete graph run';
+
+      // Check if it's a 403 Forbidden error
+      if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
+        showError('Permission denied', 'You do not have permission to delete this graph run');
+      } else {
+        showError('Failed to delete graph run', errorMessage);
+      }
+    }
+  };
+
   const handleCreateJob = async () => {
     // Create initial target for fetching clusters
     dispatch({ type: 'INIT_START' });
@@ -157,6 +181,13 @@ function App() {
               onRefreshScenarioRun={(scenarioRunName) =>
                 dispatch({ type: 'REFRESH_SCENARIO_RUN', payload: { scenarioRunName } })
               }
+              graphRuns={state.graphRuns}
+              expandedGraphRunIds={state.expandedGraphRunIds}
+              pausedGraphPollingIds={state.pausedGraphPollingIds}
+              onToggleGraphRunAccordion={(graphRunName) =>
+                dispatch({ type: 'TOGGLE_GRAPH_RUN_ACCORDION', payload: { graphRunName } })
+              }
+              onDeleteGraphRun={handleDeleteGraphRun}
             />
           </PageSection>
         );

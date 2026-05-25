@@ -39,11 +39,12 @@ import {
   LockIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase } from '../types/api';
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
+
+import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState } from '../types/api';
 
 interface JobsListProps {
   scenarioRuns: ScenarioRunState[];
@@ -56,6 +57,12 @@ interface JobsListProps {
   onDeleteJob: (jobId: string) => Promise<void>;
   onCreateJob: () => void;
   onRefreshScenarioRun: (scenarioRunName: string) => void;
+  // GraphRuns props
+  graphRuns: GraphRunState[];
+  expandedGraphRunIds: Set<string>;
+  pausedGraphPollingIds: Set<string>;
+  onToggleGraphRunAccordion: (graphRunName: string) => void;
+  onDeleteGraphRun: (graphRunName: string) => Promise<void>;
 }
 
 export function JobsList({
@@ -69,7 +76,21 @@ export function JobsList({
   onDeleteJob,
   onCreateJob,
   onRefreshScenarioRun,
+  graphRuns,
+  expandedGraphRunIds,
+  pausedGraphPollingIds,
+  onToggleGraphRunAccordion,
+  onDeleteGraphRun,
 }: JobsListProps) {
+  // TODO: Integrate graph runs into the unified runs list
+  // GraphRuns will be merged with ScenarioRuns and displayed with TopologyIcon badge
+  // Expanded graph runs will show GraphRunDetail component with ReactFlow DAG
+  // Temporary logging to avoid unused var warnings - will be removed in next commit
+  if (graphRuns.length > 0 || expandedGraphRunIds.size > 0 || pausedGraphPollingIds.size > 0) {
+    console.log('GraphRuns:', { graphRuns, expandedGraphRunIds, pausedGraphPollingIds });
+  }
+  void onToggleGraphRunAccordion; // Temporary to avoid unused warning
+  void onDeleteGraphRun; // Temporary to avoid unused warning
   const { isAdmin } = useRole();
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
   const [deletingRun, setDeletingRun] = useState<string | null>(null);

@@ -18,6 +18,11 @@ const initialState: AppState = {
   expandedRunIds: new Set<string>(),
   expandedClusterJobs: new Set<string>(),
 
+  // Graph runs list (GraphRun orchestration)
+  graphRuns: [],
+  expandedGraphRunIds: new Set<string>(),
+  pausedGraphPollingIds: new Set<string>(),
+
   // Workflow state
   clusters: null,
   selectedClusters: [],
@@ -222,6 +227,72 @@ function appReducer(state: AppState, action: AppAction): AppState {
         expandedClusterJobs: newExpandedJobs,
       };
     }
+
+    // Graph runs management
+    case 'GRAPH_RUN_CREATED':
+      return state; // Graph run created notification - actual data comes via polling
+
+    case 'ADD_GRAPH_RUN': {
+      // Add new graph run if not already present
+      const exists = state.graphRuns.some(r => r.name === action.payload.run.name);
+      if (exists) {
+        return state;
+      }
+      return {
+        ...state,
+        graphRuns: [action.payload.run, ...state.graphRuns],
+      };
+    }
+
+    case 'UPDATE_GRAPH_RUN': {
+      // Update existing graph run
+      const updatedGraphRuns = state.graphRuns.map(run =>
+        run.name === action.payload.run.name ? action.payload.run : run
+      );
+      return {
+        ...state,
+        graphRuns: updatedGraphRuns,
+      };
+    }
+
+    case 'LOAD_GRAPH_RUNS_SUCCESS':
+      return {
+        ...state,
+        graphRuns: action.payload.runs,
+      };
+
+    case 'TOGGLE_GRAPH_RUN_ACCORDION': {
+      const newExpandedGraphRuns = new Set(state.expandedGraphRunIds);
+      const newPausedGraphPolling = new Set(state.pausedGraphPollingIds);
+
+      if (newExpandedGraphRuns.has(action.payload.graphRunName)) {
+        // Closing accordion - remove from expanded and paused
+        newExpandedGraphRuns.delete(action.payload.graphRunName);
+        newPausedGraphPolling.delete(action.payload.graphRunName);
+      } else {
+        // Opening accordion - add to expanded and paused
+        newExpandedGraphRuns.add(action.payload.graphRunName);
+        newPausedGraphPolling.add(action.payload.graphRunName);
+      }
+
+      return {
+        ...state,
+        expandedGraphRunIds: newExpandedGraphRuns,
+        pausedGraphPollingIds: newPausedGraphPolling,
+      };
+    }
+
+    case 'DELETE_GRAPH_RUN':
+      return {
+        ...state,
+        graphRuns: state.graphRuns.filter(run => run.name !== action.payload.graphRunName),
+        expandedGraphRunIds: new Set(
+          [...state.expandedGraphRunIds].filter(id => id !== action.payload.graphRunName)
+        ),
+        pausedGraphPollingIds: new Set(
+          [...state.pausedGraphPollingIds].filter(id => id !== action.payload.graphRunName)
+        ),
+      };
 
     // Workflow control
     case 'START_CREATE_WORKFLOW':

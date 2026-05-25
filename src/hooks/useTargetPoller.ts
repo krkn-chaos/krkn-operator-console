@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
+import { graphRunsApi } from '../services';
 import { config } from '../config';
-import type { ScenarioRunState } from '../types/api';
+import type { ScenarioRunState, GraphRunState } from '../types/api';
 
 /**
  * Custom hook to manage the target polling workflow
@@ -195,6 +196,31 @@ export function useTargetPoller() {
         }
       } catch (error) {
         // Silently handle error
+      }
+
+      // Load graph runs in parallel
+      try {
+        const graphRuns = await graphRunsApi.listGraphRuns();
+
+        // Convert GraphRunListItem[] to GraphRunState[]
+        const graphRunStates: GraphRunState[] = graphRuns.map((run) => ({
+          name: run.name,
+          namespace: run.namespace,
+          creationTimestamp: run.creationTimestamp,
+          phase: run.phase,
+          ownerUserId: run.ownerUserId,
+          targetRequestId: run.targetRequestId,
+          summary: run.summary,
+          startTime: run.startTime,
+          completionTime: run.completionTime,
+        }));
+
+        dispatch({
+          type: 'LOAD_GRAPH_RUNS_SUCCESS',
+          payload: { runs: graphRunStates }
+        });
+      } catch (error) {
+        // Silently handle error - graph runs are optional feature
       }
     }
 

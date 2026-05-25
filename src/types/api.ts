@@ -398,6 +398,11 @@ export interface AppState {
   expandedRunIds: Set<string>;
   expandedClusterJobs: Set<string>; // jobId
 
+  // Graph runs list (GraphRun orchestration)
+  graphRuns: GraphRunState[];
+  expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
+  pausedGraphPollingIds: Set<string>; // Graph runs with polling paused (accordion open)
+
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
   selectedClusters: SelectedCluster[]; // Array of selected clusters
@@ -447,6 +452,14 @@ export type AppAction =
   | { type: 'LOAD_SCENARIO_RUNS_SUCCESS'; payload: { runs: ScenarioRunState[] } }
   | { type: 'TOGGLE_RUN_ACCORDION'; payload: { scenarioRunName: string } }
   | { type: 'TOGGLE_CLUSTER_JOB_ACCORDION'; payload: { jobId: string } }
+
+  // Graph runs list management
+  | { type: 'GRAPH_RUN_CREATED'; payload: { graphRunName: string; totalNodes: number } }
+  | { type: 'ADD_GRAPH_RUN'; payload: { run: GraphRunState } }
+  | { type: 'UPDATE_GRAPH_RUN'; payload: { run: GraphRunState } }
+  | { type: 'LOAD_GRAPH_RUNS_SUCCESS'; payload: { runs: GraphRunState[] } }
+  | { type: 'TOGGLE_GRAPH_RUN_ACCORDION'; payload: { graphRunName: string } }
+  | { type: 'DELETE_GRAPH_RUN'; payload: { graphRunName: string } }
 
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }
