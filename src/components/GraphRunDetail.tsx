@@ -102,10 +102,10 @@ function ScenarioNode({ data }: NodeProps) {
         e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
-      {/* Input handle for dependencies */}
+      {/* Input handle for dependencies (left side for horizontal flow) */}
       <Handle
         type="target"
-        position={Position.Top}
+        position={Position.Left}
         style={{ background: 'var(--pf-v5-global--BorderColor--300)' }}
       />
 
@@ -135,10 +135,10 @@ function ScenarioNode({ data }: NodeProps) {
         </div>
       </div>
 
-      {/* Output handle for dependents */}
+      {/* Output handle for dependents (right side for horizontal flow) */}
       <Handle
         type="source"
-        position={Position.Bottom}
+        position={Position.Right}
         style={{ background: 'var(--pf-v5-global--BorderColor--300)' }}
       />
     </div>
@@ -284,10 +284,11 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
       }
     });
 
-    // Layout nodes and edges
+    // Layout nodes and edges (horizontal LR layout)
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
       reactFlowNodes,
-      reactFlowEdges
+      reactFlowEdges,
+      'LR'
     );
 
     setNodes(layoutedNodes);
