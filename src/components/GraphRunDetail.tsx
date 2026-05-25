@@ -360,6 +360,25 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
 
         {/* ReactFlow graph */}
         <div style={{ height: '600px', border: '1px solid var(--pf-v5-global--BorderColor--100)', borderRadius: '4px' }}>
+          <style>{`
+            .react-flow__attribution {
+              background: rgba(255, 255, 255, 0.8) !important;
+              padding: 2px 6px !important;
+              border-radius: 3px !important;
+              font-size: 10px !important;
+            }
+            .pf-v5-theme-dark .react-flow__attribution {
+              background: rgba(0, 0, 0, 0.6) !important;
+              color: rgba(255, 255, 255, 0.7) !important;
+            }
+            .react-flow__attribution a {
+              color: var(--pf-v5-global--link--Color) !important;
+              text-decoration: none !important;
+            }
+            .react-flow__attribution a:hover {
+              text-decoration: underline !important;
+            }
+          `}</style>
           <ReactFlow
             nodes={nodes}
             edges={edges}
