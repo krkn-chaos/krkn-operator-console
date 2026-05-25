@@ -75,33 +75,62 @@ function ScenarioNode({ data }: NodeProps) {
   const phaseDisplay = getPhaseDisplay(phase);
 
   return (
-    <div
-      onClick={() => onClick?.(nodeStatus)}
-      style={{
-        padding: '12px 16px',
-        borderRadius: '8px',
-        border: `2px solid ${
-          phase === 'Completed' ? 'var(--pf-v5-global--success-color--100)' :
-          phase === 'Failed' ? 'var(--pf-v5-global--danger-color--100)' :
-          phase === 'Running' ? 'var(--pf-v5-global--info-color--100)' :
-          phase === 'Blocked' ? 'var(--pf-v5-global--disabled-color--100)' :
-          'var(--pf-v5-global--warning-color--100)'
-        }`,
-        backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
-        minWidth: '200px',
-        cursor: 'pointer',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        transition: 'all 0.2s ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-        e.currentTarget.style.transform = 'translateY(0)';
-      }}
-    >
+    <>
+      {/* Add keyframe animation for running nodes */}
+      {phase === 'Running' && (
+        <style>{`
+          @keyframes pulse-border {
+            0%, 100% {
+              box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4);
+            }
+            50% {
+              box-shadow: 0 0 0 8px rgba(0, 123, 255, 0);
+            }
+          }
+          @keyframes glow {
+            0%, 100% {
+              filter: brightness(1);
+            }
+            50% {
+              filter: brightness(1.2);
+            }
+          }
+        `}</style>
+      )}
+      <div
+        onClick={() => onClick?.(nodeStatus)}
+        style={{
+          padding: '12px 16px',
+          borderRadius: '8px',
+          border: `2px solid ${
+            phase === 'Completed' ? 'var(--pf-v5-global--success-color--100)' :
+            phase === 'Failed' ? 'var(--pf-v5-global--danger-color--100)' :
+            phase === 'Running' ? 'var(--pf-v5-global--info-color--100)' :
+            phase === 'Blocked' ? 'var(--pf-v5-global--disabled-color--100)' :
+            'var(--pf-v5-global--warning-color--100)'
+          }`,
+          backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
+          minWidth: '200px',
+          cursor: 'pointer',
+          boxShadow: phase === 'Running'
+            ? '0 2px 4px rgba(0,0,0,0.1), 0 0 0 0 rgba(0, 123, 255, 0.4)'
+            : '0 2px 4px rgba(0,0,0,0.1)',
+          transition: 'all 0.2s ease',
+          animation: phase === 'Running' ? 'pulse-border 2s ease-in-out infinite, glow 2s ease-in-out infinite' : 'none',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseLeave={(e) => {
+          if (phase === 'Running') {
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1), 0 0 0 0 rgba(0, 123, 255, 0.4)';
+          } else {
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+          }
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}
+      >
       {/* Input handle for dependencies (left side for horizontal flow) */}
       <Handle
         type="target"
@@ -142,6 +171,7 @@ function ScenarioNode({ data }: NodeProps) {
         style={{ background: 'var(--pf-v5-global--BorderColor--300)' }}
       />
     </div>
+    </>
   );
 }
 
