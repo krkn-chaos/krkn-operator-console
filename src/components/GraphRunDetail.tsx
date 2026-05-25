@@ -377,7 +377,7 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
             attributionPosition="bottom-left"
           >
             <Background />
-            <Controls showZoom={false} showInteractive={false} />
+            <Controls showZoom={false} showInteractive={false} position="top-right" />
           </ReactFlow>
         </div>
       </CardBody>
