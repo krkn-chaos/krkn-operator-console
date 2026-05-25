@@ -629,17 +629,15 @@ export function JobsList({
                             </div>
                           </DataListCell>,
                           <DataListCell key="actions" width={1}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              <Tooltip content="Delete graph run">
-                                <Button
-                                  variant="danger"
-                                  onClick={() => setConfirmDeleteRun(item.graphRunName)}
-                                  isDisabled={deletingRun === item.graphRunName}
-                                  isLoading={deletingRun === item.graphRunName}
-                                  icon={<TrashIcon />}
-                                  size="sm"
-                                />
-                              </Tooltip>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                              <Button
+                                variant="plain"
+                                aria-label="Delete graph run"
+                                onClick={() => setConfirmDeleteRun(item.graphRunName)}
+                                isDisabled={deletingRun === item.graphRunName}
+                                icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
+                                style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                              />
                             </div>
                           </DataListCell>,
                         ]}
