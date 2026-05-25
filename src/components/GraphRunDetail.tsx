@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
+  Controls,
   Background,
   NodeProps,
   Handle,
@@ -376,6 +377,7 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
             attributionPosition="bottom-left"
           >
             <Background />
+            <Controls showZoom={false} showInteractive={false} />
           </ReactFlow>
         </div>
       </CardBody>
