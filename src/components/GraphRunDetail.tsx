@@ -10,7 +10,6 @@ import { useState, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
-  Controls,
   Background,
   NodeProps,
   Handle,
@@ -366,11 +365,17 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={true}
+            zoomOnScroll={false}
+            zoomOnPinch={false}
+            zoomOnDoubleClick={false}
+            panOnDrag={true}
             fitView
             attributionPosition="bottom-left"
           >
             <Background />
-            <Controls />
           </ReactFlow>
         </div>
       </CardBody>
