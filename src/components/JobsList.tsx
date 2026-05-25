@@ -25,9 +25,13 @@ import {
   SelectOption,
   SelectList,
   MenuToggle,
+  MenuToggleAction,
   Alert,
   AlertActionLink,
   Tooltip,
+  Dropdown,
+  DropdownList,
+  DropdownItem,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -41,6 +45,7 @@ import {
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
+import { DebugGraphRunCreate } from './DebugGraphRunCreate';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
@@ -101,6 +106,8 @@ export function JobsList({
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
+  const [isDebugGraphRunOpen, setIsDebugGraphRunOpen] = useState(false);
+  const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -224,9 +231,54 @@ export function JobsList({
             </Title>
           </FlexItem>
           <FlexItem>
-            <Button variant="primary" onClick={onCreateJob} size="lg">
-              Run Scenarios
-            </Button>
+            {/* Split button dropdown - GitHub style */}
+            <Dropdown
+              isOpen={isRunDropdownOpen}
+              onOpenChange={(isOpen) => setIsRunDropdownOpen(isOpen)}
+              toggle={(toggleRef) => (
+                <MenuToggle
+                  ref={toggleRef}
+                  splitButtonOptions={{
+                    variant: 'action',
+                    items: [
+                      <MenuToggleAction
+                        key="default-action"
+                        onClick={onCreateJob}
+                        aria-label="Run single scenario"
+                      >
+                        Run Scenarios
+                      </MenuToggleAction>,
+                    ],
+                  }}
+                  variant="primary"
+                  onClick={() => setIsRunDropdownOpen(!isRunDropdownOpen)}
+                  isExpanded={isRunDropdownOpen}
+                  aria-label="Run scenarios options"
+                />
+              )}
+            >
+              <DropdownList>
+                <DropdownItem
+                  onClick={() => {
+                    setIsRunDropdownOpen(false);
+                    onCreateJob();
+                  }}
+                  description="Run a single chaos scenario on selected clusters"
+                >
+                  Single Scenario Run
+                </DropdownItem>
+                <DropdownItem
+                  onClick={() => {
+                    setIsRunDropdownOpen(false);
+                    setIsDebugGraphRunOpen(true);
+                  }}
+                  description="Run multiple scenarios with dependencies (workflow)"
+                  icon={<span>🔗</span>}
+                >
+                  Graph Workflow Run
+                </DropdownItem>
+              </DropdownList>
+            </Dropdown>
           </FlexItem>
         </Flex>
       </CardTitle>
@@ -811,6 +863,16 @@ export function JobsList({
       >
         Are you sure you want to delete job <strong>{confirmDeleteJob?.jobName}</strong>?
       </Modal>
+
+      {/* Debug Graph Run Create Modal */}
+      <DebugGraphRunCreate
+        isOpen={isDebugGraphRunOpen}
+        onClose={() => setIsDebugGraphRunOpen(false)}
+        onSuccess={() => {
+          // Graph run created successfully
+          // Polling will automatically pick it up
+        }}
+      />
     </Card>
   );
 }
