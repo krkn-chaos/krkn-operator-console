@@ -284,6 +284,8 @@ export interface ScenarioRunStatusResponse {
   createdAt?: string; // Optional - backend may include it in the future
   ownerUserId?: string; // Email of the user who created the run
   registryName?: string; // Name of private registry used (null for public Quay registry)
+  graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
+  graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
 }
 
 // Internal state for tracking scenario runs
@@ -299,6 +301,8 @@ export interface ScenarioRunState {
   createdAt: string;
   ownerUserId?: string; // Email of the user who created the run
   registryName?: string; // Name of private registry used (null for public Quay registry)
+  graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
+  graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
 }
 
 // User Management Types

@@ -41,6 +41,7 @@ import {
   ExclamationTriangleIcon,
   TrashIcon,
   LockIcon,
+  TopologyIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
@@ -50,6 +51,11 @@ import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState } from '../types/api';
+
+// Unified run item type - can be either a GraphRun or a standalone ScenarioRun
+type UnifiedRunItem =
+  | { type: 'graph'; graphRunName: string; nodes: ScenarioRunState[]; phase: ScenarioRunPhase; createdAt: string; ownerUserId?: string }
+  | { type: 'scenario'; run: ScenarioRunState };
 
 interface JobsListProps {
   scenarioRuns: ScenarioRunState[];
@@ -81,21 +87,12 @@ export function JobsList({
   onDeleteJob,
   onCreateJob,
   onRefreshScenarioRun,
-  graphRuns,
-  expandedGraphRunIds,
-  pausedGraphPollingIds,
-  onToggleGraphRunAccordion,
+  graphRuns: _graphRuns, // Not used - GraphRuns are derived from scenarioRuns
+  expandedGraphRunIds: _expandedGraphRunIds, // Not used - using expandedRunIds for both
+  pausedGraphPollingIds: _pausedGraphPollingIds, // Not used - polling via useScenarioRunsPoller
+  onToggleGraphRunAccordion: _onToggleGraphRunAccordion, // Not used - using onToggleRunAccordion
   onDeleteGraphRun,
 }: JobsListProps) {
-  // TODO: Integrate graph runs into the unified runs list
-  // GraphRuns will be merged with ScenarioRuns and displayed with TopologyIcon badge
-  // Expanded graph runs will show GraphRunDetail component with ReactFlow DAG
-  // Temporary logging to avoid unused var warnings - will be removed in next commit
-  if (graphRuns.length > 0 || expandedGraphRunIds.size > 0 || pausedGraphPollingIds.size > 0) {
-    console.log('GraphRuns:', { graphRuns, expandedGraphRunIds, pausedGraphPollingIds });
-  }
-  void onToggleGraphRunAccordion; // Temporary to avoid unused warning
-  void onDeleteGraphRun; // Temporary to avoid unused warning
   const { isAdmin } = useRole();
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
@@ -161,7 +158,16 @@ export function JobsList({
     setConfirmDeleteRun(null);
 
     try {
-      await onDeleteScenarioRun(confirmDeleteRun);
+      // Determine if this is a GraphRun or ScenarioRun
+      const isGraphRun = unifiedRuns.some(
+        (item) => item.type === 'graph' && item.graphRunName === confirmDeleteRun
+      );
+
+      if (isGraphRun) {
+        await onDeleteGraphRun(confirmDeleteRun);
+      } else {
+        await onDeleteScenarioRun(confirmDeleteRun);
+      }
     } finally {
       setDeletingRun(null);
     }
@@ -212,12 +218,63 @@ export function JobsList({
     return true;
   });
 
-  // Sort scenario runs by createdAt ascending (oldest first)
-  // Memoized to avoid recomputing on every render (polling updates scenarioRuns frequently)
-  const sortedScenarioRuns = useMemo(() => {
-    return [...filteredScenarioRuns].sort((a, b) => {
-      // ISO 8601 strings are lexicographically sortable, no need to parse to Date
-      return a.createdAt.localeCompare(b.createdAt);
+  // Group scenario runs into unified items (GraphRuns + standalone ScenarioRuns)
+  const unifiedRuns = useMemo((): UnifiedRunItem[] => {
+    const graphRunsMap = new Map<string, ScenarioRunState[]>();
+    const standaloneRuns: ScenarioRunState[] = [];
+
+    // Group by graphRunName
+    filteredScenarioRuns.forEach((run) => {
+      if (run.graphRunName) {
+        const nodes = graphRunsMap.get(run.graphRunName) || [];
+        nodes.push(run);
+        graphRunsMap.set(run.graphRunName, nodes);
+      } else {
+        standaloneRuns.push(run);
+      }
+    });
+
+    // Build unified items
+    const items: UnifiedRunItem[] = [];
+
+    // Add GraphRuns
+    graphRunsMap.forEach((nodes, graphRunName) => {
+      // Calculate aggregated phase for the GraphRun
+      let phase: ScenarioRunPhase = 'Pending';
+      const hasFailed = nodes.some((n) => n.phase === 'Failed');
+      const hasPartiallyFailed = nodes.some((n) => n.phase === 'PartiallyFailed');
+      const hasRunning = nodes.some((n) => n.phase === 'Running');
+      const allSucceeded = nodes.every((n) => n.phase === 'Succeeded');
+
+      if (hasFailed || hasPartiallyFailed) {
+        phase = 'Failed'; // Consider graph failed if any node failed
+      } else if (allSucceeded) {
+        phase = 'Succeeded';
+      } else if (hasRunning) {
+        phase = 'Running';
+      }
+
+      // Use earliest createdAt as the GraphRun creation time
+      const createdAt = nodes.reduce((earliest, node) =>
+        node.createdAt < earliest ? node.createdAt : earliest
+      , nodes[0].createdAt);
+
+      // Use ownerUserId from first node (they should all be the same)
+      const ownerUserId = nodes[0].ownerUserId;
+
+      items.push({ type: 'graph', graphRunName, nodes, phase, createdAt, ownerUserId });
+    });
+
+    // Add standalone ScenarioRuns
+    standaloneRuns.forEach((run) => {
+      items.push({ type: 'scenario', run });
+    });
+
+    // Sort by createdAt descending (most recent first)
+    return items.sort((a, b) => {
+      const aDate = a.type === 'graph' ? a.createdAt : a.run.createdAt;
+      const bDate = b.type === 'graph' ? b.createdAt : b.run.createdAt;
+      return bDate.localeCompare(aDate); // Reversed for descending
     });
   }, [filteredScenarioRuns]);
 
@@ -419,7 +476,7 @@ export function JobsList({
           </Card>
         )}
 
-        {filteredScenarioRuns.length === 0 && scenarioRuns.length > 0 ? (
+        {unifiedRuns.length === 0 && scenarioRuns.length > 0 ? (
           <EmptyState>
             <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
@@ -439,7 +496,242 @@ export function JobsList({
           </EmptyState>
         ) : (
           <DataList aria-label="Scenario runs list" isCompact>
-            {sortedScenarioRuns.map((run) => {
+            {unifiedRuns.map((item) => {
+              // Handle GraphRun
+              if (item.type === 'graph') {
+                const isGraphExpanded = expandedRunIds.has(item.graphRunName);
+                const phaseDisplay = getRunPhaseDisplay(item.phase);
+
+                // Aggregate job counts across all nodes
+                const successfulJobs = item.nodes.reduce((sum, node) => sum + node.successfulJobs, 0);
+                const failedJobs = item.nodes.reduce((sum, node) => sum + node.failedJobs, 0);
+                const runningJobs = item.nodes.reduce((sum, node) => sum + node.runningJobs, 0);
+
+                return (
+                  <DataListItem key={item.graphRunName} isExpanded={isGraphExpanded}>
+                    {/* GraphRun Summary Row */}
+                    <DataListItemRow>
+                      <DataListToggle
+                        onClick={() => onToggleRunAccordion(item.graphRunName)}
+                        isExpanded={isGraphExpanded}
+                        id={`toggle-graph-${item.graphRunName}`}
+                        aria-controls={`expand-graph-${item.graphRunName}`}
+                        style={{ display: 'flex', alignItems: 'center' }}
+                      />
+                      <DataListItemCells
+                        dataListCells={[
+                          <DataListCell key="status" width={1}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>Status:</strong>
+                              </div>
+                              <Label color={phaseDisplay.color} icon={phaseDisplay.icon}>
+                                {phaseDisplay.label}
+                              </Label>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="graph-name" width={2}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>
+                                  <TopologyIcon style={{ marginRight: '0.25rem' }} />
+                                  Graph Workflow:
+                                </strong>
+                              </div>
+                              <code
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {item.graphRunName}
+                              </code>
+                              <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)', marginTop: '0.25rem' }}>
+                                {item.nodes.length} node{item.nodes.length !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="owner" width={2}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>User:</strong>
+                              </div>
+                              <code
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {item.ownerUserId || 'Unknown'}
+                              </code>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="created" width={3}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>Created:</strong>
+                              </div>
+                              <code
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {formatTimestamp(item.createdAt)}
+                              </code>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="jobs-summary" width={2}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>Total Jobs:</strong>
+                              </div>
+                              <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '1.25rem' }}>✓</span> {successfulJobs}
+                                </span>
+                                <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '1.25rem' }}>✗</span> {failedJobs}
+                                </span>
+                                <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '1.25rem' }}>⟳</span> {runningJobs}
+                                </span>
+                              </div>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="actions" width={1}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <Tooltip content="Delete graph run">
+                                <Button
+                                  variant="danger"
+                                  onClick={() => setConfirmDeleteRun(item.graphRunName)}
+                                  isDisabled={deletingRun === item.graphRunName}
+                                  isLoading={deletingRun === item.graphRunName}
+                                  icon={<TrashIcon />}
+                                  size="sm"
+                                />
+                              </Tooltip>
+                            </div>
+                          </DataListCell>,
+                        ]}
+                      />
+                    </DataListItemRow>
+
+                    {/* GraphRun Expanded Content - Show all nodes */}
+                    <DataListContent
+                      aria-label={`Graph run ${item.graphRunName} details`}
+                      id={`expand-graph-${item.graphRunName}`}
+                      isHidden={!isGraphExpanded}
+                    >
+                      <Card isCompact>
+                        <CardTitle>
+                          <strong>Workflow Nodes ({item.nodes.length})</strong>
+                        </CardTitle>
+                        <CardBody>
+                          <DataList aria-label="Graph nodes list" isCompact>
+                            {item.nodes.map((node) => {
+                              const nodePhaseDisplay = getRunPhaseDisplay(node.phase);
+                              return (
+                                <DataListItem key={node.scenarioRunName}>
+                                  <DataListItemRow>
+                                    <DataListItemCells
+                                      dataListCells={[
+                                        <DataListCell key="node-id" width={2}>
+                                          <div>
+                                            <div style={{ marginBottom: '0.25rem' }}>
+                                              <strong>Node ID:</strong>
+                                            </div>
+                                            <code
+                                              style={{
+                                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                                padding: '0.125rem 0.5rem',
+                                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                                display: 'inline-block',
+                                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                              }}
+                                            >
+                                              {node.graphNodeId}
+                                            </code>
+                                          </div>
+                                        </DataListCell>,
+                                        <DataListCell key="scenario" width={2}>
+                                          <div>
+                                            <div style={{ marginBottom: '0.25rem' }}>
+                                              <strong>Scenario:</strong>
+                                            </div>
+                                            <code
+                                              style={{
+                                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                                padding: '0.125rem 0.5rem',
+                                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                                display: 'inline-block',
+                                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                              }}
+                                            >
+                                              {node.scenarioName}
+                                            </code>
+                                          </div>
+                                        </DataListCell>,
+                                        <DataListCell key="status" width={1}>
+                                          <div>
+                                            <div style={{ marginBottom: '0.25rem' }}>
+                                              <strong>Status:</strong>
+                                            </div>
+                                            <Label color={nodePhaseDisplay.color} icon={nodePhaseDisplay.icon}>
+                                              {nodePhaseDisplay.label}
+                                            </Label>
+                                          </div>
+                                        </DataListCell>,
+                                        <DataListCell key="jobs" width={2}>
+                                          <div>
+                                            <div style={{ marginBottom: '0.25rem' }}>
+                                              <strong>Jobs:</strong>
+                                            </div>
+                                            <div style={{ fontSize: 'var(--pf-v5-global--FontSize--md)', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                              <span style={{ color: 'var(--pf-v5-global--success-color--100)' }}>✓ {node.successfulJobs}</span>
+                                              <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>✗ {node.failedJobs}</span>
+                                              <span style={{ color: 'var(--pf-v5-global--info-color--100)' }}>⟳ {node.runningJobs}</span>
+                                            </div>
+                                          </div>
+                                        </DataListCell>,
+                                      ]}
+                                    />
+                                  </DataListItemRow>
+                                </DataListItem>
+                              );
+                            })}
+                          </DataList>
+                        </CardBody>
+                      </Card>
+                    </DataListContent>
+                  </DataListItem>
+                );
+              }
+
+              // Handle standalone ScenarioRun
+              const run = item.run;
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
 
@@ -469,7 +761,10 @@ export function JobsList({
                         <DataListCell key="scenario" width={2}>
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Scenario:</strong>
+                              <strong>
+                                <HiOutlineRocketLaunch style={{ marginRight: '0.25rem' }} />
+                                Scenario:
+                              </strong>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <code
@@ -816,10 +1111,15 @@ export function JobsList({
         )}
       </CardBody>
 
-      {/* Confirmation Modal for Scenario Run Deletion */}
+      {/* Confirmation Modal for Run Deletion (Scenario or Graph) */}
       <Modal
         variant={ModalVariant.small}
-        title="Delete Scenario Run"
+        title={
+          confirmDeleteRun &&
+          unifiedRuns.some((item) => item.type === 'graph' && item.graphRunName === confirmDeleteRun)
+            ? 'Delete Graph Run'
+            : 'Delete Scenario Run'
+        }
         isOpen={confirmDeleteRun !== null}
         onClose={() => setConfirmDeleteRun(null)}
         actions={[
@@ -837,7 +1137,19 @@ export function JobsList({
           </Button>,
         ]}
       >
-        Are you sure you want to delete <strong>{confirmDeleteRun}</strong> scenario run?
+        {confirmDeleteRun &&
+        unifiedRuns.some((item) => item.type === 'graph' && item.graphRunName === confirmDeleteRun) ? (
+          <>
+            Are you sure you want to delete graph run <strong>{confirmDeleteRun}</strong>?
+            <br />
+            <br />
+            This will delete all associated scenario runs in the workflow.
+          </>
+        ) : (
+          <>
+            Are you sure you want to delete scenario run <strong>{confirmDeleteRun}</strong>?
+          </>
+        )}
       </Modal>
 
       {/* Confirmation Modal for Job Deletion */}
