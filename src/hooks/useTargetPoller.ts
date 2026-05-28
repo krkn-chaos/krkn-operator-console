@@ -148,11 +148,18 @@ export function useTargetPoller() {
             completionTime: run.completionTime,
           }));
 
+          // DEBUG: Log GraphRuns loaded
+          console.log('[useTargetPoller] GraphRuns loaded:', {
+            count: graphRunStates.length,
+            runs: graphRunStates.map(gr => ({ name: gr.name, summary: gr.summary }))
+          });
+
           dispatch({
             type: 'LOAD_GRAPH_RUNS_SUCCESS',
             payload: { runs: graphRunStates }
           });
         } catch (error) {
+          console.error('[useTargetPoller] Failed to load GraphRuns:', error);
           // Silently handle error - graph runs are optional feature
         }
 
