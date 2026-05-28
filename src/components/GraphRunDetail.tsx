@@ -386,6 +386,18 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
     return null;
   }
 
+  // Calculate summary excluding _comment nodes
+  const filteredNodes = graphRunDetail.status.nodeStatuses.filter(
+    (ns: NodeStatus) => ns.nodeId !== '_comment'
+  );
+  const summary = {
+    totalNodes: filteredNodes.length,
+    completedNodes: filteredNodes.filter((ns: NodeStatus) => ns.phase === 'Completed').length,
+    runningNodes: filteredNodes.filter((ns: NodeStatus) => ns.phase === 'Running').length,
+    failedNodes: filteredNodes.filter((ns: NodeStatus) => ns.phase === 'Failed').length,
+    pendingNodes: filteredNodes.filter((ns: NodeStatus) => ns.phase === 'Pending').length,
+  };
+
   return (
     <Card isFlat>
       <CardBody>
@@ -393,27 +405,27 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
         <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <Tooltip content="Total nodes in the graph">
             <Label color="blue" isCompact>
-              Total: {graphRunDetail.status.summary.totalNodes}
+              Total: {summary.totalNodes}
             </Label>
           </Tooltip>
           <Tooltip content="Successfully completed nodes">
             <Label color="green" icon={<CheckCircleIcon />} isCompact>
-              Completed: {graphRunDetail.status.summary.completedNodes}
+              Completed: {summary.completedNodes}
             </Label>
           </Tooltip>
           <Tooltip content="Currently running nodes">
             <Label color="blue" icon={<SyncAltIcon />} isCompact>
-              Running: {graphRunDetail.status.summary.runningNodes}
+              Running: {summary.runningNodes}
             </Label>
           </Tooltip>
           <Tooltip content="Failed nodes">
             <Label color="red" icon={<ExclamationCircleIcon />} isCompact>
-              Failed: {graphRunDetail.status.summary.failedNodes}
+              Failed: {summary.failedNodes}
             </Label>
           </Tooltip>
           <Tooltip content="Pending nodes (waiting for dependencies)">
             <Label color="orange" icon={<HourglassHalfIcon />} isCompact>
-              Pending: {graphRunDetail.status.summary.pendingNodes}
+              Pending: {summary.pendingNodes}
             </Label>
           </Tooltip>
         </div>
