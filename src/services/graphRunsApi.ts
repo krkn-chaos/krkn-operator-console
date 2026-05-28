@@ -45,9 +45,31 @@ class GraphRunsApiClient extends BaseApiClient {
     const queryString = params.toString();
     const url = queryString ? `/graphruns?${queryString}` : '/graphruns';
 
-    // API returns {graphRuns: [...]} not a direct array
-    const data = await this.fetchJson<{ graphRuns?: GraphRunListItem[] }>(url);
-    return data.graphRuns || [];
+    // DEBUG: Log raw API response
+    const data = await this.fetchJson<any>(url);
+    console.log('[graphRunsApi] Raw API response:', {
+      type: typeof data,
+      isArray: Array.isArray(data),
+      keys: Object.keys(data || {}),
+      firstItem: Array.isArray(data) ? data[0] : null,
+      graphRunsField: data?.graphRuns,
+      dataPreview: JSON.stringify(data).substring(0, 200)
+    });
+
+    // Try different unwrapping strategies
+    if (Array.isArray(data)) {
+      console.log('[graphRunsApi] ✓ Direct array, length:', data.length);
+      return data;
+    } else if (data?.graphRuns && Array.isArray(data.graphRuns)) {
+      console.log('[graphRunsApi] ✓ Wrapped in graphRuns field, length:', data.graphRuns.length);
+      return data.graphRuns;
+    } else if (data?.items && Array.isArray(data.items)) {
+      console.log('[graphRunsApi] ✓ Wrapped in items field, length:', data.items.length);
+      return data.items;
+    } else {
+      console.error('[graphRunsApi] ✗ Unexpected format, returning empty array');
+      return [];
+    }
   }
 
   /**

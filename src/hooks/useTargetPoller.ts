@@ -133,7 +133,9 @@ export function useTargetPoller() {
         // Always load GraphRuns (needed for correct totalNodes count)
         // Do this BEFORE the accordion check so _graphRuns is always up-to-date
         try {
+          console.log('[useTargetPoller] Fetching GraphRuns...');
           const graphRuns = await graphRunsApi.listGraphRuns();
+          console.log('[useTargetPoller] Received GraphRuns:', graphRuns.length, 'items');
 
           // Convert GraphRunListItem[] to GraphRunState[]
           const graphRunStates: GraphRunState[] = graphRuns.map((run) => ({
@@ -148,12 +150,15 @@ export function useTargetPoller() {
             completionTime: run.completionTime,
           }));
 
+          console.log('[useTargetPoller] Dispatching LOAD_GRAPH_RUNS_SUCCESS with', graphRunStates.length, 'runs');
+          console.log('[useTargetPoller] GraphRun summaries:', graphRunStates.map(gr => ({ name: gr.name, totalNodes: gr.summary?.totalNodes })));
+
           dispatch({
             type: 'LOAD_GRAPH_RUNS_SUCCESS',
             payload: { runs: graphRunStates }
           });
         } catch (error) {
-          // Silently handle error - graph runs are optional feature
+          console.error('[useTargetPoller] Failed to load GraphRuns:', error);
         }
 
         // Skip full ScenarioRuns list refresh if any accordion is open to prevent log interruptions
