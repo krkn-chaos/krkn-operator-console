@@ -359,7 +359,7 @@ export function DebugGraphRunCreate({ isOpen, onClose, onSuccess }: DebugGraphRu
       case 'success':
         return (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
-            <CheckCircleIcon size="xl" color="var(--pf-v5-global--success-color--100)" style={{ fontSize: '4rem' }} />
+            <CheckCircleIcon color="var(--pf-v5-global--success-color--100)" style={{ fontSize: '4rem' }} />
             <div style={{ marginTop: '1rem', fontSize: '1.2rem', fontWeight: 'bold' }}>
               Graph Run Created Successfully!
             </div>

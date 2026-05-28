@@ -129,12 +129,38 @@ export function useTargetPoller() {
     }
 
     async function loadScenarioRuns() {
-      // Skip full list refresh if any accordion is open to prevent log interruptions
-      if (pausedPollingRunIdsRef.current.size > 0) {
-        return;
-      }
-
       try {
+        // Always load GraphRuns (needed for correct totalNodes count)
+        // Do this BEFORE the accordion check so _graphRuns is always up-to-date
+        try {
+          const graphRuns = await graphRunsApi.listGraphRuns();
+
+          // Convert GraphRunListItem[] to GraphRunState[]
+          const graphRunStates: GraphRunState[] = graphRuns.map((run) => ({
+            name: run.name,
+            namespace: run.namespace,
+            creationTimestamp: run.creationTimestamp,
+            phase: run.phase,
+            ownerUserId: run.ownerUserId,
+            targetRequestId: run.targetRequestId,
+            summary: run.summary,
+            startTime: run.startTime,
+            completionTime: run.completionTime,
+          }));
+
+          dispatch({
+            type: 'LOAD_GRAPH_RUNS_SUCCESS',
+            payload: { runs: graphRunStates }
+          });
+        } catch (error) {
+          // Silently handle error - graph runs are optional feature
+        }
+
+        // Skip full ScenarioRuns list refresh if any accordion is open to prevent log interruptions
+        if (pausedPollingRunIdsRef.current.size > 0) {
+          return;
+        }
+
         const scenarioRuns = await operatorApi.listScenarioRuns();
 
         // Convert ScenarioRunStatusResponse[] to ScenarioRunState[]
@@ -200,31 +226,6 @@ export function useTargetPoller() {
         }
       } catch (error) {
         // Silently handle error
-      }
-
-      // Load graph runs in parallel
-      try {
-        const graphRuns = await graphRunsApi.listGraphRuns();
-
-        // Convert GraphRunListItem[] to GraphRunState[]
-        const graphRunStates: GraphRunState[] = graphRuns.map((run) => ({
-          name: run.name,
-          namespace: run.namespace,
-          creationTimestamp: run.creationTimestamp,
-          phase: run.phase,
-          ownerUserId: run.ownerUserId,
-          targetRequestId: run.targetRequestId,
-          summary: run.summary,
-          startTime: run.startTime,
-          completionTime: run.completionTime,
-        }));
-
-        dispatch({
-          type: 'LOAD_GRAPH_RUNS_SUCCESS',
-          payload: { runs: graphRunStates }
-        });
-      } catch (error) {
-        // Silently handle error - graph runs are optional feature
       }
     }
 

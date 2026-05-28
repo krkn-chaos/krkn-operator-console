@@ -244,8 +244,17 @@ export function JobsList({
       const graphRunState = _graphRuns.find(gr => gr.name === graphRunName);
 
       // Use phase from GraphRunState if available, otherwise calculate from nodes
-      let phase: ScenarioRunPhase = graphRunState?.phase || 'Pending';
-      if (!graphRunState) {
+      // Map GraphRun phase ('Completed') to ScenarioRun phase ('Succeeded')
+      let phase: ScenarioRunPhase = 'Pending';
+      if (graphRunState) {
+        // Map GraphRun phases to ScenarioRun phases
+        if (graphRunState.phase === 'Completed') {
+          phase = 'Succeeded';
+        } else if (graphRunState.phase === 'Pending' || graphRunState.phase === 'Running' ||
+                   graphRunState.phase === 'Failed' || graphRunState.phase === 'PartiallyFailed') {
+          phase = graphRunState.phase;
+        }
+      } else {
         const hasFailed = nodes.some((n) => n.phase === 'Failed');
         const hasPartiallyFailed = nodes.some((n) => n.phase === 'PartiallyFailed');
         const hasRunning = nodes.some((n) => n.phase === 'Running');
