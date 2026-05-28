@@ -243,15 +243,6 @@ export function JobsList({
       // Find matching GraphRunState to get summary
       const graphRunState = _graphRuns.find(gr => gr.name === graphRunName);
 
-      // DEBUG: Log join operation
-      console.log('[JobsList] GraphRun join:', {
-        graphRunName,
-        foundInState: !!graphRunState,
-        stateCount: _graphRuns.length,
-        summary: graphRunState?.summary,
-        nodesLength: nodes.length
-      });
-
       // Use phase from GraphRunState if available, otherwise calculate from nodes
       // Map GraphRun phase ('Completed') to ScenarioRun phase ('Succeeded')
       let phase: ScenarioRunPhase = 'Pending';

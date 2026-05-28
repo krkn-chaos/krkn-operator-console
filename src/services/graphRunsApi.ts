@@ -45,7 +45,9 @@ class GraphRunsApiClient extends BaseApiClient {
     const queryString = params.toString();
     const url = queryString ? `/graphruns?${queryString}` : '/graphruns';
 
-    return this.fetchJson<GraphRunListItem[]>(url);
+    // API returns {graphRuns: [...]} not a direct array
+    const data = await this.fetchJson<{ graphRuns?: GraphRunListItem[] }>(url);
+    return data.graphRuns || [];
   }
 
   /**
