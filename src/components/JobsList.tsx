@@ -354,10 +354,10 @@ export function JobsList({
                     setIsRunDropdownOpen(false);
                     setIsDebugGraphRunOpen(true);
                   }}
-                  description="Run multiple scenarios with dependencies (workflow)"
+                  description="Run multiple scenarios with dependencies"
                   icon={<TopologyIcon />}
                 >
-                  Graph Workflow Run
+                  Graph Run
                 </DropdownItem>
               </DropdownList>
             </Dropdown>
