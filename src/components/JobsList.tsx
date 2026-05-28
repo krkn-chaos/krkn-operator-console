@@ -221,9 +221,6 @@ export function JobsList({
 
   // Group scenario runs into unified items (GraphRuns + standalone ScenarioRuns)
   const unifiedRuns = useMemo((): UnifiedRunItem[] => {
-    console.log('[JobsList useMemo] Starting with _graphRuns:', _graphRuns.length, 'items');
-    console.log('[JobsList useMemo] _graphRuns data:', _graphRuns.map(gr => ({ name: gr.name, summary: gr.summary })));
-
     const graphRunsMap = new Map<string, ScenarioRunState[]>();
     const standaloneRuns: ScenarioRunState[] = [];
 
@@ -245,15 +242,6 @@ export function JobsList({
     graphRunsMap.forEach((nodes, graphRunName) => {
       // Find matching GraphRunState to get summary
       const graphRunState = _graphRuns.find(gr => gr.name === graphRunName);
-
-      console.log('[JobsList] Join attempt:', {
-        graphRunName,
-        foundInState: !!graphRunState,
-        stateCount: _graphRuns.length,
-        allStateNames: _graphRuns.map(gr => gr.name),
-        summary: graphRunState?.summary,
-        nodesLength: nodes.length
-      });
 
       // Use phase from GraphRunState if available, otherwise calculate from nodes
       // Map GraphRun phase ('Completed') to ScenarioRun phase ('Succeeded')
