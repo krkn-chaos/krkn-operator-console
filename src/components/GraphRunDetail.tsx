@@ -6,7 +6,7 @@
  * Similar to GitHub Actions workflow visualization.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -38,12 +38,11 @@ import {
 } from '@patternfly/react-icons';
 import type { GraphRunDetail, NodeStatus } from '../types/api';
 import { graphRunsApi } from '../services';
+import { ScenarioRunDetailModal } from './ScenarioRunDetailModal';
 
 interface GraphRunDetailProps {
   /** Name of the graph run to visualize */
   graphRunName: string;
-  /** Callback when a node is clicked */
-  onNodeClick?: (nodeStatus: NodeStatus) => void;
 }
 
 /**
@@ -224,12 +223,22 @@ function getLayoutedElements(
 /**
  * Main GraphRunDetail component
  */
-export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProps) {
+export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
   const [graphRunDetail, setGraphRunDetail] = useState<GraphRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedScenarioRunName, setSelectedScenarioRunName] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Handle node click - open detail modal
+  const handleNodeClick = useCallback((nodeStatus: NodeStatus) => {
+    if (nodeStatus.scenarioRunRef) {
+      setSelectedScenarioRunName(nodeStatus.scenarioRunRef);
+      setIsModalOpen(true);
+    }
+  }, []);
 
   // Fetch graph run details
   useEffect(() => {
@@ -309,7 +318,7 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
       position: { x: 0, y: 0 }, // Will be calculated by dagre
       data: {
         nodeStatus,
-        onClick: onNodeClick,
+        onClick: handleNodeClick,
       },
     }));
 
@@ -353,7 +362,7 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
 
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
-  }, [graphRunDetail, onNodeClick, setNodes, setEdges]);
+  }, [graphRunDetail, handleNodeClick, setNodes, setEdges]);
 
   // Loading state
   if (loading) {
@@ -472,6 +481,13 @@ export function GraphRunDetail({ graphRunName, onNodeClick }: GraphRunDetailProp
           </ReactFlow>
         </div>
       </CardBody>
+
+      {/* Scenario Run Detail Modal */}
+      <ScenarioRunDetailModal
+        scenarioRunName={selectedScenarioRunName}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </Card>
   );
 }
