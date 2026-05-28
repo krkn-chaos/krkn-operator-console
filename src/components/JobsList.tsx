@@ -345,6 +345,7 @@ export function JobsList({
                     onCreateJob();
                   }}
                   description="Run a single chaos scenario on selected clusters"
+                  icon={<HiOutlineRocketLaunch />}
                 >
                   Single Scenario Run
                 </DropdownItem>
@@ -354,7 +355,7 @@ export function JobsList({
                     setIsDebugGraphRunOpen(true);
                   }}
                   description="Run multiple scenarios with dependencies (workflow)"
-                  icon={<span>🔗</span>}
+                  icon={<TopologyIcon />}
                 >
                   Graph Workflow Run
                 </DropdownItem>
