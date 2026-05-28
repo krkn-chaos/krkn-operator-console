@@ -581,11 +581,15 @@ export function JobsList({
                           <DataListCell key="total-nodes" width={2}>
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Total Nodes:</strong>
+                                <strong>Graph Nodes:</strong>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <Label color="blue" icon={<TopologyIcon />}>
-                                  {item.nodes.length} {item.nodes.length === 1 ? 'node' : 'nodes'}
+                                  {(() => {
+                                    const completedNodes = item.nodes.filter(n => n.phase === 'Succeeded').length;
+                                    const totalNodes = item.nodes.length;
+                                    return `${completedNodes} / ${totalNodes}`;
+                                  })()}
                                 </Label>
                               </div>
                             </div>
