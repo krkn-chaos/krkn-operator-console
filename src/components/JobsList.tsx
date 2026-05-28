@@ -315,6 +315,7 @@ export function JobsList({
             <Dropdown
               isOpen={isRunDropdownOpen}
               onOpenChange={(isOpen) => setIsRunDropdownOpen(isOpen)}
+              popperProps={{ position: 'right' }}
               toggle={(toggleRef) => (
                 <MenuToggle
                   ref={toggleRef}
