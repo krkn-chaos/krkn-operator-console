@@ -51,11 +51,11 @@ import { GraphRunDetail } from './GraphRunDetail';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState } from '../types/api';
+import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState, GraphRunSummary } from '../types/api';
 
 // Unified run item type - can be either a GraphRun or a standalone ScenarioRun
 type UnifiedRunItem =
-  | { type: 'graph'; graphRunName: string; nodes: ScenarioRunState[]; phase: ScenarioRunPhase; createdAt: string; ownerUserId?: string }
+  | { type: 'graph'; graphRunName: string; nodes: ScenarioRunState[]; phase: ScenarioRunPhase; createdAt: string; ownerUserId?: string; summary: GraphRunSummary }
   | { type: 'scenario'; run: ScenarioRunState };
 
 interface JobsListProps {
@@ -238,32 +238,45 @@ export function JobsList({
     // Build unified items
     const items: UnifiedRunItem[] = [];
 
-    // Add GraphRuns
+    // Add GraphRuns (join with graphRuns state to get summary)
     graphRunsMap.forEach((nodes, graphRunName) => {
-      // Calculate aggregated phase for the GraphRun
-      let phase: ScenarioRunPhase = 'Pending';
-      const hasFailed = nodes.some((n) => n.phase === 'Failed');
-      const hasPartiallyFailed = nodes.some((n) => n.phase === 'PartiallyFailed');
-      const hasRunning = nodes.some((n) => n.phase === 'Running');
-      const allSucceeded = nodes.every((n) => n.phase === 'Succeeded');
+      // Find matching GraphRunState to get summary
+      const graphRunState = _graphRuns.find(gr => gr.name === graphRunName);
 
-      if (hasFailed || hasPartiallyFailed) {
-        phase = 'Failed'; // Consider graph failed if any node failed
-      } else if (allSucceeded) {
-        phase = 'Succeeded';
-      } else if (hasRunning) {
-        phase = 'Running';
+      // Use phase from GraphRunState if available, otherwise calculate from nodes
+      let phase: ScenarioRunPhase = graphRunState?.phase || 'Pending';
+      if (!graphRunState) {
+        const hasFailed = nodes.some((n) => n.phase === 'Failed');
+        const hasPartiallyFailed = nodes.some((n) => n.phase === 'PartiallyFailed');
+        const hasRunning = nodes.some((n) => n.phase === 'Running');
+        const allSucceeded = nodes.every((n) => n.phase === 'Succeeded');
+
+        if (hasFailed || hasPartiallyFailed) {
+          phase = 'Failed';
+        } else if (allSucceeded) {
+          phase = 'Succeeded';
+        } else if (hasRunning) {
+          phase = 'Running';
+        }
       }
 
-      // Use earliest createdAt as the GraphRun creation time
-      const createdAt = nodes.reduce((earliest, node) =>
+      // Use GraphRunState data if available
+      const createdAt = graphRunState?.creationTimestamp || nodes.reduce((earliest, node) =>
         node.createdAt < earliest ? node.createdAt : earliest
       , nodes[0].createdAt);
 
-      // Use ownerUserId from first node (they should all be the same)
-      const ownerUserId = nodes[0].ownerUserId;
+      const ownerUserId = graphRunState?.ownerUserId || nodes[0].ownerUserId;
 
-      items.push({ type: 'graph', graphRunName, nodes, phase, createdAt, ownerUserId });
+      // Use summary from GraphRunState (has correct totalNodes)
+      const summary = graphRunState?.summary || {
+        totalNodes: nodes.length,
+        completedNodes: nodes.filter(n => n.phase === 'Succeeded').length,
+        runningNodes: nodes.filter(n => n.phase === 'Running').length,
+        failedNodes: nodes.filter(n => n.phase === 'Failed').length,
+        pendingNodes: nodes.filter(n => n.phase === 'Pending').length,
+      };
+
+      items.push({ type: 'graph', graphRunName, nodes, phase, createdAt, ownerUserId, summary });
     });
 
     // Add standalone ScenarioRuns
@@ -277,7 +290,7 @@ export function JobsList({
       const bDate = b.type === 'graph' ? b.createdAt : b.run.createdAt;
       return bDate.localeCompare(aDate); // Reversed for descending
     });
-  }, [filteredScenarioRuns]);
+  }, [filteredScenarioRuns, _graphRuns]);
 
   return (
     <Card>
@@ -585,11 +598,7 @@ export function JobsList({
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <Label color="blue" icon={<TopologyIcon />}>
-                                  {(() => {
-                                    const completedNodes = item.nodes.filter(n => n.phase === 'Succeeded').length;
-                                    const totalNodes = item.nodes.length;
-                                    return `${completedNodes} / ${totalNodes}`;
-                                  })()}
+                                  {item.summary.completedNodes} / {item.summary.totalNodes}
                                 </Label>
                               </div>
                             </div>
