@@ -124,18 +124,10 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
 
   // Clone node (copy config, not dependencies)
   const cloneNode = useCallback((sourceNodeId: string, newNodeId: string) => {
-    console.log('[cloneNode] Called with:', { sourceNodeId, newNodeId });
     setWorkflow(prev => {
       const sourceNode = prev.nodes.find(n => n.nodeId === sourceNodeId);
-      console.log('[cloneNode] Source node:', sourceNode);
 
-      if (!sourceNode) {
-        console.error('[cloneNode] Source node not found');
-        return prev; // No changes
-      }
-
-      if (sourceNode.status !== 'configured') {
-        console.error('[cloneNode] Source node not configured');
+      if (!sourceNode || sourceNode.status !== 'configured') {
         return prev; // No changes
       }
 
@@ -148,9 +140,6 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
           y: sourceNode.position.y + 50,
         },
       };
-
-      console.log('[cloneNode] Creating cloned node:', clonedNode);
-      console.log('[cloneNode] Total nodes before:', prev.nodes.length);
 
       return {
         ...prev,

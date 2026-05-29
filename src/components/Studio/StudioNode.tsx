@@ -36,23 +36,23 @@ export function StudioNode({ data }: NodeProps) {
 
   return (
     <>
-      {/* Input handle (left side) - Large invisible area for easy connection */}
+      {/* Input handle (left side) - Large area centered vertically */}
       <Handle
         type="target"
         position={Position.Left}
         style={{
-          width: '100%',
-          height: '100%',
-          left: 0,
-          top: 0,
-          borderRadius: '8px',
+          width: '24px',
+          height: '80px',
+          left: '-12px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          borderRadius: '12px',
           background: 'transparent',
           border: 'none',
-          opacity: 0,
         }}
       />
 
-      {/* Visual indicator for input (small visible dot) */}
+      {/* Visual indicator for input (centered dot) */}
       <div
         style={{
           position: 'absolute',
@@ -65,6 +65,7 @@ export function StudioNode({ data }: NodeProps) {
           background: 'var(--pf-v5-global--BorderColor--300)',
           border: '2px solid var(--pf-v5-global--BackgroundColor--100)',
           pointerEvents: 'none',
+          zIndex: 10,
         }}
       />
 

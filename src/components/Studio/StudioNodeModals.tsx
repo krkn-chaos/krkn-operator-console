@@ -43,10 +43,6 @@ export function StudioNodeModals({
   const handleCloneConfirm = () => {
     if (!cloneNodeData || !cloneNodeId || cloneError) return;
 
-    console.log('[handleCloneConfirm] Calling cloneNode', {
-      source: cloneNodeData.nodeId,
-      new: cloneNodeId,
-    });
     cloneNode(cloneNodeData.nodeId, cloneNodeId);
     setCloneNodeId('');
     setCloneError(undefined);
