@@ -16,17 +16,21 @@ import {
   Card,
   CardBody,
 } from '@patternfly/react-core';
+import { useAppContext } from '../../context/AppContext';
 import { StudioProvider, loadAutosave, clearAutosave, useStudioContext } from './StudioContext';
 import { StudioToolbar } from './StudioToolbar';
 import { StudioCanvas } from './StudioCanvas';
 import { StudioRecoveryModal } from './StudioRecoveryModal';
 import { StudioNodeEditorModal } from './StudioNodeEditorModal';
+import { RunWorkflowModal } from './RunWorkflowModal';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
+  const { state } = useAppContext();
   const { updateNode } = useStudioContext();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isRunWorkflowOpen, setIsRunWorkflowOpen] = useState(false);
 
   const handleNodeClick = useCallback((node: StudioNode) => {
     setSelectedNode(node);
@@ -44,6 +48,14 @@ function StudioContent() {
     setSelectedNode(null);
   }, [updateNode]);
 
+  const handleRunWorkflow = useCallback(() => {
+    setIsRunWorkflowOpen(true);
+  }, []);
+
+  const handleRunWorkflowClose = useCallback(() => {
+    setIsRunWorkflowOpen(false);
+  }, []);
+
   return (
     <>
       {/* Header */}
@@ -60,7 +72,7 @@ function StudioContent() {
       <Card>
         <CardBody>
           {/* Toolbar */}
-          <StudioToolbar />
+          <StudioToolbar onRunWorkflow={handleRunWorkflow} />
 
           {/* Canvas */}
           <div style={{ marginTop: '1rem' }}>
@@ -75,6 +87,14 @@ function StudioContent() {
         node={selectedNode}
         onClose={handleEditorClose}
         onSave={handleEditorSave}
+      />
+
+      {/* Run Workflow Modal */}
+      <RunWorkflowModal
+        isOpen={isRunWorkflowOpen}
+        onClose={handleRunWorkflowClose}
+        clusters={state.clusters}
+        targetRequestId={state.uuid}
       />
     </>
   );

@@ -7,6 +7,7 @@ export { StudioNodeContextMenu } from './StudioNodeContextMenu';
 export { StudioNodeModals } from './StudioNodeModals';
 export { StudioRecoveryModal } from './StudioRecoveryModal';
 export { StudioNodeEditorModal } from './StudioNodeEditorModal';
+export { RunWorkflowModal } from './RunWorkflowModal';
 export { WizardStepper } from './WizardStepper';
 export { RegistrySelectorStep } from './RegistrySelectorStep';
 export { ScenariosListStep } from './ScenariosListStep';

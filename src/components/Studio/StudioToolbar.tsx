@@ -3,6 +3,7 @@
  *
  * Provides:
  * - Add Scenario button
+ * - Run Workflow
  * - Export to JSON
  * - Save to Cluster (mock)
  * - Clear All
@@ -15,9 +16,14 @@ import {
   Button,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, DownloadIcon, SaveIcon, TrashIcon } from '@patternfly/react-icons';
+import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { useStudioContext } from './StudioContext';
 
-export function StudioToolbar() {
+interface StudioToolbarProps {
+  onRunWorkflow: () => void;
+}
+
+export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
   const { addNode, exportWorkflow, clearWorkflow, workflow } = useStudioContext();
 
   const handleExport = () => {
@@ -63,6 +69,19 @@ export function StudioToolbar() {
             Add Scenario
           </Button>
         </ToolbarItem>
+
+        <ToolbarItem>
+          <Button
+            variant="primary"
+            icon={<HiOutlineRocketLaunch />}
+            onClick={onRunWorkflow}
+            isDisabled={workflow.nodes.length === 0}
+          >
+            Run Workflow
+          </Button>
+        </ToolbarItem>
+
+        <ToolbarItem variant="separator" />
 
         <ToolbarItem>
           <Button
