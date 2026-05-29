@@ -17,16 +17,11 @@ import type { StudioNode as StudioNodeType } from '../../types/api';
 
 export function StudioNode({ data }: NodeProps) {
   const node: StudioNodeType = data.node;
-  const onNodeClick = data.onNodeClick as ((node: StudioNodeType) => void) | undefined;
   const isInvalidConnectionTarget = data.isInvalidConnectionTarget as boolean | undefined;
   const onMouseEnter = data.onMouseEnter as (() => void) | undefined;
   const onMouseLeave = data.onMouseLeave as (() => void) | undefined;
 
   const isConfigured = node.status === 'configured';
-
-  const handleClick = () => {
-    onNodeClick?.(node);
-  };
 
   // Border color logic
   const getBorderColor = () => {
@@ -51,7 +46,6 @@ export function StudioNode({ data }: NodeProps) {
       {/* Node content */}
       <div
         className="nopan"
-        onClick={handleClick}
         onMouseEnter={(e) => {
           onMouseEnter?.();
           e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
@@ -70,7 +64,7 @@ export function StudioNode({ data }: NodeProps) {
           border: `2px solid ${getBorderColor()}`,
           backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
           minWidth: '200px',
-          cursor: 'pointer',
+          cursor: 'context-menu',
           boxShadow: isInvalidConnectionTarget
             ? '0 0 8px rgba(201, 25, 11, 0.3)'
             : '0 2px 4px rgba(0,0,0,0.1)',
@@ -95,7 +89,7 @@ export function StudioNode({ data }: NodeProps) {
           <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
             {isConfigured && node.config
               ? node.config.scenarioName
-              : 'Click to configure'}
+              : 'Right-click to configure'}
           </div>
 
           {/* Node ID */}
