@@ -124,26 +124,28 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
 
   // Clone node (copy config, not dependencies)
   const cloneNode = useCallback((sourceNodeId: string, newNodeId: string) => {
-    const sourceNode = workflow.nodes.find(n => n.nodeId === sourceNodeId);
-    if (!sourceNode || sourceNode.status !== 'configured') {
-      return;
-    }
+    setWorkflow(prev => {
+      const sourceNode = prev.nodes.find(n => n.nodeId === sourceNodeId);
+      if (!sourceNode || sourceNode.status !== 'configured') {
+        return prev; // No changes
+      }
 
-    const clonedNode: StudioNode = {
-      nodeId: newNodeId,
-      status: 'configured',
-      config: sourceNode.config ? { ...sourceNode.config } : undefined,
-      position: {
-        x: sourceNode.position.x + 50,
-        y: sourceNode.position.y + 50,
-      },
-    };
+      const clonedNode: StudioNode = {
+        nodeId: newNodeId,
+        status: 'configured',
+        config: sourceNode.config ? { ...sourceNode.config } : undefined,
+        position: {
+          x: sourceNode.position.x + 50,
+          y: sourceNode.position.y + 50,
+        },
+      };
 
-    setWorkflow(prev => ({
-      ...prev,
-      nodes: [...prev.nodes, clonedNode],
-    }));
-  }, [workflow.nodes]);
+      return {
+        ...prev,
+        nodes: [...prev.nodes, clonedNode],
+      };
+    });
+  }, []);
 
   // Validate node ID
   const validateNodeId = useCallback((nodeId: string, excludeId?: string): { valid: boolean; error?: string } => {
