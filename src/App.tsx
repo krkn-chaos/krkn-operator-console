@@ -198,7 +198,11 @@ function App() {
         return <Settings />;
 
       case 'studio':
-        return <Studio />;
+        return (
+          <PageSection>
+            <Studio />
+          </PageSection>
+        );
 
       case 'selecting_clusters':
         return (

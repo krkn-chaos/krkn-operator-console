@@ -12,7 +12,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  PageSection,
   Title,
   Card,
   CardBody,
@@ -47,28 +46,28 @@ function StudioContent() {
 
   return (
     <>
-      <PageSection variant="light">
+      {/* Header */}
+      <div style={{ marginBottom: '1.5rem' }}>
         <Title headingLevel="h1" size="2xl">
           Chaos Scenario Studio
         </Title>
         <p style={{ marginTop: '0.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
           Design complex chaos workflows with visual dependency graphs
         </p>
-      </PageSection>
+      </div>
 
-      <PageSection isFilled>
-        <Card isFlat>
-          <CardBody>
-            {/* Toolbar */}
-            <StudioToolbar />
+      {/* Content */}
+      <Card isFlat>
+        <CardBody>
+          {/* Toolbar */}
+          <StudioToolbar />
 
-            {/* Canvas */}
-            <div style={{ marginTop: '1rem' }}>
-              <StudioCanvas onNodeClick={handleNodeClick} />
-            </div>
-          </CardBody>
-        </Card>
-      </PageSection>
+          {/* Canvas */}
+          <div style={{ marginTop: '1rem' }}>
+            <StudioCanvas onNodeClick={handleNodeClick} />
+          </div>
+        </CardBody>
+      </Card>
 
       {/* Node Editor Modal */}
       <StudioNodeEditorModal
