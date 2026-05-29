@@ -85,6 +85,7 @@ export function Studio() {
   const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(undefined);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; timestamp: number } | null>(null);
+  const [isReady, setIsReady] = useState(false); // Wait for user decision
 
   // Check for autosave on mount
   useEffect(() => {
@@ -95,6 +96,10 @@ export function Studio() {
         timestamp: autosave.timestamp,
       });
       setShowRecoveryModal(true);
+      // Don't set isReady yet - wait for user choice
+    } else {
+      // No autosave, ready to start fresh
+      setIsReady(true);
     }
   }, []);
 
@@ -104,25 +109,34 @@ export function Studio() {
       setInitialWorkflow(autosaveData.workflow);
     }
     setShowRecoveryModal(false);
+    setIsReady(true); // Now ready with autosave data
   };
 
   const handleDiscardAutosave = () => {
     clearAutosave();
     setShowRecoveryModal(false);
     setAutosaveData(null);
+    setIsReady(true); // Now ready to start fresh
   };
+
+  // Don't render StudioProvider until user has made autosave decision
+  if (!isReady) {
+    return (
+      <>
+        {/* Recovery Modal (shown while waiting for decision) */}
+        <StudioRecoveryModal
+          isOpen={showRecoveryModal}
+          timestamp={autosaveData?.timestamp || 0}
+          onResume={handleResumeAutosave}
+          onDiscard={handleDiscardAutosave}
+        />
+      </>
+    );
+  }
 
   return (
     <StudioProvider initialWorkflow={initialWorkflow}>
       <StudioContent />
-
-      {/* Recovery Modal */}
-      <StudioRecoveryModal
-        isOpen={showRecoveryModal}
-        timestamp={autosaveData?.timestamp || 0}
-        onResume={handleResumeAutosave}
-        onDiscard={handleDiscardAutosave}
-      />
     </StudioProvider>
   );
 }
