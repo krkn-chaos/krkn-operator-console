@@ -1,5 +1,5 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Alert, AlertActionCloseButton, AlertGroup, Dropdown, DropdownItem, DropdownList, MenuToggle, Modal, ModalVariant } from '@patternfly/react-core';
-import { CogIcon, EditIcon, KeyIcon, MoonIcon, SunIcon } from '@patternfly/react-icons';
+import { CogIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, CodeBranchIcon } from '@patternfly/react-icons';
 import { HiOutlineUserCircle } from 'react-icons/hi2';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly, QuakeTerminal } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly, QuakeTerminal, Studio } from './components';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { UserForm } from './components/UserForm';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
@@ -181,6 +181,7 @@ function App() {
               onRefreshScenarioRun={(scenarioRunName) =>
                 dispatch({ type: 'REFRESH_SCENARIO_RUN', payload: { scenarioRunName } })
               }
+              onNavigateToStudio={handleNavigateToStudio}
               graphRuns={state.graphRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
               pausedGraphPollingIds={state.pausedGraphPollingIds}
@@ -195,6 +196,9 @@ function App() {
 
       case 'settings':
         return <Settings />;
+
+      case 'studio':
+        return <Studio />;
 
       case 'selecting_clusters':
         return (
@@ -253,6 +257,10 @@ function App() {
 
   const handleNavigateToSettings = () => {
     dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
+  };
+
+  const handleNavigateToStudio = () => {
+    dispatch({ type: 'NAVIGATE_TO_STUDIO' });
   };
 
   const handleNavigateToHome = () => {
@@ -314,6 +322,16 @@ function App() {
           Admin Settings
         </DropdownItem>
       </AdminOnly>
+      <DropdownItem
+        key="studio"
+        icon={<CodeBranchIcon />}
+        onClick={() => {
+          handleNavigateToStudio();
+          setIsUserMenuOpen(false);
+        }}
+      >
+        Scenario Studio
+      </DropdownItem>
       <DropdownItem key="editProfile" icon={<EditIcon />} onClick={handleEditProfile}>
         Edit Profile
       </DropdownItem>

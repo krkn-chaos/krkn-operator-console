@@ -356,6 +356,7 @@ export type AppPhase =
   | 'polling'
   | 'jobs_list' // Landing page
   | 'settings' // Settings page
+  | 'studio' // Chaos Scenario Studio page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -503,6 +504,7 @@ export type AppAction =
   | { type: 'GO_BACK' }
   | { type: 'RETRY' }
   | { type: 'NAVIGATE_TO_SETTINGS' }
+  | { type: 'NAVIGATE_TO_STUDIO' }
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
@@ -826,3 +828,79 @@ export interface GraphRunState {
 export type RunItem =
   | (ScenarioRunState & { runType: 'scenario' })
   | (GraphRunState & { runType: 'graph' });
+
+// Chaos Scenario Studio Types
+
+/**
+ * StudioNodeStatus - Configuration status of a node in the studio
+ */
+export type StudioNodeStatus = 'unconfigured' | 'configured';
+
+/**
+ * StudioNode - Represents a scenario node in the studio canvas
+ */
+export interface StudioNode {
+  /** Unique node identifier (user-defined, pattern: ^[a-z0-9\-]{5,25}$) */
+  nodeId: string;
+  /** Configuration status of the node */
+  status: StudioNodeStatus;
+  /** Node configuration (only present when status === 'configured') */
+  config?: {
+    /** Registry type (public or private) */
+    registryType: 'public' | 'private';
+    /** Registry configuration (contains registryName for private registries) */
+    registryConfig: ScenariosRequest;
+    /** Selected scenario name */
+    scenarioName: string;
+    /** Full scenario image URL */
+    scenarioImage: string;
+    /** Scenario form values (environment variables) */
+    scenarioFormValues: ScenarioFormValues;
+    /** Global form values (optional) */
+    globalFormValues?: ScenarioFormValues;
+    /** Global touched fields (tracks which global fields were modified) */
+    globalTouchedFields?: TouchedFields;
+    /** Volume mounts (mock dropdown for now) */
+    volumes?: { [key: string]: string };
+    /** File mounts (mock dropdown for now) */
+    files?: string[];
+  };
+  /** Node position on canvas */
+  position: { x: number; y: number };
+}
+
+/**
+ * StudioEdge - Represents a dependency edge between two nodes
+ */
+export interface StudioEdge {
+  /** Edge ID (format: "source-target") */
+  id: string;
+  /** Source node ID */
+  source: string;
+  /** Target node ID (target depends on source) */
+  target: string;
+}
+
+/**
+ * StudioWorkflow - Complete workflow state in the studio
+ */
+export interface StudioWorkflow {
+  /** All nodes in the workflow */
+  nodes: StudioNode[];
+  /** All edges (dependencies) in the workflow */
+  edges: StudioEdge[];
+  /** Next node number for auto-positioning */
+  nextNodeNumber: number;
+}
+
+/**
+ * StudioAutosave - Autosave data structure
+ */
+export interface StudioAutosave {
+  /** Saved workflow state */
+  workflow: StudioWorkflow;
+  /** When the autosave was created */
+  timestamp: number;
+  /** Autosave format version */
+  version: string;
+}

@@ -4,3 +4,4 @@ export { useProviderConfigPoller } from './useProviderConfigPoller';
 export { useRole } from './useRole';
 export { useActiveRunsPoller } from './useActiveRunsPoller';
 export { useClusterDiscovery } from './useClusterDiscovery';
+export { useScenariosFetch } from './useScenariosFetch';

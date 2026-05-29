@@ -488,6 +488,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
             phase: 'jobs_list',
           };
 
+        case 'studio':
+          // From studio → back to jobs list
+          return {
+            ...state,
+            phase: 'jobs_list',
+          };
+
         case 'selecting_clusters':
           // From cluster selection → cancel workflow, back to jobs list
           return {
@@ -540,6 +547,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'settings',
+      };
+
+    case 'NAVIGATE_TO_STUDIO':
+      return {
+        ...state,
+        phase: 'studio',
       };
 
     // Notifications
