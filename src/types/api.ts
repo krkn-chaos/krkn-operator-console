@@ -394,9 +394,6 @@ export interface AppState {
   uuid: string | null; // Used as targetRequestId throughout workflow
   pollAttempts: number;
 
-  // Studio run mode (when running workflow from Studio instead of normal job creation)
-  studioRunMode: boolean;
-
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: ScenarioRunState[];
   scenarioRunsRefreshTrigger: number; // Increment to force immediate refresh
@@ -502,11 +499,6 @@ export type AppAction =
   // Batch scenario execution
   | { type: 'SCENARIOS_RUN_BATCH_SUCCESS' } // No payload - scenarioRun already added via ADD_SCENARIO_RUN
   | { type: 'SCENARIOS_RUN_BATCH_ERROR'; payload: AppError }
-
-  // Studio run workflow
-  | { type: 'INIT_STUDIO_RUN_START' }
-  | { type: 'COMPLETE_STUDIO_RUN' }
-  | { type: 'CANCEL_STUDIO_RUN' }
 
   // Navigation
   | { type: 'GO_BACK' }

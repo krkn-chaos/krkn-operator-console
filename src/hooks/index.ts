@@ -5,3 +5,4 @@ export { useRole } from './useRole';
 export { useActiveRunsPoller } from './useActiveRunsPoller';
 export { useClusterDiscovery } from './useClusterDiscovery';
 export { useScenariosFetch } from './useScenariosFetch';
+export { useStudioTargetFetch } from './useStudioTargetFetch';

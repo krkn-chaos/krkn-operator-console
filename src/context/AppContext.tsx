@@ -9,9 +9,6 @@ const initialState: AppState = {
   uuid: null,
   pollAttempts: 0,
 
-  // Studio run mode
-  studioRunMode: false,
-
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: [],
   scenarioRunsRefreshTrigger: 0,
@@ -556,36 +553,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'studio',
-      };
-
-    // Studio run workflow
-    case 'INIT_STUDIO_RUN_START':
-      return {
-        ...state,
-        phase: 'initializing',
-        uuid: null,
-        clusters: null,
-        selectedClusters: [],
-        pollAttempts: 0,
-        error: null,
-        studioRunMode: true,
-      };
-
-    case 'COMPLETE_STUDIO_RUN':
-      return {
-        ...state,
-        phase: 'studio',
-        uuid: null,
-        clusters: null,
-        selectedClusters: [],
-        studioRunMode: false,
-      };
-
-    case 'CANCEL_STUDIO_RUN':
-      return {
-        ...state,
-        phase: 'studio',
-        studioRunMode: false,
       };
 
     // Notifications
