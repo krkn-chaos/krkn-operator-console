@@ -5,7 +5,7 @@
  * Provides a simple multi-step form with navigation controls.
  */
 
-import { useState, ReactNode } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -45,6 +45,16 @@ export function WizardStepper({
   const currentStep = steps[activeStepIndex];
   const isFirstStep = activeStepIndex === 0;
   const isLastStep = activeStepIndex === steps.length - 1;
+
+  // Remove focus from ReactFlow nodes when modal opens to prevent aria-hidden warning
+  useEffect(() => {
+    if (isOpen) {
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement && activeElement !== document.body) {
+        activeElement.blur();
+      }
+    }
+  }, [isOpen]);
 
   const handleNext = () => {
     if (!isLastStep) {

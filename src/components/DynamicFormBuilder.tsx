@@ -56,6 +56,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
               placeholder={field.default}
+              autoComplete={field.secret ? 'off' : undefined}
             />
             {field.description && (
               <FormHelperText>
