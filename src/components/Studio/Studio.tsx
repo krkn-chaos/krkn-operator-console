@@ -51,6 +51,10 @@ function StudioContent() {
   }, [updateNode]);
 
   const handleRunWorkflow = useCallback(() => {
+    // Blur the active element to prevent aria-hidden warning
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setIsRunWorkflowOpen(true);
     targetFetch.startFetch();
   }, [targetFetch]);
