@@ -10,11 +10,9 @@
  * - Right-click: Context menu (Edit, Clone, Delete)
  */
 
-import { useState } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { Label } from '@patternfly/react-core';
 import { CogIcon, CheckCircleIcon } from '@patternfly/react-icons';
-import { StudioNodeContextMenu } from './StudioNodeContextMenu';
 import type { StudioNode as StudioNodeType } from '../../types/api';
 
 export function StudioNode({ data }: NodeProps) {
@@ -24,24 +22,10 @@ export function StudioNode({ data }: NodeProps) {
   const onMouseEnter = data.onMouseEnter as (() => void) | undefined;
   const onMouseLeave = data.onMouseLeave as (() => void) | undefined;
 
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-
   const isConfigured = node.status === 'configured';
 
   const handleClick = () => {
     onNodeClick?.(node);
-  };
-
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
-    setShowContextMenu(true);
-  };
-
-  const handleEdit = (editNode: StudioNodeType) => {
-    onNodeClick?.(editNode);
   };
 
   // Border color logic
@@ -68,7 +52,6 @@ export function StudioNode({ data }: NodeProps) {
       <div
         className="nopan"
         onClick={handleClick}
-        onContextMenu={handleContextMenu}
         onMouseEnter={(e) => {
           onMouseEnter?.();
           e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
@@ -141,16 +124,6 @@ export function StudioNode({ data }: NodeProps) {
           </div>
         </div>
       </div>
-
-      {/* Context Menu */}
-      {showContextMenu && (
-        <StudioNodeContextMenu
-          node={node}
-          onEdit={handleEdit}
-          position={contextMenuPosition}
-          onClose={() => setShowContextMenu(false)}
-        />
-      )}
 
       {/* Output handle (right side) - disabled if unconfigured */}
       <Handle

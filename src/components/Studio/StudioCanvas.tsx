@@ -28,6 +28,7 @@ import { Button } from '@patternfly/react-core';
 import { TimesIcon } from '@patternfly/react-icons';
 import { useStudioContext } from './StudioContext';
 import { StudioNode } from './StudioNode';
+import { StudioNodeContextMenu } from './StudioNodeContextMenu';
 import type { StudioNode as StudioNodeType } from '../../types/api';
 
 // Custom edge with delete button
@@ -107,6 +108,7 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
 
   // Convert Studio workflow to ReactFlow nodes and edges
   useEffect(() => {
@@ -128,6 +130,7 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
         isInvalidConnectionTarget: connectingFrom && hoveredNode === node.nodeId && wouldBeInvalidTarget,
         onMouseEnter: () => setHoveredNode(node.nodeId),
         onMouseLeave: () => setHoveredNode(null),
+        contextMenuOpen: contextMenu?.nodeId === node.nodeId,
       },
     }));
 
@@ -150,7 +153,25 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
 
     setNodes(reactFlowNodes);
     setEdges(reactFlowEdges);
-  }, [workflow, setNodes, setEdges, onNodeClick, connectingFrom, hoveredNode, validateConnection]);
+  }, [workflow, setNodes, setEdges, onNodeClick, connectingFrom, hoveredNode, validateConnection, contextMenu]);
+
+  // Handle node context menu (right-click)
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      setContextMenu({
+        nodeId: node.id,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    []
+  );
+
+  // Close context menu
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   // Handle node position changes
   const handleNodesChange = useCallback(
@@ -252,6 +273,11 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
     );
   }
 
+  // Get node for context menu
+  const contextMenuNode = contextMenu
+    ? workflow.nodes.find(n => n.nodeId === contextMenu.nodeId)
+    : null;
+
   return (
     <div style={{ height: '600px', border: '1px solid var(--pf-v5-global--BorderColor--100)', borderRadius: '4px' }}>
       <ReactFlow
@@ -262,6 +288,7 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
         onConnect={handleConnect}
         onConnectStart={handleConnectStart}
         onConnectEnd={handleConnectEnd}
+        onNodeContextMenu={handleNodeContextMenu}
         isValidConnection={isValidConnection}
         connectionLineStyle={getConnectionLineStyle()}
         nodeTypes={nodeTypes}
@@ -275,6 +302,19 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
         <Background />
         <Controls />
       </ReactFlow>
+
+      {/* Context Menu */}
+      {contextMenu && contextMenuNode && (
+        <StudioNodeContextMenu
+          node={contextMenuNode}
+          onEdit={(node) => {
+            onNodeClick?.(node);
+            handleCloseContextMenu();
+          }}
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </div>
   );
 }
