@@ -118,6 +118,28 @@ export function ScenarioConfigStep({
     };
   }, [showGlobalParameters, scenarioName, scenarioGlobals, registryName]); // Only primitive dependencies
 
+  // Memoize filtered field arrays to prevent infinite loops
+  // MUST be before any conditional returns (hooks order must be consistent)
+  const requiredFields = useMemo(
+    () => scenarioDetail?.fields.filter(field => field.required) || [],
+    [scenarioDetail?.fields]
+  );
+
+  const optionalFields = useMemo(
+    () => scenarioDetail?.fields.filter(field => !field.required) || [],
+    [scenarioDetail?.fields]
+  );
+
+  const requiredGlobalFields = useMemo(
+    () => scenarioGlobals?.fields.filter(field => field.required) || [],
+    [scenarioGlobals?.fields]
+  );
+
+  const optionalGlobalFields = useMemo(
+    () => scenarioGlobals?.fields.filter(field => !field.required) || [],
+    [scenarioGlobals?.fields]
+  );
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
@@ -137,27 +159,6 @@ export function ScenarioConfigStep({
   if (!scenarioDetail) {
     return null;
   }
-
-  // Memoize filtered field arrays to prevent infinite loops
-  const requiredFields = useMemo(
-    () => scenarioDetail.fields.filter(field => field.required),
-    [scenarioDetail.fields]
-  );
-
-  const optionalFields = useMemo(
-    () => scenarioDetail.fields.filter(field => !field.required),
-    [scenarioDetail.fields]
-  );
-
-  const requiredGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => field.required) || [],
-    [scenarioGlobals?.fields]
-  );
-
-  const optionalGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => !field.required) || [],
-    [scenarioGlobals?.fields]
-  );
 
   return (
     <div>
