@@ -205,6 +205,15 @@ function App() {
         );
 
       case 'selecting_clusters':
+        // If we're in studio run mode, keep showing Studio (it will show the modal internally)
+        if (state.studioRunMode) {
+          return (
+            <PageSection>
+              <Studio />
+            </PageSection>
+          );
+        }
+        // Otherwise show normal cluster selector
         return (
           <PageSection>
             <ClusterMultiSelector
