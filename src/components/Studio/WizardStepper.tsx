@@ -92,9 +92,17 @@ export function WizardStepper({
       onClose={handleModalClose}
       aria-label={title}
     >
-      <div style={{ padding: '1.5rem' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '1.5rem' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '80vh',
+        maxHeight: '800px'
+      }}>
+        {/* Header - Fixed */}
+        <div style={{
+          padding: '1.5rem 1.5rem 0 1.5rem',
+          borderBottom: '1px solid var(--pf-v5-global--BorderColor--100)'
+        }}>
           <Title headingLevel="h1" size="2xl">
             {title}
           </Title>
@@ -103,32 +111,42 @@ export function WizardStepper({
               {description}
             </Text>
           )}
+
+          {/* Progress Stepper */}
+          <ProgressStepper style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+            {steps.map((step, stepIndex) => (
+              <ProgressStep
+                key={step.id}
+                variant={getStepVariant(stepIndex)}
+                id={step.id}
+                titleId={`${step.id}-title`}
+                aria-label={step.name}
+                isCurrent={stepIndex === activeStepIndex}
+                onClick={() => handleStepClick(stepIndex)}
+              >
+                {step.name}
+              </ProgressStep>
+            ))}
+          </ProgressStepper>
         </div>
 
-        {/* Progress Stepper */}
-        <ProgressStepper style={{ marginBottom: '2rem' }}>
-          {steps.map((step, stepIndex) => (
-            <ProgressStep
-              key={step.id}
-              variant={getStepVariant(stepIndex)}
-              id={step.id}
-              titleId={`${step.id}-title`}
-              aria-label={step.name}
-              isCurrent={stepIndex === activeStepIndex}
-              onClick={() => handleStepClick(stepIndex)}
-            >
-              {step.name}
-            </ProgressStep>
-          ))}
-        </ProgressStepper>
-
-        {/* Step Content */}
-        <div style={{ marginBottom: '2rem', minHeight: '400px' }}>
+        {/* Step Content - Scrollable */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '1.5rem'
+        }}>
           {currentStep.component}
         </div>
 
-        {/* Footer Buttons */}
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid var(--pf-v5-global--BorderColor--100)', paddingTop: '1rem' }}>
+        {/* Footer - Fixed */}
+        <div style={{
+          padding: '1rem 1.5rem',
+          borderTop: '1px solid var(--pf-v5-global--BorderColor--100)',
+          display: 'flex',
+          gap: '1rem',
+          justifyContent: 'flex-end'
+        }}>
           <Button variant="link" onClick={handleModalClose}>
             Cancel
           </Button>
