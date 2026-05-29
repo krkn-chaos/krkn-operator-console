@@ -145,6 +145,7 @@ export function RunWorkflowModal({
         isOpen={isOpen}
         onClose={onClose}
         showClose={false}
+        aria-label="Creating target request"
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -166,6 +167,7 @@ export function RunWorkflowModal({
         isOpen={isOpen}
         onClose={onClose}
         showClose={false}
+        aria-label="Polling target status"
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -189,6 +191,7 @@ export function RunWorkflowModal({
         isOpen={isOpen}
         onClose={onClose}
         showClose={false}
+        aria-label="Loading clusters"
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -210,6 +213,7 @@ export function RunWorkflowModal({
         isOpen={isOpen}
         onClose={onClose}
         showClose={false}
+        aria-label="Error loading clusters"
       >
         <Alert variant="danger" isInline title="Error">
           {targetFetchState.error}
@@ -230,6 +234,7 @@ export function RunWorkflowModal({
       isOpen={isOpen}
       onClose={onClose}
       showClose={false}
+      aria-label="Select clusters to run workflow"
     >
       {targetFetchState.status === 'ready' && targetFetchState.clusters && (
         <>
