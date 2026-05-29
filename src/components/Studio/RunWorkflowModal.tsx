@@ -5,7 +5,7 @@
  * then submits the workflow as a GraphRun.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -14,7 +14,7 @@ import {
   Spinner,
 } from '@patternfly/react-core';
 import { ClusterMultiSelector } from '../ClusterMultiSelector';
-import { graphRunsApi } from '../../services';
+import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
 import type { SelectedCluster, CreateGraphRunRequest } from '../../types/api';
 import { useStudioContext } from './StudioContext';
@@ -42,6 +42,7 @@ export function RunWorkflowModal({
   const { showSuccess, showError } = useNotifications();
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const wasOpenRef = useRef(false);
 
   // Reset selected clusters when modal closes
   useEffect(() => {
@@ -49,6 +50,22 @@ export function RunWorkflowModal({
       setSelectedClusters([]);
     }
   }, [isOpen]);
+
+  // Cleanup target request when modal closes
+  useEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+
+    // Detect close event
+    if (wasOpen && !isOpen) {
+      // Delete the target request if exists
+      if (targetFetchState.uuid) {
+        operatorApi.deleteTargetRequest(targetFetchState.uuid).catch(() => {
+          // Silently handle cleanup failures
+        });
+      }
+    }
+  }, [isOpen, targetFetchState.uuid]);
 
   const handleToggleCluster = (cluster: SelectedCluster) => {
     setSelectedClusters((prev) => {
