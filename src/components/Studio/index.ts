@@ -4,6 +4,7 @@ export { StudioToolbar } from './StudioToolbar';
 export { StudioCanvas } from './StudioCanvas';
 export { StudioNode } from './StudioNode';
 export { StudioNodeContextMenu } from './StudioNodeContextMenu';
+export { StudioNodeModals } from './StudioNodeModals';
 export { StudioRecoveryModal } from './StudioRecoveryModal';
 export { StudioNodeEditorModal } from './StudioNodeEditorModal';
 export { WizardStepper } from './WizardStepper';

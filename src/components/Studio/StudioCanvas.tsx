@@ -29,6 +29,7 @@ import { TimesIcon } from '@patternfly/react-icons';
 import { useStudioContext } from './StudioContext';
 import { StudioNode } from './StudioNode';
 import { StudioNodeContextMenu } from './StudioNodeContextMenu';
+import { StudioNodeModals } from './StudioNodeModals';
 import type { StudioNode as StudioNodeType } from '../../types/api';
 
 // Custom edge with delete button
@@ -109,6 +110,8 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [cloneModal, setCloneModal] = useState<{ nodeId: string } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ nodeId: string } | null>(null);
 
   // Convert Studio workflow to ReactFlow nodes and edges
   useEffect(() => {
@@ -273,9 +276,17 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
     );
   }
 
-  // Get node for context menu
+  // Get nodes for modals
   const contextMenuNode = contextMenu
     ? workflow.nodes.find(n => n.nodeId === contextMenu.nodeId)
+    : null;
+
+  const cloneNodeData = cloneModal
+    ? workflow.nodes.find(n => n.nodeId === cloneModal.nodeId)
+    : null;
+
+  const deleteNodeData = deleteModal
+    ? workflow.nodes.find(n => n.nodeId === deleteModal.nodeId)
     : null;
 
   return (
@@ -313,8 +324,18 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
           }}
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onClose={handleCloseContextMenu}
+          onOpenClone={(nodeId) => setCloneModal({ nodeId })}
+          onOpenDelete={(nodeId) => setDeleteModal({ nodeId })}
         />
       )}
+
+      {/* Clone & Delete Modals */}
+      <StudioNodeModals
+        cloneNode={cloneNodeData || null}
+        deleteNode={deleteNodeData || null}
+        onCloseClone={() => setCloneModal(null)}
+        onCloseDelete={() => setDeleteModal(null)}
+      />
     </div>
   );
 }
