@@ -76,7 +76,7 @@ function StudioContent() {
       {/* Header */}
       <div style={{ marginBottom: '1.5rem' }}>
         <Title headingLevel="h1" size="2xl">
-          Chaos Scenario Studio
+          Chaos Studio
         </Title>
         <p style={{ marginTop: '0.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
           Design complex chaos workflows with visual dependency graphs

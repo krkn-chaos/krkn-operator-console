@@ -354,10 +354,10 @@ export function JobsList({
                     setIsRunDropdownOpen(false);
                     onNavigateToStudio();
                   }}
-                  description="Design and run complex scenario workflows"
+                  description="Design and run complex chaos scenario workflows"
                   icon={<TopologyIcon />}
                 >
-                  Graph Run
+                  Chaos Studio
                 </DropdownItem>
               </DropdownList>
             </Dropdown>

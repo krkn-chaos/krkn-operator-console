@@ -326,16 +326,6 @@ function App() {
           Admin Settings
         </DropdownItem>
       </AdminOnly>
-      <DropdownItem
-        key="studio"
-        icon={<CodeBranchIcon />}
-        onClick={() => {
-          handleNavigateToStudio();
-          setIsUserMenuOpen(false);
-        }}
-      >
-        Scenario Studio
-      </DropdownItem>
       <DropdownItem key="editProfile" icon={<EditIcon />} onClick={handleEditProfile}>
         Edit Profile
       </DropdownItem>
