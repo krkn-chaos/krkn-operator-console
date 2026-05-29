@@ -43,6 +43,12 @@ export function RunWorkflowModal({
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const wasOpenRef = useRef(false);
+  const currentUuidRef = useRef<string | undefined>(undefined);
+
+  // Track current UUID
+  useEffect(() => {
+    currentUuidRef.current = targetFetchState.uuid;
+  }, [targetFetchState.uuid]);
 
   // Reset selected clusters when modal closes
   useEffect(() => {
@@ -59,13 +65,14 @@ export function RunWorkflowModal({
     // Detect close event
     if (wasOpen && !isOpen) {
       // Delete the target request if exists
-      if (targetFetchState.uuid) {
-        operatorApi.deleteTargetRequest(targetFetchState.uuid).catch(() => {
+      const uuid = currentUuidRef.current;
+      if (uuid) {
+        operatorApi.deleteTargetRequest(uuid).catch(() => {
           // Silently handle cleanup failures
         });
       }
     }
-  }, [isOpen, targetFetchState.uuid]);
+  }, [isOpen]);
 
   const handleToggleCluster = (cluster: SelectedCluster) => {
     setSelectedClusters((prev) => {
