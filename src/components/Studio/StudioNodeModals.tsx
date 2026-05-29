@@ -76,7 +76,10 @@ export function StudioNodeModals({
       >
         {cloneNodeData && (
           <>
-            <Form>
+            <Form onSubmit={(e) => {
+              e.preventDefault();
+              handleCloneConfirm();
+            }}>
               <FormGroup label="New Node ID" isRequired fieldId="clone-node-id">
                 <TextInput
                   id="clone-node-id"
