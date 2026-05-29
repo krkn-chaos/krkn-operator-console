@@ -4,10 +4,15 @@
  * Displays scenario node in two states:
  * - Unconfigured: Placeholder with "Configure" prompt
  * - Configured: Shows scenario name and status
+ *
+ * Interactions:
+ * - Left-click: Open configuration wizard
+ * - Right-click: Context menu (Edit, Clone, Delete)
  */
 
+import { useState } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
-import { Label } from '@patternfly/react-core';
+import { Label, Tooltip } from '@patternfly/react-core';
 import { CogIcon, CheckCircleIcon } from '@patternfly/react-icons';
 import { StudioNodeContextMenu } from './StudioNodeContextMenu';
 import type { StudioNode as StudioNodeType } from '../../types/api';
@@ -19,7 +24,21 @@ export function StudioNode({ data }: NodeProps) {
   const onMouseEnter = data.onMouseEnter as (() => void) | undefined;
   const onMouseLeave = data.onMouseLeave as (() => void) | undefined;
 
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+
   const isConfigured = node.status === 'configured';
+
+  const handleClick = () => {
+    onNodeClick?.(node);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    setShowContextMenu(true);
+  };
 
   const handleEdit = (editNode: StudioNodeType) => {
     onNodeClick?.(editNode);
@@ -45,68 +64,89 @@ export function StudioNode({ data }: NodeProps) {
         style={{ background: 'var(--pf-v5-global--BorderColor--300)' }}
       />
 
-      {/* Node content */}
-      <div
-        onMouseEnter={(e) => {
-          onMouseEnter?.();
-          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-          e.currentTarget.style.transform = 'translateY(-2px)';
-        }}
-        onMouseLeave={(e) => {
-          onMouseLeave?.();
-          e.currentTarget.style.boxShadow = isInvalidConnectionTarget
-            ? '0 0 8px rgba(201, 25, 11, 0.3)'
-            : '0 2px 4px rgba(0,0,0,0.1)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}
-        style={{
-          padding: '12px 16px',
-          borderRadius: '8px',
-          border: `2px solid ${getBorderColor()}`,
-          backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
-          minWidth: '200px',
-          boxShadow: isInvalidConnectionTarget
-            ? '0 0 8px rgba(201, 25, 11, 0.3)'
-            : '0 2px 4px rgba(0,0,0,0.1)',
-          transition: 'all 0.2s ease',
-        }}
+      {/* Node content with tooltip */}
+      <Tooltip
+        content={
+          <div>
+            Click to {isConfigured ? 'edit' : 'configure'}
+            <br />
+            Right-click for options
+          </div>
+        }
+        position="top"
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Header: Status badge + Context menu */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {isConfigured ? (
-              <Label color="green" icon={<CheckCircleIcon />} isCompact>
-                Configured
-              </Label>
-            ) : (
-              <Label color="grey" icon={<CogIcon />} isCompact>
-                Unconfigured
-              </Label>
-            )}
-            <div onClick={(e) => e.stopPropagation()}>
-              <StudioNodeContextMenu node={node} onEdit={handleEdit} />
+        <div
+          onClick={handleClick}
+          onContextMenu={handleContextMenu}
+          onMouseEnter={(e) => {
+            onMouseEnter?.();
+            e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            onMouseLeave?.();
+            e.currentTarget.style.boxShadow = isInvalidConnectionTarget
+              ? '0 0 8px rgba(201, 25, 11, 0.3)'
+              : '0 2px 4px rgba(0,0,0,0.1)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+          style={{
+            padding: '12px 16px',
+            borderRadius: '8px',
+            border: `2px solid ${getBorderColor()}`,
+            backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
+            minWidth: '200px',
+            cursor: 'pointer',
+            boxShadow: isInvalidConnectionTarget
+              ? '0 0 8px rgba(201, 25, 11, 0.3)'
+              : '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Status badge */}
+            <div>
+              {isConfigured ? (
+                <Label color="green" icon={<CheckCircleIcon />} isCompact>
+                  Configured
+                </Label>
+              ) : (
+                <Label color="grey" icon={<CogIcon />} isCompact>
+                  Unconfigured
+                </Label>
+              )}
+            </div>
+
+            {/* Scenario name or placeholder */}
+            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+              {isConfigured && node.config
+                ? node.config.scenarioName
+                : 'Click to configure'}
+            </div>
+
+            {/* Node ID */}
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--pf-v5-global--Color--200)',
+                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+              }}
+            >
+              {node.nodeId}
             </div>
           </div>
-
-          {/* Scenario name or placeholder */}
-          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-            {isConfigured && node.config
-              ? node.config.scenarioName
-              : 'Use menu to configure'}
-          </div>
-
-          {/* Node ID */}
-          <div
-            style={{
-              fontSize: '11px',
-              color: 'var(--pf-v5-global--Color--200)',
-              fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-            }}
-          >
-            {node.nodeId}
-          </div>
         </div>
-      </div>
+      </Tooltip>
+
+      {/* Context Menu */}
+      {showContextMenu && (
+        <StudioNodeContextMenu
+          node={node}
+          onEdit={handleEdit}
+          position={contextMenuPosition}
+          onClose={() => setShowContextMenu(false)}
+        />
+      )}
 
       {/* Output handle (right side) - disabled if unconfigured */}
       <Handle

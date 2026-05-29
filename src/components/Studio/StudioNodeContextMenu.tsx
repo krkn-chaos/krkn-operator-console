@@ -2,14 +2,15 @@
  * StudioNodeContextMenu - Context menu for node actions
  *
  * Provides Edit, Delete, and Clone actions for scenario nodes.
+ * Triggered by right-click on node.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Dropdown,
-  DropdownList,
-  DropdownItem,
-  MenuToggle,
+  Menu,
+  MenuContent,
+  MenuList,
+  MenuItem,
   Modal,
   ModalVariant,
   Form,
@@ -18,30 +19,45 @@ import {
   Button,
   Alert,
 } from '@patternfly/react-core';
-import { EllipsisVIcon } from '@patternfly/react-icons';
 import { useStudioContext } from './StudioContext';
 import type { StudioNode } from '../../types/api';
 
 interface StudioNodeContextMenuProps {
   node: StudioNode;
   onEdit: (node: StudioNode) => void;
+  position: { x: number; y: number };
+  onClose: () => void;
 }
 
-export function StudioNodeContextMenu({ node, onEdit }: StudioNodeContextMenuProps) {
+export function StudioNodeContextMenu({ node, onEdit, position, onClose }: StudioNodeContextMenuProps) {
   const { deleteNode, cloneNode, validateNodeId } = useStudioContext();
-  const [isOpen, setIsOpen] = useState(false);
   const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [cloneNodeId, setCloneNodeId] = useState('');
   const [cloneError, setCloneError] = useState<string | undefined>(undefined);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const isConfigured = node.status === 'configured';
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
 
   const handleEdit = () => {
-    setIsOpen(false);
+    onClose();
     onEdit(node);
   };
 
   const handleDeleteClick = () => {
-    setIsOpen(false);
+    onClose();
     setIsDeleteModalOpen(true);
   };
 
@@ -51,7 +67,7 @@ export function StudioNodeContextMenu({ node, onEdit }: StudioNodeContextMenuPro
   };
 
   const handleCloneClick = () => {
-    setIsOpen(false);
+    onClose();
     setIsCloneModalOpen(true);
     setCloneNodeId('');
     setCloneError(undefined);
@@ -72,38 +88,40 @@ export function StudioNodeContextMenu({ node, onEdit }: StudioNodeContextMenuPro
     setCloneError(undefined);
   };
 
-  const isConfigured = node.status === 'configured';
-
   return (
     <>
-      <Dropdown
-        isOpen={isOpen}
-        onOpenChange={setIsOpen}
-        toggle={(toggleRef) => (
-          <MenuToggle
-            ref={toggleRef}
-            onClick={() => setIsOpen(!isOpen)}
-            variant="plain"
-            aria-label="Node actions"
-          >
-            <EllipsisVIcon />
-          </MenuToggle>
-        )}
+      {/* Context Menu */}
+      <div
+        ref={menuRef}
+        style={{
+          position: 'fixed',
+          left: position.x,
+          top: position.y,
+          zIndex: 9999,
+          backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+          borderRadius: '4px',
+          border: '1px solid var(--pf-v5-global--BorderColor--100)',
+        }}
       >
-        <DropdownList>
-          <DropdownItem key="edit" onClick={handleEdit}>
-            {isConfigured ? 'Edit' : 'Configure'}
-          </DropdownItem>
-          {isConfigured && (
-            <DropdownItem key="clone" onClick={handleCloneClick}>
-              Clone
-            </DropdownItem>
-          )}
-          <DropdownItem key="delete" onClick={handleDeleteClick}>
-            Delete
-          </DropdownItem>
-        </DropdownList>
-      </Dropdown>
+        <Menu>
+          <MenuContent>
+            <MenuList>
+              <MenuItem onClick={handleEdit}>
+                {isConfigured ? 'Edit Configuration' : 'Configure'}
+              </MenuItem>
+              {isConfigured && (
+                <MenuItem onClick={handleCloneClick}>
+                  Clone Node
+                </MenuItem>
+              )}
+              <MenuItem onClick={handleDeleteClick}>
+                Delete Node
+              </MenuItem>
+            </MenuList>
+          </MenuContent>
+        </Menu>
+      </div>
 
       {/* Clone Modal */}
       <Modal
