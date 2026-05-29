@@ -150,6 +150,11 @@ export function RunWorkflowModal({
           <Spinner size="lg" />
           <p style={{ marginTop: '1rem' }}>Creating target request...</p>
         </div>
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+          <Button variant="secondary" onClick={onClose} size="lg">
+            Cancel
+          </Button>
+        </div>
       </Modal>
     );
   }
@@ -168,6 +173,11 @@ export function RunWorkflowModal({
             Polling target status... (attempt {targetFetchState.attempts || 0})
           </p>
         </div>
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+          <Button variant="secondary" onClick={onClose} size="lg">
+            Cancel
+          </Button>
+        </div>
       </Modal>
     );
   }
@@ -183,6 +193,11 @@ export function RunWorkflowModal({
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
           <p style={{ marginTop: '1rem' }}>Loading clusters...</p>
+        </div>
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+          <Button variant="secondary" onClick={onClose} size="lg">
+            Cancel
+          </Button>
         </div>
       </Modal>
     );
