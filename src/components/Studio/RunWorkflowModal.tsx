@@ -5,7 +5,7 @@
  * then submits the workflow as a GraphRun.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -42,13 +42,6 @@ export function RunWorkflowModal({
   const { showSuccess, showError } = useNotifications();
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const wasOpenRef = useRef(false);
-  const currentUuidRef = useRef<string | undefined>(undefined);
-
-  // Track current UUID
-  useEffect(() => {
-    currentUuidRef.current = targetFetchState.uuid;
-  }, [targetFetchState.uuid]);
 
   // Reset selected clusters when modal closes
   useEffect(() => {
@@ -57,22 +50,15 @@ export function RunWorkflowModal({
     }
   }, [isOpen]);
 
-  // Cleanup target request when modal closes
-  useEffect(() => {
-    const wasOpen = wasOpenRef.current;
-    wasOpenRef.current = isOpen;
-
-    // Detect close event
-    if (wasOpen && !isOpen) {
-      // Delete the target request if exists
-      const uuid = currentUuidRef.current;
-      if (uuid) {
-        operatorApi.deleteTargetRequest(uuid).catch(() => {
-          // Silently handle cleanup failures
-        });
-      }
+  const handleCancel = () => {
+    // Delete target request if exists
+    if (targetFetchState.uuid) {
+      operatorApi.deleteTargetRequest(targetFetchState.uuid).catch(() => {
+        // Silently handle cleanup failures
+      });
     }
-  }, [isOpen]);
+    onClose();
+  };
 
   const handleToggleCluster = (cluster: SelectedCluster) => {
     setSelectedClusters((prev) => {
@@ -143,7 +129,7 @@ export function RunWorkflowModal({
       <Modal
         variant={ModalVariant.medium}
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={handleCancel}
         showClose={false}
         aria-label="Creating target request"
       >
@@ -152,7 +138,7 @@ export function RunWorkflowModal({
           <p style={{ marginTop: '1rem' }}>Creating target request...</p>
         </div>
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
-          <Button variant="secondary" onClick={onClose} size="lg">
+          <Button variant="secondary" onClick={handleCancel} size="lg">
             Cancel
           </Button>
         </div>
@@ -165,7 +151,7 @@ export function RunWorkflowModal({
       <Modal
         variant={ModalVariant.medium}
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={handleCancel}
         showClose={false}
         aria-label="Polling target status"
       >
@@ -176,7 +162,7 @@ export function RunWorkflowModal({
           </p>
         </div>
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
-          <Button variant="secondary" onClick={onClose} size="lg">
+          <Button variant="secondary" onClick={handleCancel} size="lg">
             Cancel
           </Button>
         </div>
@@ -189,7 +175,7 @@ export function RunWorkflowModal({
       <Modal
         variant={ModalVariant.medium}
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={handleCancel}
         showClose={false}
         aria-label="Loading clusters"
       >
@@ -198,7 +184,7 @@ export function RunWorkflowModal({
           <p style={{ marginTop: '1rem' }}>Loading clusters...</p>
         </div>
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
-          <Button variant="secondary" onClick={onClose} size="lg">
+          <Button variant="secondary" onClick={handleCancel} size="lg">
             Cancel
           </Button>
         </div>
@@ -211,7 +197,7 @@ export function RunWorkflowModal({
       <Modal
         variant={ModalVariant.medium}
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={handleCancel}
         showClose={false}
         aria-label="Error loading clusters"
       >
@@ -219,7 +205,7 @@ export function RunWorkflowModal({
           {targetFetchState.error}
         </Alert>
         <div style={{ marginTop: '1.5rem' }}>
-          <Button variant="primary" onClick={onClose}>
+          <Button variant="primary" onClick={handleCancel}>
             Close
           </Button>
         </div>
@@ -258,7 +244,7 @@ export function RunWorkflowModal({
             >
               {isSubmitting ? 'Running...' : `Run Workflow${selectedClusters.length > 0 ? ` on ${selectedClusters.length} cluster${selectedClusters.length === 1 ? '' : 's'}` : ''}`}
             </Button>
-            <Button variant="secondary" onClick={onClose} isDisabled={isSubmitting} size="lg">
+            <Button variant="secondary" onClick={handleCancel} isDisabled={isSubmitting} size="lg">
               Cancel
             </Button>
           </div>
