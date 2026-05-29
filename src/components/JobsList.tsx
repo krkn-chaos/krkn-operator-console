@@ -46,7 +46,6 @@ import {
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
-import { DebugGraphRunCreate } from './DebugGraphRunCreate';
 import { GraphRunDetail } from './GraphRunDetail';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
@@ -69,6 +68,7 @@ interface JobsListProps {
   onDeleteJob: (jobId: string) => Promise<void>;
   onCreateJob: () => void;
   onRefreshScenarioRun: (scenarioRunName: string) => void;
+  onNavigateToStudio: () => void;
   // GraphRuns props
   graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>;
@@ -88,6 +88,7 @@ export function JobsList({
   onDeleteJob,
   onCreateJob,
   onRefreshScenarioRun,
+  onNavigateToStudio,
   graphRuns: _graphRuns, // Not used - GraphRuns are derived from scenarioRuns
   expandedGraphRunIds: _expandedGraphRunIds, // Not used - using expandedRunIds for both
   pausedGraphPollingIds: _pausedGraphPollingIds, // Not used - polling via useScenarioRunsPoller
@@ -104,7 +105,6 @@ export function JobsList({
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
-  const [isDebugGraphRunOpen, setIsDebugGraphRunOpen] = useState(false);
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
 
   // Format timestamp for display
@@ -352,9 +352,9 @@ export function JobsList({
                 <DropdownItem
                   onClick={() => {
                     setIsRunDropdownOpen(false);
-                    setIsDebugGraphRunOpen(true);
+                    onNavigateToStudio();
                   }}
-                  description="Run multiple scenarios with dependencies"
+                  description="Design and run complex scenario workflows"
                   icon={<TopologyIcon />}
                 >
                   Graph Run
@@ -1139,16 +1139,6 @@ export function JobsList({
       >
         Are you sure you want to delete job <strong>{confirmDeleteJob?.jobName}</strong>?
       </Modal>
-
-      {/* Debug Graph Run Create Modal */}
-      <DebugGraphRunCreate
-        isOpen={isDebugGraphRunOpen}
-        onClose={() => setIsDebugGraphRunOpen(false)}
-        onSuccess={() => {
-          // Graph run created successfully
-          // Polling will automatically pick it up
-        }}
-      />
     </Card>
   );
 }
