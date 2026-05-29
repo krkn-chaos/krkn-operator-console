@@ -118,9 +118,9 @@ export function RunWorkflowModal({
     return (
       <Modal
         variant={ModalVariant.medium}
-        title="Run Workflow"
         isOpen={isOpen}
         onClose={onClose}
+        showClose={true}
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -134,9 +134,9 @@ export function RunWorkflowModal({
     return (
       <Modal
         variant={ModalVariant.medium}
-        title="Run Workflow"
         isOpen={isOpen}
         onClose={onClose}
+        showClose={true}
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -152,9 +152,9 @@ export function RunWorkflowModal({
     return (
       <Modal
         variant={ModalVariant.medium}
-        title="Run Workflow"
         isOpen={isOpen}
         onClose={onClose}
+        showClose={true}
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -168,18 +168,18 @@ export function RunWorkflowModal({
     return (
       <Modal
         variant={ModalVariant.medium}
-        title="Run Workflow"
         isOpen={isOpen}
         onClose={onClose}
-        actions={[
-          <Button key="close" variant="primary" onClick={onClose}>
-            Close
-          </Button>,
-        ]}
+        showClose={true}
       >
         <Alert variant="danger" isInline title="Error">
           {targetFetchState.error}
         </Alert>
+        <div style={{ marginTop: '1.5rem' }}>
+          <Button variant="primary" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </Modal>
     );
   }
@@ -187,34 +187,38 @@ export function RunWorkflowModal({
   // Render cluster selector when ready
   return (
     <Modal
-      variant={ModalVariant.large}
-      title="Run Workflow"
+      variant={ModalVariant.medium}
       isOpen={isOpen}
       onClose={onClose}
-      actions={[
-        <Button
-          key="run"
-          variant="primary"
-          onClick={handleSubmit}
-          isDisabled={selectedClusters.length === 0 || isSubmitting}
-          isLoading={isSubmitting}
-        >
-          {isSubmitting ? 'Running...' : `Run Workflow${selectedClusters.length > 0 ? ` on ${selectedClusters.length} cluster${selectedClusters.length === 1 ? '' : 's'}` : ''}`}
-        </Button>,
-        <Button key="cancel" variant="link" onClick={onClose} isDisabled={isSubmitting}>
-          Cancel
-        </Button>,
-      ]}
+      showClose={true}
     >
       {targetFetchState.status === 'ready' && targetFetchState.clusters && (
-        <ClusterMultiSelector
-          clusters={targetFetchState.clusters}
-          selectedClusters={selectedClusters}
-          onToggle={handleToggleCluster}
-          onProceed={handleSubmit}
-          onCancel={onClose}
-          showActions={false}
-        />
+        <>
+          <ClusterMultiSelector
+            clusters={targetFetchState.clusters}
+            selectedClusters={selectedClusters}
+            onToggle={handleToggleCluster}
+            onProceed={handleSubmit}
+            onCancel={onClose}
+            showActions={false}
+          />
+
+          {/* Custom actions aligned left */}
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+            <Button
+              variant="primary"
+              onClick={handleSubmit}
+              isDisabled={selectedClusters.length === 0 || isSubmitting}
+              isLoading={isSubmitting}
+              size="lg"
+            >
+              {isSubmitting ? 'Running...' : `Run Workflow${selectedClusters.length > 0 ? ` on ${selectedClusters.length} cluster${selectedClusters.length === 1 ? '' : 's'}` : ''}`}
+            </Button>
+            <Button variant="secondary" onClick={onClose} isDisabled={isSubmitting} size="lg">
+              Cancel
+            </Button>
+          </div>
+        </>
       )}
     </Modal>
   );
