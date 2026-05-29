@@ -17,7 +17,7 @@ import { ClusterMultiSelector } from '../ClusterMultiSelector';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
 import type { SelectedCluster, CreateGraphRunRequest } from '../../types/api';
-import { useStudioContext } from './StudioContext';
+import { useStudioContext, clearAutosave } from './StudioContext';
 
 interface RunWorkflowModalProps {
   isOpen: boolean;
@@ -114,6 +114,8 @@ export function RunWorkflowModal({
     try {
       const graphRun = await graphRunsApi.createGraphRun(request);
       showSuccess('Workflow started', `GraphRun ${graphRun.name} created successfully`);
+      // Clear autosave since workflow was successfully submitted
+      clearAutosave();
       onSuccess();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create GraphRun';
