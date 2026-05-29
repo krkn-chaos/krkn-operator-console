@@ -16,6 +16,7 @@ import {
   Card,
   CardBody,
 } from '@patternfly/react-core';
+import { useAppContext } from '../../context/AppContext';
 import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
 import { StudioProvider, loadAutosave, clearAutosave, useStudioContext } from './StudioContext';
 import { StudioToolbar } from './StudioToolbar';
@@ -26,6 +27,7 @@ import { RunWorkflowModal } from './RunWorkflowModal';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
+  const { dispatch } = useAppContext();
   const { updateNode } = useStudioContext();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -57,6 +59,13 @@ function StudioContent() {
     setIsRunWorkflowOpen(false);
     targetFetch.reset();
   }, [targetFetch]);
+
+  const handleRunWorkflowSuccess = useCallback(() => {
+    setIsRunWorkflowOpen(false);
+    targetFetch.reset();
+    // Navigate to home to see the new GraphRun
+    dispatch({ type: 'JOBS_LIST_READY' });
+  }, [dispatch, targetFetch]);
 
   return (
     <>
@@ -95,6 +104,7 @@ function StudioContent() {
       <RunWorkflowModal
         isOpen={isRunWorkflowOpen}
         onClose={handleRunWorkflowClose}
+        onSuccess={handleRunWorkflowSuccess}
         targetFetchState={targetFetch.state}
       />
     </>

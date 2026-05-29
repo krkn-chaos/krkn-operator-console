@@ -22,6 +22,7 @@ import { useStudioContext } from './StudioContext';
 interface RunWorkflowModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess: () => void;
   targetFetchState: {
     status: 'idle' | 'creating_target' | 'polling' | 'fetching_clusters' | 'ready' | 'error';
     uuid?: string;
@@ -34,6 +35,7 @@ interface RunWorkflowModalProps {
 export function RunWorkflowModal({
   isOpen,
   onClose,
+  onSuccess,
   targetFetchState,
 }: RunWorkflowModalProps) {
   const { exportWorkflow } = useStudioContext();
@@ -101,8 +103,8 @@ export function RunWorkflowModal({
 
     try {
       const graphRun = await graphRunsApi.createGraphRun(request);
-      showSuccess('Workflow started', `GraphRun ${graphRun.metadata.name} created successfully`);
-      onClose();
+      showSuccess('Workflow started', `GraphRun ${graphRun.name} created successfully`);
+      onSuccess();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create GraphRun';
       showError('Failed to run workflow', errorMessage);

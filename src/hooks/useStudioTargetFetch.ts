@@ -22,6 +22,7 @@ export function useStudioTargetFetch() {
   const [state, setState] = useState<FetchState>({ status: 'idle' });
   const pollIntervalRef = useRef<number | null>(null);
   const pollStartTimeRef = useRef<number | null>(null);
+  const currentUuidRef = useRef<string | null>(null);
 
   // Start target creation and polling
   const startFetch = async () => {
@@ -29,6 +30,7 @@ export function useStudioTargetFetch() {
 
     try {
       const response = await operatorApi.createTargetRequest();
+      currentUuidRef.current = response.uuid;
       setState({ status: 'polling', uuid: response.uuid, attempts: 0 });
     } catch (error) {
       setState({
@@ -42,14 +44,15 @@ export function useStudioTargetFetch() {
   useEffect(() => {
     if (state.status !== 'polling') return;
 
+    const uuid = currentUuidRef.current;
+    if (!uuid) return;
+
     pollStartTimeRef.current = Date.now();
     let attempt = 0;
 
     const pollTargetStatus = async () => {
-      if (state.status !== 'polling') return;
-
       attempt++;
-      setState({ ...state, attempts: attempt });
+      setState(prev => prev.status === 'polling' ? { ...prev, attempts: attempt } : prev);
 
       // Check timeout
       if (pollStartTimeRef.current && Date.now() - pollStartTimeRef.current > config.pollTimeout) {
@@ -61,16 +64,16 @@ export function useStudioTargetFetch() {
       }
 
       try {
-        const status = await operatorApi.getTargetStatus(state.uuid);
+        const status = await operatorApi.getTargetStatus(uuid);
 
         if (status === 200) {
           // Success - stop polling and fetch clusters
           if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current);
           }
-          setState({ status: 'fetching_clusters', uuid: state.uuid });
+          setState({ status: 'fetching_clusters', uuid });
         } else if (status === 202) {
-          // Continue polling
+          // Continue polling (no state update needed)
           if (config.debugMode) {
             console.log(`Poll attempt ${attempt}: 202 Accepted (pending)`);
           }
@@ -105,18 +108,21 @@ export function useStudioTargetFetch() {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [state]);
+  }, [state.status]); // Only depend on status, not entire state
 
   // Fetch clusters when polling succeeds
   useEffect(() => {
     if (state.status !== 'fetching_clusters') return;
 
+    const uuid = currentUuidRef.current;
+    if (!uuid) return;
+
     const fetchClusters = async () => {
       try {
-        const response = await operatorApi.getClusters(state.uuid);
+        const response = await operatorApi.getClusters(uuid);
         setState({
           status: 'ready',
-          uuid: state.uuid,
+          uuid,
           clusters: response.targetData
         });
       } catch (error) {
@@ -128,13 +134,14 @@ export function useStudioTargetFetch() {
     };
 
     fetchClusters();
-  }, [state]);
+  }, [state.status]); // Only depend on status, not entire state
 
   // Reset to idle
   const reset = () => {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
+    currentUuidRef.current = null;
     setState({ status: 'idle' });
   };
 
