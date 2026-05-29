@@ -5,7 +5,7 @@
  * but as a controlled component for the Studio wizard.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Spinner,
   Alert,
@@ -138,6 +138,27 @@ export function ScenarioConfigStep({
     return null;
   }
 
+  // Memoize filtered field arrays to prevent infinite loops
+  const requiredFields = useMemo(
+    () => scenarioDetail.fields.filter(field => field.required),
+    [scenarioDetail.fields]
+  );
+
+  const optionalFields = useMemo(
+    () => scenarioDetail.fields.filter(field => !field.required),
+    [scenarioDetail.fields]
+  );
+
+  const requiredGlobalFields = useMemo(
+    () => scenarioGlobals?.fields.filter(field => field.required) || [],
+    [scenarioGlobals?.fields]
+  );
+
+  const optionalGlobalFields = useMemo(
+    () => scenarioGlobals?.fields.filter(field => !field.required) || [],
+    [scenarioGlobals?.fields]
+  );
+
   return (
     <div>
       {/* Scenario Header */}
@@ -153,7 +174,7 @@ export function ScenarioConfigStep({
         <CardTitle>Required Parameters</CardTitle>
         <CardBody>
           <DynamicFormBuilder
-            fields={scenarioDetail.fields.filter(field => field.required)}
+            fields={requiredFields}
             values={formValues}
             onChange={onFormChange}
           />
@@ -175,9 +196,9 @@ export function ScenarioConfigStep({
         <Card style={{ marginTop: '1.5rem' }}>
           <CardTitle>Optional Parameters</CardTitle>
           <CardBody>
-            {scenarioDetail.fields.filter(field => !field.required).length > 0 ? (
+            {optionalFields.length > 0 ? (
               <DynamicFormBuilder
-                fields={scenarioDetail.fields.filter(field => !field.required)}
+                fields={optionalFields}
                 values={formValues}
                 onChange={onFormChange}
               />
@@ -215,12 +236,12 @@ export function ScenarioConfigStep({
           ) : scenarioGlobals ? (
             <>
               {/* Required Global Fields */}
-              {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
+              {requiredGlobalFields.length > 0 && (
                 <Card style={{ marginTop: '1.5rem' }}>
                   <CardTitle>Required Global Parameters</CardTitle>
                   <CardBody>
                     <DynamicFormBuilderWithTracking
-                      fields={scenarioGlobals.fields.filter(field => field.required)}
+                      fields={requiredGlobalFields}
                       values={globalFormValues}
                       touchedFields={globalTouchedFields}
                       onChange={onGlobalFormChange}
@@ -230,12 +251,12 @@ export function ScenarioConfigStep({
               )}
 
               {/* Optional Global Fields */}
-              {scenarioGlobals.fields.filter(field => !field.required).length > 0 && (
+              {optionalGlobalFields.length > 0 && (
                 <Card style={{ marginTop: '1.5rem' }}>
                   <CardTitle>Optional Global Parameters</CardTitle>
                   <CardBody>
                     <DynamicFormBuilderWithTracking
-                      fields={scenarioGlobals.fields.filter(field => !field.required)}
+                      fields={optionalGlobalFields}
                       values={globalFormValues}
                       touchedFields={globalTouchedFields}
                       onChange={onGlobalFormChange}
