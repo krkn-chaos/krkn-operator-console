@@ -57,7 +57,7 @@ function StudioContent() {
       </div>
 
       {/* Content */}
-      <Card isFlat>
+      <Card>
         <CardBody>
           {/* Toolbar */}
           <StudioToolbar />
