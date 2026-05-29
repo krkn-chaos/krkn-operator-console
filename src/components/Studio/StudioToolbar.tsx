@@ -9,10 +9,10 @@
  */
 
 import {
-  Toolbar,
-  ToolbarContent,
-  ToolbarItem,
   Button,
+  Flex,
+  FlexItem,
+  Divider,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, DownloadIcon, SaveIcon, TrashIcon } from '@patternfly/react-icons';
 import { useStudioContext } from './StudioContext';
@@ -52,53 +52,51 @@ export function StudioToolbar() {
   };
 
   return (
-    <Toolbar>
-      <ToolbarContent>
-        <ToolbarItem>
-          <Button
-            variant="primary"
-            icon={<PlusCircleIcon />}
-            onClick={addNode}
-          >
-            Add Scenario
-          </Button>
-        </ToolbarItem>
+    <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
+      <FlexItem>
+        <Button
+          variant="primary"
+          icon={<PlusCircleIcon />}
+          onClick={addNode}
+        >
+          Add Scenario
+        </Button>
+      </FlexItem>
 
-        <ToolbarItem>
-          <Button
-            variant="secondary"
-            icon={<DownloadIcon />}
-            onClick={handleExport}
-            isDisabled={workflow.nodes.length === 0}
-          >
-            Export JSON
-          </Button>
-        </ToolbarItem>
+      <FlexItem>
+        <Button
+          variant="secondary"
+          icon={<DownloadIcon />}
+          onClick={handleExport}
+          isDisabled={workflow.nodes.length === 0}
+        >
+          Export JSON
+        </Button>
+      </FlexItem>
 
-        <ToolbarItem>
-          <Button
-            variant="secondary"
-            icon={<SaveIcon />}
-            onClick={handleSaveToCluster}
-            isDisabled={workflow.nodes.length === 0}
-          >
-            Save to Cluster
-          </Button>
-        </ToolbarItem>
+      <FlexItem>
+        <Button
+          variant="secondary"
+          icon={<SaveIcon />}
+          onClick={handleSaveToCluster}
+          isDisabled={workflow.nodes.length === 0}
+        >
+          Save to Cluster
+        </Button>
+      </FlexItem>
 
-        <ToolbarItem variant="separator" />
+      <Divider orientation={{ default: 'vertical' }} />
 
-        <ToolbarItem>
-          <Button
-            variant="danger"
-            icon={<TrashIcon />}
-            onClick={handleClearAll}
-            isDisabled={workflow.nodes.length === 0}
-          >
-            Clear All
-          </Button>
-        </ToolbarItem>
-      </ToolbarContent>
-    </Toolbar>
+      <FlexItem>
+        <Button
+          variant="danger"
+          icon={<TrashIcon />}
+          onClick={handleClearAll}
+          isDisabled={workflow.nodes.length === 0}
+        >
+          Clear All
+        </Button>
+      </FlexItem>
+    </Flex>
   );
 }

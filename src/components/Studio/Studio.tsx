@@ -15,6 +15,8 @@ import {
   Title,
   Card,
   CardBody,
+  Flex,
+  FlexItem,
 } from '@patternfly/react-core';
 import { StudioProvider, loadAutosave, clearAutosave, useStudioContext } from './StudioContext';
 import { StudioToolbar } from './StudioToolbar';
@@ -46,25 +48,50 @@ function StudioContent() {
 
   return (
     <>
-      {/* Header */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <Title headingLevel="h1" size="2xl">
-          Chaos Scenario Studio
-        </Title>
-        <p style={{ marginTop: '0.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
-          Design complex chaos workflows with visual dependency graphs
-        </p>
-      </div>
+      {/* Header with controls */}
+      <Flex
+        justifyContent={{ default: 'justifyContentSpaceBetween' }}
+        alignItems={{ default: 'alignItemsCenter' }}
+        style={{ marginBottom: '1.5rem' }}
+      >
+        <FlexItem>
+          <div>
+            <Title headingLevel="h1" size="2xl">
+              Chaos Scenario Studio
+            </Title>
+            <p style={{ marginTop: '0.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
+              Design complex chaos workflows with visual dependency graphs
+            </p>
+          </div>
+        </FlexItem>
+        <FlexItem>
+          <StudioToolbar />
+        </FlexItem>
+      </Flex>
 
       {/* Content */}
       <Card>
         <CardBody>
-          {/* Toolbar */}
-          <StudioToolbar />
-
-          {/* Canvas */}
-          <div style={{ marginTop: '1rem' }}>
+          {/* Canvas with watermark */}
+          <div style={{ position: 'relative' }}>
             <StudioCanvas onNodeClick={handleNodeClick} />
+
+            {/* Watermark */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '16px',
+                left: '16px',
+                fontSize: '11px',
+                color: 'var(--pf-v5-global--Color--200)',
+                opacity: 0.6,
+                pointerEvents: 'none',
+                zIndex: 5,
+                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+              }}
+            >
+              Generated with Claude Code
+            </div>
           </div>
         </CardBody>
       </Card>
