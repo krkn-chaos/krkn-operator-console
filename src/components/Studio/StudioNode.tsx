@@ -9,6 +9,7 @@
 import { NodeProps, Handle, Position } from 'reactflow';
 import { Label } from '@patternfly/react-core';
 import { CogIcon, CheckCircleIcon } from '@patternfly/react-icons';
+import { StudioNodeContextMenu } from './StudioNodeContextMenu';
 import type { StudioNode as StudioNodeType } from '../../types/api';
 
 export function StudioNode({ data }: NodeProps) {
@@ -20,8 +21,8 @@ export function StudioNode({ data }: NodeProps) {
 
   const isConfigured = node.status === 'configured';
 
-  const handleClick = () => {
-    onNodeClick?.(node);
+  const handleEdit = (editNode: StudioNodeType) => {
+    onNodeClick?.(editNode);
   };
 
   // Border color logic
@@ -46,7 +47,6 @@ export function StudioNode({ data }: NodeProps) {
 
       {/* Node content */}
       <div
-        onClick={handleClick}
         onMouseEnter={(e) => {
           onMouseEnter?.();
           e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
@@ -65,7 +65,6 @@ export function StudioNode({ data }: NodeProps) {
           border: `2px solid ${getBorderColor()}`,
           backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
           minWidth: '200px',
-          cursor: 'pointer',
           boxShadow: isInvalidConnectionTarget
             ? '0 0 8px rgba(201, 25, 11, 0.3)'
             : '0 2px 4px rgba(0,0,0,0.1)',
@@ -73,8 +72,8 @@ export function StudioNode({ data }: NodeProps) {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Status badge */}
-          <div>
+          {/* Header: Status badge + Context menu */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             {isConfigured ? (
               <Label color="green" icon={<CheckCircleIcon />} isCompact>
                 Configured
@@ -84,13 +83,16 @@ export function StudioNode({ data }: NodeProps) {
                 Unconfigured
               </Label>
             )}
+            <div onClick={(e) => e.stopPropagation()}>
+              <StudioNodeContextMenu node={node} onEdit={handleEdit} />
+            </div>
           </div>
 
           {/* Scenario name or placeholder */}
           <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
             {isConfigured && node.config
               ? node.config.scenarioName
-              : 'Click to configure'}
+              : 'Use menu to configure'}
           </div>
 
           {/* Node ID */}

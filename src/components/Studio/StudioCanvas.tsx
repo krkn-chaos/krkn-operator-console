@@ -19,14 +19,82 @@ import ReactFlow, {
   MarkerType,
   OnConnectStart,
   OnConnectEnd,
+  EdgeProps,
+  getBezierPath,
+  BaseEdge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { Button } from '@patternfly/react-core';
+import { TimesIcon } from '@patternfly/react-icons';
 import { useStudioContext } from './StudioContext';
 import { StudioNode } from './StudioNode';
 import type { StudioNode as StudioNodeType } from '../../types/api';
 
+// Custom edge with delete button
+function DeletableEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+}: EdgeProps) {
+  const { deleteEdge } = useStudioContext();
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteEdge(id);
+  };
+
+  return (
+    <>
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
+      <foreignObject
+        width={24}
+        height={24}
+        x={labelX - 12}
+        y={labelY - 12}
+        className="edgebutton-foreignobject"
+        requiredExtensions="http://www.w3.org/1999/xhtml"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Button
+            variant="danger"
+            style={{
+              width: '24px',
+              height: '24px',
+              padding: 0,
+              minWidth: 'unset',
+              fontSize: '10px',
+            }}
+            onClick={handleDelete}
+            aria-label="Delete connection"
+          >
+            <TimesIcon />
+          </Button>
+        </div>
+      </foreignObject>
+    </>
+  );
+}
+
 const nodeTypes = {
   studioNode: StudioNode,
+};
+
+const edgeTypes = {
+  deletable: DeletableEdge,
 };
 
 interface StudioCanvasProps {
@@ -63,12 +131,12 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
       },
     }));
 
-    // Create ReactFlow edges (all valid now since we block invalid connections)
+    // Create ReactFlow edges with delete button
     const reactFlowEdges: Edge[] = workflow.edges.map(edge => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      type: 'smoothstep',
+      type: 'deletable',
       animated: false,
       style: {
         stroke: 'var(--pf-v5-global--BorderColor--300)',
@@ -197,10 +265,11 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
         isValidConnection={isValidConnection}
         connectionLineStyle={getConnectionLineStyle()}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         nodesDraggable={true}
         nodesConnectable={true}
         elementsSelectable={true}
-        deleteKeyCode={null} // Disable delete key (use context menu instead)
+        deleteKeyCode={null} // Disable delete key (use delete button on edge instead)
         fitView
       >
         <Background />
