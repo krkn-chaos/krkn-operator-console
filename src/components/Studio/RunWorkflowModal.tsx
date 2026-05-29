@@ -120,7 +120,6 @@ export function RunWorkflowModal({
         variant={ModalVariant.medium}
         isOpen={isOpen}
         onClose={onClose}
-        showClose={true}
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -136,7 +135,6 @@ export function RunWorkflowModal({
         variant={ModalVariant.medium}
         isOpen={isOpen}
         onClose={onClose}
-        showClose={true}
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -154,7 +152,6 @@ export function RunWorkflowModal({
         variant={ModalVariant.medium}
         isOpen={isOpen}
         onClose={onClose}
-        showClose={true}
       >
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <Spinner size="lg" />
@@ -170,7 +167,6 @@ export function RunWorkflowModal({
         variant={ModalVariant.medium}
         isOpen={isOpen}
         onClose={onClose}
-        showClose={true}
       >
         <Alert variant="danger" isInline title="Error">
           {targetFetchState.error}
@@ -190,7 +186,6 @@ export function RunWorkflowModal({
       variant={ModalVariant.medium}
       isOpen={isOpen}
       onClose={onClose}
-      showClose={true}
     >
       {targetFetchState.status === 'ready' && targetFetchState.clusters && (
         <>
