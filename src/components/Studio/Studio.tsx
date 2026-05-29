@@ -16,8 +16,7 @@ import {
   Card,
   CardBody,
 } from '@patternfly/react-core';
-import { useAppContext } from '../../context/AppContext';
-import { operatorApi } from '../../services/operatorApi';
+import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
 import { StudioProvider, loadAutosave, clearAutosave, useStudioContext } from './StudioContext';
 import { StudioToolbar } from './StudioToolbar';
 import { StudioCanvas } from './StudioCanvas';
@@ -27,10 +26,11 @@ import { RunWorkflowModal } from './RunWorkflowModal';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
-  const { state, dispatch } = useAppContext();
   const { updateNode } = useStudioContext();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isRunWorkflowOpen, setIsRunWorkflowOpen] = useState(false);
+  const targetFetch = useStudioTargetFetch();
 
   const handleNodeClick = useCallback((node: StudioNode) => {
     setSelectedNode(node);
@@ -48,33 +48,15 @@ function StudioContent() {
     setSelectedNode(null);
   }, [updateNode]);
 
-  const handleRunWorkflow = useCallback(async () => {
-    // Start studio run workflow - creates target and polls
-    dispatch({ type: 'INIT_STUDIO_RUN_START' });
-
-    try {
-      const response = await operatorApi.createTargetRequest();
-      dispatch({
-        type: 'INIT_SUCCESS',
-        payload: { uuid: response.uuid },
-      });
-    } catch (error) {
-      dispatch({
-        type: 'INIT_ERROR',
-        payload: {
-          type: 'network',
-          message: error instanceof Error ? error.message : 'Failed to create target',
-        },
-      });
-    }
-  }, [dispatch]);
+  const handleRunWorkflow = useCallback(() => {
+    setIsRunWorkflowOpen(true);
+    targetFetch.startFetch();
+  }, [targetFetch]);
 
   const handleRunWorkflowClose = useCallback(() => {
-    dispatch({ type: 'CANCEL_STUDIO_RUN' });
-  }, [dispatch]);
-
-  // Auto-open run workflow modal when in selecting_clusters phase during studio run
-  const isRunWorkflowOpen = state.phase === 'selecting_clusters' && state.studioRunMode;
+    setIsRunWorkflowOpen(false);
+    targetFetch.reset();
+  }, [targetFetch]);
 
   return (
     <>
@@ -113,6 +95,7 @@ function StudioContent() {
       <RunWorkflowModal
         isOpen={isRunWorkflowOpen}
         onClose={handleRunWorkflowClose}
+        targetFetchState={targetFetch.state}
       />
     </>
   );
