@@ -91,7 +91,7 @@ export function JobsList({
   onNavigateToStudio,
   graphRuns: _graphRuns, // Not used - GraphRuns are derived from scenarioRuns
   expandedGraphRunIds,
-  pausedGraphPollingIds, // Not used yet - polling via useGraphRunsPoller
+  pausedGraphPollingIds: _pausedGraphPollingIds, // Not used yet - polling via useGraphRunsPoller
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
 }: JobsListProps) {

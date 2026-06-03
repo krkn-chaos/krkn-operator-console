@@ -1,5 +1,5 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Alert, AlertActionCloseButton, AlertGroup, Dropdown, DropdownItem, DropdownList, MenuToggle, Modal, ModalVariant } from '@patternfly/react-core';
-import { CogIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, CodeBranchIcon } from '@patternfly/react-icons';
+import { CogIcon, EditIcon, KeyIcon, MoonIcon, SunIcon } from '@patternfly/react-icons';
 import { HiOutlineUserCircle } from 'react-icons/hi2';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
