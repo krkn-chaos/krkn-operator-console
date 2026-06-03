@@ -48,6 +48,8 @@ echo "✅ Image verified: ${CURRENT_IMAGE}"
 
 echo ""
 echo "🌐 Deploying Service..."
+# Delete existing service if it exists to avoid conflicts with old spec
+kubectl delete service krkn-operator-console -n "${NAMESPACE}" --ignore-not-found=true
 kubectl apply -f k8s/service.yaml -n "${NAMESPACE}"
 
 echo ""
