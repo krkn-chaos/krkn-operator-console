@@ -144,12 +144,6 @@ function StudioNodeEditorModalComponent({
     // Merge default values for optional fields that weren't touched
     const finalFormValues = { ...scenarioDefaultValues, ...formValues };
 
-    console.log('Studio Node Save Debug:', {
-      scenarioDefaultValues,
-      formValues,
-      finalFormValues
-    });
-
     const updates: Partial<StudioNode> = {
       status: 'configured',
       config: {
@@ -178,7 +172,6 @@ function StudioNodeEditorModalComponent({
   }, []);
 
   const handleDefaultValuesLoad = useCallback((defaults: ScenarioFormValues) => {
-    console.log('StudioNodeEditorModal - Received defaults:', defaults);
     setScenarioDefaultValues(defaults);
   }, []);
 

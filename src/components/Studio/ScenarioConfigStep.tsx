@@ -50,7 +50,6 @@ export function ScenarioConfigStep({
 
   // Fetch scenario detail when scenario changes
   useEffect(() => {
-    console.log('ScenarioConfigStep - useEffect triggered:', { scenarioName, registryName });
     let mounted = true;
 
     async function fetchScenarioDetail() {
@@ -66,12 +65,6 @@ export function ScenarioConfigStep({
         if (mounted) {
           setScenarioDetail(detail);
 
-          console.log('ScenarioConfigStep - Full scenario detail:', {
-            scenarioName,
-            detail,
-            fields: detail.fields
-          });
-
           // Extract default values from ALL fields
           const defaults: ScenarioFormValues = {};
 
@@ -83,14 +76,6 @@ export function ScenarioConfigStep({
               }
             });
           }
-
-          console.log('ScenarioConfigStep - Extracted defaults:', {
-            scenarioName,
-            totalFieldsCount: Array.isArray(detail.fields) ? detail.fields.length : 0,
-            defaults,
-            defaultsCount: Object.keys(defaults).length,
-            hasCallback: !!onDefaultValuesLoad
-          });
 
           // Notify parent of default values
           onDefaultValuesLoad?.(defaults);
