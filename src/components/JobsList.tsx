@@ -90,9 +90,9 @@ export function JobsList({
   onRefreshScenarioRun,
   onNavigateToStudio,
   graphRuns: _graphRuns, // Not used - GraphRuns are derived from scenarioRuns
-  expandedGraphRunIds: _expandedGraphRunIds, // Not used - using expandedRunIds for both
-  pausedGraphPollingIds: _pausedGraphPollingIds, // Not used - polling via useScenarioRunsPoller
-  onToggleGraphRunAccordion: _onToggleGraphRunAccordion, // Not used - using onToggleRunAccordion
+  expandedGraphRunIds,
+  pausedGraphPollingIds, // Not used yet - polling via useGraphRunsPoller
+  onToggleGraphRunAccordion,
   onDeleteGraphRun,
 }: JobsListProps) {
   const { isAdmin } = useRole();
@@ -524,7 +524,7 @@ export function JobsList({
             {unifiedRuns.map((item) => {
               // Handle GraphRun
               if (item.type === 'graph') {
-                const isGraphExpanded = expandedRunIds.has(item.graphRunName);
+                const isGraphExpanded = expandedGraphRunIds.has(item.graphRunName);
                 const phaseDisplay = getRunPhaseDisplay(item.phase);
 
                 // Aggregate job counts across all nodes
@@ -537,7 +537,7 @@ export function JobsList({
                     {/* GraphRun Summary Row */}
                     <DataListItemRow>
                       <DataListToggle
-                        onClick={() => onToggleRunAccordion(item.graphRunName)}
+                        onClick={() => onToggleGraphRunAccordion(item.graphRunName)}
                         isExpanded={isGraphExpanded}
                         id={`toggle-graph-${item.graphRunName}`}
                         aria-controls={`expand-graph-${item.graphRunName}`}
