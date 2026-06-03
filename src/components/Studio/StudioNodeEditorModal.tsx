@@ -78,6 +78,7 @@ function StudioNodeEditorModalComponent({
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
+      setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
       fetchScenarios(node.config.registryConfig);
     } else {
@@ -88,6 +89,7 @@ function StudioNodeEditorModalComponent({
       setFormValues({});
       setGlobalFormValues({});
       setGlobalTouchedFields({});
+      setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
       fetchScenarios({});
     }
@@ -141,6 +143,12 @@ function StudioNodeEditorModalComponent({
 
     // Merge default values for optional fields that weren't touched
     const finalFormValues = { ...scenarioDefaultValues, ...formValues };
+
+    console.log('Studio Node Save Debug:', {
+      scenarioDefaultValues,
+      formValues,
+      finalFormValues
+    });
 
     const updates: Partial<StudioNode> = {
       status: 'configured',
