@@ -67,11 +67,13 @@ export function ScenarioConfigStep({
 
           // Extract default values from optional fields
           const defaults: ScenarioFormValues = {};
-          detail.fields.optional.forEach(field => {
-            if (field.default !== undefined && field.default !== '') {
-              defaults[field.variable] = field.default;
-            }
-          });
+          if (detail.fields.optional) {
+            detail.fields.optional.forEach(field => {
+              if (field.default !== undefined && field.default !== '') {
+                defaults[field.variable] = field.default;
+              }
+            });
+          }
 
           // Notify parent of default values
           onDefaultValuesLoad?.(defaults);
