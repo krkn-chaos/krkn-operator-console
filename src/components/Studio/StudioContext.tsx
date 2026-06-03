@@ -351,6 +351,7 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
 }
 
 // Hook to use Studio context
+// eslint-disable-next-line react-refresh/only-export-components
 export function useStudioContext() {
   const context = useContext(StudioContext);
   if (context === undefined) {
