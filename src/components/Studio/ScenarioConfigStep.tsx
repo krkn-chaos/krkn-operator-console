@@ -50,6 +50,7 @@ export function ScenarioConfigStep({
 
   // Fetch scenario detail when scenario changes
   useEffect(() => {
+    console.log('ScenarioConfigStep - useEffect triggered:', { scenarioName, registryName });
     let mounted = true;
 
     async function fetchScenarioDetail() {
