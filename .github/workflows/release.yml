@@ -55,29 +55,11 @@ jobs:
             quay.io/krkn-chaos/krkn-operator-console:${{ env.VERSION }}
             quay.io/krkn-chaos/krkn-operator-console:latest
 
-      - name: Generate Release Notes
-        id: generate
-        continue-on-error: true
-        run: |
-          python3 scripts/generate-release-notes.py \
-            --version $VERSION \
-            --repo-url https://github.com/krkn-operator-ecosystem/krkn-operator-console \
-            --docs-url https://krkn-chaos.dev/docs/krkn-operator/ \
-            > release-notes.md
-
-      - name: Fallback Release Notes
-        if: steps.generate.outcome == 'failure'
-        run: |
-          echo "## Release $VERSION" > release-notes.md
-          echo "" >> release-notes.md
-          echo "See commit history for changes." >> release-notes.md
-          echo "" >> release-notes.md
-          echo "---" >> release-notes.md
-          echo "" >> release-notes.md
-          echo "**Documentation**: https://krkn-chaos.dev/docs/krkn-operator/" >> release-notes.md
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $VERSION --title "Release $VERSION" --notes-file release-notes.md
+          gh release create $VERSION \
+            --title "Release $VERSION" \
+            --generate-notes \
+            --notes-start-tag $(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
