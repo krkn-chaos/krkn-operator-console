@@ -46,6 +46,7 @@ function StudioNodeEditorModalComponent({
   const [formValues, setFormValues] = useState<ScenarioFormValues>({});
   const [globalFormValues, setGlobalFormValues] = useState<ScenarioFormValues>({});
   const [globalTouchedFields, setGlobalTouchedFields] = useState<TouchedFields>({});
+  const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
 
   // Step 4: Node metadata
   const [newNodeId, setNewNodeId] = useState<string>('');
@@ -138,6 +139,9 @@ function StudioNodeEditorModalComponent({
     // Build registryConfig from primitive
     const registryConfig: ScenariosRequest = registryName ? { registryName } : {};
 
+    // Merge default values for optional fields that weren't touched
+    const finalFormValues = { ...scenarioDefaultValues, ...formValues };
+
     const updates: Partial<StudioNode> = {
       status: 'configured',
       config: {
@@ -145,7 +149,7 @@ function StudioNodeEditorModalComponent({
         registryConfig,
         scenarioName: selectedScenario,
         scenarioImage,
-        scenarioFormValues: formValues,
+        scenarioFormValues: finalFormValues,
         globalFormValues,
         globalTouchedFields,
       },
@@ -163,6 +167,10 @@ function StudioNodeEditorModalComponent({
   const handleGlobalFormChange = useCallback((values: ScenarioFormValues, touchedFields: TouchedFields) => {
     setGlobalFormValues(values);
     setGlobalTouchedFields(touchedFields);
+  }, []);
+
+  const handleDefaultValuesLoad = useCallback((defaults: ScenarioFormValues) => {
+    setScenarioDefaultValues(defaults);
   }, []);
 
   const handleClose = () => {
@@ -210,6 +218,7 @@ function StudioNodeEditorModalComponent({
           globalTouchedFields={globalTouchedFields}
           onFormChange={setFormValues}
           onGlobalFormChange={handleGlobalFormChange}
+          onDefaultValuesLoad={handleDefaultValuesLoad}
         />
       ) : null,
     },
