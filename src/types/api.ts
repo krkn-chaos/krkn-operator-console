@@ -284,6 +284,8 @@ export interface ScenarioRunStatusResponse {
   createdAt?: string; // Optional - backend may include it in the future
   ownerUserId?: string; // Email of the user who created the run
   registryName?: string; // Name of private registry used (null for public Quay registry)
+  graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
+  graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
 }
 
 // Internal state for tracking scenario runs
@@ -299,6 +301,8 @@ export interface ScenarioRunState {
   createdAt: string;
   ownerUserId?: string; // Email of the user who created the run
   registryName?: string; // Name of private registry used (null for public Quay registry)
+  graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
+  graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
 }
 
 // User Management Types
@@ -352,6 +356,7 @@ export type AppPhase =
   | 'polling'
   | 'jobs_list' // Landing page
   | 'settings' // Settings page
+  | 'studio' // Chaos Scenario Studio page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -397,6 +402,11 @@ export interface AppState {
   pausedPollingRunIds: Set<string>; // Runs with polling paused (accordion open)
   expandedRunIds: Set<string>;
   expandedClusterJobs: Set<string>; // jobId
+
+  // Graph runs list (GraphRun orchestration)
+  graphRuns: GraphRunState[];
+  expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
+  pausedGraphPollingIds: Set<string>; // Graph runs with polling paused (accordion open)
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
@@ -448,6 +458,14 @@ export type AppAction =
   | { type: 'TOGGLE_RUN_ACCORDION'; payload: { scenarioRunName: string } }
   | { type: 'TOGGLE_CLUSTER_JOB_ACCORDION'; payload: { jobId: string } }
 
+  // Graph runs list management
+  | { type: 'GRAPH_RUN_CREATED'; payload: { graphRunName: string; totalNodes: number } }
+  | { type: 'ADD_GRAPH_RUN'; payload: { run: GraphRunState } }
+  | { type: 'UPDATE_GRAPH_RUN'; payload: { run: GraphRunState } }
+  | { type: 'LOAD_GRAPH_RUNS_SUCCESS'; payload: { runs: GraphRunState[] } }
+  | { type: 'TOGGLE_GRAPH_RUN_ACCORDION'; payload: { graphRunName: string } }
+  | { type: 'DELETE_GRAPH_RUN'; payload: { graphRunName: string } }
+
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }
   | { type: 'CANCEL_WORKFLOW' }
@@ -486,6 +504,7 @@ export type AppAction =
   | { type: 'GO_BACK' }
   | { type: 'RETRY' }
   | { type: 'NAVIGATE_TO_SETTINGS' }
+  | { type: 'NAVIGATE_TO_STUDIO' }
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
@@ -634,4 +653,254 @@ export interface AvailableRegistry {
 
 export interface AvailableRegistriesResponse {
   registries: AvailableRegistry[];
+}
+
+// Graph Run API Types
+
+/**
+ * GraphScenarioNode represents a node in the scenario dependency graph
+ * Compatible with krknctl ScenarioNode structure
+ */
+export interface GraphScenarioNode {
+  /** Optional comment describing the scenario */
+  _comment?: string;
+  /** Container image for the scenario */
+  image?: string;
+  /** Name of the scenario */
+  name?: string;
+  /** Environment variables for the scenario */
+  env?: { [key: string]: string };
+  /** Volume mounts for the scenario */
+  volumes?: { [key: string]: string };
+  /** Node ID that this scenario depends on (parent in the graph) */
+  depends_on?: string;
+}
+
+/**
+ * NodeStatus represents the status of a single node in the dependency graph
+ */
+export interface NodeStatus {
+  /** Unique identifier for this node in the graph */
+  nodeId: string;
+  /** Human-readable name of the scenario */
+  nodeName: string;
+  /** Current phase of this node */
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Blocked';
+  /** Reference to the KrknScenarioRun CR created for this node */
+  scenarioRunRef?: string;
+  /** When this node started execution */
+  startTime?: string;
+  /** When this node completed execution */
+  completionTime?: string;
+  /** List of node IDs that this node depends on */
+  dependsOn?: string[];
+  /** Additional information about the node status */
+  message?: string;
+}
+
+/**
+ * GraphRunSummary contains aggregate statistics about the graph run
+ */
+export interface GraphRunSummary {
+  /** Total number of nodes in the graph */
+  totalNodes: number;
+  /** Number of successfully completed nodes */
+  completedNodes: number;
+  /** Number of currently running nodes */
+  runningNodes: number;
+  /** Number of failed nodes */
+  failedNodes: number;
+  /** Number of pending nodes (including blocked nodes) */
+  pendingNodes: number;
+}
+
+/**
+ * GraphRunSpec represents the specification of a graph run
+ */
+export interface GraphRunSpec {
+  /** Dependency graph of scenarios to execute (maps node ID to scenario node) */
+  graph: { [nodeId: string]: GraphScenarioNode };
+  /** Reference to the KrknTargetRequest CR UUID */
+  targetRequestId: string;
+  /** Map of provider name to list of cluster names */
+  targetClusters: { [providerName: string]: string[] };
+  /** Email address of the user who created this graph run */
+  ownerUserId?: string;
+}
+
+/**
+ * GraphRunStatus represents the status of a graph run
+ */
+export interface GraphRunStatus {
+  /** Overall phase of the graph run */
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'PartiallyFailed';
+  /** Aggregate statistics about the graph run */
+  summary: GraphRunSummary;
+  /** Status of each node in the graph */
+  nodeStatuses: NodeStatus[];
+  /** Pre-computed topological levels for frontend rendering */
+  resolvedLevels: string[][];
+  /** When the graph run started */
+  startTime?: string;
+  /** When the graph run completed */
+  completionTime?: string;
+}
+
+/**
+ * GraphRunListItem represents a single item in the graph runs list
+ * Response from GET /api/v1/graphruns
+ */
+export interface GraphRunListItem {
+  name: string;
+  namespace: string;
+  creationTimestamp: string;
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'PartiallyFailed';
+  ownerUserId: string;
+  targetRequestId: string;
+  summary: GraphRunSummary;
+  startTime?: string;
+  completionTime?: string;
+}
+
+/**
+ * GraphRunDetail represents detailed information about a single graph run
+ * Response from GET /api/v1/graphruns/:name and POST /api/v1/graphruns
+ */
+export interface GraphRunDetail {
+  name: string;
+  namespace: string;
+  creationTimestamp: string;
+  spec: GraphRunSpec;
+  status: GraphRunStatus;
+}
+
+/**
+ * CreateGraphRunRequest is the request body for POST /api/v1/graphruns
+ */
+export interface CreateGraphRunRequest {
+  /** Dependency graph of scenarios to execute */
+  graph: { [nodeId: string]: GraphScenarioNode };
+  /** Reference to the KrknTargetRequest CR UUID */
+  targetRequestId: string;
+  /** Map of provider name to list of cluster names */
+  targetClusters: { [providerName: string]: string[] };
+}
+
+/**
+ * ListGraphRunsFilters for filtering graph runs in GET /api/v1/graphruns
+ */
+export interface ListGraphRunsFilters {
+  /** Filter by owner user ID (email) */
+  ownerUserId?: string;
+}
+
+/**
+ * GraphRunState - Internal state for tracking graph runs in the frontend (list view)
+ * Lightweight version for list display - matches GraphRunListItem from backend
+ * Full details (graph, nodeStatuses, resolvedLevels) fetched on-demand via getGraphRun()
+ */
+export interface GraphRunState {
+  /** Unique name of the graph run (e.g., graphrun-abc123) */
+  name: string;
+  /** Kubernetes namespace */
+  namespace: string;
+  /** When the graph run was created */
+  creationTimestamp: string;
+  /** Overall phase of the graph run */
+  phase: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'PartiallyFailed';
+  /** Email of the user who created the graph run */
+  ownerUserId: string;
+  /** Reference to the KrknTargetRequest CR UUID */
+  targetRequestId: string;
+  /** Aggregate statistics about the graph run */
+  summary: GraphRunSummary;
+  /** When the graph run started execution */
+  startTime?: string;
+  /** When the graph run completed execution */
+  completionTime?: string;
+}
+
+/**
+ * RunItem - Union type for items displayed in the runs list
+ * Can be either a regular scenario run or a graph run
+ * Both types are lightweight for list performance
+ */
+export type RunItem =
+  | (ScenarioRunState & { runType: 'scenario' })
+  | (GraphRunState & { runType: 'graph' });
+
+// Chaos Scenario Studio Types
+
+/**
+ * StudioNodeStatus - Configuration status of a node in the studio
+ */
+export type StudioNodeStatus = 'unconfigured' | 'configured';
+
+/**
+ * StudioNode - Represents a scenario node in the studio canvas
+ */
+export interface StudioNode {
+  /** Unique node identifier (user-defined, pattern: ^[a-z0-9\-]{5,25}$) */
+  nodeId: string;
+  /** Configuration status of the node */
+  status: StudioNodeStatus;
+  /** Node configuration (only present when status === 'configured') */
+  config?: {
+    /** Registry type (public or private) */
+    registryType: 'public' | 'private';
+    /** Registry configuration (contains registryName for private registries) */
+    registryConfig: ScenariosRequest;
+    /** Selected scenario name */
+    scenarioName: string;
+    /** Full scenario image URL */
+    scenarioImage: string;
+    /** Scenario form values (environment variables) */
+    scenarioFormValues: ScenarioFormValues;
+    /** Global form values (optional) */
+    globalFormValues?: ScenarioFormValues;
+    /** Global touched fields (tracks which global fields were modified) */
+    globalTouchedFields?: TouchedFields;
+    /** Volume mounts (mock dropdown for now) */
+    volumes?: { [key: string]: string };
+    /** File mounts (mock dropdown for now) */
+    files?: string[];
+  };
+  /** Node position on canvas */
+  position: { x: number; y: number };
+}
+
+/**
+ * StudioEdge - Represents a dependency edge between two nodes
+ */
+export interface StudioEdge {
+  /** Edge ID (format: "source-target") */
+  id: string;
+  /** Source node ID */
+  source: string;
+  /** Target node ID (target depends on source) */
+  target: string;
+}
+
+/**
+ * StudioWorkflow - Complete workflow state in the studio
+ */
+export interface StudioWorkflow {
+  /** All nodes in the workflow */
+  nodes: StudioNode[];
+  /** All edges (dependencies) in the workflow */
+  edges: StudioEdge[];
+  /** Next node number for auto-positioning */
+  nextNodeNumber: number;
+}
+
+/**
+ * StudioAutosave - Autosave data structure
+ */
+export interface StudioAutosave {
+  /** Saved workflow state */
+  workflow: StudioWorkflow;
+  /** When the autosave was created */
+  timestamp: number;
+  /** Autosave format version */
+  version: string;
 }

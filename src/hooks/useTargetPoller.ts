@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
+import { graphRunsApi } from '../services';
 import { config } from '../config';
-import type { ScenarioRunState } from '../types/api';
+import type { ScenarioRunState, GraphRunState } from '../types/api';
 
 /**
  * Custom hook to manage the target polling workflow
@@ -128,12 +129,38 @@ export function useTargetPoller() {
     }
 
     async function loadScenarioRuns() {
-      // Skip full list refresh if any accordion is open to prevent log interruptions
-      if (pausedPollingRunIdsRef.current.size > 0) {
-        return;
-      }
-
       try {
+        // Always load GraphRuns (needed for correct totalNodes count)
+        // Do this BEFORE the accordion check so _graphRuns is always up-to-date
+        try {
+          const graphRuns = await graphRunsApi.listGraphRuns();
+
+          // Convert GraphRunListItem[] to GraphRunState[]
+          const graphRunStates: GraphRunState[] = graphRuns.map((run) => ({
+            name: run.name,
+            namespace: run.namespace,
+            creationTimestamp: run.creationTimestamp,
+            phase: run.phase,
+            ownerUserId: run.ownerUserId,
+            targetRequestId: run.targetRequestId,
+            summary: run.summary,
+            startTime: run.startTime,
+            completionTime: run.completionTime,
+          }));
+
+          dispatch({
+            type: 'LOAD_GRAPH_RUNS_SUCCESS',
+            payload: { runs: graphRunStates }
+          });
+        } catch (error) {
+          // Silently handle error - graph runs are optional feature
+        }
+
+        // Skip full ScenarioRuns list refresh if any accordion is open to prevent log interruptions
+        if (pausedPollingRunIdsRef.current.size > 0) {
+          return;
+        }
+
         const scenarioRuns = await operatorApi.listScenarioRuns();
 
         // Convert ScenarioRunStatusResponse[] to ScenarioRunState[]
@@ -154,6 +181,8 @@ export function useTargetPoller() {
             createdAt: run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || new Date().toISOString(),
             ownerUserId: run.ownerUserId, // Owner user ID (email)
             registryName: run.registryName,
+            graphRunName: run.graphRunName, // Name of parent GraphRun (if part of a graph)
+            graphNodeId: run.graphNodeId, // Node ID within the graph (if part of a graph)
           };
         });
 
@@ -182,6 +211,8 @@ export function useTargetPoller() {
                 runningJobs: details.runningJobs,
                 ownerUserId: details.ownerUserId || run.ownerUserId,
                 registryName: details.registryName || run.registryName,
+                graphRunName: details.graphRunName || run.graphRunName,
+                graphNodeId: details.graphNodeId || run.graphNodeId,
               };
 
               dispatch({

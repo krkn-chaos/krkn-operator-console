@@ -29,6 +29,7 @@ interface ClusterMultiSelectorProps {
   onToggle: (cluster: SelectedCluster) => void;
   onProceed: () => void;
   onCancel: () => void;
+  showActions?: boolean; // Show action buttons (default: true)
 }
 
 export function ClusterMultiSelector({
@@ -37,6 +38,7 @@ export function ClusterMultiSelector({
   onToggle,
   onProceed,
   onCancel,
+  showActions = true,
 }: ClusterMultiSelectorProps) {
   // Helper to check if a cluster is selected
   const isSelected = (operatorName: string, clusterName: string): boolean => {
@@ -194,27 +196,29 @@ export function ClusterMultiSelector({
             </Card>
           ))}
 
-          <Flex style={{ marginTop: '1.5rem', gap: '2rem' }}>
-            <FlexItem>
-              <Button variant="secondary" onClick={onCancel} size="lg">
-                Cancel
-              </Button>
-            </FlexItem>
-            <FlexItem>
-              <Button
-                variant="primary"
-                onClick={onProceed}
-                isDisabled={selectedClusters.length === 0}
-                size="lg"
-              >
-                {selectedClusters.length > 0
-                  ? `Proceed with ${selectedClusters.length} cluster${
-                      selectedClusters.length === 1 ? '' : 's'
-                    }`
-                  : 'Select clusters to proceed'}
-              </Button>
-            </FlexItem>
-          </Flex>
+          {showActions && (
+            <Flex style={{ marginTop: '1.5rem', gap: '2rem' }}>
+              <FlexItem>
+                <Button variant="secondary" onClick={onCancel} size="lg">
+                  Cancel
+                </Button>
+              </FlexItem>
+              <FlexItem>
+                <Button
+                  variant="primary"
+                  onClick={onProceed}
+                  isDisabled={selectedClusters.length === 0}
+                  size="lg"
+                >
+                  {selectedClusters.length > 0
+                    ? `Proceed with ${selectedClusters.length} cluster${
+                        selectedClusters.length === 1 ? '' : 's'
+                      }`
+                    : 'Select clusters to proceed'}
+                </Button>
+              </FlexItem>
+            </Flex>
+          )}
         </CardBody>
       </Card>
     </div>

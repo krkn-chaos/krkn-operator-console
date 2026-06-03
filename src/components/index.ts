@@ -20,3 +20,4 @@ export { ViewGroupMembersModal } from './ViewGroupMembersModal';
 export { AddMembersModal } from './AddMembersModal';
 export { QuakeTerminal } from './QuakeTerminal';
 export { TerminalContent } from './TerminalContent';
+export { Studio } from './Studio';

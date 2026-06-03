@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Form,
   FormGroup,
@@ -22,6 +22,7 @@ interface DynamicFormBuilderProps {
 
 export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuilderProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const initializedFieldsKey = useRef<string>('');
 
   const handleChange = (variable: string, value: string | number | boolean | File) => {
     const newValues = { ...values, [variable]: value };
@@ -55,6 +56,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
               placeholder={field.default}
+              autoComplete={field.secret ? 'off' : undefined}
             />
             {field.description && (
               <FormHelperText>
@@ -244,8 +246,22 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
   };
 
   // Initialize form values with defaults
-  // Set default values on mount
+  // Only initialize once per unique fields configuration
   useEffect(() => {
+    // Create a stable key from fields including defaults, types, and secret flags
+    // to detect changes to field metadata, not just variable names
+    const fieldsKey = fields
+      .map(f => `${f.variable}:${f.type}:${f.default}:${f.secret}`)
+      .sort()
+      .join(',');
+
+    // Skip if already initialized for these exact fields
+    if (initializedFieldsKey.current === fieldsKey) {
+      return;
+    }
+
+    initializedFieldsKey.current = fieldsKey;
+
     const initialValues: ScenarioFormValues = {};
     fields.forEach((field) => {
       if (field.default !== undefined) {
