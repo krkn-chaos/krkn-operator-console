@@ -5,7 +5,7 @@ import type { GraphRunState, GraphRunListItem } from '../types/api';
 
 /**
  * Hook to poll graph runs for status updates
- * - Polls each active graph run individually for status
+ * - Fetches full list once per interval (5s), not per active run
  * - Skips polling for completed runs (Completed, Failed, PartiallyFailed)
  * - Skips polling for runs with expanded accordion (pausedGraphPollingIds)
  */
@@ -30,10 +30,12 @@ export function useGraphRunsPoller() {
         return;
       }
 
-      for (const run of activeRuns) {
-        try {
-          // Fetch updated list item (lightweight, no full graph details)
-          const graphRuns = await graphRunsApi.listGraphRuns();
+      try {
+        // Fetch list once for all active runs (not N times!)
+        const graphRuns = await graphRunsApi.listGraphRuns();
+
+        // Process each active run
+        for (const run of activeRuns) {
           const updated = graphRuns.find((gr: GraphRunListItem) => gr.name === run.name);
 
           if (!updated) {
@@ -64,9 +66,9 @@ export function useGraphRunsPoller() {
               payload: { run: updatedState },
             });
           }
-        } catch (error) {
-          // Silently handle error - continue polling
         }
+      } catch (error) {
+        // Silently handle error - continue polling
       }
     }, 5000); // Poll every 5 seconds
 
