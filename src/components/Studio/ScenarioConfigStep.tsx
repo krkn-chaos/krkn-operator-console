@@ -27,6 +27,7 @@ interface ScenarioConfigStepProps {
   globalTouchedFields: TouchedFields;
   onFormChange: (values: ScenarioFormValues) => void;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
+  onDefaultValuesLoad?: (defaults: ScenarioFormValues) => void;
 }
 
 export function ScenarioConfigStep({
@@ -37,6 +38,7 @@ export function ScenarioConfigStep({
   globalTouchedFields,
   onFormChange,
   onGlobalFormChange,
+  onDefaultValuesLoad,
 }: ScenarioConfigStepProps) {
   const [scenarioDetail, setScenarioDetail] = useState<ScenarioDetail | null>(null);
   const [scenarioGlobals, setScenarioGlobals] = useState<ScenarioGlobals | null>(null);
@@ -62,6 +64,21 @@ export function ScenarioConfigStep({
 
         if (mounted) {
           setScenarioDetail(detail);
+
+          // Extract default values from ALL fields
+          const defaults: ScenarioFormValues = {};
+
+          // Fields is a direct array, not separated by required/optional
+          if (Array.isArray(detail.fields)) {
+            detail.fields.forEach(field => {
+              if (field.default !== undefined && field.default !== '') {
+                defaults[field.variable] = field.default;
+              }
+            });
+          }
+
+          // Notify parent of default values
+          onDefaultValuesLoad?.(defaults);
         }
       } catch (err) {
         if (mounted) {
@@ -79,7 +96,7 @@ export function ScenarioConfigStep({
     return () => {
       mounted = false;
     };
-  }, [scenarioName, registryName]); // Only primitive dependencies
+  }, [scenarioName, registryName, onDefaultValuesLoad]);
 
   // Fetch global parameters when checkbox is toggled
   useEffect(() => {
