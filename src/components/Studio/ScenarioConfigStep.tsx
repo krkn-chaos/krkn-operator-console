@@ -66,6 +66,12 @@ export function ScenarioConfigStep({
         if (mounted) {
           setScenarioDetail(detail);
 
+          console.log('ScenarioConfigStep - Full scenario detail:', {
+            scenarioName,
+            detail,
+            fields: detail.fields
+          });
+
           // Extract default values from ALL fields (required + optional)
           const defaults: ScenarioFormValues = {};
 
