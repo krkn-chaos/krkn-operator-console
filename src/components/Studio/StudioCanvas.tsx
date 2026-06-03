@@ -22,6 +22,8 @@ import ReactFlow, {
   EdgeProps,
   getBezierPath,
   BaseEdge,
+  NodeChange,
+  NodePositionChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@patternfly/react-core';
@@ -178,13 +180,14 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
 
   // Handle node position changes
   const handleNodesChange = useCallback(
-    (changes: any) => {
+    (changes: NodeChange[]) => {
       onNodesChange(changes);
 
       // Update positions in workflow state
-      changes.forEach((change: any) => {
-        if (change.type === 'position' && change.position) {
-          updateNode(change.id, { position: change.position });
+      changes.forEach((change) => {
+        if (change.type === 'position' && 'position' in change && change.position) {
+          const positionChange = change as NodePositionChange;
+          updateNode(positionChange.id, { position: positionChange.position });
         }
       });
     },

@@ -46,13 +46,15 @@ class GraphRunsApiClient extends BaseApiClient {
     const url = queryString ? `/graphruns?${queryString}` : '/graphruns';
 
     // API can return different formats - handle all cases
-    const data = await this.fetchJson<any>(url);
+    const data = await this.fetchJson<
+      GraphRunListItem[] | { graphRuns: GraphRunListItem[] } | { items: GraphRunListItem[] }
+    >(url);
 
     if (Array.isArray(data)) {
       return data;
-    } else if (data?.graphRuns && Array.isArray(data.graphRuns)) {
+    } else if ('graphRuns' in data && Array.isArray(data.graphRuns)) {
       return data.graphRuns;
-    } else if (data?.items && Array.isArray(data.items)) {
+    } else if ('items' in data && Array.isArray(data.items)) {
       return data.items;
     } else {
       return [];

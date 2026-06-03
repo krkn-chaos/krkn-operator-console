@@ -16,7 +16,7 @@ import {
 import { ClusterMultiSelector } from '../ClusterMultiSelector';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
-import type { SelectedCluster, CreateGraphRunRequest } from '../../types/api';
+import type { SelectedCluster, CreateGraphRunRequest, Cluster } from '../../types/api';
 import { useStudioContext, clearAutosave } from './StudioContext';
 
 interface RunWorkflowModalProps {
@@ -26,7 +26,7 @@ interface RunWorkflowModalProps {
   targetFetchState: {
     status: 'idle' | 'creating_target' | 'polling' | 'fetching_clusters' | 'ready' | 'error';
     uuid?: string;
-    clusters?: { [operatorName: string]: any[] };
+    clusters?: { [operatorName: string]: Cluster[] };
     error?: string;
     attempts?: number;
   };

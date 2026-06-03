@@ -8,10 +8,10 @@
  * - Autosave to localStorage
  */
 
-import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode, useRef } from 'react';
 import type { StudioNode, StudioEdge, StudioWorkflow, StudioAutosave, GraphScenarioNode } from '../../types/api';
+import { AUTOSAVE_KEY, AUTOSAVE_VERSION, saveAutosave } from './studioAutosave';
 
-const AUTOSAVE_KEY = 'chaos-studio-autosave';
 const AUTOSAVE_INTERVAL = 30000; // 30 seconds
 const AUTOSAVE_VERSION = '1.0';
 
@@ -59,7 +59,7 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
           timestamp: Date.now(),
           version: AUTOSAVE_VERSION,
         };
-        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(autosave));
+        saveAutosave(autosave);
       }
     }, AUTOSAVE_INTERVAL);
 
@@ -360,27 +360,8 @@ export function useStudioContext() {
   return context;
 }
 
-// Helper: Load autosave from localStorage
-export function loadAutosave(): StudioAutosave | null {
-  try {
-    const data = localStorage.getItem(AUTOSAVE_KEY);
-    if (!data) return null;
-
-    const autosave: StudioAutosave = JSON.parse(data);
-    if (autosave.version !== AUTOSAVE_VERSION) {
-      return null; // Incompatible version
-    }
-
-    return autosave;
-  } catch {
-    return null;
-  }
-}
-
-// Helper: Clear autosave from localStorage
-export function clearAutosave() {
-  localStorage.removeItem(AUTOSAVE_KEY);
-}
+// Re-export autosave helpers for convenience
+export { loadAutosave, clearAutosave } from './studioAutosave';
 
 // Helper: Detect circular dependencies (adapted from graphRunsApi)
 function detectCircularDependencies(graph: { [nodeId: string]: GraphScenarioNode }): string[] {
