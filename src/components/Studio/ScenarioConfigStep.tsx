@@ -72,21 +72,12 @@ export function ScenarioConfigStep({
             fields: detail.fields
           });
 
-          // Extract default values from ALL fields (required + optional)
+          // Extract default values from ALL fields
           const defaults: ScenarioFormValues = {};
 
-          // Required fields with defaults
-          if (detail.fields.required) {
-            detail.fields.required.forEach(field => {
-              if (field.default !== undefined && field.default !== '') {
-                defaults[field.variable] = field.default;
-              }
-            });
-          }
-
-          // Optional fields with defaults
-          if (detail.fields.optional) {
-            detail.fields.optional.forEach(field => {
+          // Fields is a direct array, not separated by required/optional
+          if (Array.isArray(detail.fields)) {
+            detail.fields.forEach(field => {
               if (field.default !== undefined && field.default !== '') {
                 defaults[field.variable] = field.default;
               }
@@ -95,9 +86,9 @@ export function ScenarioConfigStep({
 
           console.log('ScenarioConfigStep - Extracted defaults:', {
             scenarioName,
-            requiredFieldsCount: detail.fields.required?.length || 0,
-            optionalFieldsCount: detail.fields.optional?.length || 0,
+            totalFieldsCount: Array.isArray(detail.fields) ? detail.fields.length : 0,
             defaults,
+            defaultsCount: Object.keys(defaults).length,
             hasCallback: !!onDefaultValuesLoad
           });
 
