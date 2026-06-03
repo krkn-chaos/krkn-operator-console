@@ -10,7 +10,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode, useRef } from 'react';
 import type { StudioNode, StudioEdge, StudioWorkflow, StudioAutosave, GraphScenarioNode } from '../../types/api';
-import { AUTOSAVE_VERSION, saveAutosave } from './studioAutosave';
+import { AUTOSAVE_KEY, AUTOSAVE_VERSION, saveAutosave } from './studioAutosave';
 
 const AUTOSAVE_INTERVAL = 30000; // 30 seconds
 
