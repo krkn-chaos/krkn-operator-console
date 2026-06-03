@@ -17,7 +17,8 @@ import { ClusterMultiSelector } from '../ClusterMultiSelector';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
 import type { SelectedCluster, CreateGraphRunRequest, Cluster } from '../../types/api';
-import { useStudioContext, clearAutosave } from './StudioContext';
+import { useStudioContext } from './StudioContext';
+import { clearAutosave } from './studioAutosave';
 
 interface RunWorkflowModalProps {
   isOpen: boolean;

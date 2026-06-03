@@ -18,7 +18,8 @@ import {
 } from '@patternfly/react-core';
 import { useAppContext } from '../../context/AppContext';
 import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
-import { StudioProvider, loadAutosave, clearAutosave, useStudioContext } from './StudioContext';
+import { StudioProvider, useStudioContext } from './StudioContext';
+import { loadAutosave, clearAutosave } from './studioAutosave';
 import { StudioToolbar } from './StudioToolbar';
 import { StudioCanvas } from './StudioCanvas';
 import { StudioRecoveryModal } from './StudioRecoveryModal';

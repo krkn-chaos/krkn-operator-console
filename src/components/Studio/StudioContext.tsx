@@ -360,9 +360,6 @@ export function useStudioContext() {
   return context;
 }
 
-// Re-export autosave helpers for convenience
-export { loadAutosave, clearAutosave } from './studioAutosave';
-
 // Helper: Detect circular dependencies (adapted from graphRunsApi)
 function detectCircularDependencies(graph: { [nodeId: string]: GraphScenarioNode }): string[] {
   const errors: string[] = [];
