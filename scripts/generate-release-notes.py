@@ -1,55 +1,55 @@
 #!/usr/bin/env python3
 """
-Generate GitHub release notes from conventional commits.
+Generate GitHub release notes from merged pull requests.
 
-Parses git log between tags, categorizes commits by type (feat, fix, etc.),
-extracts PR numbers, and formats as markdown suitable for GitHub releases.
+Fetches merged PRs between tags using GitHub API and formats as markdown.
+Much simpler and cleaner than parsing commits.
 """
 
 import subprocess
 import sys
 import re
 import argparse
-from typing import List, Dict, Optional, Tuple
+import json
+from typing import List, Dict, Optional
 from dataclasses import dataclass
+from urllib import request, error
 
-# Category order for output (type -> display name)
-CATEGORY_ORDER = [
-    ("feat", "Features"),
-    ("fix", "Bug Fixes"),
-    ("refactor", "Refactoring"),
-    ("perf", "Performance Improvements"),
-    ("test", "Tests"),
-    ("docs", "Documentation"),
-    ("ci", "CI/CD"),
-    ("chore", "Chores"),
-]
-
-# Regex pattern for conventional commits: type(scope): description
-CONVENTIONAL_COMMIT_REGEX = r'^([a-z]+)(?:\(([^)]+)\))?: (.+)$'
-
+# Category mapping from PR labels to display names
+LABEL_CATEGORIES = {
+    "feature": "✨ Features",
+    "enhancement": "✨ Features",
+    "bug": "🐛 Bug Fixes",
+    "bugfix": "🐛 Bug Fixes",
+    "fix": "🐛 Bug Fixes",
+    "performance": "⚡ Performance",
+    "documentation": "📚 Documentation",
+    "docs": "📚 Documentation",
+    "refactor": "♻️ Refactoring",
+    "test": "✅ Tests",
+    "ci": "👷 CI/CD",
+    "chore": "🔧 Chores",
+}
 
 @dataclass
-class Commit:
-    """Structured representation of a git commit."""
-    hash: str
-    subject: str
-    body: str
-    type: Optional[str] = None
-    scope: Optional[str] = None
-    description: str = ""
-    pr_number: Optional[int] = None
+class PullRequest:
+    """Structured representation of a GitHub PR."""
+    number: int
+    title: str
+    url: str
+    labels: List[str]
+    category: str = "other"
 
 
 class ReleaseNotesGenerator:
-    """Orchestrates release note generation from git commits."""
+    """Generates release notes from GitHub PRs."""
 
     def __init__(self, version: str, repo_url: str, docs_url: str):
         """
         Initialize the release notes generator.
 
         Args:
-            version: The release version tag (e.g., v0.2.2-beta)
+            version: The release version tag (e.g., v0.3.0-beta)
             repo_url: GitHub repository URL
             docs_url: Documentation URL to include in footer
         """
@@ -57,13 +57,16 @@ class ReleaseNotesGenerator:
         self.repo_url = repo_url.rstrip('/')
         self.docs_url = docs_url
 
-    def _find_previous_tag(self) -> Optional[str]:
-        """
-        Find the previous release tag before current version.
+        # Extract owner/repo from URL
+        match = re.search(r'github\.com/([^/]+)/([^/]+)', repo_url)
+        if not match:
+            raise ValueError(f"Invalid GitHub URL: {repo_url}")
 
-        Returns:
-            Previous tag name, or None if this is the first release
-        """
+        self.owner = match.group(1)
+        self.repo = match.group(2)
+
+    def _find_previous_tag(self) -> Optional[str]:
+        """Find the previous release tag before current version."""
         try:
             result = subprocess.run(
                 ['git', 'describe', '--tags', '--abbrev=0', f'{self.version}^'],
@@ -73,189 +76,175 @@ class ReleaseNotesGenerator:
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError:
-            # No previous tag found (first release)
             return None
 
-    def _get_commits(self, previous_tag: Optional[str]) -> List[str]:
+    def _get_date_for_tag(self, tag: str) -> Optional[str]:
+        """Get ISO date for a git tag."""
+        try:
+            result = subprocess.run(
+                ['git', 'log', '-1', '--format=%aI', tag],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError:
+            return None
+
+    def _fetch_merged_prs(self, since_date: Optional[str]) -> List[PullRequest]:
         """
-        Get commit log between previous tag and current version.
+        Fetch merged PRs from GitHub API.
 
         Args:
-            previous_tag: Previous release tag, or None for first release
+            since_date: ISO date to fetch PRs from (None = all PRs)
 
         Returns:
-            List of commit strings in format: hash|subject|body
+            List of PullRequest objects
         """
-        # Build git log command
+        # Build GitHub API URL
+        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/pulls"
+        params = "state=closed&sort=updated&direction=desc&per_page=100"
+
+        if since_date:
+            params += f"&since={since_date}"
+
+        url = f"{api_url}?{params}"
+
+        try:
+            req = request.Request(url)
+            req.add_header('Accept', 'application/vnd.github.v3+json')
+
+            with request.urlopen(req) as response:
+                data = json.loads(response.read().decode())
+
+            prs = []
+            for pr_data in data:
+                # Only include merged PRs
+                if not pr_data.get('merged_at'):
+                    continue
+
+                # Extract labels
+                labels = [label['name'].lower() for label in pr_data.get('labels', [])]
+
+                # Determine category from labels
+                category = "other"
+                for label in labels:
+                    if label in LABEL_CATEGORIES:
+                        category = label
+                        break
+
+                pr = PullRequest(
+                    number=pr_data['number'],
+                    title=pr_data['title'],
+                    url=pr_data['html_url'],
+                    labels=labels,
+                    category=category
+                )
+                prs.append(pr)
+
+            return prs
+
+        except error.URLError as e:
+            print(f"WARNING: Could not fetch PRs from GitHub API: {e}", file=sys.stderr)
+            print("INFO: Falling back to git log", file=sys.stderr)
+            return self._fallback_prs_from_git()
+        except Exception as e:
+            print(f"WARNING: Error fetching PRs: {e}", file=sys.stderr)
+            return self._fallback_prs_from_git()
+
+    def _fallback_prs_from_git(self) -> List[PullRequest]:
+        """
+        Fallback: extract PR numbers from git commit messages.
+
+        Returns:
+            List of PullRequest objects (with minimal info)
+        """
+        previous_tag = self._find_previous_tag()
+
         if previous_tag:
             commit_range = f'{previous_tag}..{self.version}'
         else:
-            # First release - get all commits up to version
             commit_range = self.version
 
         try:
             result = subprocess.run(
-                [
-                    'git', 'log',
-                    '--format=%H|%s|%b',
-                    '--no-merges',
-                    commit_range
-                ],
+                ['git', 'log', '--format=%s', '--no-merges', commit_range],
                 capture_output=True,
                 text=True,
                 check=True
             )
 
-            # Split by double newline (separates commits)
-            commits = [c.strip() for c in result.stdout.split('\n\n') if c.strip()]
-            return commits
+            prs = []
+            seen = set()
 
-        except subprocess.CalledProcessError as e:
-            print(f"Error getting commits: {e.stderr}", file=sys.stderr)
+            for line in result.stdout.split('\n'):
+                # Extract PR number from commit message
+                match = re.search(r'#(\d+)', line)
+                if match:
+                    pr_number = int(match.group(1))
+
+                    # Avoid duplicates
+                    if pr_number in seen:
+                        continue
+                    seen.add(pr_number)
+
+                    # Use commit subject as title (fallback)
+                    title = re.sub(r'\s*\(#\d+\)\s*$', '', line).strip()
+
+                    pr = PullRequest(
+                        number=pr_number,
+                        title=title,
+                        url=f"{self.repo_url}/pull/{pr_number}",
+                        labels=[],
+                        category="other"
+                    )
+                    prs.append(pr)
+
+            return prs
+
+        except subprocess.CalledProcessError:
             return []
 
-    def _parse_commit(self, commit_text: str) -> Optional[Commit]:
+    def _categorize_prs(self, prs: List[PullRequest]) -> Dict[str, List[PullRequest]]:
         """
-        Parse raw commit text into structured Commit object.
+        Group PRs by category.
 
         Args:
-            commit_text: Raw commit in format hash|subject|body
+            prs: List of PullRequest objects
 
         Returns:
-            Commit object, or None if parsing fails
+            Dictionary mapping category to list of PRs
         """
-        # Split by delimiter: hash|subject|body
-        parts = commit_text.strip().split('|', 2)
-        if len(parts) < 2:
-            return None
+        categorized: Dict[str, List[PullRequest]] = {}
 
-        hash_val = parts[0]
-        subject = parts[1]
-        body = parts[2] if len(parts) > 2 else ""
-
-        commit = Commit(hash=hash_val, subject=subject, body=body)
-
-        # Try to parse as conventional commit
-        match = re.match(CONVENTIONAL_COMMIT_REGEX, subject)
-        if match:
-            commit.type = match.group(1)
-            commit.scope = match.group(2) if match.group(2) else None
-            commit.description = match.group(3)
-        else:
-            # Not a conventional commit - use full subject as description
-            commit.description = subject
-
-        # Extract PR number from subject (format: #123)
-        pr_match = re.search(r'#(\d+)', subject)
-        if pr_match:
-            commit.pr_number = int(pr_match.group(1))
-
-        return commit
-
-    def _extract_body_excerpt(self, body: str) -> str:
-        """
-        Extract first meaningful paragraph from commit body.
-
-        Skips metadata lines like Co-Authored-By and Signed-off-by.
-
-        Args:
-            body: Raw commit body text
-
-        Returns:
-            Cleaned excerpt (max 250 chars), or empty string
-        """
-        if not body:
-            return ""
-
-        # Split into paragraphs
-        paragraphs = re.split(r'\n\n+', body.strip())
-
-        for para in paragraphs:
-            # Skip metadata lines
-            if re.match(r'^(Co-Authored-By|Signed-off-by|Assisted-by):', para, re.IGNORECASE):
-                continue
-
-            # Skip bullet point lists (can be added in future enhancement)
-            if re.match(r'^\s*[*-] ', para):
-                continue
-
-            # Clean up whitespace
-            cleaned = ' '.join(para.split())
-
-            # Return if meaningful content (at least 20 chars)
-            if len(cleaned) > 20:
-                # Truncate to 250 chars
-                return cleaned[:250]
-
-        return ""
-
-    def _categorize_commits(self, commits: List[Commit]) -> Dict[str, List[Commit]]:
-        """
-        Group commits by type (feat, fix, etc.).
-
-        Args:
-            commits: List of parsed Commit objects
-
-        Returns:
-            Dictionary mapping commit type to list of commits
-        """
-        categorized: Dict[str, List[Commit]] = {}
-
-        for commit in commits:
-            # Use commit type if available, otherwise put in "other"
-            category = commit.type if commit.type else "other"
+        for pr in prs:
+            category = pr.category
 
             if category not in categorized:
                 categorized[category] = []
 
-            categorized[category].append(commit)
+            categorized[category].append(pr)
 
         return categorized
 
-    def _format_commit(self, commit: Commit) -> str:
+    def _format_pr(self, pr: PullRequest) -> str:
         """
-        Format a commit as a markdown list item.
+        Format a PR as a markdown list item.
 
         Args:
-            commit: Commit object to format
+            pr: PullRequest object
 
         Returns:
             Markdown-formatted string
         """
-        # Build prefix: **type(scope)**: or **type**:
-        if commit.type:
-            if commit.scope:
-                prefix = f"**{commit.type}({commit.scope})**:"
-            else:
-                prefix = f"**{commit.type}**:"
-        else:
-            prefix = ""
+        return f"- {pr.title} [#{pr.number}]({pr.url})"
 
-        # Build PR link if available
-        pr_link = ""
-        if commit.pr_number:
-            pr_url = f"{self.repo_url}/pull/{commit.pr_number}"
-            pr_link = f" [#{commit.pr_number}]({pr_url})"
-
-        # Main line
-        if prefix:
-            result = f"- {prefix} {commit.description}{pr_link}"
-        else:
-            result = f"- {commit.description}{pr_link}"
-
-        # Add body excerpt as blockquote if available
-        excerpt = self._extract_body_excerpt(commit.body)
-        if excerpt:
-            result += f"\n  > {excerpt}"
-
-        return result
-
-    def _generate_changelog_section(self, categorized: Dict[str, List[Commit]]) -> str:
+    def _generate_changelog_section(self, categorized: Dict[str, List[PullRequest]]) -> str:
         """
         Generate the "What's Changed" markdown section.
 
         Args:
-            categorized: Dictionary of commits grouped by type
+            categorized: Dictionary of PRs grouped by category
 
         Returns:
             Markdown-formatted changelog
@@ -265,32 +254,27 @@ class ReleaseNotesGenerator:
 
         sections = ["## What's Changed\n"]
 
-        # Add sections in defined order
-        for type_key, display_name in CATEGORY_ORDER:
-            if type_key in categorized:
+        # Add sections in order (features, bugs, etc.)
+        for label, display_name in LABEL_CATEGORIES.items():
+            if label in categorized:
                 sections.append(f"### {display_name}\n")
 
-                for commit in categorized[type_key]:
-                    sections.append(self._format_commit(commit))
+                for pr in categorized[label]:
+                    sections.append(self._format_pr(pr))
 
                 sections.append("")  # Blank line after each category
 
-        # Add "Other Changes" section for non-conventional commits
+        # Add "Other Changes" section
         if "other" in categorized:
-            sections.append("### Other Changes\n")
-            for commit in categorized["other"]:
-                sections.append(self._format_commit(commit))
+            sections.append("### 🔀 Other Changes\n")
+            for pr in categorized["other"]:
+                sections.append(self._format_pr(pr))
             sections.append("")
 
         return "\n".join(sections)
 
     def _generate_footer(self) -> str:
-        """
-        Generate footer with documentation link.
-
-        Returns:
-            Markdown-formatted footer
-        """
+        """Generate footer with documentation link."""
         return f"---\n\n**Documentation**: {self.docs_url}\n"
 
     def generate(self) -> str:
@@ -300,54 +284,46 @@ class ReleaseNotesGenerator:
         Returns:
             Complete markdown release notes
         """
-        # 1. Find previous tag
+        # Find previous tag
         previous_tag = self._find_previous_tag()
 
         if previous_tag:
             print(f"INFO: Generating changelog from {previous_tag} to {self.version}", file=sys.stderr)
+            since_date = self._get_date_for_tag(previous_tag)
         else:
-            print(f"INFO: No previous tag found. Using all commits up to {self.version}", file=sys.stderr)
+            print(f"INFO: No previous tag found. Using all PRs", file=sys.stderr)
+            since_date = None
 
-        # 2. Get commits in range
-        commit_texts = self._get_commits(previous_tag)
+        # Fetch merged PRs
+        prs = self._fetch_merged_prs(since_date)
 
-        if not commit_texts:
-            print("INFO: No commits found in range.", file=sys.stderr)
+        if not prs:
+            print("INFO: No PRs found in range.", file=sys.stderr)
             return f"## What's Changed\n\nNo changes in this release.\n\n{self._generate_footer()}"
 
-        print(f"INFO: Found {len(commit_texts)} commits", file=sys.stderr)
+        print(f"INFO: Found {len(prs)} merged PRs", file=sys.stderr)
 
-        # 3. Parse commits
-        commits = []
-        for commit_text in commit_texts:
-            commit = self._parse_commit(commit_text)
-            if commit:
-                commits.append(commit)
-            else:
-                print(f"WARNING: Could not parse commit: {commit_text[:50]}...", file=sys.stderr)
+        # Categorize PRs
+        categorized = self._categorize_prs(prs)
 
-        # 4. Categorize commits
-        categorized = self._categorize_commits(commits)
-
-        # 5. Generate changelog section
+        # Generate changelog
         changelog = self._generate_changelog_section(categorized)
 
-        # 6. Append footer
+        # Append footer
         footer = self._generate_footer()
 
-        # 7. Return complete release notes
         return f"{changelog}\n{footer}"
 
 
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Generate GitHub release notes from conventional commits"
+        description="Generate GitHub release notes from merged pull requests"
     )
     parser.add_argument(
         "--version",
         required=True,
-        help="Release version tag (e.g., v0.2.2-beta)"
+        help="Release version tag (e.g., v0.3.0-beta)"
     )
     parser.add_argument(
         "--repo-url",
