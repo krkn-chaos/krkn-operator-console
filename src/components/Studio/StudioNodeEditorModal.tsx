@@ -107,8 +107,9 @@ function StudioNodeEditorModalComponent({
       // Private registry - reset to trigger auto-select
       setRegistryName('');
     }
-    // Clear scenario and defaults when registry changes
+    // Clear scenario, form values and defaults when registry changes
     setSelectedScenario(null);
+    setFormValues({});
     setScenarioDefaultValues({});
   }, [fetchScenarios]);
 
@@ -117,8 +118,9 @@ function StudioNodeEditorModalComponent({
     setRegistryName(name);
     const config: ScenariosRequest = name ? { registryName: name } : {};
     fetchScenarios(config);
-    // Clear scenario and defaults when registry name changes
+    // Clear scenario, form values and defaults when registry name changes
     setSelectedScenario(null);
+    setFormValues({});
     setScenarioDefaultValues({});
   }, [fetchScenarios]);
 
@@ -140,8 +142,9 @@ function StudioNodeEditorModalComponent({
 
     setScenarioImage(`${registry}:${scenarioName}`);
 
-    // Reset default values immediately when scenario changes
-    // Will be repopulated when new scenario detail loads
+    // Reset form values and defaults immediately when scenario changes
+    // Prevents stale values from previous scenario being saved
+    setFormValues({});
     setScenarioDefaultValues({});
   }, [registryType, registryName]);
 
