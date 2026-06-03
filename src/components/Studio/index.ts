@@ -1,5 +1,6 @@
 export { Studio } from './Studio';
-export { StudioProvider, useStudioContext, loadAutosave, clearAutosave } from './StudioContext';
+export { StudioProvider, useStudioContext } from './StudioContext';
+export { loadAutosave, clearAutosave } from './studioAutosave';
 export { StudioToolbar } from './StudioToolbar';
 export { StudioCanvas } from './StudioCanvas';
 export { StudioNode } from './StudioNode';
