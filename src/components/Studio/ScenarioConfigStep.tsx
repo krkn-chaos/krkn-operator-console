@@ -66,8 +66,19 @@ export function ScenarioConfigStep({
         if (mounted) {
           setScenarioDetail(detail);
 
-          // Extract default values from optional fields
+          // Extract default values from ALL fields (required + optional)
           const defaults: ScenarioFormValues = {};
+
+          // Required fields with defaults
+          if (detail.fields.required) {
+            detail.fields.required.forEach(field => {
+              if (field.default !== undefined && field.default !== '') {
+                defaults[field.variable] = field.default;
+              }
+            });
+          }
+
+          // Optional fields with defaults
           if (detail.fields.optional) {
             detail.fields.optional.forEach(field => {
               if (field.default !== undefined && field.default !== '') {
@@ -78,6 +89,7 @@ export function ScenarioConfigStep({
 
           console.log('ScenarioConfigStep - Extracted defaults:', {
             scenarioName,
+            requiredFieldsCount: detail.fields.required?.length || 0,
             optionalFieldsCount: detail.fields.optional?.length || 0,
             defaults,
             hasCallback: !!onDefaultValuesLoad
