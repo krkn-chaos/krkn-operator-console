@@ -96,7 +96,7 @@ export function ScenarioConfigStep({
     return () => {
       mounted = false;
     };
-  }, [scenarioName, registryName]); // Only primitive dependencies
+  }, [scenarioName, registryName, onDefaultValuesLoad]);
 
   // Fetch global parameters when checkbox is toggled
   useEffect(() => {
