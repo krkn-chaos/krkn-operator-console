@@ -75,6 +75,13 @@ export function ScenarioConfigStep({
             });
           }
 
+          console.log('ScenarioConfigStep - Extracted defaults:', {
+            scenarioName,
+            optionalFieldsCount: detail.fields.optional?.length || 0,
+            defaults,
+            hasCallback: !!onDefaultValuesLoad
+          });
+
           // Notify parent of default values
           onDefaultValuesLoad?.(defaults);
         }

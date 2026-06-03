@@ -178,6 +178,7 @@ function StudioNodeEditorModalComponent({
   }, []);
 
   const handleDefaultValuesLoad = useCallback((defaults: ScenarioFormValues) => {
+    console.log('StudioNodeEditorModal - Received defaults:', defaults);
     setScenarioDefaultValues(defaults);
   }, []);
 
