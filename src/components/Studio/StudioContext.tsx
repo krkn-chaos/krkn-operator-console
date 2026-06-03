@@ -45,12 +45,17 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
     }
   );
 
-  // Autosave to localStorage
+  // Use ref to access latest workflow without re-creating interval
+  const workflowRef = useRef(workflow);
+  workflowRef.current = workflow;
+
+  // Autosave to localStorage - interval runs once, reads from ref
   useEffect(() => {
     const interval = setInterval(() => {
-      if (workflow.nodes.length > 0) {
+      const currentWorkflow = workflowRef.current;
+      if (currentWorkflow.nodes.length > 0) {
         const autosave: StudioAutosave = {
-          workflow,
+          workflow: currentWorkflow,
           timestamp: Date.now(),
           version: AUTOSAVE_VERSION,
         };
@@ -59,7 +64,7 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
     }, AUTOSAVE_INTERVAL);
 
     return () => clearInterval(interval);
-  }, [workflow]);
+  }, []); // Empty deps - interval never re-created
 
   // Add new unconfigured node
   const addNode = useCallback(() => {
