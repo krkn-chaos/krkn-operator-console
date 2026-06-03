@@ -107,6 +107,9 @@ function StudioNodeEditorModalComponent({
       // Private registry - reset to trigger auto-select
       setRegistryName('');
     }
+    // Clear scenario and defaults when registry changes
+    setSelectedScenario(null);
+    setScenarioDefaultValues({});
   }, [fetchScenarios]);
 
   // Handle registry name change
@@ -114,6 +117,9 @@ function StudioNodeEditorModalComponent({
     setRegistryName(name);
     const config: ScenariosRequest = name ? { registryName: name } : {};
     fetchScenarios(config);
+    // Clear scenario and defaults when registry name changes
+    setSelectedScenario(null);
+    setScenarioDefaultValues({});
   }, [fetchScenarios]);
 
   // Validate node ID
@@ -133,6 +139,10 @@ function StudioNodeEditorModalComponent({
       : 'quay.io/krkn-chaos/krkn-hub';
 
     setScenarioImage(`${registry}:${scenarioName}`);
+
+    // Reset default values immediately when scenario changes
+    // Will be repopulated when new scenario detail loads
+    setScenarioDefaultValues({});
   }, [registryType, registryName]);
 
   const handleSave = () => {
