@@ -248,8 +248,12 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
   // Initialize form values with defaults
   // Only initialize once per unique fields configuration
   useEffect(() => {
-    // Create a stable key from fields to detect actual field changes
-    const fieldsKey = fields.map(f => f.variable).sort().join(',');
+    // Create a stable key from fields including defaults, types, and secret flags
+    // to detect changes to field metadata, not just variable names
+    const fieldsKey = fields
+      .map(f => `${f.variable}:${f.type}:${f.default}:${f.secret}`)
+      .sort()
+      .join(',');
 
     // Skip if already initialized for these exact fields
     if (initializedFieldsKey.current === fieldsKey) {
