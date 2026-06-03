@@ -5,7 +5,7 @@ set -e
 
 NAMESPACE="${NAMESPACE:-krkn-operator-system}"
 PLATFORM="${PLATFORM:-openshift}"  # openshift or kubernetes
-IMG="${IMG:-quay.io/krkn-chaos/krkn-operator:console}"
+IMG="${IMG:-quay.io/krkn-chaos/krkn-operator-console:latest}"
 
 echo "🚀 Deploying Krkn Operator Console"
 echo "===================================="
