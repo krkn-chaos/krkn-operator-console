@@ -8,12 +8,6 @@
 
 import { useState } from 'react';
 import {
-  Table,
-  Thead,
-  Tr,
-  Th,
-  Tbody,
-  Td,
   Button,
   EmptyState,
   EmptyStateHeader,
@@ -29,6 +23,7 @@ import {
   Flex,
   FlexItem,
 } from '@patternfly/react-core';
+import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus } from 'react-icons/fi';
 import type { FileResponse } from '../../types/api';
 

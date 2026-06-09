@@ -40,15 +40,6 @@ export function FileManagementModal({
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileResponse | null>(null);
 
-  // Load files when modal opens
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    loadFiles();
-  }, [isOpen, loadFiles]);
-
   const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -64,6 +55,15 @@ export function FileManagementModal({
       setLoading(false);
     }
   }, []);
+
+  // Load files when modal opens
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    loadFiles();
+  }, [isOpen, loadFiles]);
 
   const handleCreateClick = () => {
     setSelectedFile(null);
