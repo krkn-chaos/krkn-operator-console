@@ -44,15 +44,18 @@ export function FilesTable({
 }: FilesTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Ensure files is always an array
+  const filesList = Array.isArray(files) ? files : [];
+
   // Filter files based on search term
-  const filteredFiles = files.filter(
+  const filteredFiles = filesList.filter(
     (file) =>
       file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (files.length === 0) {
+  if (filesList.length === 0) {
     return (
       <EmptyState>
         <EmptyStateHeader
