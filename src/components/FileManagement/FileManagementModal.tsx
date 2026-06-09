@@ -46,13 +46,10 @@ export function FileManagementModal({
 
     try {
       // Always use getAvailableFiles - backend handles group-based filtering
-      const data = await operatorApi.getAvailableFiles();
+      const response = await operatorApi.getAvailableFiles();
 
-      console.log('[FileManagementModal] Loaded files:', data);
-      console.log('[FileManagementModal] Files is array?', Array.isArray(data));
-      console.log('[FileManagementModal] Files length:', data?.length);
-
-      setFiles(data);
+      // Backend returns { files: [...] }
+      setFiles(response.files || []);
     } catch (err) {
       console.error('[FileManagementModal] Error loading files:', err);
       setError(err instanceof Error ? err.message : 'Failed to load files');

@@ -18,6 +18,7 @@ import type {
   TerminalResponse,
   AvailableCommandsResponse,
   FileResponse,
+  FilesListResponse,
   CreateFileRequest,
   UpdateFileRequest
 } from '../types/api';
@@ -476,19 +477,19 @@ class OperatorApiClient extends BaseApiClient {
   /**
    * GET /api/v1/files/available
    * Get files available to the current user (based on groups)
-   * @returns Promise with list of files user can access
+   * @returns Promise with response containing files array
    */
-  async getAvailableFiles(): Promise<FileResponse[]> {
-    return this.fetchJson<FileResponse[]>('/files/available');
+  async getAvailableFiles(): Promise<FilesListResponse> {
+    return this.fetchJson<FilesListResponse>('/files/available');
   }
 
   /**
    * GET /api/v1/files
    * Get all files (admin can see all, users see their groups)
-   * @returns Promise with list of files
+   * @returns Promise with response containing files array
    */
-  async getAllFiles(): Promise<FileResponse[]> {
-    return this.fetchJson<FileResponse[]>('/files');
+  async getAllFiles(): Promise<FilesListResponse> {
+    return this.fetchJson<FilesListResponse>('/files');
   }
 
   /**

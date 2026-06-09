@@ -972,3 +972,11 @@ export interface UpdateFileRequest {
   /** Optional file type classification */
   fileType?: string;
 }
+
+/**
+ * FilesListResponse - Response containing list of files
+ */
+export interface FilesListResponse {
+  /** Array of files */
+  files: FileResponse[];
+}
