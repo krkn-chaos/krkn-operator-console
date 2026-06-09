@@ -2,6 +2,7 @@
  * FileForm - Create/Edit file form
  *
  * Handles both creation and editing of files with validation.
+ * Backend handles group-based permissions.
  */
 
 import { useState } from 'react';

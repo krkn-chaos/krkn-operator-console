@@ -484,8 +484,8 @@ class OperatorApiClient extends BaseApiClient {
 
   /**
    * GET /api/v1/files
-   * Get all files (admin only)
-   * @returns Promise with list of all files
+   * Get all files (admin can see all, users see their groups)
+   * @returns Promise with list of files
    */
   async getAllFiles(): Promise<FileResponse[]> {
     return this.fetchJson<FileResponse[]>('/files');
@@ -503,7 +503,7 @@ class OperatorApiClient extends BaseApiClient {
 
   /**
    * POST /api/v1/files
-   * Create a new file (admin only)
+   * Create a new file (permissions enforced by backend)
    * @param request - File creation request
    * @returns Promise with created file data
    */
@@ -517,7 +517,7 @@ class OperatorApiClient extends BaseApiClient {
 
   /**
    * PUT /api/v1/files/{name}
-   * Update an existing file (admin only)
+   * Update an existing file (permissions enforced by backend)
    * @param name - ConfigMap name
    * @param request - File update request
    * @returns Promise with updated file data
@@ -532,7 +532,7 @@ class OperatorApiClient extends BaseApiClient {
 
   /**
    * DELETE /api/v1/files/{name}
-   * Delete a file (admin only)
+   * Delete a file (permissions enforced by backend)
    * @param name - ConfigMap name
    * @returns Promise that resolves when file is deleted
    */

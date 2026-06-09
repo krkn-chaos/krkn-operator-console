@@ -26,7 +26,6 @@ import type { FileResponse } from '../../types/api';
 interface FileManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isAdmin: boolean;
 }
 
 type ActiveTab = 'list' | 'create' | 'edit';
@@ -34,7 +33,6 @@ type ActiveTab = 'list' | 'create' | 'edit';
 export function FileManagementModal({
   isOpen,
   onClose,
-  isAdmin,
 }: FileManagementModalProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('list');
   const [files, setFiles] = useState<FileResponse[]>([]);
@@ -49,16 +47,15 @@ export function FileManagementModal({
     }
 
     loadFiles();
-  }, [isOpen, isAdmin, loadFiles]);
+  }, [isOpen, loadFiles]);
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const data = isAdmin
-        ? await operatorApi.getAllFiles()
-        : await operatorApi.getAvailableFiles();
+      // Always use getAvailableFiles - backend handles group-based filtering
+      const data = await operatorApi.getAvailableFiles();
 
       setFiles(data);
     } catch (err) {
@@ -66,7 +63,7 @@ export function FileManagementModal({
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, []);
 
   const handleCreateClick = () => {
     setSelectedFile(null);
@@ -149,7 +146,6 @@ export function FileManagementModal({
             <div style={{ marginTop: '1rem' }}>
               <FilesTable
                 files={files}
-                isAdmin={isAdmin}
                 onCreateClick={handleCreateClick}
                 onEditClick={handleEditClick}
                 onDeleteClick={handleDeleteClick}
@@ -158,23 +154,21 @@ export function FileManagementModal({
             </div>
           </Tab>
 
-          {isAdmin && (
-            <Tab
-              eventKey="create"
-              title={<TabTitleText>Create File</TabTitleText>}
-              aria-label="Create new file"
-            >
-              <div style={{ marginTop: '1rem' }}>
-                <FileForm
-                  mode="create"
-                  onSuccess={handleFormSuccess}
-                  onCancel={handleFormCancel}
-                />
-              </div>
-            </Tab>
-          )}
+          <Tab
+            eventKey="create"
+            title={<TabTitleText>Create File</TabTitleText>}
+            aria-label="Create new file"
+          >
+            <div style={{ marginTop: '1rem' }}>
+              <FileForm
+                mode="create"
+                onSuccess={handleFormSuccess}
+                onCancel={handleFormCancel}
+              />
+            </div>
+          </Tab>
 
-          {isAdmin && activeTab === 'edit' && selectedFile && (
+          {activeTab === 'edit' && selectedFile && (
             <Tab
               eventKey="edit"
               title={<TabTitleText>Edit File</TabTitleText>}

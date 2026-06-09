@@ -3,7 +3,7 @@
  *
  * Shows file list with columns:
  * - Name, File Name, Mount Path, Description, Groups, Public/Private
- * - Actions: View, Edit (admin), Delete (admin)
+ * - Actions: View, Edit, Delete (permissions enforced by backend)
  */
 
 import { useState } from 'react';
@@ -34,7 +34,6 @@ import type { FileResponse } from '../../types/api';
 
 interface FilesTableProps {
   files: FileResponse[];
-  isAdmin: boolean;
   onCreateClick: () => void;
   onEditClick: (file: FileResponse) => void;
   onDeleteClick: (fileName: string) => void;
@@ -43,7 +42,6 @@ interface FilesTableProps {
 
 export function FilesTable({
   files,
-  isAdmin,
   onCreateClick,
   onEditClick,
   onDeleteClick,
@@ -68,19 +66,15 @@ export function FilesTable({
           headingLevel="h4"
         />
         <EmptyStateBody>
-          {isAdmin
-            ? 'No files have been created yet. Create your first file to get started.'
-            : 'No files are currently available to you. Contact your administrator for access.'}
+          No files are currently available to you. Create your first file to get started or contact your administrator for access.
         </EmptyStateBody>
-        {isAdmin && (
-          <EmptyStateFooter>
-            <EmptyStateActions>
-              <Button variant="primary" onClick={onCreateClick} icon={<FiPlus />}>
-                Create File
-              </Button>
-            </EmptyStateActions>
-          </EmptyStateFooter>
-        )}
+        <EmptyStateFooter>
+          <EmptyStateActions>
+            <Button variant="primary" onClick={onCreateClick} icon={<FiPlus />}>
+              Create File
+            </Button>
+          </EmptyStateActions>
+        </EmptyStateFooter>
       </EmptyState>
     );
   }
@@ -102,13 +96,11 @@ export function FilesTable({
               Refresh
             </Button>
           </ToolbarItem>
-          {isAdmin && (
-            <ToolbarItem>
-              <Button variant="primary" onClick={onCreateClick} icon={<FiPlus />}>
-                Create File
-              </Button>
-            </ToolbarItem>
-          )}
+          <ToolbarItem>
+            <Button variant="primary" onClick={onCreateClick} icon={<FiPlus />}>
+              Create File
+            </Button>
+          </ToolbarItem>
         </ToolbarContent>
       </Toolbar>
 
@@ -120,7 +112,7 @@ export function FilesTable({
             <Th>Mount Path</Th>
             <Th>Description</Th>
             <Th>Access</Th>
-            {isAdmin && <Th>Actions</Th>}
+            <Th>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
@@ -156,33 +148,31 @@ export function FilesTable({
                   )}
                 </Flex>
               </Td>
-              {isAdmin && (
-                <Td dataLabel="Actions">
-                  <Flex spaceItems={{ default: 'spaceItemsSm' }}>
-                    <FlexItem>
-                      <Button
-                        variant="link"
-                        isInline
-                        onClick={() => onEditClick(file)}
-                        icon={<FiEdit />}
-                      >
-                        Edit
-                      </Button>
-                    </FlexItem>
-                    <FlexItem>
-                      <Button
-                        variant="link"
-                        isInline
-                        isDanger
-                        onClick={() => onDeleteClick(file.name)}
-                        icon={<FiTrash2 />}
-                      >
-                        Delete
-                      </Button>
-                    </FlexItem>
-                  </Flex>
-                </Td>
-              )}
+              <Td dataLabel="Actions">
+                <Flex spaceItems={{ default: 'spaceItemsSm' }}>
+                  <FlexItem>
+                    <Button
+                      variant="link"
+                      isInline
+                      onClick={() => onEditClick(file)}
+                      icon={<FiEdit />}
+                    >
+                      Edit
+                    </Button>
+                  </FlexItem>
+                  <FlexItem>
+                    <Button
+                      variant="link"
+                      isInline
+                      isDanger
+                      onClick={() => onDeleteClick(file.name)}
+                      icon={<FiTrash2 />}
+                    >
+                      Delete
+                    </Button>
+                  </FlexItem>
+                </Flex>
+              </Td>
             </Tr>
           ))}
         </Tbody>

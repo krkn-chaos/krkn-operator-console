@@ -362,18 +362,16 @@ export function JobsList({
                 >
                   Chaos Studio
                 </DropdownItem>
-                {isAdmin && (
-                  <DropdownItem
-                    onClick={() => {
-                      setIsRunDropdownOpen(false);
-                      setIsFileManagementOpen(true);
-                    }}
-                    description="Manage ConfigMap-based files for scenarios"
-                    icon={<FileIcon />}
-                  >
-                    Manage Files
-                  </DropdownItem>
-                )}
+                <DropdownItem
+                  onClick={() => {
+                    setIsRunDropdownOpen(false);
+                    setIsFileManagementOpen(true);
+                  }}
+                  description="Manage ConfigMap-based files for scenarios"
+                  icon={<FileIcon />}
+                >
+                  Manage Files
+                </DropdownItem>
               </DropdownList>
             </Dropdown>
           </FlexItem>
@@ -1159,7 +1157,6 @@ export function JobsList({
       <FileManagementModal
         isOpen={isFileManagementOpen}
         onClose={() => setIsFileManagementOpen(false)}
-        isAdmin={isAdmin}
       />
     </Card>
   );
