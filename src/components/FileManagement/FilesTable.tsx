@@ -105,69 +105,66 @@ export function FilesTable({
       <Table aria-label="Files table" variant="compact">
         <Thead>
           <Tr>
-            <Th>Name</Th>
-            <Th>File Name</Th>
-            <Th>Mount Path</Th>
-            <Th>Description</Th>
-            <Th>Access</Th>
-            <Th>Actions</Th>
+            <Th width={15}>Name</Th>
+            <Th width={15}>File</Th>
+            <Th width={20}>Mount Path</Th>
+            <Th width={25}>Description</Th>
+            <Th width={15}>Access</Th>
+            <Th width={10}>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
           {filteredFiles.map((file) => (
             <Tr key={file.name}>
-              <Td dataLabel="Name">{file.name}</Td>
-              <Td dataLabel="File Name">
-                <code>{file.fileName}</code>
+              <Td dataLabel="Name">
+                <strong>{file.name}</strong>
               </Td>
-              <Td dataLabel="Mount Path">
-                <code>{file.mountPath}</code>
+              <Td dataLabel="File">
+                <code style={{ fontSize: '0.9em' }}>{file.fileName}</code>
               </Td>
-              <Td dataLabel="Description">{file.description || '-'}</Td>
+              <Td dataLabel="Mount Path" modifier="truncate">
+                <code style={{ fontSize: '0.85em', color: 'var(--pf-v5-global--Color--200)' }}>
+                  {file.mountPath}
+                </code>
+              </Td>
+              <Td dataLabel="Description" modifier="truncate">
+                {file.description || <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>-</span>}
+              </Td>
               <Td dataLabel="Access">
-                <Flex spaceItems={{ default: 'spaceItemsSm' }} flexWrap={{ default: 'wrap' }}>
-                  {file.availableToAll ? (
-                    <FlexItem>
-                      <Label color="green">Public</Label>
-                    </FlexItem>
-                  ) : (
-                    <>
-                      {file.groups?.map((group) => (
-                        <FlexItem key={group}>
-                          <Label color="blue">{group}</Label>
-                        </FlexItem>
-                      ))}
-                      {(!file.groups || file.groups.length === 0) && (
-                        <FlexItem>
-                          <Label color="grey">No groups</Label>
-                        </FlexItem>
-                      )}
-                    </>
-                  )}
-                </Flex>
+                {file.availableToAll ? (
+                  <Label color="green" isCompact>Public</Label>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                    {file.groups && file.groups.length > 0 ? (
+                      file.groups.map((group) => (
+                        <Label key={group} color="blue" isCompact>
+                          {group}
+                        </Label>
+                      ))
+                    ) : (
+                      <Label color="grey" isCompact>No groups</Label>
+                    )}
+                  </div>
+                )}
               </Td>
-              <Td dataLabel="Actions">
-                <Flex spaceItems={{ default: 'spaceItemsSm' }}>
+              <Td dataLabel="Actions" isActionCell>
+                <Flex spaceItems={{ default: 'spaceItemsNone' }}>
                   <FlexItem>
                     <Button
-                      variant="link"
-                      isInline
+                      variant="plain"
                       onClick={() => onEditClick(file)}
+                      aria-label="Edit file"
                       icon={<FiEdit />}
-                    >
-                      Edit
-                    </Button>
+                    />
                   </FlexItem>
                   <FlexItem>
                     <Button
-                      variant="link"
-                      isInline
-                      isDanger
+                      variant="plain"
                       onClick={() => onDeleteClick(file.name)}
+                      aria-label="Delete file"
+                      isDanger
                       icon={<FiTrash2 />}
-                    >
-                      Delete
-                    </Button>
+                    />
                   </FlexItem>
                 </Flex>
               </Td>
