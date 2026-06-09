@@ -904,3 +904,71 @@ export interface StudioAutosave {
   /** Autosave format version */
   version: string;
 }
+
+// ============================================================================
+// File Management API Types
+// ============================================================================
+
+/**
+ * FileResponse - ConfigMap-based file data
+ */
+export interface FileResponse {
+  /** ConfigMap name (unique identifier) */
+  name: string;
+  /** File name (ConfigMap key) */
+  fileName: string;
+  /** File content */
+  content: string;
+  /** Mount path in pods */
+  mountPath: string;
+  /** File description */
+  description?: string;
+  /** Groups that can access this file */
+  groups?: string[];
+  /** If true, available to all users */
+  availableToAll: boolean;
+  /** Optional file type classification */
+  fileType?: string;
+}
+
+/**
+ * CreateFileRequest - Request to create a new file
+ */
+export interface CreateFileRequest {
+  /** ConfigMap name (RFC 1123 compliant) */
+  name: string;
+  /** File name (ConfigMap key) */
+  fileName: string;
+  /** File content */
+  content: string;
+  /** Mount path in pods */
+  mountPath: string;
+  /** File description (optional) */
+  description?: string;
+  /** Groups that can access this file (optional if availableToAll) */
+  groups?: string[];
+  /** If true, available to all users */
+  availableToAll: boolean;
+  /** Optional file type classification */
+  fileType?: string;
+}
+
+/**
+ * UpdateFileRequest - Request to update an existing file
+ */
+export interface UpdateFileRequest {
+  /** File name (ConfigMap key) */
+  fileName: string;
+  /** File content */
+  content: string;
+  /** Mount path in pods */
+  mountPath: string;
+  /** File description (optional) */
+  description?: string;
+  /** Groups that can access this file (optional if availableToAll) */
+  groups?: string[];
+  /** If true, available to all users */
+  availableToAll: boolean;
+  /** Optional file type classification */
+  fileType?: string;
+}

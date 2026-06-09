@@ -16,7 +16,10 @@ import type {
   ActiveRunsResponse,
   TerminalRequest,
   TerminalResponse,
-  AvailableCommandsResponse
+  AvailableCommandsResponse,
+  FileResponse,
+  CreateFileRequest,
+  UpdateFileRequest
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -464,6 +467,79 @@ class OperatorApiClient extends BaseApiClient {
    */
   async getActiveRuns(): Promise<ActiveRunsResponse> {
     return this.fetchJson<ActiveRunsResponse>('/dashboard/active-runs');
+  }
+
+  // ============================================================================
+  // File Management API
+  // ============================================================================
+
+  /**
+   * GET /api/v1/files/available
+   * Get files available to the current user (based on groups)
+   * @returns Promise with list of files user can access
+   */
+  async getAvailableFiles(): Promise<FileResponse[]> {
+    return this.fetchJson<FileResponse[]>('/files/available');
+  }
+
+  /**
+   * GET /api/v1/files
+   * Get all files (admin only)
+   * @returns Promise with list of all files
+   */
+  async getAllFiles(): Promise<FileResponse[]> {
+    return this.fetchJson<FileResponse[]>('/files');
+  }
+
+  /**
+   * GET /api/v1/files/{name}
+   * Get details of a specific file
+   * @param name - ConfigMap name
+   * @returns Promise with file details
+   */
+  async getFile(name: string): Promise<FileResponse> {
+    return this.fetchJson<FileResponse>(`/files/${encodeURIComponent(name)}`);
+  }
+
+  /**
+   * POST /api/v1/files
+   * Create a new file (admin only)
+   * @param request - File creation request
+   * @returns Promise with created file data
+   */
+  async createFile(request: CreateFileRequest): Promise<FileResponse> {
+    return this.fetchJson<FileResponse>('/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * PUT /api/v1/files/{name}
+   * Update an existing file (admin only)
+   * @param name - ConfigMap name
+   * @param request - File update request
+   * @returns Promise with updated file data
+   */
+  async updateFile(name: string, request: UpdateFileRequest): Promise<FileResponse> {
+    return this.fetchJson<FileResponse>(`/files/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * DELETE /api/v1/files/{name}
+   * Delete a file (admin only)
+   * @param name - ConfigMap name
+   * @returns Promise that resolves when file is deleted
+   */
+  async deleteFile(name: string): Promise<void> {
+    await this.fetchJson<void>(`/files/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
   }
 }
 

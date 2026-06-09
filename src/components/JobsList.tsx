@@ -42,11 +42,13 @@ import {
   TrashIcon,
   LockIcon,
   TopologyIcon,
+  FileIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
+import { FileManagementModal } from './FileManagement';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
@@ -106,6 +108,7 @@ export function JobsList({
   const [dateTo, setDateTo] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
+  const [isFileManagementOpen, setIsFileManagementOpen] = useState(false);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -359,6 +362,18 @@ export function JobsList({
                 >
                   Chaos Studio
                 </DropdownItem>
+                {isAdmin && (
+                  <DropdownItem
+                    onClick={() => {
+                      setIsRunDropdownOpen(false);
+                      setIsFileManagementOpen(true);
+                    }}
+                    description="Manage ConfigMap-based files for scenarios"
+                    icon={<FileIcon />}
+                  >
+                    Manage Files
+                  </DropdownItem>
+                )}
               </DropdownList>
             </Dropdown>
           </FlexItem>
@@ -1139,6 +1154,13 @@ export function JobsList({
       >
         Are you sure you want to delete job <strong>{confirmDeleteJob?.jobName}</strong>?
       </Modal>
+
+      {/* File Management Modal */}
+      <FileManagementModal
+        isOpen={isFileManagementOpen}
+        onClose={() => setIsFileManagementOpen(false)}
+        isAdmin={isAdmin}
+      />
     </Card>
   );
 }
