@@ -980,3 +980,55 @@ export interface FilesListResponse {
   /** Array of files */
   files: FileResponse[];
 }
+
+// ============================================================================
+// File Types API Types
+// ============================================================================
+
+/**
+ * FileTypeResponse - File type metadata with usage statistics
+ */
+export interface FileTypeResponse {
+  /** Type name (unique identifier) */
+  name: string;
+  /** Hex color for badge (e.g., #FF5733) - empty string means use UI default */
+  color: string;
+  /** Icon name/identifier - empty string means use UI default */
+  icon: string;
+  /** Number of files using this type */
+  usageCount: number;
+  /** When this type was created */
+  createdAt: string;
+}
+
+/**
+ * FileTypesListResponse - Response containing list of file types
+ */
+export interface FileTypesListResponse {
+  /** Array of file types */
+  fileTypes: FileTypeResponse[];
+}
+
+/**
+ * CreateFileTypeRequest - Request to create a new file type
+ */
+export interface CreateFileTypeRequest {
+  /** Type name (Kubernetes label-compatible) */
+  name: string;
+  /** Hex color (optional - empty string for default) */
+  color?: string;
+  /** Icon name (optional - empty string for default) */
+  icon?: string;
+}
+
+/**
+ * UpdateFileTypeRequest - Request to update file type metadata
+ */
+export interface UpdateFileTypeRequest {
+  /** Type name (must match URL param, immutable) */
+  name: string;
+  /** Hex color (empty string resets to default) */
+  color: string;
+  /** Icon name (empty string resets to default) */
+  icon: string;
+}

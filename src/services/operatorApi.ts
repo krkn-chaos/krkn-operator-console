@@ -20,7 +20,11 @@ import type {
   FileResponse,
   FilesListResponse,
   CreateFileRequest,
-  UpdateFileRequest
+  UpdateFileRequest,
+  FileTypeResponse,
+  FileTypesListResponse,
+  CreateFileTypeRequest,
+  UpdateFileTypeRequest
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -539,6 +543,71 @@ class OperatorApiClient extends BaseApiClient {
    */
   async deleteFile(name: string): Promise<void> {
     await this.fetchJson<void>(`/files/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ============================================================================
+  // File Types Management API
+  // ============================================================================
+
+  /**
+   * GET /api/v1/file-types
+   * Get all file types with usage statistics
+   * @returns Promise with response containing file types array
+   */
+  async getFileTypes(): Promise<FileTypesListResponse> {
+    return this.fetchJson<FileTypesListResponse>('/file-types');
+  }
+
+  /**
+   * GET /api/v1/file-types/{name}
+   * Get details of a specific file type
+   * @param name - File type name
+   * @returns Promise with file type details
+   */
+  async getFileType(name: string): Promise<FileTypeResponse> {
+    return this.fetchJson<FileTypeResponse>(`/file-types/${encodeURIComponent(name)}`);
+  }
+
+  /**
+   * POST /api/v1/file-types
+   * Create a new file type (admin only)
+   * @param request - File type creation request
+   * @returns Promise with created file type data
+   */
+  async createFileType(request: CreateFileTypeRequest): Promise<FileTypeResponse> {
+    return this.fetchJson<FileTypeResponse>('/file-types', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * PUT /api/v1/file-types/{name}
+   * Update file type metadata (admin only)
+   * @param name - File type name
+   * @param request - File type update request
+   * @returns Promise with updated file type data
+   */
+  async updateFileType(name: string, request: UpdateFileTypeRequest): Promise<FileTypeResponse> {
+    return this.fetchJson<FileTypeResponse>(`/file-types/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * DELETE /api/v1/file-types/{name}
+   * Delete a file type (admin only, fails if in use)
+   * @param name - File type name
+   * @returns Promise that resolves when type is deleted
+   * @throws 409 Conflict if type is in use
+   */
+  async deleteFileType(name: string): Promise<void> {
+    await this.fetchJson<void>(`/file-types/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     });
   }
