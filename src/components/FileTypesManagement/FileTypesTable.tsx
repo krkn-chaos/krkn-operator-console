@@ -2,7 +2,7 @@
  * FileTypesTable - Table view of all file types
  *
  * Shows file types with:
- * - Name, Color preview (badge), Icon preview, Usage count, Created date
+ * - Name, Color preview (badge), Usage count, Created date
  * - Actions: Edit, Delete (with usage validation)
  */
 
@@ -118,9 +118,8 @@ export function FileTypesTable({
         <Thead>
           <Tr>
             <Th width={20}>Name</Th>
-            <Th width={15}>Preview</Th>
-            <Th width={15}>Color</Th>
-            <Th width={15}>Icon</Th>
+            <Th width={20}>Preview</Th>
+            <Th width={20}>Color</Th>
             <Th width={15}>Usage</Th>
             <Th width={15}>Created</Th>
             <Th width={10}>Actions</Th>
@@ -141,7 +140,7 @@ export function FileTypesTable({
                     color: '#fff',
                   }}
                 >
-                  {type.icon || 'file'} {type.name}
+                  {type.name}
                 </Label>
               </Td>
               <Td dataLabel="Color">
@@ -163,11 +162,6 @@ export function FileTypesTable({
                     </code>
                   </FlexItem>
                 </Flex>
-              </Td>
-              <Td dataLabel="Icon">
-                <code style={{ fontSize: '0.85em', color: 'var(--pf-v5-global--Color--200)' }}>
-                  {type.icon || '(default)'}
-                </code>
               </Td>
               <Td dataLabel="Usage">
                 <Label color={type.usageCount > 0 ? 'blue' : 'grey'} isCompact>

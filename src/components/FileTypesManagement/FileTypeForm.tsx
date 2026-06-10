@@ -36,7 +36,6 @@ interface FileTypeFormProps {
 export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTypeFormProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [color, setColor] = useState(initialData?.color || '');
-  const [icon, setIcon] = useState(initialData?.icon || '');
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +74,6 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
         const request: CreateFileTypeRequest = {
           name,
           color: color.trim() || undefined,
-          icon: icon.trim() || undefined,
         };
 
         await operatorApi.createFileType(request);
@@ -83,7 +81,7 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
         const request: UpdateFileTypeRequest = {
           name,
           color: color.trim(),
-          icon: icon.trim(),
+          icon: '', // Empty string - using default
         };
 
         await operatorApi.updateFileType(name, request);
@@ -99,7 +97,6 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
 
   // Get preview color (fallback to grey if empty)
   const previewColor = color || '#6c757d';
-  const previewIcon = icon || 'file';
 
   return (
     <Form onSubmit={handleSubmit}>
@@ -158,25 +155,14 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
               }}
             />
           </FlexItem>
-          <FlexItem flex={{ default: 'flex_1' }}>
+          <FlexItem>
             <TextInput
               id="color-input"
               value={color}
               onChange={(_event, value) => setColor(value)}
               validated={validationErrors.color ? 'error' : 'default'}
               placeholder="#FF5733"
-              style={{ fontFamily: 'monospace', width: '120px' }}
-            />
-          </FlexItem>
-          <FlexItem>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '4px',
-                backgroundColor: previewColor,
-                border: '2px solid var(--pf-v5-global--BorderColor--100)',
-              }}
+              style={{ fontFamily: 'monospace', width: '140px' }}
             />
           </FlexItem>
           {color && (
@@ -203,33 +189,6 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
         </FormHelperText>
       </FormGroup>
 
-      <FormGroup label="Icon" fieldId="icon-input">
-        <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
-          <FlexItem flex={{ default: 'flex_1' }}>
-            <TextInput
-              id="icon-input"
-              value={icon}
-              onChange={(_event, value) => setIcon(value)}
-              placeholder="file-code, terminal, gear..."
-            />
-          </FlexItem>
-          {icon && (
-            <FlexItem>
-              <Button variant="link" isInline onClick={() => setIcon('')}>
-                Clear (use default)
-              </Button>
-            </FlexItem>
-          )}
-        </Flex>
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem>
-              Icon name or identifier. Leave empty to use default icon.
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
-
       <FormGroup label="Preview" fieldId="preview">
         <Label
           color="grey"
@@ -240,7 +199,7 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
             padding: '0.5rem 1rem',
           }}
         >
-          {previewIcon} {name || 'type-name'}
+          {name || 'type-name'}
         </Label>
         <FormHelperText>
           <HelperText>
