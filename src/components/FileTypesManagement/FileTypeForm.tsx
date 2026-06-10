@@ -144,13 +144,28 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
       <FormGroup label="Color" fieldId="color-input">
         <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>
+            <input
+              type="color"
+              id="color-picker"
+              value={color || '#6c757d'}
+              onChange={(e) => setColor(e.target.value)}
+              style={{
+                width: '60px',
+                height: '40px',
+                border: '2px solid var(--pf-v5-global--BorderColor--100)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            />
+          </FlexItem>
+          <FlexItem flex={{ default: 'flex_1' }}>
             <TextInput
               id="color-input"
               value={color}
               onChange={(_event, value) => setColor(value)}
               validated={validationErrors.color ? 'error' : 'default'}
               placeholder="#FF5733"
-              style={{ fontFamily: 'monospace' }}
+              style={{ fontFamily: 'monospace', width: '120px' }}
             />
           </FlexItem>
           <FlexItem>
@@ -182,7 +197,7 @@ export function FileTypeForm({ mode, initialData, onSuccess, onCancel }: FileTyp
         <FormHelperText>
           <HelperText>
             <HelperTextItem>
-              Hex color code (e.g., #FF5733). Leave empty to use default UI color.
+              Pick a color or enter hex code (e.g., #FF5733). Leave empty to use default UI color.
             </HelperTextItem>
           </HelperText>
         </FormHelperText>
