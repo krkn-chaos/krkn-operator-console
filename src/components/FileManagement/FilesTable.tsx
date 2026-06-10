@@ -29,6 +29,7 @@ import type { FileResponse } from '../../types/api';
 
 interface FilesTableProps {
   files: FileResponse[];
+  fileTypes: Array<{ name: string; color: string }>; // For type badge colors
   onCreateClick: () => void;
   onEditClick: (file: FileResponse) => void;
   onDeleteClick: (fileName: string) => void;
@@ -37,6 +38,7 @@ interface FilesTableProps {
 
 export function FilesTable({
   files,
+  fileTypes,
   onCreateClick,
   onEditClick,
   onDeleteClick,
@@ -105,12 +107,13 @@ export function FilesTable({
       <Table aria-label="Files table" variant="compact">
         <Thead>
           <Tr>
-            <Th width={15}>Name</Th>
-            <Th width={15}>File</Th>
-            <Th width={20}>Mount Path</Th>
-            <Th width={25}>Description</Th>
+            <Th width={12}>Name</Th>
+            <Th width={12}>File</Th>
+            <Th width={10}>Type</Th>
+            <Th width={18}>Mount Path</Th>
+            <Th width={20}>Description</Th>
             <Th width={15}>Access</Th>
-            <Th width={10}>Actions</Th>
+            <Th width={13}>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
@@ -121,6 +124,22 @@ export function FilesTable({
               </Td>
               <Td dataLabel="File">
                 <code style={{ fontSize: '0.9em' }}>{file.fileName}</code>
+              </Td>
+              <Td dataLabel="Type">
+                {file.fileType ? (
+                  <Label
+                    color="grey"
+                    isCompact
+                    style={{
+                      backgroundColor: fileTypes.find(t => t.name === file.fileType)?.color || '#6c757d',
+                      color: '#fff',
+                    }}
+                  >
+                    {file.fileType}
+                  </Label>
+                ) : (
+                  <span style={{ color: 'var(--pf-v5-global--Color--200)', fontSize: '0.85em' }}>-</span>
+                )}
               </Td>
               <Td dataLabel="Mount Path" modifier="truncate">
                 <code style={{ fontSize: '0.85em', color: 'var(--pf-v5-global--Color--200)' }}>

@@ -235,6 +235,7 @@ export function FileManagementModal({
               <div style={{ marginTop: '1rem' }}>
                 <FilesTable
                   files={files}
+                  fileTypes={fileTypes}
                   onCreateClick={handleCreateFileClick}
                   onEditClick={handleEditFileClick}
                   onDeleteClick={handleDeleteFileClick}

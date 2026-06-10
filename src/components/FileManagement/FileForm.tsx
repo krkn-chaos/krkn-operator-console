@@ -29,6 +29,7 @@ import {
   TextInputGroupUtilities,
   Flex,
   FlexItem,
+  Spinner,
 } from '@patternfly/react-core';
 import { FiPlus, FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
@@ -76,6 +77,7 @@ export function FileForm({
   const [groupsLoaded, setGroupsLoaded] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+  const [loadingFile, setLoadingFile] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -86,6 +88,48 @@ export function FileForm({
   // Group select state (single selection)
   const [isGroupSelectOpen, setIsGroupSelectOpen] = useState(false);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
+
+  // Load file details in edit mode
+  useEffect(() => {
+    if (mode !== 'edit' || !initialData?.name) {
+      return;
+    }
+
+    async function loadFile() {
+      setLoadingFile(true);
+      setError(null);
+
+      try {
+        const file = await operatorApi.getFile(initialData.name);
+
+        // Pre-populate all fields
+        setFileName(file.fileName);
+        setContent(file.content);
+        setMountPath(file.mountPath);
+        setDescription(file.description || '');
+        setFileType(file.fileType || '');
+        setAccessType(file.availableToAll ? 'public' : 'group');
+        setSelectedGroup(file.groups?.[0] || '');
+      } catch (err) {
+        if (err instanceof Error) {
+          if (err.message.includes('403')) {
+            setError('You do not have permission to edit this file');
+          } else if (err.message.includes('404')) {
+            setError('File not found - it may have been deleted');
+          } else {
+            setError('Failed to load file: ' + err.message);
+          }
+        } else {
+          setError('Failed to load file');
+        }
+        console.error('[FileForm] Error loading file for edit:', err);
+      } finally {
+        setLoadingFile(false);
+      }
+    }
+
+    loadFile();
+  }, [mode, initialData?.name]);
 
   // Load available groups
   useEffect(() => {
@@ -192,6 +236,25 @@ export function FileForm({
       setSubmitting(false);
     }
   };
+
+  // Show loading state while fetching file in edit mode
+  if (loadingFile) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+        <Spinner size="lg" aria-label="Loading file" />
+        <span style={{ marginLeft: '1rem' }}>Loading file details...</span>
+      </div>
+    );
+  }
+
+  // Show error if file couldn't be loaded
+  if (mode === 'edit' && error) {
+    return (
+      <Alert variant="danger" isInline title="Cannot Edit File">
+        {error}
+      </Alert>
+    );
+  }
 
   return (
     <Form onSubmit={handleSubmit}>
