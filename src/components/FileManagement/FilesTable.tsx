@@ -221,20 +221,22 @@ export function FilesTable({
                             <span style={{ marginLeft: '0.5rem' }}>{file.description}</span>
                           </FlexItem>
                         )}
-                        <FlexItem>
-                          <strong>Content Preview:</strong>
-                          <pre style={{
-                            marginTop: '0.5rem',
-                            padding: '0.5rem',
-                            backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
-                            borderRadius: '4px',
-                            fontSize: '0.85em',
-                            maxHeight: '200px',
-                            overflow: 'auto',
-                          }}>
-                            {file.content.slice(0, 500)}{file.content.length > 500 ? '...' : ''}
-                          </pre>
-                        </FlexItem>
+                        {file.content && (
+                          <FlexItem>
+                            <strong>Content Preview:</strong>
+                            <pre style={{
+                              marginTop: '0.5rem',
+                              padding: '0.5rem',
+                              backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
+                              borderRadius: '4px',
+                              fontSize: '0.85em',
+                              maxHeight: '200px',
+                              overflow: 'auto',
+                            }}>
+                              {file.content.slice(0, 500)}{file.content.length > 500 ? '...' : ''}
+                            </pre>
+                          </FlexItem>
+                        )}
                       </Flex>
                     </div>
                   </ExpandableRowContent>
