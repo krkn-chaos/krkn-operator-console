@@ -1,7 +1,5 @@
 /**
- * FilesTable - Table view of all files
- *
- * Clean, readable table with essential columns and expandable rows for details
+ * FilesTable - Clean table view of files
  */
 
 import { useState } from 'react';
@@ -18,17 +16,15 @@ import {
   ToolbarItem,
   SearchInput,
   Label,
-  Flex,
-  FlexItem,
   Tooltip,
 } from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td, ExpandableRowContent } from '@patternfly/react-table';
+import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock } from 'react-icons/fi';
 import type { FileResponse } from '../../types/api';
 
 interface FilesTableProps {
   files: FileResponse[];
-  fileTypes: Array<{ name: string; color: string }>; // For type badge colors
+  fileTypes: Array<{ name: string; color: string }>;
   onCreateClick: () => void;
   onEditClick: (file: FileResponse) => void;
   onDeleteClick: (fileName: string) => void;
@@ -44,28 +40,15 @@ export function FilesTable({
   onRefresh,
 }: FilesTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  // Ensure files is always an array
   const filesList = Array.isArray(files) ? files : [];
 
-  // Filter files based on search term
   const filteredFiles = filesList.filter(
     (file) =>
       file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const toggleExpand = (fileName: string) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(fileName)) {
-      newExpanded.delete(fileName);
-    } else {
-      newExpanded.add(fileName);
-    }
-    setExpandedRows(newExpanded);
-  };
 
   if (filesList.length === 0) {
     return (
@@ -114,145 +97,103 @@ export function FilesTable({
         </ToolbarContent>
       </Toolbar>
 
-      <Table aria-label="Files table" variant="compact">
+      <Table aria-label="Files table" borders>
         <Thead>
           <Tr>
-            <Th />
-            <Th width={25}>Name</Th>
-            <Th width={20}>File</Th>
-            <Th width={15}>Type</Th>
-            <Th width={20}>Access</Th>
-            <Th width={20}>Actions</Th>
+            <Th>Name</Th>
+            <Th>File</Th>
+            <Th>Type</Th>
+            <Th>Mount Path</Th>
+            <Th>Access</Th>
+            <Th>Actions</Th>
           </Tr>
         </Thead>
-        {filteredFiles.map((file, rowIndex) => {
-          const isExpanded = expandedRows.has(file.name);
-          return (
-            <Tbody key={file.name} isExpanded={isExpanded}>
-              <Tr>
-                <Td
-                  expand={{
-                    rowIndex,
-                    isExpanded,
-                    onToggle: () => toggleExpand(file.name),
-                  }}
-                />
-                <Td dataLabel="Name">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FiFile style={{ color: 'var(--pf-v5-global--Color--200)' }} />
-                    <strong>{file.name}</strong>
-                  </div>
-                </Td>
-                <Td dataLabel="File">
-                  <code style={{ fontSize: '0.9em', color: 'var(--pf-v5-global--Color--200)' }}>
-                    {file.fileName}
-                  </code>
-                </Td>
-                <Td dataLabel="Type">
-                  {file.fileType ? (
-                    <Label
-                      color="grey"
-                      isCompact
-                      style={{
-                        backgroundColor: fileTypes.find(t => t.name === file.fileType)?.color || '#6c757d',
-                        color: '#fff',
-                      }}
-                    >
-                      {file.fileType}
+        <Tbody>
+          {filteredFiles.map((file) => (
+            <Tr key={file.name}>
+              <Td dataLabel="Name">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
+                  <strong>{file.name}</strong>
+                </div>
+              </Td>
+              <Td dataLabel="File">
+                <code style={{
+                  fontSize: '0.875rem',
+                  padding: '0.125rem 0.25rem',
+                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                  borderRadius: '3px',
+                }}>
+                  {file.fileName}
+                </code>
+              </Td>
+              <Td dataLabel="Type">
+                {file.fileType ? (
+                  <Label
+                    isCompact
+                    style={{
+                      backgroundColor: fileTypes.find(t => t.name === file.fileType)?.color || '#6c757d',
+                      color: '#fff',
+                    }}
+                  >
+                    {file.fileType}
+                  </Label>
+                ) : (
+                  <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>—</span>
+                )}
+              </Td>
+              <Td dataLabel="Mount Path">
+                <code style={{
+                  fontSize: '0.8125rem',
+                  color: 'var(--pf-v5-global--Color--200)',
+                }}>
+                  {file.mountPath}
+                </code>
+              </Td>
+              <Td dataLabel="Access">
+                {file.availableToAll ? (
+                  <Tooltip content="Available to all users">
+                    <Label color="green" isCompact icon={<FiGlobe />}>
+                      Public
                     </Label>
-                  ) : (
-                    <span style={{ color: 'var(--pf-v5-global--Color--200)', fontSize: '0.85em' }}>—</span>
-                  )}
-                </Td>
-                <Td dataLabel="Access">
-                  {file.availableToAll ? (
-                    <Tooltip content="Available to all users">
-                      <Label color="green" isCompact icon={<FiGlobe />}>
-                        Public
-                      </Label>
-                    </Tooltip>
-                  ) : (
-                    <Tooltip content={file.groups?.length ? `Only ${file.groups[0]} members` : 'No groups assigned'}>
-                      <Label color="blue" isCompact icon={<FiLock />}>
-                        {file.groups && file.groups.length > 0 ? file.groups[0] : 'Private'}
-                      </Label>
-                    </Tooltip>
-                  )}
-                </Td>
-                <Td dataLabel="Actions" isActionCell>
-                  <Flex spaceItems={{ default: 'spaceItemsNone' }}>
-                    <FlexItem>
-                      <Tooltip content="Edit file">
-                        <Button
-                          variant="plain"
-                          onClick={() => onEditClick(file)}
-                          aria-label="Edit file"
-                          icon={<FiEdit />}
-                        />
-                      </Tooltip>
-                    </FlexItem>
-                    <FlexItem>
-                      <Tooltip content="Delete file">
-                        <Button
-                          variant="plain"
-                          onClick={() => onDeleteClick(file.name)}
-                          aria-label="Delete file"
-                          isDanger
-                          icon={<FiTrash2 />}
-                        />
-                      </Tooltip>
-                    </FlexItem>
-                  </Flex>
-                </Td>
-              </Tr>
-              <Tr isExpanded={isExpanded}>
-                <Td />
-                <Td colSpan={5}>
-                  <ExpandableRowContent>
-                    <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)' }}>
-                      <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsSm' }}>
-                        <FlexItem>
-                          <strong>Mount Path:</strong>
-                          <code style={{ marginLeft: '0.5rem', fontSize: '0.9em' }}>{file.mountPath}</code>
-                        </FlexItem>
-                        {file.description && (
-                          <FlexItem>
-                            <strong>Description:</strong>
-                            <span style={{ marginLeft: '0.5rem' }}>{file.description}</span>
-                          </FlexItem>
-                        )}
-                        {file.content && (
-                          <FlexItem>
-                            <strong>Content Preview:</strong>
-                            <pre style={{
-                              marginTop: '0.5rem',
-                              padding: '0.5rem',
-                              backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
-                              borderRadius: '4px',
-                              fontSize: '0.85em',
-                              maxHeight: '200px',
-                              overflow: 'auto',
-                            }}>
-                              {file.content.slice(0, 500)}{file.content.length > 500 ? '...' : ''}
-                            </pre>
-                          </FlexItem>
-                        )}
-                      </Flex>
-                    </div>
-                  </ExpandableRowContent>
-                </Td>
-              </Tr>
-            </Tbody>
-          );
-        })}
+                  </Tooltip>
+                ) : (
+                  <Tooltip content={file.groups?.length ? `Only ${file.groups[0]} members` : 'No groups'}>
+                    <Label color="blue" isCompact icon={<FiLock />}>
+                      {file.groups && file.groups.length > 0 ? file.groups[0] : 'Private'}
+                    </Label>
+                  </Tooltip>
+                )}
+              </Td>
+              <Td isActionCell>
+                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                  <Tooltip content="Edit file">
+                    <Button
+                      variant="plain"
+                      onClick={() => onEditClick(file)}
+                      aria-label="Edit file"
+                      icon={<FiEdit />}
+                    />
+                  </Tooltip>
+                  <Tooltip content="Delete file">
+                    <Button
+                      variant="plain"
+                      onClick={() => onDeleteClick(file.name)}
+                      aria-label="Delete file"
+                      isDanger
+                      icon={<FiTrash2 />}
+                    />
+                  </Tooltip>
+                </div>
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
       </Table>
 
       {filteredFiles.length === 0 && searchTerm && (
         <EmptyState>
-          <EmptyStateHeader
-            titleText="No results found"
-            headingLevel="h4"
-          />
+          <EmptyStateHeader titleText="No results found" headingLevel="h4" />
           <EmptyStateBody>
             No files match your search criteria. Try adjusting your search term.
           </EmptyStateBody>
