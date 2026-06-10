@@ -91,23 +91,19 @@ export function FileForm({
   useEffect(() => {
     async function loadGroups() {
       try {
-        console.log('[FileForm] Loading groups...');
         const response = await operatorApi.getGroups();
-        console.log('[FileForm] Groups API response:', JSON.stringify(response, null, 2));
-        console.log('[FileForm] isAdmin:', isAdmin);
-        console.log('[FileForm] groups array:', response.groups);
-        console.log('[FileForm] groups count:', response.groups?.length || 0);
         setAvailableGroups(response.groups || []);
         setGroupsLoaded(true);
       } catch (err) {
         console.error('[FileForm] Error loading groups:', err);
-        setGroupsLoaded(true); // Mark as loaded even on error
+        // On error (e.g., 403 Forbidden), treat as no groups available
+        setAvailableGroups([]);
+        setGroupsLoaded(true);
       }
     }
 
     loadGroups();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Load only once on mount
+  }, []);
 
   // Auto-populate group when user has exactly 1 group and switches to 'group' mode
   useEffect(() => {
