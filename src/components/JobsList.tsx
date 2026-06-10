@@ -43,14 +43,12 @@ import {
   LockIcon,
   TopologyIcon,
   FileIcon,
-  TagIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
 import { FileManagementModal } from './FileManagement';
-import { FileTypesManagementModal } from './FileTypesManagement';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
@@ -111,7 +109,6 @@ export function JobsList({
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
   const [isFileManagementOpen, setIsFileManagementOpen] = useState(false);
-  const [isFileTypesManagementOpen, setIsFileTypesManagementOpen] = useState(false);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -374,16 +371,6 @@ export function JobsList({
                   icon={<FileIcon />}
                 >
                   Manage Files
-                </DropdownItem>
-                <DropdownItem
-                  onClick={() => {
-                    setIsRunDropdownOpen(false);
-                    setIsFileTypesManagementOpen(true);
-                  }}
-                  description="Manage file type metadata (colors and icons)"
-                  icon={<TagIcon />}
-                >
-                  Manage File Types
                 </DropdownItem>
               </DropdownList>
             </Dropdown>
@@ -1170,12 +1157,6 @@ export function JobsList({
       <FileManagementModal
         isOpen={isFileManagementOpen}
         onClose={() => setIsFileManagementOpen(false)}
-      />
-
-      {/* File Types Management Modal */}
-      <FileTypesManagementModal
-        isOpen={isFileTypesManagementOpen}
-        onClose={() => setIsFileTypesManagementOpen(false)}
       />
     </Card>
   );

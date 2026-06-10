@@ -18,23 +18,35 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
+  FormSelect,
+  FormSelectOption,
 } from '@patternfly/react-core';
 import { operatorApi } from '../../services/operatorApi';
-import type { FileResponse, CreateFileRequest, UpdateFileRequest } from '../../types/api';
+import type { FileResponse, CreateFileRequest, UpdateFileRequest, FileTypeResponse } from '../../types/api';
 
 interface FileFormProps {
   mode: 'create' | 'edit';
   initialData?: FileResponse;
+  availableFileTypes: FileTypeResponse[];
   onSuccess: () => void;
   onCancel: () => void;
+  onRequestNewFileType: () => void;
 }
 
-export function FileForm({ mode, initialData, onSuccess, onCancel }: FileFormProps) {
+export function FileForm({
+  mode,
+  initialData,
+  availableFileTypes,
+  onSuccess,
+  onCancel,
+  onRequestNewFileType,
+}: FileFormProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [fileName, setFileName] = useState(initialData?.fileName || '');
   const [content, setContent] = useState(initialData?.content || '');
   const [mountPath, setMountPath] = useState(initialData?.mountPath || '');
   const [description, setDescription] = useState(initialData?.description || '');
+  const [fileType, setFileType] = useState(initialData?.fileType || '');
   const [accessType, setAccessType] = useState<'public' | 'groups'>(
     initialData?.availableToAll ? 'public' : 'groups'
   );
@@ -100,6 +112,7 @@ export function FileForm({ mode, initialData, onSuccess, onCancel }: FileFormPro
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
+          fileType: fileType.trim() || undefined,
         };
 
         await operatorApi.createFile(request);
@@ -111,6 +124,7 @@ export function FileForm({ mode, initialData, onSuccess, onCancel }: FileFormPro
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
+          fileType: fileType.trim() || undefined,
         };
 
         await operatorApi.updateFile(name, request);
@@ -225,6 +239,33 @@ export function FileForm({ mode, initialData, onSuccess, onCancel }: FileFormPro
           value={description}
           onChange={(_event, value) => setDescription(value)}
         />
+      </FormGroup>
+
+      <FormGroup label="File Type" fieldId="file-type-select">
+        <FormSelect
+          id="file-type-select"
+          value={fileType}
+          onChange={(_event, value) => {
+            if (value === '__ADD_NEW__') {
+              onRequestNewFileType();
+            } else {
+              setFileType(value);
+            }
+          }}
+        >
+          <FormSelectOption value="" label="(No type)" />
+          {availableFileTypes.map((type) => (
+            <FormSelectOption key={type.name} value={type.name} label={type.name} />
+          ))}
+          <FormSelectOption value="__ADD_NEW__" label="+ Add New Type" />
+        </FormSelect>
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem>
+              Optional file type classification. Select "+ Add New Type" to create a new type.
+            </HelperTextItem>
+          </HelperText>
+        </FormHelperText>
       </FormGroup>
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
