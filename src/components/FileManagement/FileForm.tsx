@@ -61,10 +61,14 @@ export function FileForm({
   const [mountPath, setMountPath] = useState(initialData?.mountPath || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [fileType, setFileType] = useState(initialData?.fileType || '');
-  const [accessType, setAccessType] = useState<'public' | 'group'>(
-    // Non-admin users can only create group-based files
-    isAdmin && initialData?.availableToAll ? 'public' : 'group'
-  );
+  const [accessType, setAccessType] = useState<'public' | 'group'>(() => {
+    // For edit mode: use existing value
+    if (initialData) {
+      return initialData.availableToAll ? 'public' : 'group';
+    }
+    // For create mode: default to public
+    return 'public';
+  });
   const [selectedGroup, setSelectedGroup] = useState<string>(
     initialData?.groups?.[0] || '' // Max 1 group
   );
@@ -89,8 +93,8 @@ export function FileForm({
         const response = await operatorApi.getGroups();
         setAvailableGroups(response.groups || []);
 
-        // For non-admin users, auto-select their first group (only on initial load)
-        if (!isAdmin && response.groups.length > 0 && !initialData) {
+        // Auto-populate group if user has exactly 1 group and switches to 'group' mode
+        if (!isAdmin && response.groups.length === 1 && accessType === 'group' && !selectedGroup) {
           setSelectedGroup(response.groups[0].name);
         }
       } catch (err) {
@@ -99,8 +103,7 @@ export function FileForm({
     }
 
     loadGroups();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [isAdmin, accessType, selectedGroup]);
 
   // Validate form
   const validate = (): boolean => {
