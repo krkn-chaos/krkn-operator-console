@@ -18,9 +18,9 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
-  FormSelect,
-  FormSelectOption,
-  Checkbox,
+  Label,
+  Flex,
+  FlexItem,
 } from '@patternfly/react-core';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
@@ -33,6 +33,28 @@ interface FileFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   onRequestNewFileType: () => void;
+}
+
+// Generate consistent color from group name
+function getGroupColor(groupName: string): string {
+  const colors = [
+    '#0066CC', // blue
+    '#2ECC71', // green
+    '#E74C3C', // red
+    '#9B59B6', // purple
+    '#F39C12', // orange
+    '#1ABC9C', // teal
+    '#E67E22', // dark orange
+    '#3498DB', // light blue
+    '#16A085', // dark teal
+    '#C0392B', // dark red
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < groupName.length; i++) {
+    hash = groupName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
 }
 
 export function FileForm({
@@ -266,27 +288,67 @@ export function FileForm({
       </FormGroup>
 
       <FormGroup label="File Type" fieldId="file-type-select">
-        <FormSelect
-          id="file-type-select"
-          value={fileType}
-          onChange={(_event, value) => {
-            if (value === '__ADD_NEW__') {
-              onRequestNewFileType();
-            } else {
-              setFileType(value);
-            }
-          }}
-        >
-          <FormSelectOption value="" label="(No type)" />
+        <Flex spaceItems={{ default: 'spaceItemsSm' }} flexWrap={{ default: 'wrap' }}>
+          {/* No Type option */}
+          <FlexItem>
+            <Label
+              color="grey"
+              isCompact
+              onClick={() => setFileType('')}
+              style={{
+                cursor: 'pointer',
+                backgroundColor: fileType === '' ? '#6c757d' : '#f0f0f0',
+                color: fileType === '' ? '#fff' : '#666',
+                border: `2px solid ${fileType === '' ? '#6c757d' : '#ccc'}`,
+                transition: 'all 0.2s',
+              }}
+            >
+              (No type)
+            </Label>
+          </FlexItem>
+
+          {/* Existing file types */}
           {availableFileTypes.map((type) => (
-            <FormSelectOption key={type.name} value={type.name} label={type.name} />
+            <FlexItem key={type.name}>
+              <Label
+                color="grey"
+                isCompact
+                onClick={() => setFileType(type.name)}
+                style={{
+                  cursor: 'pointer',
+                  backgroundColor: fileType === type.name ? (type.color || '#6c757d') : '#f0f0f0',
+                  color: fileType === type.name ? '#fff' : '#666',
+                  border: `2px solid ${fileType === type.name ? (type.color || '#6c757d') : '#ccc'}`,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {type.name}
+              </Label>
+            </FlexItem>
           ))}
-          <FormSelectOption value="__ADD_NEW__" label="+ Add New Type" />
-        </FormSelect>
+
+          {/* Add New Type button */}
+          <FlexItem>
+            <Label
+              color="blue"
+              isCompact
+              onClick={onRequestNewFileType}
+              style={{
+                cursor: 'pointer',
+                backgroundColor: '#fff',
+                color: '#0066CC',
+                border: '2px dashed #0066CC',
+                transition: 'all 0.2s',
+              }}
+            >
+              + Add New Type
+            </Label>
+          </FlexItem>
+        </Flex>
         <FormHelperText>
           <HelperText>
             <HelperTextItem>
-              Optional file type classification. Select "+ Add New Type" to create a new type.
+              Click a type to select it, or create a new one with "+ Add New Type"
             </HelperTextItem>
           </HelperText>
         </FormHelperText>
@@ -316,24 +378,41 @@ export function FileForm({
           {availableGroups.length === 0 ? (
             <Alert variant="info" isInline title="No groups available" />
           ) : (
-            <>
-              {availableGroups.map((group) => (
-                <Checkbox
-                  key={group.name}
-                  id={`group-${group.name}`}
-                  label={group.description ? `${group.name} - ${group.description}` : group.name}
-                  isChecked={selectedGroups.includes(group.name)}
-                  onChange={(_event, checked) => {
-                    if (checked) {
-                      setSelectedGroups([...selectedGroups, group.name]);
-                    } else {
-                      setSelectedGroups(selectedGroups.filter(g => g !== group.name));
-                    }
-                  }}
-                  isDisabled={!isAdmin}
-                />
-              ))}
-            </>
+            <Flex spaceItems={{ default: 'spaceItemsSm' }} flexWrap={{ default: 'wrap' }}>
+              {availableGroups.map((group) => {
+                const isSelected = selectedGroups.includes(group.name);
+                const color = getGroupColor(group.name);
+
+                return (
+                  <FlexItem key={group.name}>
+                    <Label
+                      color="grey"
+                      isCompact
+                      onClick={() => {
+                        if (!isAdmin) return; // Non-admin cannot change selection
+
+                        if (isSelected) {
+                          setSelectedGroups(selectedGroups.filter(g => g !== group.name));
+                        } else {
+                          setSelectedGroups([...selectedGroups, group.name]);
+                        }
+                      }}
+                      style={{
+                        cursor: isAdmin ? 'pointer' : 'default',
+                        backgroundColor: isSelected ? color : '#f0f0f0',
+                        color: isSelected ? '#fff' : '#666',
+                        border: `2px solid ${isSelected ? color : '#ccc'}`,
+                        opacity: isAdmin ? 1 : 0.7,
+                        transition: 'all 0.2s',
+                      }}
+                      title={group.description || group.name}
+                    >
+                      {group.name}
+                    </Label>
+                  </FlexItem>
+                );
+              })}
+            </Flex>
           )}
           {validationErrors.groups && (
             <FormHelperText>
@@ -346,7 +425,7 @@ export function FileForm({
             <HelperText>
               <HelperTextItem>
                 {isAdmin
-                  ? 'Select one or more groups that can access this file'
+                  ? 'Click tags to select/deselect groups'
                   : 'File will be created in your assigned groups'}
               </HelperTextItem>
             </HelperText>
