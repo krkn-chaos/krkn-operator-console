@@ -21,6 +21,7 @@ import type {
   FilesListResponse,
   CreateFileRequest,
   UpdateFileRequest,
+  GroupsListResponse,
   FileTypeResponse,
   FileTypesListResponse,
   CreateFileTypeRequest,
@@ -472,6 +473,19 @@ class OperatorApiClient extends BaseApiClient {
    */
   async getActiveRuns(): Promise<ActiveRunsResponse> {
     return this.fetchJson<ActiveRunsResponse>('/dashboard/active-runs');
+  }
+
+  // ============================================================================
+  // Groups API
+  // ============================================================================
+
+  /**
+   * GET /api/v1/groups
+   * Get all groups available in the system
+   * @returns Promise with response containing groups array
+   */
+  async getGroups(): Promise<GroupsListResponse> {
+    return this.fetchJson<GroupsListResponse>('/groups');
   }
 
   // ============================================================================

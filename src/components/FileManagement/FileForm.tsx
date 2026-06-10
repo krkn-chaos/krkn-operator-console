@@ -5,7 +5,7 @@
  * Backend handles group-based permissions.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Form,
   FormGroup,
@@ -20,9 +20,11 @@ import {
   HelperTextItem,
   FormSelect,
   FormSelectOption,
+  Checkbox,
 } from '@patternfly/react-core';
 import { operatorApi } from '../../services/operatorApi';
-import type { FileResponse, CreateFileRequest, UpdateFileRequest, FileTypeResponse } from '../../types/api';
+import { useRole } from '../../hooks/useRole';
+import type { FileResponse, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
   mode: 'create' | 'edit';
@@ -41,6 +43,8 @@ export function FileForm({
   onCancel,
   onRequestNewFileType,
 }: FileFormProps) {
+  const { isAdmin } = useRole();
+
   const [name, setName] = useState(initialData?.name || '');
   const [fileName, setFileName] = useState(initialData?.fileName || '');
   const [content, setContent] = useState(initialData?.content || '');
@@ -48,13 +52,35 @@ export function FileForm({
   const [description, setDescription] = useState(initialData?.description || '');
   const [fileType, setFileType] = useState(initialData?.fileType || '');
   const [accessType, setAccessType] = useState<'public' | 'groups'>(
-    initialData?.availableToAll ? 'public' : 'groups'
+    // Non-admin users can only create group-based files
+    isAdmin && initialData?.availableToAll ? 'public' : 'groups'
   );
-  const [groups, setGroups] = useState(initialData?.groups?.join(', ') || '');
+  const [selectedGroups, setSelectedGroups] = useState<string[]>(initialData?.groups || []);
+  const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Load available groups
+  useEffect(() => {
+    async function loadGroups() {
+      try {
+        const response = await operatorApi.getGroups();
+        setAvailableGroups(response.groups || []);
+
+        // For non-admin users, auto-select their groups (only on initial load)
+        if (!isAdmin && response.groups.length > 0 && !initialData) {
+          setSelectedGroups(response.groups.map(g => g.name));
+        }
+      } catch (err) {
+        console.error('[FileForm] Error loading groups:', err);
+      }
+    }
+
+    loadGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   // Validate form
   const validate = (): boolean => {
@@ -80,7 +106,7 @@ export function FileForm({
       errors.mountPath = 'Mount path must start with /';
     }
 
-    if (accessType === 'groups' && !groups.trim()) {
+    if (accessType === 'groups' && selectedGroups.length === 0) {
       errors.groups = 'At least one group is required for group-based access';
     }
 
@@ -99,9 +125,7 @@ export function FileForm({
     setError(null);
 
     try {
-      const groupsArray = accessType === 'groups'
-        ? groups.split(',').map(g => g.trim()).filter(Boolean)
-        : [];
+      const groupsArray = accessType === 'groups' ? selectedGroups : [];
 
       if (mode === 'create') {
         const request: CreateFileRequest = {
@@ -269,13 +293,15 @@ export function FileForm({
       </FormGroup>
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
-        <Radio
-          id="access-public"
-          name="access-type"
-          label="Public (available to all users)"
-          isChecked={accessType === 'public'}
-          onChange={() => setAccessType('public')}
-        />
+        {isAdmin && (
+          <Radio
+            id="access-public"
+            name="access-type"
+            label="Public (available to all users)"
+            isChecked={accessType === 'public'}
+            onChange={() => setAccessType('public')}
+          />
+        )}
         <Radio
           id="access-groups"
           name="access-type"
@@ -287,13 +313,28 @@ export function FileForm({
 
       {accessType === 'groups' && (
         <FormGroup label="Groups" isRequired fieldId="groups-input">
-          <TextInput
-            id="groups-input"
-            value={groups}
-            onChange={(_event, value) => setGroups(value)}
-            validated={validationErrors.groups ? 'error' : 'default'}
-            placeholder="group1, group2, group3"
-          />
+          {availableGroups.length === 0 ? (
+            <Alert variant="info" isInline title="No groups available" />
+          ) : (
+            <>
+              {availableGroups.map((group) => (
+                <Checkbox
+                  key={group.name}
+                  id={`group-${group.name}`}
+                  label={group.description ? `${group.name} - ${group.description}` : group.name}
+                  isChecked={selectedGroups.includes(group.name)}
+                  onChange={(_event, checked) => {
+                    if (checked) {
+                      setSelectedGroups([...selectedGroups, group.name]);
+                    } else {
+                      setSelectedGroups(selectedGroups.filter(g => g !== group.name));
+                    }
+                  }}
+                  isDisabled={!isAdmin}
+                />
+              ))}
+            </>
+          )}
           {validationErrors.groups && (
             <FormHelperText>
               <HelperText>
@@ -303,7 +344,11 @@ export function FileForm({
           )}
           <FormHelperText>
             <HelperText>
-              <HelperTextItem>Comma-separated list of group names</HelperTextItem>
+              <HelperTextItem>
+                {isAdmin
+                  ? 'Select one or more groups that can access this file'
+                  : 'File will be created in your assigned groups'}
+              </HelperTextItem>
             </HelperText>
           </FormHelperText>
         </FormGroup>

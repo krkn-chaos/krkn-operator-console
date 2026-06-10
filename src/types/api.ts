@@ -982,6 +982,28 @@ export interface FilesListResponse {
 }
 
 // ============================================================================
+// Groups API Types
+// ============================================================================
+
+/**
+ * GroupResponse - User group information
+ */
+export interface GroupResponse {
+  /** Group name */
+  name: string;
+  /** Group description */
+  description?: string;
+}
+
+/**
+ * GroupsListResponse - Response containing list of groups
+ */
+export interface GroupsListResponse {
+  /** Array of groups */
+  groups: GroupResponse[];
+}
+
+// ============================================================================
 // File Types API Types
 // ============================================================================
 
