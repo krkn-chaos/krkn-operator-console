@@ -19,9 +19,18 @@ import {
   HelperText,
   HelperTextItem,
   Label,
+  Select,
+  SelectList,
+  SelectOption,
+  MenuToggle,
+  MenuToggleElement,
+  TextInputGroup,
+  TextInputGroupMain,
+  TextInputGroupUtilities,
   Flex,
   FlexItem,
 } from '@patternfly/react-core';
+import { FiPlus, FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
 import type { FileResponse, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
@@ -35,27 +44,6 @@ interface FileFormProps {
   onRequestNewFileType: () => void;
 }
 
-// Generate consistent color from group name
-function getGroupColor(groupName: string): string {
-  const colors = [
-    '#0066CC', // blue
-    '#2ECC71', // green
-    '#E74C3C', // red
-    '#9B59B6', // purple
-    '#F39C12', // orange
-    '#1ABC9C', // teal
-    '#E67E22', // dark orange
-    '#3498DB', // light blue
-    '#16A085', // dark teal
-    '#C0392B', // dark red
-  ];
-
-  let hash = 0;
-  for (let i = 0; i < groupName.length; i++) {
-    hash = groupName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
 
 export function FileForm({
   mode,
@@ -73,16 +61,26 @@ export function FileForm({
   const [mountPath, setMountPath] = useState(initialData?.mountPath || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [fileType, setFileType] = useState(initialData?.fileType || '');
-  const [accessType, setAccessType] = useState<'public' | 'groups'>(
+  const [accessType, setAccessType] = useState<'public' | 'group'>(
     // Non-admin users can only create group-based files
-    isAdmin && initialData?.availableToAll ? 'public' : 'groups'
+    isAdmin && initialData?.availableToAll ? 'public' : 'group'
   );
-  const [selectedGroups, setSelectedGroups] = useState<string[]>(initialData?.groups || []);
+  const [selectedGroup, setSelectedGroup] = useState<string>(
+    initialData?.groups?.[0] || '' // Max 1 group
+  );
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // File type select state
+  const [isFileTypeSelectOpen, setIsFileTypeSelectOpen] = useState(false);
+  const [fileTypeSearchTerm, setFileTypeSearchTerm] = useState('');
+
+  // Group select state (single selection)
+  const [isGroupSelectOpen, setIsGroupSelectOpen] = useState(false);
+  const [groupSearchTerm, setGroupSearchTerm] = useState('');
 
   // Load available groups
   useEffect(() => {
@@ -91,9 +89,9 @@ export function FileForm({
         const response = await operatorApi.getGroups();
         setAvailableGroups(response.groups || []);
 
-        // For non-admin users, auto-select their groups (only on initial load)
+        // For non-admin users, auto-select their first group (only on initial load)
         if (!isAdmin && response.groups.length > 0 && !initialData) {
-          setSelectedGroups(response.groups.map(g => g.name));
+          setSelectedGroup(response.groups[0].name);
         }
       } catch (err) {
         console.error('[FileForm] Error loading groups:', err);
@@ -128,8 +126,8 @@ export function FileForm({
       errors.mountPath = 'Mount path must start with /';
     }
 
-    if (accessType === 'groups' && selectedGroups.length === 0) {
-      errors.groups = 'At least one group is required for group-based access';
+    if (accessType === 'group' && !selectedGroup) {
+      errors.group = 'Group selection is required for group-based access';
     }
 
     setValidationErrors(errors);
@@ -147,7 +145,8 @@ export function FileForm({
     setError(null);
 
     try {
-      const groupsArray = accessType === 'groups' ? selectedGroups : [];
+      // Max 1 group (or empty for public)
+      const groupsArray = accessType === 'group' && selectedGroup ? [selectedGroup] : [];
 
       if (mode === 'create') {
         const request: CreateFileRequest = {
@@ -288,148 +287,306 @@ export function FileForm({
       </FormGroup>
 
       <FormGroup label="File Type" fieldId="file-type-select">
-        <Flex spaceItems={{ default: 'spaceItemsSm' }} flexWrap={{ default: 'wrap' }}>
-          {/* No Type option */}
-          <FlexItem>
+        {/* Selected file type badge preview */}
+        {fileType && (
+          <div style={{ marginBottom: '0.5rem' }}>
             <Label
               color="grey"
-              isCompact
-              onClick={() => setFileType('')}
               style={{
-                cursor: 'pointer',
-                backgroundColor: fileType === '' ? '#6c757d' : '#f0f0f0',
-                color: fileType === '' ? '#fff' : '#666',
-                border: `2px solid ${fileType === '' ? '#6c757d' : '#ccc'}`,
-                transition: 'all 0.2s',
+                backgroundColor: availableFileTypes.find(t => t.name === fileType)?.color || '#6c757d',
+                color: '#fff',
               }}
+              onClose={() => setFileType('')}
             >
-              (No type)
+              {fileType}
             </Label>
-          </FlexItem>
+          </div>
+        )}
 
-          {/* Existing file types */}
-          {availableFileTypes.map((type) => (
-            <FlexItem key={type.name}>
-              <Label
-                color="grey"
-                isCompact
-                onClick={() => setFileType(type.name)}
-                style={{
-                  cursor: 'pointer',
-                  backgroundColor: fileType === type.name ? (type.color || '#6c757d') : '#f0f0f0',
-                  color: fileType === type.name ? '#fff' : '#666',
-                  border: `2px solid ${fileType === type.name ? (type.color || '#6c757d') : '#ccc'}`,
-                  transition: 'all 0.2s',
-                }}
-              >
-                {type.name}
-              </Label>
-            </FlexItem>
-          ))}
-
-          {/* Add New Type button */}
-          <FlexItem>
-            <Label
-              color="blue"
-              isCompact
-              onClick={onRequestNewFileType}
-              style={{
-                cursor: 'pointer',
-                backgroundColor: '#fff',
-                color: '#0066CC',
-                border: '2px dashed #0066CC',
-                transition: 'all 0.2s',
-              }}
+        {/* Combobox: select existing OR type new (freeform input) */}
+        <Select
+          isOpen={isFileTypeSelectOpen}
+          selected={fileType}
+          onSelect={(_event, value) => {
+            setFileType(value as string);
+            setIsFileTypeSelectOpen(false);
+            setFileTypeSearchTerm('');
+          }}
+          onOpenChange={(isOpen) => {
+            setIsFileTypeSelectOpen(isOpen);
+            if (!isOpen) {
+              setFileTypeSearchTerm('');
+            }
+          }}
+          toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+            <MenuToggle
+              ref={toggleRef}
+              onClick={() => setIsFileTypeSelectOpen(!isFileTypeSelectOpen)}
+              isExpanded={isFileTypeSelectOpen}
+              style={{ width: '100%' }}
             >
-              + Add New Type
-            </Label>
-          </FlexItem>
-        </Flex>
+              <TextInputGroup>
+                <TextInputGroupMain
+                  value={fileTypeSearchTerm}
+                  onClick={() => setIsFileTypeSelectOpen(true)}
+                  onChange={(_event, value) => {
+                    setFileTypeSearchTerm(value);
+                    // Allow freeform input: update fileType as user types
+                    setFileType(value);
+                  }}
+                  placeholder={fileType || 'Type to create new or select existing...'}
+                />
+                {fileTypeSearchTerm && (
+                  <TextInputGroupUtilities>
+                    <Button
+                      variant="plain"
+                      onClick={() => {
+                        setFileTypeSearchTerm('');
+                        setFileType('');
+                      }}
+                      icon={<FiX />}
+                      aria-label="Clear"
+                    />
+                  </TextInputGroupUtilities>
+                )}
+              </TextInputGroup>
+            </MenuToggle>
+          )}
+        >
+          <SelectList>
+            {/* No type option */}
+            <SelectOption value="">
+              <span style={{ color: '#666', fontStyle: 'italic' }}>(No type)</span>
+            </SelectOption>
+
+            {/* Filtered file types */}
+            {availableFileTypes
+              .filter((type) =>
+                type.name.toLowerCase().includes(fileTypeSearchTerm.toLowerCase())
+              )
+              .map((type) => (
+                <SelectOption key={type.name} value={type.name}>
+                  <Label
+                    color="grey"
+                    isCompact
+                    style={{
+                      backgroundColor: type.color || '#6c757d',
+                      color: '#fff',
+                      marginRight: '0.5rem',
+                    }}
+                  >
+                    {type.name}
+                  </Label>
+                </SelectOption>
+              ))}
+
+            {/* Show "Create new" option if search term doesn't match existing */}
+            {fileTypeSearchTerm &&
+              !availableFileTypes.some(
+                (type) => type.name.toLowerCase() === fileTypeSearchTerm.toLowerCase()
+              ) && (
+                <SelectOption value={fileTypeSearchTerm}>
+                  <span style={{ color: 'var(--pf-v5-global--link--Color)', fontWeight: 'bold' }}>
+                    + Create "{fileTypeSearchTerm}"
+                  </span>
+                  <span style={{ color: 'var(--pf-v5-global--Color--200)', fontSize: '0.85em', marginLeft: '0.5rem' }}>
+                    (will be auto-created)
+                  </span>
+                </SelectOption>
+              )}
+          </SelectList>
+        </Select>
+
+        {/* Manage Types link */}
+        <div style={{ marginTop: '0.5rem' }}>
+          <Button
+            variant="link"
+            isInline
+            onClick={onRequestNewFileType}
+            icon={<FiPlus />}
+          >
+            Manage Types
+          </Button>
+        </div>
+
         <FormHelperText>
           <HelperText>
             <HelperTextItem>
-              Click a type to select it, or create a new one with "+ Add New Type"
+              Optional. Type to create a new type (auto-created on save), or select existing.
             </HelperTextItem>
           </HelperText>
         </FormHelperText>
       </FormGroup>
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
+        {/* Admin: can choose public or group */}
         {isAdmin && (
+          <>
+            <Radio
+              id="access-public"
+              name="access-type"
+              label="Public (available to all users)"
+              isChecked={accessType === 'public'}
+              onChange={() => setAccessType('public')}
+            />
+            <Radio
+              id="access-group"
+              name="access-type"
+              label="Assign to group"
+              isChecked={accessType === 'group'}
+              onChange={() => setAccessType('group')}
+            />
+          </>
+        )}
+
+        {/* User with 0 groups: forced public */}
+        {!isAdmin && availableGroups.length === 0 && (
           <Radio
-            id="access-public"
+            id="access-public-forced"
             name="access-type"
-            label="Public (available to all users)"
-            isChecked={accessType === 'public'}
-            onChange={() => setAccessType('public')}
+            label="Public file (available to all)"
+            isChecked={true}
+            isDisabled={true}
           />
         )}
-        <Radio
-          id="access-groups"
-          name="access-type"
-          label="Group-based (specific groups only)"
-          isChecked={accessType === 'groups'}
-          onChange={() => setAccessType('groups')}
-        />
+
+        {/* User with 1+ groups: can choose public or group */}
+        {!isAdmin && availableGroups.length > 0 && (
+          <>
+            <Radio
+              id="access-public"
+              name="access-type"
+              label="Public file"
+              isChecked={accessType === 'public'}
+              onChange={() => setAccessType('public')}
+            />
+            <Radio
+              id="access-group"
+              name="access-type"
+              label="My group file"
+              isChecked={accessType === 'group'}
+              onChange={() => setAccessType('group')}
+            />
+          </>
+        )}
       </FormGroup>
 
-      {accessType === 'groups' && (
-        <FormGroup label="Groups" isRequired fieldId="groups-input">
-          {availableGroups.length === 0 ? (
-            <Alert variant="info" isInline title="No groups available" />
-          ) : (
-            <Flex spaceItems={{ default: 'spaceItemsSm' }} flexWrap={{ default: 'wrap' }}>
-              {availableGroups.map((group) => {
-                const isSelected = selectedGroups.includes(group.name);
-                const color = getGroupColor(group.name);
-
-                return (
-                  <FlexItem key={group.name}>
-                    <Label
-                      color="grey"
-                      isCompact
-                      onClick={() => {
-                        if (!isAdmin) return; // Non-admin cannot change selection
-
-                        if (isSelected) {
-                          setSelectedGroups(selectedGroups.filter(g => g !== group.name));
-                        } else {
-                          setSelectedGroups([...selectedGroups, group.name]);
-                        }
-                      }}
-                      style={{
-                        cursor: isAdmin ? 'pointer' : 'default',
-                        backgroundColor: isSelected ? color : '#f0f0f0',
-                        color: isSelected ? '#fff' : '#666',
-                        border: `2px solid ${isSelected ? color : '#ccc'}`,
-                        opacity: isAdmin ? 1 : 0.7,
-                        transition: 'all 0.2s',
-                      }}
-                      title={group.description || group.name}
-                    >
-                      {group.name}
-                    </Label>
-                  </FlexItem>
-                );
-              })}
-            </Flex>
+      {accessType === 'group' && (
+        <FormGroup label="Group" isRequired fieldId="group-input">
+          {/* User with 1 group: just show badge (no selection needed) */}
+          {!isAdmin && availableGroups.length === 1 && (
+            <>
+              <Label color="blue">{availableGroups[0].name}</Label>
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>
+                    File will be assigned to your group.
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </>
           )}
-          {validationErrors.groups && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{validationErrors.groups}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
+
+          {/* User with multiple groups OR Admin: show select */}
+          {(isAdmin || availableGroups.length > 1) && (
+            <>
+              {/* Selected group badge preview */}
+              {selectedGroup && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <Label
+                    color="blue"
+                    onClose={() => setSelectedGroup('')}
+                  >
+                    {selectedGroup}
+                  </Label>
+                </div>
+              )}
+
+              {/* Select with search (single selection) */}
+              <Select
+                isOpen={isGroupSelectOpen}
+                selected={selectedGroup}
+                onSelect={(_event, value) => {
+                  setSelectedGroup(value as string);
+                  setIsGroupSelectOpen(false);
+                  setGroupSearchTerm('');
+                }}
+                onOpenChange={(isOpen) => {
+                  setIsGroupSelectOpen(isOpen);
+                  if (!isOpen) {
+                    setGroupSearchTerm('');
+                  }
+                }}
+                toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                  <MenuToggle
+                    ref={toggleRef}
+                    onClick={() => setIsGroupSelectOpen(!isGroupSelectOpen)}
+                    isExpanded={isGroupSelectOpen}
+                    style={{ width: '100%' }}
+                  >
+                    <TextInputGroup>
+                      <TextInputGroupMain
+                        value={groupSearchTerm}
+                        onClick={() => setIsGroupSelectOpen(true)}
+                        onChange={(_event, value) => setGroupSearchTerm(value)}
+                        placeholder={selectedGroup || 'Search or select a group...'}
+                      />
+                      {groupSearchTerm && (
+                        <TextInputGroupUtilities>
+                          <Button
+                            variant="plain"
+                            onClick={() => setGroupSearchTerm('')}
+                            icon={<FiX />}
+                            aria-label="Clear search"
+                          />
+                        </TextInputGroupUtilities>
+                      )}
+                    </TextInputGroup>
+                  </MenuToggle>
+                )}
+              >
+                <SelectList>
+                  {(isAdmin ? availableGroups : availableGroups)
+                    .filter((group) =>
+                      group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
+                    )
+                    .map((group) => (
+                      <SelectOption key={group.name} value={group.name}>
+                        <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
+                          <FlexItem>
+                            <strong>{group.name}</strong>
+                          </FlexItem>
+                          {group.description && (
+                            <FlexItem>
+                              <span style={{ color: 'var(--pf-v5-global--Color--200)', fontSize: '0.9em' }}>
+                                — {group.description}
+                              </span>
+                            </FlexItem>
+                          )}
+                        </Flex>
+                      </SelectOption>
+                    ))}
+                </SelectList>
+              </Select>
+
+              {validationErrors.group && (
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem variant="error">{validationErrors.group}</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>
+                    {isAdmin
+                      ? 'Select one group. File can be assigned to at most 1 group.'
+                      : 'Select one of your groups.'}
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </>
           )}
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>
-                {isAdmin
-                  ? 'Click tags to select/deselect groups'
-                  : 'File will be created in your assigned groups'}
-              </HelperTextItem>
-            </HelperText>
-          </FormHelperText>
         </FormGroup>
       )}
 

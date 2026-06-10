@@ -1,10 +1,11 @@
 /**
  * FileManagementModal - Main modal for file and file types management
  *
- * Large modal containing complete file CRUD interface + file types management:
- * - Files list and create/edit
- * - File Types management (integrated)
- * - Workflow: create new type from file form
+ * Large modal with 2 fixed tabs:
+ * - Files List
+ * - File Types List
+ *
+ * Opens child modals for create/edit operations (FileFormModal, FileTypeFormModal)
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -18,9 +19,9 @@ import {
   Spinner,
 } from '@patternfly/react-core';
 import { FilesTable } from './FilesTable';
-import { FileForm } from './FileForm';
+import { FileFormModal } from './FileFormModal';
 import { FileTypesTable } from '../FileTypesManagement/FileTypesTable';
-import { FileTypeForm } from '../FileTypesManagement/FileTypeForm';
+import { FileTypeFormModal } from '../FileTypesManagement/FileTypeFormModal';
 import { operatorApi } from '../../services/operatorApi';
 import type { FileResponse, FileTypeResponse } from '../../types/api';
 
@@ -29,9 +30,7 @@ interface FileManagementModalProps {
   onClose: () => void;
 }
 
-type ActiveTab = 'files-list' | 'file-form' | 'file-types';
-type FileFormMode = 'create' | 'edit' | null;
-type FileTypeFormMode = 'create' | 'edit' | null;
+type ActiveTab = 'files-list' | 'file-types';
 
 export function FileManagementModal({
   isOpen,
@@ -42,12 +41,14 @@ export function FileManagementModal({
   // Files state
   const [files, setFiles] = useState<FileResponse[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileResponse | null>(null);
-  const [fileFormMode, setFileFormMode] = useState<FileFormMode>(null);
+  const [fileFormOpen, setFileFormOpen] = useState(false);
+  const [fileFormMode, setFileFormMode] = useState<'create' | 'edit'>('create');
 
   // File Types state
   const [fileTypes, setFileTypes] = useState<FileTypeResponse[]>([]);
   const [selectedFileType, setSelectedFileType] = useState<FileTypeResponse | null>(null);
-  const [fileTypeFormMode, setFileTypeFormMode] = useState<FileTypeFormMode>(null);
+  const [fileTypeFormOpen, setFileTypeFormOpen] = useState(false);
+  const [fileTypeFormMode, setFileTypeFormMode] = useState<'create' | 'edit'>('create');
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -94,13 +95,13 @@ export function FileManagementModal({
   const handleCreateFileClick = () => {
     setSelectedFile(null);
     setFileFormMode('create');
-    setActiveTab('file-form');
+    setFileFormOpen(true);
   };
 
   const handleEditFileClick = (file: FileResponse) => {
     setSelectedFile(file);
     setFileFormMode('edit');
-    setActiveTab('file-form');
+    setFileFormOpen(true);
   };
 
   const handleDeleteFileClick = async (fileName: string) => {
@@ -118,16 +119,15 @@ export function FileManagementModal({
   };
 
   const handleFileFormSuccess = async () => {
-    setActiveTab('files-list');
+    setFileFormOpen(false);
     setSelectedFile(null);
-    setFileFormMode(null);
     await loadFiles();
+    await loadFileTypes(); // Refresh types in case new one was auto-created
   };
 
-  const handleFileFormCancel = () => {
-    setActiveTab('files-list');
+  const handleFileFormClose = () => {
+    setFileFormOpen(false);
     setSelectedFile(null);
-    setFileFormMode(null);
   };
 
   // ============================================================================
@@ -137,13 +137,13 @@ export function FileManagementModal({
   const handleCreateFileTypeClick = () => {
     setSelectedFileType(null);
     setFileTypeFormMode('create');
-    setActiveTab('file-types');
+    setFileTypeFormOpen(true);
   };
 
   const handleEditFileTypeClick = (fileType: FileTypeResponse) => {
     setSelectedFileType(fileType);
     setFileTypeFormMode('edit');
-    setActiveTab('file-types');
+    setFileTypeFormOpen(true);
   };
 
   const handleDeleteFileTypeClick = async (typeName: string, usageCount: number) => {
@@ -166,13 +166,13 @@ export function FileManagementModal({
   };
 
   const handleFileTypeFormSuccess = async () => {
-    setFileTypeFormMode(null);
+    setFileTypeFormOpen(false);
     setSelectedFileType(null);
     await loadFileTypes();
   };
 
-  const handleFileTypeFormCancel = () => {
-    setFileTypeFormMode(null);
+  const handleFileTypeFormClose = () => {
+    setFileTypeFormOpen(false);
     setSelectedFileType(null);
   };
 
@@ -181,108 +181,75 @@ export function FileManagementModal({
   // ============================================================================
 
   /**
-   * Called from FileForm when user selects "+ Add New Type" from file type select
-   * Switches to File Types tab in create mode
+   * Called from FileFormModal when user clicks "Manage Types"
+   * Closes file form modal and opens file type create modal
    */
   const handleRequestNewFileType = () => {
-    handleCreateFileTypeClick();
+    setFileFormOpen(false); // Close file form modal
+    setActiveTab('file-types'); // Switch to File Types tab
+    handleCreateFileTypeClick(); // Open file type create modal
   };
 
   const handleTabSelect = (_event: React.MouseEvent, tabIndex: string | number) => {
     setActiveTab(tabIndex as ActiveTab);
-
-    // Reset form modes when switching tabs manually
-    if (tabIndex === 'files-list') {
-      setFileFormMode(null);
-      setSelectedFile(null);
-    }
-    if (tabIndex === 'file-types') {
-      // Don't reset fileTypeFormMode - might be in create mode from file form
-    }
   };
 
   return (
-    <Modal
-      variant={ModalVariant.large}
-      title="File Management"
-      isOpen={isOpen}
-      onClose={onClose}
-      description="Manage ConfigMap-based files and file types"
-    >
-      {error && (
-        <Alert
-          variant="danger"
-          isInline
-          title="Error"
-          style={{ marginBottom: '1rem' }}
-          actionClose={{ onClose: () => setError(null) }}
-        >
-          {error}
-        </Alert>
-      )}
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
-          <Spinner size="lg" aria-label="Loading" />
-        </div>
-      ) : (
-        <Tabs
-          activeKey={activeTab}
-          onSelect={handleTabSelect}
-          aria-label="File management tabs"
-        >
-          {/* Files List Tab */}
-          <Tab
-            eventKey="files-list"
-            title={<TabTitleText>Files</TabTitleText>}
-            aria-label="Files list"
+    <>
+      {/* Main Modal - 2 Fixed Tabs */}
+      <Modal
+        variant={ModalVariant.large}
+        title="File Management"
+        isOpen={isOpen}
+        onClose={onClose}
+        description="Manage ConfigMap-based files and file types"
+      >
+        {error && (
+          <Alert
+            variant="danger"
+            isInline
+            title="Error"
+            style={{ marginBottom: '1rem' }}
+            actionClose={{ onClose: () => setError(null) }}
           >
-            <div style={{ marginTop: '1rem' }}>
-              <FilesTable
-                files={files}
-                onCreateClick={handleCreateFileClick}
-                onEditClick={handleEditFileClick}
-                onDeleteClick={handleDeleteFileClick}
-                onRefresh={loadFiles}
-              />
-            </div>
-          </Tab>
+            {error}
+          </Alert>
+        )}
 
-          {/* File Form Tab (Create/Edit) */}
-          {fileFormMode && (
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+            <Spinner size="lg" aria-label="Loading" />
+          </div>
+        ) : (
+          <Tabs
+            activeKey={activeTab}
+            onSelect={handleTabSelect}
+            aria-label="File management tabs"
+          >
+            {/* Files List Tab (fixed) */}
             <Tab
-              eventKey="file-form"
-              title={<TabTitleText>{fileFormMode === 'create' ? 'Create File' : 'Edit File'}</TabTitleText>}
-              aria-label={fileFormMode === 'create' ? 'Create file' : 'Edit file'}
+              eventKey="files-list"
+              title={<TabTitleText>Files</TabTitleText>}
+              aria-label="Files list"
             >
               <div style={{ marginTop: '1rem' }}>
-                <FileForm
-                  mode={fileFormMode}
-                  initialData={selectedFile || undefined}
-                  availableFileTypes={fileTypes}
-                  onSuccess={handleFileFormSuccess}
-                  onCancel={handleFileFormCancel}
-                  onRequestNewFileType={handleRequestNewFileType}
+                <FilesTable
+                  files={files}
+                  onCreateClick={handleCreateFileClick}
+                  onEditClick={handleEditFileClick}
+                  onDeleteClick={handleDeleteFileClick}
+                  onRefresh={loadFiles}
                 />
               </div>
             </Tab>
-          )}
 
-          {/* File Types Tab */}
-          <Tab
-            eventKey="file-types"
-            title={<TabTitleText>File Types</TabTitleText>}
-            aria-label="File types management"
-          >
-            <div style={{ marginTop: '1rem' }}>
-              {fileTypeFormMode ? (
-                <FileTypeForm
-                  mode={fileTypeFormMode}
-                  initialData={selectedFileType || undefined}
-                  onSuccess={handleFileTypeFormSuccess}
-                  onCancel={handleFileTypeFormCancel}
-                />
-              ) : (
+            {/* File Types Tab (fixed) */}
+            <Tab
+              eventKey="file-types"
+              title={<TabTitleText>File Types</TabTitleText>}
+              aria-label="File types management"
+            >
+              <div style={{ marginTop: '1rem' }}>
                 <FileTypesTable
                   fileTypes={fileTypes}
                   onCreateClick={handleCreateFileTypeClick}
@@ -290,11 +257,31 @@ export function FileManagementModal({
                   onDeleteClick={handleDeleteFileTypeClick}
                   onRefresh={loadFileTypes}
                 />
-              )}
-            </div>
-          </Tab>
-        </Tabs>
-      )}
-    </Modal>
+              </div>
+            </Tab>
+          </Tabs>
+        )}
+      </Modal>
+
+      {/* Child Modal: File Form (Create/Edit) */}
+      <FileFormModal
+        isOpen={fileFormOpen}
+        mode={fileFormMode}
+        initialData={selectedFile || undefined}
+        availableFileTypes={fileTypes}
+        onClose={handleFileFormClose}
+        onSuccess={handleFileFormSuccess}
+        onRequestNewFileType={handleRequestNewFileType}
+      />
+
+      {/* Child Modal: File Type Form (Create/Edit) */}
+      <FileTypeFormModal
+        isOpen={fileTypeFormOpen}
+        mode={fileTypeFormMode}
+        initialData={selectedFileType || undefined}
+        onClose={handleFileTypeFormClose}
+        onSuccess={handleFileTypeFormSuccess}
+      />
+    </>
   );
 }
