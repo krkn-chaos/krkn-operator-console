@@ -92,13 +92,11 @@ export function FileForm({
     async function loadGroups() {
       try {
         const response = await operatorApi.getGroups();
+        console.log('[FileForm] Groups loaded:', response);
+        console.log('[FileForm] isAdmin:', isAdmin);
+        console.log('[FileForm] groups count:', response.groups?.length || 0);
         setAvailableGroups(response.groups || []);
         setGroupsLoaded(true);
-
-        // Auto-populate group if user has exactly 1 group and switches to 'group' mode
-        if (!isAdmin && response.groups.length === 1 && accessType === 'group' && !selectedGroup) {
-          setSelectedGroup(response.groups[0].name);
-        }
       } catch (err) {
         console.error('[FileForm] Error loading groups:', err);
         setGroupsLoaded(true); // Mark as loaded even on error
@@ -106,7 +104,15 @@ export function FileForm({
     }
 
     loadGroups();
-  }, [isAdmin, accessType, selectedGroup]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Load only once on mount
+
+  // Auto-populate group when user has exactly 1 group and switches to 'group' mode
+  useEffect(() => {
+    if (!isAdmin && availableGroups.length === 1 && accessType === 'group' && !selectedGroup) {
+      setSelectedGroup(availableGroups[0].name);
+    }
+  }, [isAdmin, availableGroups, accessType, selectedGroup]);
 
   // Validate form
   const validate = (): boolean => {
@@ -425,6 +431,9 @@ export function FileForm({
       </FormGroup>
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
+        {/* DEBUG */}
+        {console.log('[FileForm Render] isAdmin:', isAdmin, 'groupsLoaded:', groupsLoaded, 'availableGroups.length:', availableGroups.length)}
+
         {/* Admin: can choose public or group */}
         {isAdmin && (
           <>
