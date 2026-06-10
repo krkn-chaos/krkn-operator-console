@@ -73,6 +73,7 @@ export function FileForm({
     initialData?.groups?.[0] || '' // Max 1 group
   );
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +93,7 @@ export function FileForm({
       try {
         const response = await operatorApi.getGroups();
         setAvailableGroups(response.groups || []);
+        setGroupsLoaded(true);
 
         // Auto-populate group if user has exactly 1 group and switches to 'group' mode
         if (!isAdmin && response.groups.length === 1 && accessType === 'group' && !selectedGroup) {
@@ -99,6 +101,7 @@ export function FileForm({
         }
       } catch (err) {
         console.error('[FileForm] Error loading groups:', err);
+        setGroupsLoaded(true); // Mark as loaded even on error
       }
     }
 
@@ -442,8 +445,8 @@ export function FileForm({
           </>
         )}
 
-        {/* User with 0 groups: forced public */}
-        {!isAdmin && availableGroups.length === 0 && (
+        {/* User with 0 groups: forced public (only show after groups loaded) */}
+        {!isAdmin && groupsLoaded && availableGroups.length === 0 && (
           <Radio
             id="access-public-forced"
             name="access-type"
@@ -453,8 +456,8 @@ export function FileForm({
           />
         )}
 
-        {/* User with 1+ groups: can choose public or group */}
-        {!isAdmin && availableGroups.length > 0 && (
+        {/* User with 1+ groups: can choose public or group (only show after groups loaded) */}
+        {!isAdmin && groupsLoaded && availableGroups.length > 0 && (
           <>
             <Radio
               id="access-public"
@@ -471,6 +474,13 @@ export function FileForm({
               onChange={() => setAccessType('group')}
             />
           </>
+        )}
+
+        {/* Loading state for non-admin */}
+        {!isAdmin && !groupsLoaded && (
+          <div style={{ color: 'var(--pf-v5-global--Color--200)', fontSize: '0.9em' }}>
+            Loading access options...
+          </div>
         )}
       </FormGroup>
 
