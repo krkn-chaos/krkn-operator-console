@@ -14,8 +14,9 @@ interface LogViewerProps {
 }
 
 // Global connection tracking to prevent StrictMode duplicates
-// Maps jobId -> WebSocket instance
-const activeConnections = new Map<string, WebSocket>();
+// Maps jobId -> { ws: WebSocket, refCount: number }
+// refCount tracks how many component instances are using this connection
+const activeConnections = new Map<string, { ws: WebSocket; refCount: number }>();
 
 export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status, compact = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([]);
@@ -27,6 +28,9 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
   const reconnectAttemptsRef = useRef<number>(0);
   const isCleanedUpRef = useRef<boolean>(false);
   const isFirstMessageRef = useRef<boolean>(true);
+  // Ignore flag pattern: prevents duplicate connections in StrictMode
+  // Set to true when we successfully reuse an existing connection
+  const didReuseConnectionRef = useRef<boolean>(false);
 
   const maxReconnectAttempts = 3; // Ridotto per fallire prima e provare HTTP
 
@@ -94,10 +98,12 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
     // StrictMode guard: check global connection map
     // This persists across StrictMode's double-mount, preventing duplicates
-    const existingConnection = activeConnections.get(jobId);
-    if (existingConnection && (existingConnection.readyState === WebSocket.CONNECTING || existingConnection.readyState === WebSocket.OPEN)) {
-      // Reuse existing connection
-      wsRef.current = existingConnection;
+    const existing = activeConnections.get(jobId);
+    if (existing && (existing.ws.readyState === WebSocket.CONNECTING || existing.ws.readyState === WebSocket.OPEN)) {
+      // Reuse existing connection - increment reference count
+      existing.refCount++;
+      wsRef.current = existing.ws;
+      didReuseConnectionRef.current = true;
       return;
     }
 
@@ -148,8 +154,10 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
 
         const ws = new WebSocket(wsUrl, wsProtocol);
         wsRef.current = ws;
-        // Register in global map to prevent StrictMode duplicates
-        activeConnections.set(jobId, ws);
+        // Register in global map with refCount=1 (first mount using this connection)
+        activeConnections.set(jobId, { ws, refCount: 1 });
+        // Mark that this mount created the connection (not reused)
+        didReuseConnectionRef.current = false;
 
         ws.onopen = () => {
           reconnectAttemptsRef.current = 0; // Reset on successful connection
@@ -180,9 +188,9 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
         };
 
         ws.onclose = (event) => {
-          // Remove from global map only if this is still the active connection
-          // This prevents removing a newer connection if StrictMode created one
-          if (activeConnections.get(jobId) === ws) {
+          // Remove from global map only if refCount reaches 0
+          const existing = activeConnections.get(jobId);
+          if (existing && existing.ws === ws) {
             activeConnections.delete(jobId);
           }
 
@@ -242,8 +250,21 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       }
 
       if (wsRef.current) {
-        wsRef.current.close(1000, 'Component unmounted');
-        // Note: removal from Map happens in ws.onclose to handle async close timing
+        const existing = activeConnections.get(jobId);
+        if (existing && existing.ws === wsRef.current) {
+          // Decrement reference count
+          existing.refCount--;
+
+          // Only close and remove if this was the last reference
+          if (existing.refCount <= 0) {
+            wsRef.current.close(1000, 'Component unmounted');
+            // Removal from Map happens in ws.onclose handler
+          }
+        } else if (!didReuseConnectionRef.current) {
+          // Fallback: close if we created it but it's not in the map (shouldn't happen)
+          wsRef.current.close(1000, 'Component unmounted');
+        }
+
         wsRef.current = null;
       }
     };
