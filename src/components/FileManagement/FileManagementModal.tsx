@@ -16,6 +16,7 @@ import {
   Tab,
   TabTitleText,
   Alert,
+  AlertActionCloseButton,
   Spinner,
 } from '@patternfly/react-core';
 import { FilesTable } from './FilesTable';
@@ -210,7 +211,7 @@ export function FileManagementModal({
             isInline
             title="Error"
             style={{ marginBottom: '1rem' }}
-            actionClose={{ onClose: () => setError(null) }}
+            actionClose={<AlertActionCloseButton onClose={() => setError(null)} />}
           >
             {error}
           </Alert>

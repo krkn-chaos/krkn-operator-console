@@ -59,7 +59,6 @@ export function FileForm({
   const [name, setName] = useState(initialData?.name || '');
   const [fileName, setFileName] = useState(initialData?.fileName || '');
   const [content, setContent] = useState(initialData?.content || '');
-  const [mountPath, setMountPath] = useState(initialData?.mountPath || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [fileType, setFileType] = useState(initialData?.fileType || '');
   const [accessType, setAccessType] = useState<'public' | 'group'>(() => {
@@ -100,12 +99,11 @@ export function FileForm({
       setError(null);
 
       try {
-        const file = await operatorApi.getFile(initialData.name);
+        const file = await operatorApi.getFile(initialData!.name);
 
         // Pre-populate all fields
         setFileName(file.fileName);
         setContent(file.content);
-        setMountPath(file.mountPath);
         setDescription(file.description || '');
         setFileType(file.fileType || '');
         setAccessType(file.availableToAll ? 'public' : 'group');
@@ -174,12 +172,6 @@ export function FileForm({
       errors.content = 'Content is required';
     }
 
-    if (!mountPath.trim()) {
-      errors.mountPath = 'Mount path is required';
-    } else if (!mountPath.startsWith('/')) {
-      errors.mountPath = 'Mount path must start with /';
-    }
-
     if (accessType === 'group' && !selectedGroup) {
       errors.group = 'Group selection is required for group-based access';
     }
@@ -207,7 +199,6 @@ export function FileForm({
           name,
           fileName,
           content,
-          mountPath,
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
@@ -219,7 +210,6 @@ export function FileForm({
         const request: UpdateFileRequest = {
           fileName,
           content,
-          mountPath,
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
@@ -307,28 +297,6 @@ export function FileForm({
         <FormHelperText>
           <HelperText>
             <HelperTextItem>Key name in the ConfigMap (e.g., config.yaml)</HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
-
-      <FormGroup label="Mount Path" isRequired fieldId="mount-path-input">
-        <TextInput
-          id="mount-path-input"
-          value={mountPath}
-          onChange={(_event, value) => setMountPath(value)}
-          validated={validationErrors.mountPath ? 'error' : 'default'}
-          placeholder="/path/to/mount/config.yaml"
-        />
-        {validationErrors.mountPath && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{validationErrors.mountPath}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem>Where to mount this file in pods</HelperTextItem>
           </HelperText>
         </FormHelperText>
       </FormGroup>

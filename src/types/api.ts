@@ -145,7 +145,6 @@ export interface NumberField extends BaseField {
 
 export interface FileField extends BaseField {
   type: 'file';
-  mount_path?: string;
 }
 
 export interface FileBase64Field extends BaseField {
@@ -196,7 +195,6 @@ export interface ErrorResponse {
 export interface ScenarioFileMount {
   name: string;
   content: string; // base64 encoded
-  mountPath: string;
 }
 
 export interface ScenarioRunRequest {
@@ -919,8 +917,6 @@ export interface FileResponse {
   fileName: string;
   /** File content */
   content: string;
-  /** Mount path in pods */
-  mountPath: string;
   /** File description */
   description?: string;
   /** Groups that can access this file */
@@ -941,8 +937,6 @@ export interface CreateFileRequest {
   fileName: string;
   /** File content */
   content: string;
-  /** Mount path in pods */
-  mountPath: string;
   /** File description (optional) */
   description?: string;
   /** Groups that can access this file (optional if availableToAll) */
@@ -961,8 +955,6 @@ export interface UpdateFileRequest {
   fileName: string;
   /** File content */
   content: string;
-  /** Mount path in pods */
-  mountPath: string;
   /** File description (optional) */
   description?: string;
   /** Groups that can access this file (optional if availableToAll) */

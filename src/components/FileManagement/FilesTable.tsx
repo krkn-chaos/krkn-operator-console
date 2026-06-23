@@ -103,7 +103,6 @@ export function FilesTable({
             <Th>Name</Th>
             <Th>File</Th>
             <Th>Type</Th>
-            <Th>Mount Path</Th>
             <Th>Access</Th>
             <Th>Actions</Th>
           </Tr>
@@ -141,14 +140,6 @@ export function FilesTable({
                 ) : (
                   <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>—</span>
                 )}
-              </Td>
-              <Td dataLabel="Mount Path">
-                <code style={{
-                  fontSize: '0.8125rem',
-                  color: 'var(--pf-v5-global--Color--200)',
-                }}>
-                  {file.mountPath}
-                </code>
               </Td>
               <Td dataLabel="Access">
                 {file.availableToAll ? (

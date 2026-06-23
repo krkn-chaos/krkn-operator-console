@@ -16,7 +16,7 @@ import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, FileField } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState } from '../types/api';
 
 interface ScenarioDetailProps {
   scenarioName: string;
@@ -234,7 +234,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               files.push({
                 name: value.name,
                 content: base64Content,
-                mountPath: (field as FileField).mount_path || `/config/${value.name}`,
               });
             };
             reader.readAsText(value);
@@ -274,7 +273,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   files.push({
                     name: value.name,
                     content: base64Content,
-                    mountPath: (field as FileField).mount_path || `/config/${value.name}`,
                   });
                 };
                 reader.readAsText(value);
