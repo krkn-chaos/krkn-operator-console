@@ -1046,3 +1046,54 @@ export interface UpdateFileTypeRequest {
   /** Icon name (empty string resets to default) */
   icon: string;
 }
+
+// Elasticsearch Config Types
+
+export interface ElasticsearchConfig {
+  name: string;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  telemetryIndex?: string;
+  metricsIndex?: string;
+  alertsIndex?: string;
+  grafanaUrl?: string;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface CreateElasticsearchConfigRequest {
+  name: string;
+  host: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  telemetryIndex?: string;
+  metricsIndex?: string;
+  alertsIndex?: string;
+  grafanaUrl?: string;
+}
+
+export interface UpdateElasticsearchConfigRequest {
+  host: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  telemetryIndex?: string;
+  metricsIndex?: string;
+  alertsIndex?: string;
+  grafanaUrl?: string;
+}
+
+export interface ListElasticsearchConfigsResponse {
+  configs: ElasticsearchConfig[];
+  total: number;
+}
+
+export interface ElasticsearchConfigOperationResponse {
+  message: string;
+  name?: string;
+}
