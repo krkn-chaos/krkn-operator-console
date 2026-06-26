@@ -16,7 +16,8 @@ import {
 import { DynamicFormBuilder } from '../DynamicFormBuilder';
 import { ScenarioParameterSections } from '../ScenarioParameterSections';
 import { operatorApi } from '../../services/operatorApi';
-import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields } from '../../types/api';
+import { elasticsearchApi } from '../../services/elasticsearchApi';
+import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig } from '../../types/api';
 
 interface ScenarioConfigStepProps {
   scenarioName: string;
@@ -46,6 +47,9 @@ export function ScenarioConfigStep({
   const [error, setError] = useState<string | null>(null);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
+  const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
+  const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
+  const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
   // Fetch scenario detail when scenario changes
   useEffect(() => {
@@ -134,6 +138,42 @@ export function ScenarioConfigStep({
     };
   }, [showGlobalParameters, scenarioName, scenarioGlobals, registryName]); // Only primitive dependencies
 
+  // Load ES configs once when global parameters are first shown
+  useEffect(() => {
+    if (!showGlobalParameters) return;
+    elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
+  }, [showGlobalParameters]);
+
+  const hasEsGlobalFields = scenarioGlobals?.fields.some(
+    (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
+  ) ?? false;
+
+  const applyEsConfig = (configName: string) => {
+    setSelectedEsConfigName(configName);
+    if (!configName) return;
+    const cfg = esConfigs.find((c) => c.name === configName);
+    if (!cfg) return;
+
+    setAppliedEsConfigName(configName);
+    const patch: ScenarioFormValues = {
+      ...globalFormValues,
+      ENABLE_ES: 'True',
+      ES_SERVER: cfg.host ?? '',
+      ES_PORT: String(cfg.port ?? 9200),
+      ES_USERNAME: cfg.username ?? '',
+      ES_METRICS_INDEX: cfg.metricsIndex ?? '',
+      ES_ALERTS_INDEX: cfg.alertsIndex ?? '',
+      ES_TELEMETRY_INDEX: cfg.telemetryIndex ?? '',
+    };
+
+    const touched: TouchedFields = { ...globalTouchedFields };
+    for (const key of Object.keys(patch)) {
+      touched[key] = true;
+    }
+
+    onGlobalFormChange(patch, touched);
+  };
+
   // Memoize filtered field arrays to prevent infinite loops
   // MUST be before any conditional returns (hooks order must be consistent)
   const hasGroupedScenarioFields = useMemo(
@@ -152,7 +192,9 @@ export function ScenarioConfigStep({
   );
 
   const allGlobalFields = useMemo(
-    () => scenarioGlobals?.fields || [],
+    () => (scenarioGlobals?.fields.filter(field => field.required) || []).map((f) =>
+      f.variable.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
+    ),
     [scenarioGlobals?.fields]
   );
 
@@ -212,6 +254,11 @@ export function ScenarioConfigStep({
         onToggleOptional={(isExpanded) => setShowOptionalFields(isExpanded)}
         showGlobalParameters={showGlobalParameters}
         onToggleGlobal={(isExpanded) => setShowGlobalParameters(isExpanded)}
+        hasEsGlobalFields={hasEsGlobalFields}
+        esConfigs={esConfigs}
+        selectedEsConfigName={selectedEsConfigName}
+        onSelectEsConfig={applyEsConfig}
+        appliedEsConfigName={appliedEsConfigName}
       />
     </div>
   );

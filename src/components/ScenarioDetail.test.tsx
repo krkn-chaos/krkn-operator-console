@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ScenarioDetail } from './ScenarioDetail';
 import { AppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
+import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications } from '../hooks';
 import type { AppState } from '../types/api';
 import type {
@@ -16,6 +17,7 @@ import type {
 } from '../types/api';
 
 vi.mock('../services/operatorApi');
+vi.mock('../services/elasticsearchApi');
 vi.mock('../hooks', () => ({
   useNotifications: vi.fn(),
 }));
@@ -140,6 +142,8 @@ describe('ScenarioDetail', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({ files: [] });
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
   });
 
   describe('Component Loading', () => {

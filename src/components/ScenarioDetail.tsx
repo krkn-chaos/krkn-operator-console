@@ -24,7 +24,9 @@ import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { FileSelector } from './FileSelector';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField } from '../types/api';
+import { elasticsearchApi } from '../services/elasticsearchApi';
+
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig } from '../types/api';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -85,6 +87,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     loadFiles();
   }, []);
 
+  const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
+  const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
+  const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -157,6 +162,47 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       mounted = false;
     };
   }, [showGlobalParameters, scenarioName, registryConfig, scenarioGlobals, dispatch]);
+
+  // Load ES configs once when global parameters are first shown
+  useEffect(() => {
+    if (!showGlobalParameters) return;
+    elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
+  }, [showGlobalParameters]);
+
+  // Ensures fields whose variable name contains "PASSWORD" are always rendered as secret inputs,
+  // regardless of whether the scenario definition sets secret:true.
+  // Returns true when the loaded globals contain at least one ES-related variable
+  const hasEsGlobalFields = scenarioGlobals?.fields.some(
+    (f) => f.variable != null && (f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_'))
+  ) ?? false;
+
+  const applyEsConfig = (configName: string) => {
+    setSelectedEsConfigName(configName);
+    if (!configName) return;
+    const cfg = esConfigs.find((c) => c.name === configName);
+    if (!cfg) return;
+
+    // Password is injected server-side via elasticsearchConfigName — never sent by the client.
+    setAppliedEsConfigName(configName);
+    const patch: ScenarioFormValues = {
+      ...globalFormValues,
+      ENABLE_ES: 'True',
+      ES_SERVER: cfg.host ?? '',
+      ES_PORT: String(cfg.port ?? 9200),
+      ES_USERNAME: cfg.username ?? '',
+      ES_METRICS_INDEX: cfg.metricsIndex ?? '',
+      ES_ALERTS_INDEX: cfg.alertsIndex ?? '',
+      ES_TELEMETRY_INDEX: cfg.telemetryIndex ?? '',
+    };
+
+    // Mark each applied field as touched so it is included in the run request
+    const touched: TouchedFields = { ...(globalTouchedFields || {}) };
+    for (const key of Object.keys(patch)) {
+      touched[key] = true;
+    }
+
+    dispatch({ type: 'UPDATE_GLOBAL_FORM', payload: { formValues: patch, touchedFields: touched } });
+  };
 
   const handleFormChange = (values: ScenarioFormValues) => {
     dispatch({
@@ -379,6 +425,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         targetClusters[cluster.operatorName].push(cluster.clusterName);
       });
 
+      // When a saved ES config is used, the backend injects ES_PASSWORD server-side.
+      if (appliedEsConfigName) {
+        delete environment['ES_PASSWORD'];
+      }
+
+      // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid,
         targetClusters,
@@ -390,6 +442,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
         customRunName: customRunName.trim() || undefined,
+        elasticsearchConfigName: appliedEsConfigName || undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -441,14 +494,28 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     [scenarioDetail?.fields]
   );
 
-  const optionalFields = useMemo(
-    () => scenarioDetail?.fields.filter(field => !field.required && field.type !== 'group') || [],
-    [scenarioDetail?.fields]
+  const requiredGlobalFields = useMemo(
+    () => (scenarioGlobals?.fields.filter(field => field.required) || []).map((f) =>
+      f.variable?.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
+    ),
+    [scenarioGlobals?.fields]
+  );
+
+  const optionalGlobalFields = useMemo(
+    () => (scenarioGlobals?.fields.filter(field => !field.required) || []).map((f) =>
+      f.variable?.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
+    ),
+    [scenarioGlobals?.fields]
   );
 
   const allGlobalFields = useMemo(
-    () => scenarioGlobals?.fields || [],
-    [scenarioGlobals?.fields]
+    () => [...requiredGlobalFields, ...optionalGlobalFields],
+    [requiredGlobalFields, optionalGlobalFields]
+  );
+
+  const optionalFields = useMemo(
+    () => scenarioDetail?.fields.filter(f => !f.required && f.type !== 'group') || [],
+    [scenarioDetail?.fields]
   );
 
   if (!scenarioDetail) {
@@ -580,6 +647,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             onToggleOptional={(isExpanded) => setShowOptionalFields(isExpanded)}
             showGlobalParameters={showGlobalParameters}
             onToggleGlobal={(isExpanded) => setShowGlobalParameters(isExpanded)}
+            hasEsGlobalFields={hasEsGlobalFields}
+            esConfigs={esConfigs}
+            selectedEsConfigName={selectedEsConfigName}
+            onSelectEsConfig={applyEsConfig}
+            appliedEsConfigName={appliedEsConfigName}
           />
 
           {/* Preview Button */}
