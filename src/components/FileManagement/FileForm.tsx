@@ -127,7 +127,7 @@ export function FileForm({
     }
 
     loadFile();
-  }, [mode, initialData?.name]);
+  }, [mode, initialData]);
 
   // Load available groups
   useEffect(() => {

@@ -207,6 +207,8 @@ export interface ScenarioRunRequest {
   files?: ScenarioFileMount[];
   /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
   registryName?: string;
+  /** Name of a saved Elasticsearch config — backend injects its credentials server-side so the password is never sent by the client */
+  elasticsearchConfigName?: string;
 }
 
 export interface TargetJobResult {
@@ -1045,4 +1047,55 @@ export interface UpdateFileTypeRequest {
   color: string;
   /** Icon name (empty string resets to default) */
   icon: string;
+}
+
+// Elasticsearch Config Types
+
+export interface ElasticsearchConfig {
+  name: string;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  telemetryIndex?: string;
+  metricsIndex?: string;
+  alertsIndex?: string;
+  grafanaUrl?: string;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface CreateElasticsearchConfigRequest {
+  name: string;
+  host: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  telemetryIndex?: string;
+  metricsIndex?: string;
+  alertsIndex?: string;
+  grafanaUrl?: string;
+}
+
+export interface UpdateElasticsearchConfigRequest {
+  host: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  telemetryIndex?: string;
+  metricsIndex?: string;
+  alertsIndex?: string;
+  grafanaUrl?: string;
+}
+
+export interface ListElasticsearchConfigsResponse {
+  configs: ElasticsearchConfig[];
+  total: number;
+}
+
+export interface ElasticsearchConfigOperationResponse {
+  message: string;
+  name?: string;
 }
