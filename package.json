@@ -53,5 +53,10 @@
     "workerDirectory": [
       "public"
     ]
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "esbuild@0.27.3": true,
+    "fsevents@2.3.3": true
   }
 }
