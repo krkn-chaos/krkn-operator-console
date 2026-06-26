@@ -34,6 +34,7 @@ import { TargetsList } from './TargetsList';
 import { ProviderConfigTab } from './ProviderConfigTab';
 import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
+import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -209,6 +210,15 @@ export function Settings() {
               <Tab eventKey={2} title={<TabTitleText>Private Registries</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <RegistriesCard />
+                </div>
+              </Tab>
+            )}
+
+            {/* Elasticsearch Configuration Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={4} title={<TabTitleText>Elasticsearch</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <ElasticsearchConfigsCard />
                 </div>
               </Tab>
             )}

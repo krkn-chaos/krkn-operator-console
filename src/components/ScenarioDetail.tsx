@@ -8,6 +8,9 @@ import {
   Alert,
   Spinner,
   Checkbox,
+  FormGroup,
+  FormSelect,
+  FormSelectOption,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
@@ -16,7 +19,8 @@ import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState } from '../types/api';
+import { elasticsearchApi } from '../services/elasticsearchApi';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, ElasticsearchConfig } from '../types/api';
 
 interface ScenarioDetailProps {
   scenarioName: string;
@@ -36,6 +40,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     existingRuns: string[];
   } | null>(null);
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
+  const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
+  const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -92,6 +98,51 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
     fetchGlobalParameters();
   }, [showGlobalParameters, scenarioName, registryConfig, scenarioGlobals, dispatch]);
+
+  // Load ES configs once when global parameters are first shown
+  useEffect(() => {
+    if (!showGlobalParameters) return;
+    elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => {});
+  }, [showGlobalParameters]);
+
+  // Ensures fields whose variable name contains "PASSWORD" are always rendered as secret inputs,
+  // regardless of whether the scenario definition sets secret:true.
+  const withSecretNormalized = (fields: NonNullable<typeof scenarioGlobals>['fields']) =>
+    fields.map((f) =>
+      f.variable.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
+    );
+
+  // Returns true when the loaded globals contain at least one ES-related variable
+  const hasEsGlobalFields = scenarioGlobals?.fields.some(
+    (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
+  ) ?? false;
+
+  const applyEsConfig = (configName: string) => {
+    setSelectedEsConfigName(configName);
+    if (!configName) return;
+    const cfg = esConfigs.find((c) => c.name === configName);
+    if (!cfg) return;
+
+    const patch: ScenarioFormValues = {
+      ...globalFormValues,
+      ENABLE_ES: 'True',
+      ES_SERVER: cfg.host ?? '',
+      ES_PORT: String(cfg.port ?? 9200),
+      ES_USERNAME: cfg.username ?? '',
+      ES_PASSWORD: cfg.password ?? '',
+      ES_METRICS_INDEX: cfg.metricsIndex ?? '',
+      ES_ALERTS_INDEX: cfg.alertsIndex ?? '',
+      ES_TELEMETRY_INDEX: cfg.telemetryIndex ?? '',
+    };
+
+    // Mark each applied field as touched so it is included in the run request
+    const touched: TouchedFields = { ...(globalTouchedFields || {}) };
+    for (const key of Object.keys(patch)) {
+      touched[key] = true;
+    }
+
+    dispatch({ type: 'UPDATE_GLOBAL_FORM', payload: { formValues: patch, touchedFields: touched } });
+  };
 
   const handleFormChange = (values: ScenarioFormValues) => {
     dispatch({
@@ -489,13 +540,42 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 </Card>
               ) : (
                 <>
+                  {/* ES Config Picker - only shown when globals contain ES fields */}
+                  {hasEsGlobalFields && esConfigs.length > 0 && (
+                    <Card style={{ marginTop: '1.5rem' }}>
+                      <CardTitle>Load Elasticsearch Config</CardTitle>
+                      <CardBody>
+                        <FormGroup
+                          label="Load from saved config"
+                          fieldId="es-config-picker"
+                        >
+                          <FormSelect
+                            id="es-config-picker"
+                            value={selectedEsConfigName}
+                            onChange={(_e, v) => applyEsConfig(v)}
+                            style={{ maxWidth: '500px' }}
+                          >
+                            <FormSelectOption value="" label="Select a saved Elasticsearch config…" />
+                            {esConfigs.map((c) => (
+                              <FormSelectOption
+                                key={c.name}
+                                value={c.name}
+                                label={`${c.name} — ${c.host}`}
+                              />
+                            ))}
+                          </FormSelect>
+                        </FormGroup>
+                      </CardBody>
+                    </Card>
+                  )}
+
                   {/* Required Global Fields */}
                   {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
                     <Card style={{ marginTop: '1.5rem' }}>
                       <CardTitle>Required Global Parameters</CardTitle>
                       <CardBody>
                         <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => field.required)}
+                          fields={withSecretNormalized(scenarioGlobals.fields.filter(field => field.required))}
                           values={globalFormValues || {}}
                           touchedFields={globalTouchedFields || {}}
                           onChange={handleGlobalFormChange}
@@ -510,7 +590,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                       <CardTitle>Optional Global Parameters</CardTitle>
                       <CardBody>
                         <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => !field.required)}
+                          fields={withSecretNormalized(scenarioGlobals.fields.filter(field => !field.required))}
                           values={globalFormValues || {}}
                           touchedFields={globalTouchedFields || {}}
                           onChange={handleGlobalFormChange}
