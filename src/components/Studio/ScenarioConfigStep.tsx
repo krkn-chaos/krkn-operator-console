@@ -15,7 +15,7 @@ import {
   Checkbox,
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from '../DynamicFormBuilder';
-import { DynamicFormBuilderWithTracking } from '../DynamicFormBuilderWithTracking';
+import { GlobalParametersSections } from '../GlobalParametersSections';
 import { operatorApi } from '../../services/operatorApi';
 import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields } from '../../types/api';
 
@@ -147,16 +147,6 @@ export function ScenarioConfigStep({
     [scenarioDetail?.fields]
   );
 
-  const requiredGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => field.required) || [],
-    [scenarioGlobals?.fields]
-  );
-
-  const optionalGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => !field.required) || [],
-    [scenarioGlobals?.fields]
-  );
-
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
@@ -253,35 +243,12 @@ export function ScenarioConfigStep({
             </Card>
           ) : scenarioGlobals ? (
             <>
-              {/* Required Global Fields */}
-              {requiredGlobalFields.length > 0 && (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardTitle>Required Global Parameters</CardTitle>
-                  <CardBody>
-                    <DynamicFormBuilderWithTracking
-                      fields={requiredGlobalFields}
-                      values={globalFormValues}
-                      touchedFields={globalTouchedFields}
-                      onChange={onGlobalFormChange}
-                    />
-                  </CardBody>
-                </Card>
-              )}
-
-              {/* Optional Global Fields */}
-              {optionalGlobalFields.length > 0 && (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardTitle>Optional Global Parameters</CardTitle>
-                  <CardBody>
-                    <DynamicFormBuilderWithTracking
-                      fields={optionalGlobalFields}
-                      values={globalFormValues}
-                      touchedFields={globalTouchedFields}
-                      onChange={onGlobalFormChange}
-                    />
-                  </CardBody>
-                </Card>
-              )}
+              <GlobalParametersSections
+                fields={scenarioGlobals.fields}
+                values={globalFormValues}
+                touchedFields={globalTouchedFields}
+                onChange={onGlobalFormChange}
+              />
             </>
           ) : null}
         </>

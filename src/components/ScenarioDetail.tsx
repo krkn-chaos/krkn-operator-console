@@ -13,7 +13,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { useNotifications } from '../hooks';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
-import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
+import { GlobalParametersSections } from './GlobalParametersSections';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState } from '../types/api';
@@ -488,37 +488,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   </CardBody>
                 </Card>
               ) : (
-                <>
-                  {/* Required Global Fields */}
-                  {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
-                    <Card style={{ marginTop: '1.5rem' }}>
-                      <CardTitle>Required Global Parameters</CardTitle>
-                      <CardBody>
-                        <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => field.required)}
-                          values={globalFormValues || {}}
-                          touchedFields={globalTouchedFields || {}}
-                          onChange={handleGlobalFormChange}
-                        />
-                      </CardBody>
-                    </Card>
-                  )}
-
-                  {/* Optional Global Fields */}
-                  {scenarioGlobals.fields.filter(field => !field.required).length > 0 && (
-                    <Card style={{ marginTop: '1.5rem' }}>
-                      <CardTitle>Optional Global Parameters</CardTitle>
-                      <CardBody>
-                        <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => !field.required)}
-                          values={globalFormValues || {}}
-                          touchedFields={globalTouchedFields || {}}
-                          onChange={handleGlobalFormChange}
-                        />
-                      </CardBody>
-                    </Card>
-                  )}
-                </>
+                <GlobalParametersSections
+                    fields={scenarioGlobals.fields}
+                    values={globalFormValues || {}}
+                    touchedFields={globalTouchedFields || {}}
+                    onChange={handleGlobalFormChange}
+                  />
               )}
             </>
           )}
