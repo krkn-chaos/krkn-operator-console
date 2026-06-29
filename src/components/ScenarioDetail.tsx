@@ -18,6 +18,14 @@ import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState } from '../types/api';
 
+const readFileAsBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(btoa(reader.result as string));
+    reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+    reader.readAsText(file);
+  });
+
 interface ScenarioDetailProps {
   scenarioName: string;
   registryConfig: ScenariosRequest | null;
@@ -31,6 +39,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [conflictWarning, setConflictWarning] = useState<{
     clusterName: string;
     existingRuns: string[];
@@ -212,98 +221,70 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleRunScenario = async () => {
-    if (!state.uuid || !state.selectedClusters || state.selectedClusters.length === 0 || !scenarioFormValues || !scenarioDetail) {
+    if (!state.uuid) {
+      setValidationErrors(['Missing target request — please restart the workflow.']);
+      return;
+    }
+    if (!state.selectedClusters || state.selectedClusters.length === 0) {
+      setValidationErrors(['No clusters selected — please go back and select at least one cluster.']);
+      return;
+    }
+    if (!scenarioFormValues || !scenarioDetail) {
+      setValidationErrors(['Scenario configuration is not ready — please reload the page.']);
       return;
     }
 
+    setIsSubmitting(true);
+    setValidationErrors([]);
+
     try {
-      // Build environment map from scenario form values and global touched fields
       const environment: { [key: string]: string } = {};
       const files: ScenarioFileMount[] = [];
 
-      // Add scenario form values (exclude file type fields)
-      scenarioDetail.fields.forEach((field) => {
+      for (const field of scenarioDetail.fields) {
         const value = scenarioFormValues[field.variable];
 
         if (field.type === 'file') {
-          // Handle file type - add to files array
           if (value && value instanceof File) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64Content = btoa(reader.result as string);
-              files.push({
-                name: value.name,
-                content: base64Content,
-              });
-            };
-            reader.readAsText(value);
+            files.push({ name: value.name, content: await readFileAsBase64(value) });
           }
-        } else if (field.type !== 'file_base64') {
-          // Add to environment (all types except file and file_base64)
+        } else if (field.type === 'file_base64') {
+          if (value && value instanceof File) {
+            environment[field.variable] = await readFileAsBase64(value);
+          }
+        } else {
           if (value !== undefined && value !== null && value !== '') {
             environment[field.variable] = String(value);
           } else if (field.default) {
             environment[field.variable] = field.default;
           }
-        } else {
-          // file_base64 type - add to environment as base64
-          if (value && value instanceof File) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64Content = btoa(reader.result as string);
-              environment[field.variable] = base64Content;
-            };
-            reader.readAsText(value);
-          }
         }
-      });
-
-      // Add global form values (only touched fields)
-      if (showGlobalParameters && scenarioGlobals && globalTouchedFields && globalFormValues) {
-        scenarioGlobals.fields.forEach((field) => {
-          if (globalTouchedFields[field.variable]) {
-            const value = globalFormValues[field.variable];
-
-            if (field.type === 'file') {
-              // Handle global file type
-              if (value && value instanceof File) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  const base64Content = btoa(reader.result as string);
-                  files.push({
-                    name: value.name,
-                    content: base64Content,
-                  });
-                };
-                reader.readAsText(value);
-              }
-            } else if (field.type !== 'file_base64') {
-              if (value !== undefined && value !== null && value !== '') {
-                environment[field.variable] = String(value);
-              }
-            } else {
-              // file_base64 type
-              if (value && value instanceof File) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  const base64Content = btoa(reader.result as string);
-                  environment[field.variable] = base64Content;
-                };
-                reader.readAsText(value);
-              }
-            }
-          }
-        });
       }
 
-      // Build scenario image
-      // For private registries: use only the tag name (e.g., 'node-cpu-hog')
-      // For public registry: use krkn-hub prefix (e.g., 'krkn-hub:node-cpu-hog')
-      // Backend will resolve the full image path based on registryName
+      if (showGlobalParameters && scenarioGlobals && globalTouchedFields && globalFormValues) {
+        for (const field of scenarioGlobals.fields) {
+          if (!globalTouchedFields[field.variable]) continue;
+          const value = globalFormValues[field.variable];
+
+          if (field.type === 'file') {
+            if (value && value instanceof File) {
+              files.push({ name: value.name, content: await readFileAsBase64(value) });
+            }
+          } else if (field.type === 'file_base64') {
+            if (value && value instanceof File) {
+              environment[field.variable] = await readFileAsBase64(value);
+            }
+          } else {
+            if (value !== undefined && value !== null && value !== '') {
+              environment[field.variable] = String(value);
+            }
+          }
+        }
+      }
+
       const isPrivateRegistry = !!registryConfig?.registryName;
       const scenarioImage = isPrivateRegistry ? scenarioName : `krkn-hub:${scenarioName}`;
 
-      // Build targetClusters map from selectedClusters
       const targetClusters: { [providerName: string]: string[] } = {};
       state.selectedClusters.forEach(cluster => {
         if (!targetClusters[cluster.operatorName]) {
@@ -312,36 +293,27 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         targetClusters[cluster.operatorName].push(cluster.clusterName);
       });
 
-      // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
-        targetRequestId: state.uuid, // Reuse the original target request ID
-        targetClusters, // Map of provider names to cluster names
+        targetRequestId: state.uuid,
+        targetClusters,
         scenarioImage,
         scenarioName,
         kubeconfigPath: '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
-        registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
+        registryName: registryConfig?.registryName,
       };
 
-      // Check for cluster conflicts before running
       const activeRuns = await operatorApi.getActiveRuns();
-
-      // Check if any selected cluster has active runs
       for (const cluster of state.selectedClusters) {
         const existingRuns = activeRuns.clusterRuns[cluster.clusterName];
         if (existingRuns && existingRuns.length > 0) {
-          // Found a conflict - show warning modal
-          setConflictWarning({
-            clusterName: cluster.clusterName,
-            existingRuns,
-          });
+          setConflictWarning({ clusterName: cluster.clusterName, existingRuns });
           setPendingRunRequest(runRequest);
-          return; // Stop here, wait for user decision
+          return;
         }
       }
 
-      // No conflicts - proceed with run
       await executeScenarioRun(runRequest);
     } catch (error) {
       dispatch({
@@ -351,6 +323,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           type: 'api_error',
         },
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -362,13 +336,16 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const handleConflictContinue = async () => {
     if (!pendingRunRequest) return;
 
-    // Close modal
     setConflictWarning(null);
     const request = pendingRunRequest;
     setPendingRunRequest(null);
 
-    // Proceed with the run
-    await executeScenarioRun(request);
+    setIsSubmitting(true);
+    try {
+      await executeScenarioRun(request);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!scenarioDetail) {
@@ -628,8 +605,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
           {/* Run Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-            <Button variant="primary" size="lg" onClick={handleRunScenario}>
-              Run Scenarios
+            <Button variant="primary" size="lg" onClick={handleRunScenario} isDisabled={isSubmitting} isLoading={isSubmitting}>
+              {isSubmitting ? 'Running...' : 'Run Scenarios'}
             </Button>
           </div>
         </>
