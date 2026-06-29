@@ -21,9 +21,16 @@ import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRe
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(btoa(reader.result as string));
+    reader.onload = () => {
+      const bytes = new Uint8Array(reader.result as ArrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      resolve(btoa(binary));
+    };
     reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   });
 
 interface ScenarioDetailProps {
