@@ -69,7 +69,7 @@ export interface CreateTargetRequest {
   password?: string;
 }
 
-export interface UpdateTargetRequest extends CreateTargetRequest {}
+export interface UpdateTargetRequest extends CreateTargetRequest { }
 
 export interface TargetResponse {
   uuid: string;
@@ -125,7 +125,7 @@ export interface BaseField {
   required?: boolean;
   type: FieldType;
   secret?: boolean;
-  group?: string;
+  group?: string; // variable name of the GroupField this field belongs to
   mutually_excludes?: string;
 }
 
@@ -159,6 +159,7 @@ export interface BooleanField extends BaseField {
 
 export interface GroupField extends BaseField {
   type: 'group';
+  // default contains JSON: { title: string, description?: string }
 }
 
 export type ScenarioField = StringField | EnumField | NumberField | FileField | FileBase64Field | BooleanField | GroupField;
@@ -173,6 +174,12 @@ export interface ScenarioDetail {
   fields: ScenarioField[];
 }
 
+export interface FieldGroup {
+  key: string;
+  title: string;
+  fields: string[]; // variable names in display order
+}
+
 export interface ScenarioGlobals {
   name: string;
   digest?: string;
@@ -181,6 +188,7 @@ export interface ScenarioGlobals {
   title: string;
   description: string;
   fields: ScenarioField[];
+  groups?: FieldGroup[];
 }
 
 export interface ScenarioFormValues {

@@ -23,3 +23,4 @@ export { TerminalContent } from './TerminalContent';
 export { Studio } from './Studio';
 export { FileManagementModal } from './FileManagement';
 export { FileTypesManagementModal } from './FileTypesManagement';
+export { GlobalParametersSections } from './GlobalParametersSections';
