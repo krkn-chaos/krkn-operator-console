@@ -28,7 +28,21 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
     const newValues = { ...values, [variable]: value };
     onChange(newValues);
 
-    // Clear error for this field
+    const field = fields.find(f => f.variable === variable);
+    if (field?.type === 'string' && typeof value === 'string' && value !== '') {
+      const stringField = field as StringField;
+      if (stringField.validator) {
+        try {
+          if (!new RegExp(stringField.validator).test(value)) {
+            setErrors({ ...errors, [variable]: stringField.validation_message || `Must match pattern: ${stringField.validator}` });
+            return;
+          }
+        } catch {
+          // invalid regex in schema — skip validation
+        }
+      }
+    }
+
     if (errors[variable]) {
       setErrors({ ...errors, [variable]: '' });
     }

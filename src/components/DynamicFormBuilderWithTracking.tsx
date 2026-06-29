@@ -12,7 +12,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
-import type { ScenarioField, ScenarioFormValues, TouchedFields } from '../types/api';
+import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField } from '../types/api';
 
 interface DynamicFormBuilderWithTrackingProps {
   fields: ScenarioField[];
@@ -34,7 +34,21 @@ export function DynamicFormBuilderWithTracking({
     const newTouchedFields = { ...touchedFields, [variable]: true };
     onChange(newValues, newTouchedFields);
 
-    // Clear error for this field
+    const field = fields.find(f => f.variable === variable);
+    if (field?.type === 'string' && typeof value === 'string' && value !== '') {
+      const stringField = field as StringField;
+      if (stringField.validator) {
+        try {
+          if (!new RegExp(stringField.validator).test(value)) {
+            setErrors({ ...errors, [variable]: stringField.validation_message || `Must match pattern: ${stringField.validator}` });
+            return;
+          }
+        } catch {
+          // invalid regex in schema — skip validation
+        }
+      }
+    }
+
     if (errors[variable]) {
       setErrors({ ...errors, [variable]: '' });
     }
@@ -46,7 +60,8 @@ export function DynamicFormBuilderWithTracking({
     const validated = error ? 'error' : 'default';
 
     switch (field.type) {
-      case 'string':
+      case 'string': {
+        const stringField = field as StringField;
         return (
           <FormGroup
             key={field.variable}
@@ -70,6 +85,15 @@ export function DynamicFormBuilderWithTracking({
                 </HelperText>
               </FormHelperText>
             )}
+            {stringField.validator && stringField.validation_message && !error && (
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant="indeterminate">
+                    {stringField.validation_message}
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            )}
             {error && (
               <FormHelperText>
                 <HelperText>
@@ -81,6 +105,7 @@ export function DynamicFormBuilderWithTracking({
             )}
           </FormGroup>
         );
+      }
 
       case 'number':
         return (
