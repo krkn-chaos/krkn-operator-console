@@ -30,7 +30,7 @@ const readFileAsBase64 = (file: File): Promise<string> =>
       }
     };
     reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   });
 
 interface ScenarioDetailProps {
