@@ -19,13 +19,15 @@ interface DynamicFormBuilderWithTrackingProps {
   values: ScenarioFormValues;
   touchedFields: TouchedFields;
   onChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
+  disabledFields?: string[];
 }
 
 export function DynamicFormBuilderWithTracking({
   fields,
   values,
   touchedFields,
-  onChange
+  onChange,
+  disabledFields = [],
 }: DynamicFormBuilderWithTrackingProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -46,7 +48,8 @@ export function DynamicFormBuilderWithTracking({
     const validated = error ? 'error' : 'default';
 
     switch (field.type) {
-      case 'string':
+      case 'string': {
+        const isDisabled = disabledFields.includes(field.variable);
         return (
           <FormGroup
             key={field.variable}
@@ -57,11 +60,12 @@ export function DynamicFormBuilderWithTracking({
             <TextInput
               id={field.variable}
               type={field.secret ? 'password' : 'text'}
-              value={value as string}
+              value={isDisabled ? '***' : value as string}
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
               placeholder={field.default}
               autoComplete={field.secret ? 'off' : undefined}
+              isDisabled={isDisabled}
             />
             {field.description && (
               <FormHelperText>
@@ -81,6 +85,7 @@ export function DynamicFormBuilderWithTracking({
             )}
           </FormGroup>
         );
+      }
 
       case 'number':
         return (
