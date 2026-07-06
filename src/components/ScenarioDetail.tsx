@@ -39,6 +39,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
   const [fileReferences, setFileReferences] = useState<import('../types/api').FileReference[]>([]);
   const [availableFiles, setAvailableFiles] = useState<import('../types/api').FileInfo[]>([]);
+  const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
+  const [pendingFileWarningShown, setPendingFileWarningShown] = useState(false);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -230,6 +232,15 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleRunScenario = async () => {
     if (!state.uuid || !state.selectedClusters || state.selectedClusters.length === 0 || !scenarioFormValues || !scenarioDetail) {
+      return;
+    }
+
+    // Check for pending file input (file selected or path typed but not added)
+    if (hasPendingFileInput && !pendingFileWarningShown) {
+      setValidationErrors([
+        'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
+      ]);
+      setPendingFileWarningShown(true);
       return;
     }
 
@@ -553,7 +564,20 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             <CardBody>
               <FileSelector
                 value={fileReferences}
-                onChange={setFileReferences}
+                onChange={(refs) => {
+                  setFileReferences(refs);
+                  // Reset warning when user adds/removes files
+                  setPendingFileWarningShown(false);
+                  setValidationErrors([]);
+                }}
+                onPendingChange={(pending) => {
+                  setHasPendingFileInput(pending);
+                  // Reset warning when user clears pending input
+                  if (!pending) {
+                    setPendingFileWarningShown(false);
+                    setValidationErrors([]);
+                  }
+                }}
               />
             </CardBody>
           </Card>

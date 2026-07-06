@@ -38,9 +38,11 @@ interface FileSelectorProps {
   onChange: (fileReferences: FileReference[]) => void;
   /** Optional label for the form group */
   label?: string;
+  /** Callback when user has pending input (file selected or path typed but not added) */
+  onPendingChange?: (hasPending: boolean) => void;
 }
 
-export function FileSelector({ value, onChange, label = 'Managed Files' }: FileSelectorProps) {
+export function FileSelector({ value, onChange, label = 'Managed Files', onPendingChange }: FileSelectorProps) {
   const [availableFiles, setAvailableFiles] = useState<FileInfo[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,12 @@ export function FileSelector({ value, onChange, label = 'Managed Files' }: FileS
 
     loadFiles();
   }, []);
+
+  // Notify parent when there's pending input (file selected OR path typed but not added)
+  useEffect(() => {
+    const hasPending = !!(selectedFileId || mountPath.trim());
+    onPendingChange?.(hasPending);
+  }, [selectedFileId, mountPath, onPendingChange]);
 
   // Add file reference
   const handleAddFile = () => {
