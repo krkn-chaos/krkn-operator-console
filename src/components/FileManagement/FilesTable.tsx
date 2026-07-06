@@ -100,8 +100,7 @@ export function FilesTable({
       <Table aria-label="Files table" borders>
         <Thead>
           <Tr>
-            <Th>Name</Th>
-            <Th>File</Th>
+            <Th>File Name</Th>
             <Th>Type</Th>
             <Th>Access</Th>
             <Th>Actions</Th>
@@ -110,21 +109,18 @@ export function FilesTable({
         <Tbody>
           {filteredFiles.map((file) => (
             <Tr key={file.fileId}>
-              <Td dataLabel="Name">
+              <Td dataLabel="File Name">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
-                  <strong>{file.fileId}</strong>
+                  <code style={{
+                    fontSize: '0.875rem',
+                    padding: '0.125rem 0.25rem',
+                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                    borderRadius: '3px',
+                  }}>
+                    {file.fileName}
+                  </code>
                 </div>
-              </Td>
-              <Td dataLabel="File">
-                <code style={{
-                  fontSize: '0.875rem',
-                  padding: '0.125rem 0.25rem',
-                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                  borderRadius: '3px',
-                }}>
-                  {file.fileName}
-                </code>
               </Td>
               <Td dataLabel="Type">
                 {file.fileType ? (
