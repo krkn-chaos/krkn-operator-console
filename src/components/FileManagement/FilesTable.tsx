@@ -104,10 +104,10 @@ export function FilesTable({
       >
         <Thead>
           <Tr>
-            <Th>File Name</Th>
-            <Th>Type</Th>
-            <Th>Access</Th>
-            <Th>Actions</Th>
+            <Th width={40}>File Name</Th>
+            <Th width={15}>Type</Th>
+            <Th width={20}>Access</Th>
+            <Th width={25}>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
