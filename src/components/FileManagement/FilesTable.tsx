@@ -160,13 +160,14 @@ export function FilesTable({
                 )}
               </Td>
               <Td isActionCell>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', gap: '0.125rem', alignItems: 'center' }}>
                   <Tooltip content="Edit file">
                     <Button
                       variant="plain"
                       onClick={() => onEditClick(file)}
                       aria-label="Edit file"
                       icon={<FiEdit />}
+                      size="sm"
                     />
                   </Tooltip>
                   <Tooltip content="Delete file">
@@ -176,6 +177,7 @@ export function FilesTable({
                       aria-label="Delete file"
                       isDanger
                       icon={<FiTrash2 />}
+                      size="sm"
                     />
                   </Tooltip>
                 </div>
