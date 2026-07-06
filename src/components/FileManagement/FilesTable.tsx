@@ -20,14 +20,14 @@ import {
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock } from 'react-icons/fi';
-import type { FileResponse } from '../../types/api';
+import type { FileInfo } from '../../types/api';
 
 interface FilesTableProps {
-  files: FileResponse[];
+  files: FileInfo[];
   fileTypes: Array<{ name: string; color: string }>;
   onCreateClick: () => void;
-  onEditClick: (file: FileResponse) => void;
-  onDeleteClick: (fileName: string) => void;
+  onEditClick: (file: FileInfo) => void;
+  onDeleteClick: (fileId: string) => void;
   onRefresh: () => void;
 }
 
@@ -45,7 +45,7 @@ export function FilesTable({
 
   const filteredFiles = filesList.filter(
     (file) =>
-      file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      file.fileId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -109,11 +109,11 @@ export function FilesTable({
         </Thead>
         <Tbody>
           {filteredFiles.map((file) => (
-            <Tr key={file.name}>
+            <Tr key={file.fileId}>
               <Td dataLabel="Name">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
-                  <strong>{file.name}</strong>
+                  <strong>{file.fileId}</strong>
                 </div>
               </Td>
               <Td dataLabel="File">
@@ -169,7 +169,7 @@ export function FilesTable({
                   <Tooltip content="Delete file">
                     <Button
                       variant="plain"
-                      onClick={() => onDeleteClick(file.name)}
+                      onClick={() => onDeleteClick(file.fileId)}
                       aria-label="Delete file"
                       isDanger
                       icon={<FiTrash2 />}

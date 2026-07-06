@@ -24,7 +24,7 @@ import { FileFormModal } from './FileFormModal';
 import { FileTypesTable } from '../FileTypesManagement/FileTypesTable';
 import { FileTypeFormModal } from '../FileTypesManagement/FileTypeFormModal';
 import { operatorApi } from '../../services/operatorApi';
-import type { FileResponse, FileTypeResponse } from '../../types/api';
+import type { FileInfo, FileTypeResponse } from '../../types/api';
 
 interface FileManagementModalProps {
   isOpen: boolean;
@@ -40,8 +40,8 @@ export function FileManagementModal({
   const [activeTab, setActiveTab] = useState<ActiveTab>('files-list');
 
   // Files state
-  const [files, setFiles] = useState<FileResponse[]>([]);
-  const [selectedFile, setSelectedFile] = useState<FileResponse | null>(null);
+  const [files, setFiles] = useState<FileInfo[]>([]);
+  const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [fileFormOpen, setFileFormOpen] = useState(false);
   const [fileFormMode, setFileFormMode] = useState<'create' | 'edit'>('create');
 
@@ -99,19 +99,19 @@ export function FileManagementModal({
     setFileFormOpen(true);
   };
 
-  const handleEditFileClick = (file: FileResponse) => {
+  const handleEditFileClick = (file: FileInfo) => {
     setSelectedFile(file);
     setFileFormMode('edit');
     setFileFormOpen(true);
   };
 
-  const handleDeleteFileClick = async (fileName: string) => {
-    if (!window.confirm(`Are you sure you want to delete file "${fileName}"?`)) {
+  const handleDeleteFileClick = async (fileId: string) => {
+    if (!window.confirm(`Are you sure you want to delete this file?`)) {
       return;
     }
 
     try {
-      await operatorApi.deleteFile(fileName);
+      await operatorApi.deleteFile(fileId);
       await loadFiles();
       setError(null);
     } catch (err) {

@@ -34,11 +34,11 @@ import {
 import { FiPlus, FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
-import type { FileResponse, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
+import type { FileInfo, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
   mode: 'create' | 'edit';
-  initialData?: FileResponse;
+  initialData?: FileInfo;
   availableFileTypes: FileTypeResponse[];
   onSuccess: () => void;
   onCancel: () => void;
@@ -56,21 +56,13 @@ export function FileForm({
 }: FileFormProps) {
   const { isAdmin } = useRole();
 
-  const [fileName, setFileName] = useState(initialData?.fileName || '');
-  const [content, setContent] = useState(initialData?.content || '');
-  const [description, setDescription] = useState(initialData?.description || '');
-  const [fileType, setFileType] = useState(initialData?.fileType || '');
-  const [accessType, setAccessType] = useState<'public' | 'group'>(() => {
-    // For edit mode: use existing value
-    if (initialData) {
-      return initialData.availableToAll ? 'public' : 'group';
-    }
-    // For create mode: default to public
-    return 'public';
-  });
-  const [selectedGroup, setSelectedGroup] = useState<string>(
-    initialData?.groups?.[0] || '' // Max 1 group
-  );
+  // State - will be populated from getFile() in edit mode
+  const [fileName, setFileName] = useState('');
+  const [content, setContent] = useState('');
+  const [description, setDescription] = useState('');
+  const [fileType, setFileType] = useState('');
+  const [accessType, setAccessType] = useState<'public' | 'group'>('public');
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
   const [groupsLoaded, setGroupsLoaded] = useState(false);
 
@@ -89,7 +81,7 @@ export function FileForm({
 
   // Load file details in edit mode
   useEffect(() => {
-    if (mode !== 'edit' || !initialData?.name) {
+    if (mode !== 'edit' || !initialData?.fileId) {
       return;
     }
 
@@ -98,7 +90,7 @@ export function FileForm({
       setError(null);
 
       try {
-        const file = await operatorApi.getFile(initialData!.name);
+        const file = await operatorApi.getFile(initialData!.fileId);
 
         // Pre-populate all fields
         setFileName(file.fileName);
@@ -126,7 +118,7 @@ export function FileForm({
     }
 
     loadFile();
-  }, [mode, initialData?.name]);
+  }, [mode, initialData?.fileId]);
 
   // Load available groups
   useEffect(() => {
@@ -208,7 +200,7 @@ export function FileForm({
           fileType: fileType.trim() || undefined,
         };
 
-        await operatorApi.updateFile(initialData!.name, request);
+        await operatorApi.updateFile(initialData!.fileId, request);
       }
 
       onSuccess();

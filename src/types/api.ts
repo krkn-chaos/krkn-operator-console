@@ -908,11 +908,11 @@ export interface StudioAutosave {
 // ============================================================================
 
 /**
- * FileResponse - ConfigMap-based file data
+ * FileResponse - ConfigMap-based file data (full details)
  */
 export interface FileResponse {
-  /** ConfigMap name (unique identifier) */
-  name: string;
+  /** File UUID (unique identifier) */
+  fileId: string;
   /** File name (ConfigMap key) */
   fileName: string;
   /** File content */
@@ -929,7 +929,7 @@ export interface FileResponse {
 
 /**
  * CreateFileRequest - Request to create a new file
- * Note: ConfigMap name is auto-generated server-side
+ * Note: fileId and ConfigMap name are auto-generated server-side
  */
 export interface CreateFileRequest {
   /** File name (ConfigMap key) */
@@ -944,6 +944,16 @@ export interface CreateFileRequest {
   availableToAll: boolean;
   /** Optional file type classification */
   fileType?: string;
+}
+
+/**
+ * CreateFileResponse - Response from creating a file
+ */
+export interface CreateFileResponse {
+  /** Success message */
+  message: string;
+  /** Auto-generated file UUID */
+  fileId: string;
 }
 
 /**
@@ -965,7 +975,52 @@ export interface UpdateFileRequest {
 }
 
 /**
- * FilesListResponse - Response containing list of files
+ * UpdateFileResponse - Response from updating a file
+ */
+export interface UpdateFileResponse {
+  /** Success message */
+  message: string;
+  /** File UUID */
+  fileId: string;
+}
+
+/**
+ * FileInfo - Minimal file information for listings
+ */
+export interface FileInfo {
+  /** File UUID */
+  fileId: string;
+  /** File name */
+  fileName: string;
+  /** File description */
+  description?: string;
+  /** If true, available to all users */
+  availableToAll: boolean;
+  /** Groups that can access this file */
+  groups?: string[];
+  /** Optional file type classification */
+  fileType?: string;
+}
+
+/**
+ * AvailableFilesResponse - Response from GET /api/v1/files/available
+ */
+export interface AvailableFilesResponse {
+  /** Array of available files (minimal info) */
+  files: FileInfo[];
+}
+
+/**
+ * DeleteFileResponse - Response from deleting a file
+ */
+export interface DeleteFileResponse {
+  /** Success message */
+  message: string;
+}
+
+/**
+ * FilesListResponse - Response containing full file details
+ * @deprecated Use AvailableFilesResponse for listings, FileResponse for individual files
  */
 export interface FilesListResponse {
   /** Array of files */
