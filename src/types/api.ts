@@ -197,6 +197,17 @@ export interface ScenarioFileMount {
   content: string; // base64 encoded
 }
 
+/**
+ * FileReference - Reference to a centrally-managed file by UUID
+ * Used in ScenarioRunRequest to mount existing files without uploading content
+ */
+export interface FileReference {
+  /** File UUID from centrally-managed files */
+  fileId: string;
+  /** Absolute path where file should be mounted in pods */
+  mountPath: string;
+}
+
 export interface ScenarioRunRequest {
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
@@ -205,6 +216,8 @@ export interface ScenarioRunRequest {
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
+  /** References to centrally-managed files (optional) */
+  fileReferences?: FileReference[];
   /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
   registryName?: string;
 }

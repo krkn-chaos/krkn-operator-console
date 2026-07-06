@@ -15,6 +15,7 @@ import { useNotifications } from '../hooks';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
+import { FileSelector } from './FileSelector';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState } from '../types/api';
 
@@ -36,6 +37,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     existingRuns: string[];
   } | null>(null);
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
+  const [fileReferences, setFileReferences] = useState<import('../types/api').FileReference[]>([]);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -321,6 +323,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         kubeconfigPath: '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
+        fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
       };
 
@@ -522,6 +525,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               )}
             </>
           )}
+
+          {/* File References Section */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardTitle>Managed Files (Optional)</CardTitle>
+            <CardBody>
+              <FileSelector
+                value={fileReferences}
+                onChange={setFileReferences}
+              />
+            </CardBody>
+          </Card>
 
           {/* Preview Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
