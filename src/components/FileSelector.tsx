@@ -93,7 +93,10 @@ export function FileSelector({ value, onChange, label = 'Managed Files' }: FileS
     }
 
     // Add to list
-    onChange([...value, { fileId: selectedFileId, mountPath: mountPath.trim() }]);
+    const newRef = { fileId: selectedFileId, mountPath: mountPath.trim() };
+    const newValue = [...value, newRef];
+    console.log('[FileSelector] Adding file reference:', { newRef, newValue });
+    onChange(newValue);
 
     // Reset form
     setSelectedFileId('');

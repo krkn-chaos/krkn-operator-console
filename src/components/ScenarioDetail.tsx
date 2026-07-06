@@ -342,6 +342,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
       };
 
+      console.log('[ScenarioDetail] Building run request:', {
+        fileReferencesCount: fileReferences.length,
+        fileReferences,
+        runRequest,
+      });
+
       // Check for cluster conflicts before running
       const activeRuns = await operatorApi.getActiveRuns();
 
