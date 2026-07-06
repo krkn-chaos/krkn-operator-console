@@ -32,6 +32,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [conflictWarning, setConflictWarning] = useState<{
     clusterName: string;
     existingRuns: string[];
@@ -55,6 +56,14 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     }
     loadFiles();
   }, []);
+
+  // Reset warning when pending input is cleared
+  useEffect(() => {
+    if (!hasPendingFileInput && pendingFileWarningShown) {
+      setPendingFileWarningShown(false);
+      setValidationWarnings([]);
+    }
+  }, [hasPendingFileInput, pendingFileWarningShown]);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -149,7 +158,19 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handlePreview = () => {
+    // Check for pending file input BEFORE validation
+    console.log('[ScenarioDetail] Preview clicked, checking pending input:', { hasPendingFileInput, pendingFileWarningShown });
+    if (hasPendingFileInput && !pendingFileWarningShown) {
+      console.log('[ScenarioDetail] Blocking preview - showing pending file warning');
+      setValidationWarnings([
+        'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
+      ]);
+      setPendingFileWarningShown(true);
+      return;
+    }
+
     if (validateForm()) {
+      setValidationWarnings([]); // Clear warnings when proceeding
       setShowPreview(true);
     }
   };
@@ -232,15 +253,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleRunScenario = async () => {
     if (!state.uuid || !state.selectedClusters || state.selectedClusters.length === 0 || !scenarioFormValues || !scenarioDetail) {
-      return;
-    }
-
-    // Check for pending file input (file selected or path typed but not added)
-    if (hasPendingFileInput && !pendingFileWarningShown) {
-      setValidationErrors([
-        'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
-      ]);
-      setPendingFileWarningShown(true);
       return;
     }
 
@@ -456,6 +468,21 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         </Alert>
       )}
 
+      {/* Validation Warnings */}
+      {validationWarnings.length > 0 && (
+        <Alert
+          variant="warning"
+          title="Warning"
+          style={{ marginBottom: '1.5rem' }}
+        >
+          <ul>
+            {validationWarnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        </Alert>
+      )}
+
       {!showPreview ? (
         <>
           {/* Required Fields Section */}
@@ -466,6 +493,27 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 fields={scenarioDetail.fields.filter(field => field.required)}
                 values={scenarioFormValues || {}}
                 onChange={handleFormChange}
+              />
+            </CardBody>
+          </Card>
+
+          {/* File References Section */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardTitle>Managed Files</CardTitle>
+            <CardBody>
+              <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                Select centrally-managed files to mount in the scenario container.
+                The mount path must include the full file path (folder + filename), e.g., <code>/etc/config/file.yaml</code>.
+              </div>
+              <FileSelector
+                value={fileReferences}
+                onChange={(refs) => {
+                  setFileReferences(refs);
+                  // Reset warning when user adds/removes files
+                  setPendingFileWarningShown(false);
+                  setValidationWarnings([]);
+                }}
+                onPendingChange={setHasPendingFileInput}
               />
             </CardBody>
           </Card>
@@ -557,30 +605,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               )}
             </>
           )}
-
-          {/* File References Section */}
-          <Card style={{ marginTop: '1.5rem' }}>
-            <CardTitle>Managed Files (Optional)</CardTitle>
-            <CardBody>
-              <FileSelector
-                value={fileReferences}
-                onChange={(refs) => {
-                  setFileReferences(refs);
-                  // Reset warning when user adds/removes files
-                  setPendingFileWarningShown(false);
-                  setValidationErrors([]);
-                }}
-                onPendingChange={(pending) => {
-                  setHasPendingFileInput(pending);
-                  // Reset warning when user clears pending input
-                  if (!pending) {
-                    setPendingFileWarningShown(false);
-                    setValidationErrors([]);
-                  }
-                }}
-              />
-            </CardBody>
-          </Card>
 
           {/* Preview Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>

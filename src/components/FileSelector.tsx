@@ -75,6 +75,7 @@ export function FileSelector({ value, onChange, label = 'Managed Files', onPendi
   // Notify parent when there's pending input (file selected OR path typed but not added)
   useEffect(() => {
     const hasPending = !!(selectedFileId || mountPath.trim());
+    console.log('[FileSelector] Pending state changed:', { selectedFileId, mountPath, hasPending });
     onPendingChange?.(hasPending);
   }, [selectedFileId, mountPath, onPendingChange]);
 
