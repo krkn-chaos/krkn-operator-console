@@ -929,10 +929,9 @@ export interface FileResponse {
 
 /**
  * CreateFileRequest - Request to create a new file
+ * Note: ConfigMap name is auto-generated server-side
  */
 export interface CreateFileRequest {
-  /** ConfigMap name (RFC 1123 compliant) */
-  name: string;
   /** File name (ConfigMap key) */
   fileName: string;
   /** File content */

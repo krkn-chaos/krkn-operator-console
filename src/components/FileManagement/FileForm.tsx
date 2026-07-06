@@ -56,7 +56,6 @@ export function FileForm({
 }: FileFormProps) {
   const { isAdmin } = useRole();
 
-  const [name, setName] = useState(initialData?.name || '');
   const [fileName, setFileName] = useState(initialData?.fileName || '');
   const [content, setContent] = useState(initialData?.content || '');
   const [description, setDescription] = useState(initialData?.description || '');
@@ -158,12 +157,6 @@ export function FileForm({
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!name.trim()) {
-      errors.name = 'Name is required';
-    } else if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name)) {
-      errors.name = 'Name must be RFC 1123 compliant (lowercase, numbers, hyphens)';
-    }
-
     if (!fileName.trim()) {
       errors.fileName = 'File name is required';
     }
@@ -196,7 +189,6 @@ export function FileForm({
 
       if (mode === 'create') {
         const request: CreateFileRequest = {
-          name,
           fileName,
           content,
           description: description.trim() || undefined,
@@ -216,7 +208,7 @@ export function FileForm({
           fileType: fileType.trim() || undefined,
         };
 
-        await operatorApi.updateFile(name, request);
+        await operatorApi.updateFile(initialData!.name, request);
       }
 
       onSuccess();
@@ -253,32 +245,6 @@ export function FileForm({
           {error}
         </Alert>
       )}
-
-      <FormGroup label="Name" isRequired fieldId="file-name-input">
-        <TextInput
-          id="file-name-input"
-          value={name}
-          onChange={(_event, value) => setName(value)}
-          isDisabled={mode === 'edit'}
-          validated={validationErrors.name ? 'error' : 'default'}
-        />
-        {validationErrors.name && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{validationErrors.name}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-        {mode === 'create' && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>
-                ConfigMap name (RFC 1123: lowercase, numbers, hyphens)
-              </HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
 
       <FormGroup label="File Name" isRequired fieldId="filename-input">
         <TextInput
