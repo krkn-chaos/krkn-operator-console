@@ -7,7 +7,7 @@
  * - Files (optional, mock dropdown for now)
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   Form,
   FormGroup,
@@ -28,6 +28,7 @@ interface NodeMetadataStepProps {
   currentNodeId?: string; // Current node ID (for validation exclusion)
   volumes?: { [fileId: string]: string }; // fileId -> mountPath mapping
   onVolumesChange?: (volumes: { [fileId: string]: string }) => void;
+  onPendingChange?: (hasPending: boolean) => void;
 }
 
 export function NodeMetadataStep({
@@ -36,9 +37,9 @@ export function NodeMetadataStep({
   nodeIdError,
   volumes = {},
   onVolumesChange,
+  onPendingChange,
 }: NodeMetadataStepProps) {
   const validated = nodeIdError ? 'error' : nodeId ? 'success' : 'default';
-  const [, setHasPendingFileInput] = useState(false);
 
   // Convert volumes object to FileReference array for FileSelector
   const fileReferences = useMemo((): FileReference[] => {
@@ -103,7 +104,7 @@ export function NodeMetadataStep({
         <FileSelector
           value={fileReferences}
           onChange={handleFileReferencesChange}
-          onPendingChange={setHasPendingFileInput}
+          onPendingChange={onPendingChange}
           label=""
         />
       </div>

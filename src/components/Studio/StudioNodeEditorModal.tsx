@@ -52,6 +52,9 @@ function StudioNodeEditorModalComponent({
   // Step 4: Node metadata
   const [newNodeId, setNewNodeId] = useState<string>('');
   const [nodeIdError, setNodeIdError] = useState<string | undefined>(undefined);
+  const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
+  const [pendingFileWarningShown, setPendingFileWarningShown] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
   // Track if we've initialized to prevent repeated initialization
   const hasInitialized = useRef(false);
@@ -151,8 +154,25 @@ function StudioNodeEditorModalComponent({
     setScenarioDefaultValues({});
   }, [registryType, registryName]);
 
+  // Reset warning when pending input is cleared
+  useEffect(() => {
+    if (!hasPendingFileInput && pendingFileWarningShown) {
+      setPendingFileWarningShown(false);
+      setValidationWarnings([]);
+    }
+  }, [hasPendingFileInput, pendingFileWarningShown]);
+
   const handleSave = () => {
     if (!node || !selectedScenario || nodeIdError) return;
+
+    // Check for pending file input (file selected or path typed but not added)
+    if (hasPendingFileInput && !pendingFileWarningShown) {
+      setValidationWarnings([
+        'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
+      ]);
+      setPendingFileWarningShown(true);
+      return;
+    }
 
     // Build registryConfig from primitive
     const registryConfig: ScenariosRequest = registryName ? { registryName } : {};
@@ -251,7 +271,12 @@ function StudioNodeEditorModalComponent({
           nodeIdError={nodeIdError}
           currentNodeId={node.nodeId}
           volumes={volumes}
-          onVolumesChange={setVolumes}
+          onVolumesChange={(vols) => {
+            setVolumes(vols);
+            setPendingFileWarningShown(false);
+            setValidationWarnings([]);
+          }}
+          onPendingChange={setHasPendingFileInput}
         />
       ),
       isNextDisabled: !!nodeIdError || !newNodeId,
@@ -264,6 +289,7 @@ function StudioNodeEditorModalComponent({
       title="Configure Chaos Scenario"
       description={`Configure node: ${node.nodeId}`}
       steps={steps}
+      validationWarnings={validationWarnings}
       onClose={handleClose}
       onSave={handleSave}
     />
