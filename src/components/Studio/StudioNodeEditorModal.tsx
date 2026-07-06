@@ -47,6 +47,7 @@ function StudioNodeEditorModalComponent({
   const [globalFormValues, setGlobalFormValues] = useState<ScenarioFormValues>({});
   const [globalTouchedFields, setGlobalTouchedFields] = useState<TouchedFields>({});
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
+  const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
 
   // Step 4: Node metadata
   const [newNodeId, setNewNodeId] = useState<string>('');
@@ -78,6 +79,7 @@ function StudioNodeEditorModalComponent({
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
+      setVolumes(node.config.volumes || {});
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
       fetchScenarios(node.config.registryConfig);
@@ -89,6 +91,7 @@ function StudioNodeEditorModalComponent({
       setFormValues({});
       setGlobalFormValues({});
       setGlobalTouchedFields({});
+      setVolumes({});
       setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
       fetchScenarios({});
@@ -167,6 +170,7 @@ function StudioNodeEditorModalComponent({
         scenarioFormValues: finalFormValues,
         globalFormValues,
         globalTouchedFields,
+        volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
       },
     };
 
@@ -231,8 +235,10 @@ function StudioNodeEditorModalComponent({
           formValues={formValues}
           globalFormValues={globalFormValues}
           globalTouchedFields={globalTouchedFields}
+          volumes={volumes}
           onFormChange={setFormValues}
           onGlobalFormChange={handleGlobalFormChange}
+          onVolumesChange={setVolumes}
           onDefaultValuesLoad={handleDefaultValuesLoad}
         />
       ) : null,
