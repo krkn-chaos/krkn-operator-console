@@ -38,6 +38,21 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   } | null>(null);
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
   const [fileReferences, setFileReferences] = useState<import('../types/api').FileReference[]>([]);
+  const [availableFiles, setAvailableFiles] = useState<import('../types/api').FileInfo[]>([]);
+
+  // Load available files for file reference mapping
+  useEffect(() => {
+    async function loadFiles() {
+      try {
+        const response = await operatorApi.getAvailableFiles();
+        setAvailableFiles(response.files || []);
+      } catch (err) {
+        // Silently fail - file references will show fileId instead of fileName
+        console.error('[ScenarioDetail] Failed to load available files:', err);
+      }
+    }
+    loadFiles();
+  }, []);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -633,6 +648,33 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                             </Tr>
                           );
                         })}
+                    </Tbody>
+                  </Table>
+                </>
+              )}
+
+              {/* File References Preview */}
+              {fileReferences.length > 0 && (
+                <>
+                  <div style={{ marginTop: '2rem', marginBottom: '1rem', fontWeight: 'bold' }}>Managed Files</div>
+                  <Table variant="compact" borders={true}>
+                    <Thead>
+                      <Tr>
+                        <Th width={50}>File</Th>
+                        <Th width={50}>Mount Path</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {fileReferences.map((ref, index) => {
+                        const file = availableFiles.find(f => f.fileId === ref.fileId);
+                        const displayName = file?.fileName || ref.fileId;
+                        return (
+                          <Tr key={index}>
+                            <Td style={{ fontFamily: 'monospace' }}>{displayName}</Td>
+                            <Td style={{ fontFamily: 'monospace' }}>{ref.mountPath}</Td>
+                          </Tr>
+                        );
+                      })}
                     </Tbody>
                   </Table>
                 </>
