@@ -235,10 +235,8 @@ function StudioNodeEditorModalComponent({
           formValues={formValues}
           globalFormValues={globalFormValues}
           globalTouchedFields={globalTouchedFields}
-          volumes={volumes}
           onFormChange={setFormValues}
           onGlobalFormChange={handleGlobalFormChange}
-          onVolumesChange={setVolumes}
           onDefaultValuesLoad={handleDefaultValuesLoad}
         />
       ) : null,
@@ -252,6 +250,8 @@ function StudioNodeEditorModalComponent({
           onNodeIdChange={handleNodeIdChange}
           nodeIdError={nodeIdError}
           currentNodeId={node.nodeId}
+          volumes={volumes}
+          onVolumesChange={setVolumes}
         />
       ),
       isNextDisabled: !!nodeIdError || !newNodeId,

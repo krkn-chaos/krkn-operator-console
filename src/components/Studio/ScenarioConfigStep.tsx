@@ -16,9 +16,8 @@ import {
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from '../DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from '../DynamicFormBuilderWithTracking';
-import { FileSelector } from '../FileSelector';
 import { operatorApi } from '../../services/operatorApi';
-import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, FileReference } from '../../types/api';
+import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields } from '../../types/api';
 
 interface ScenarioConfigStepProps {
   scenarioName: string;
@@ -26,10 +25,8 @@ interface ScenarioConfigStepProps {
   formValues: ScenarioFormValues;
   globalFormValues: ScenarioFormValues;
   globalTouchedFields: TouchedFields;
-  volumes?: { [fileId: string]: string }; // fileId -> mountPath mapping
   onFormChange: (values: ScenarioFormValues) => void;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
-  onVolumesChange?: (volumes: { [fileId: string]: string }) => void;
   onDefaultValuesLoad?: (defaults: ScenarioFormValues) => void;
 }
 
@@ -39,10 +36,8 @@ export function ScenarioConfigStep({
   formValues,
   globalFormValues,
   globalTouchedFields,
-  volumes = {},
   onFormChange,
   onGlobalFormChange,
-  onVolumesChange,
   onDefaultValuesLoad,
 }: ScenarioConfigStepProps) {
   const [scenarioDetail, setScenarioDetail] = useState<ScenarioDetail | null>(null);
@@ -52,23 +47,6 @@ export function ScenarioConfigStep({
   const [error, setError] = useState<string | null>(null);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
-
-  // File selector state (for pending input warning - not used in wizard, but required by FileSelector)
-  const [, setHasPendingFileInput] = useState(false);
-
-  // Convert volumes object to FileReference array for FileSelector
-  const fileReferences = useMemo((): FileReference[] => {
-    return Object.entries(volumes).map(([fileId, mountPath]) => ({ fileId, mountPath }));
-  }, [volumes]);
-
-  // Handle FileSelector change - convert FileReference[] back to volumes object
-  const handleFileReferencesChange = (refs: FileReference[]) => {
-    const newVolumes: { [fileId: string]: string } = {};
-    refs.forEach(ref => {
-      newVolumes[ref.fileId] = ref.mountPath;
-    });
-    onVolumesChange?.(newVolumes);
-  };
 
   // Fetch scenario detail when scenario changes
   useEffect(() => {
@@ -217,22 +195,6 @@ export function ScenarioConfigStep({
             fields={requiredFields}
             values={formValues}
             onChange={onFormChange}
-          />
-        </CardBody>
-      </Card>
-
-      {/* File References Section */}
-      <Card style={{ marginTop: '1.5rem' }}>
-        <CardTitle>Managed Files</CardTitle>
-        <CardBody>
-          <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
-            Select centrally-managed files to mount in the scenario container.
-            The mount path must include the full file path (folder + filename), e.g., <code>/etc/config/file.yaml</code>.
-          </div>
-          <FileSelector
-            value={fileReferences}
-            onChange={handleFileReferencesChange}
-            onPendingChange={setHasPendingFileInput}
           />
         </CardBody>
       </Card>
