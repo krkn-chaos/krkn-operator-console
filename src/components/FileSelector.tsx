@@ -19,8 +19,6 @@ import {
   MenuToggleElement,
   TextInput,
   Button,
-  Chip,
-  ChipGroup,
   FormHelperText,
   HelperText,
   HelperTextItem,
@@ -133,16 +131,42 @@ export function FileSelector({ value, onChange, label = 'Managed Files', onPendi
     <FormGroup label={label} fieldId="file-selector">
       {/* Selected files display */}
       {value.length > 0 && (
-        <ChipGroup categoryName="Selected files" style={{ marginBottom: '1rem' }}>
-          {value.map(ref => (
-            <Chip
-              key={ref.fileId}
-              onClick={() => handleRemoveFile(ref.fileId)}
-            >
-              {getFileName(ref.fileId)} → {ref.mountPath}
-            </Chip>
-          ))}
-        </ChipGroup>
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
+            Selected files
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {value.map(ref => {
+              const file = availableFiles.find(f => f.fileId === ref.fileId);
+              const displayName = file?.fileName || ref.fileId;
+              return (
+                <div
+                  key={ref.fileId}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0.5rem',
+                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                    borderRadius: '3px',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <code style={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                    {displayName} → {ref.mountPath}
+                  </code>
+                  <Button
+                    variant="plain"
+                    onClick={() => handleRemoveFile(ref.fileId)}
+                    aria-label="Remove file"
+                    style={{ padding: '0.25rem' }}
+                  >
+                    ×
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* Add file section */}
