@@ -97,7 +97,11 @@ export function FilesTable({
         </ToolbarContent>
       </Toolbar>
 
-      <Table aria-label="Files table" borders>
+      <Table
+        aria-label="Files table"
+        borders
+        variant="compact"
+      >
         <Thead>
           <Tr>
             <Th>File Name</Th>
@@ -110,17 +114,20 @@ export function FilesTable({
           {filteredFiles.map((file) => (
             <Tr key={file.fileId}>
               <Td dataLabel="File Name">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
-                  <code style={{
-                    fontSize: '0.875rem',
-                    padding: '0.125rem 0.25rem',
-                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                    borderRadius: '3px',
-                  }}>
-                    {file.fileName}
-                  </code>
-                </div>
+                <Tooltip content={file.description || 'No description'} position="top">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
+                    <code style={{
+                      fontSize: '0.875rem',
+                      padding: '0.125rem 0.25rem',
+                      backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                      borderRadius: '3px',
+                      cursor: 'help',
+                    }}>
+                      {file.fileName}
+                    </code>
+                  </div>
+                </Tooltip>
               </Td>
               <Td dataLabel="Type">
                 {file.fileType ? (
