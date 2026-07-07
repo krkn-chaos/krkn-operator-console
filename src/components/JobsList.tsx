@@ -676,19 +676,27 @@ export function JobsList({
                               </div>
                               {item.resiliencyScoreEnabled ? (
                                 item.resiliencyScore && item.resiliencyScoreBaseline ? (
-                                  <Label
-                                    color={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).color}
-                                    icon={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).icon}
+                                  <Tooltip
+                                    content={`Score: ${item.resiliencyScore.calculated.toFixed(1)} / Baseline: ${item.resiliencyScoreBaseline.toFixed(1)} (${item.resiliencyScore.status})`}
                                   >
-                                    {getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).label}
-                                  </Label>
+                                    <Label
+                                      color={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).color}
+                                      icon={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).icon}
+                                    >
+                                      {getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).label}
+                                    </Label>
+                                  </Tooltip>
                                 ) : (
-                                  <Label color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
-                                    Calculating...
-                                  </Label>
+                                  <Tooltip content="Score calculation in progress...">
+                                    <Label color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
+                                      Calculating...
+                                    </Label>
+                                  </Tooltip>
                                 )
                               ) : (
-                                <Label color="grey">N/A</Label>
+                                <Tooltip content="Resiliency score not enabled for this run">
+                                  <Label color="grey">N/A</Label>
+                                </Tooltip>
                               )}
                             </div>
                           </DataListCell>,
