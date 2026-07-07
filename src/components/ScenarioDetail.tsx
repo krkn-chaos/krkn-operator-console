@@ -159,9 +159,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handlePreview = () => {
     // Check for pending file input BEFORE validation
-    console.log('[ScenarioDetail] Preview clicked, checking pending input:', { hasPendingFileInput, pendingFileWarningShown });
     if (hasPendingFileInput && !pendingFileWarningShown) {
-      console.log('[ScenarioDetail] Blocking preview - showing pending file warning');
       setValidationWarnings([
         'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
       ]);
@@ -364,12 +362,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
       };
-
-      console.log('[ScenarioDetail] Building run request:', {
-        fileReferencesCount: fileReferences.length,
-        fileReferences,
-        runRequest,
-      });
 
       // Check for cluster conflicts before running
       const activeRuns = await operatorApi.getActiveRuns();
