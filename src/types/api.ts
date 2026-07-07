@@ -798,6 +798,20 @@ export interface CreateGraphRunRequest {
 }
 
 /**
+ * ResiliencyScoreConfig - Configuration for resiliency score calculation
+ */
+export interface ResiliencyScoreConfig {
+  /** Baseline score value (float, >= 0) */
+  baseline: number;
+  /** Mount path for metrics file in container (default: /etc/krkn/metrics.yaml) */
+  mountPath: string;
+  /** Single file ID for all nodes (when using 'same file' mode) */
+  fileId?: string;
+  /** Per-node file mapping (when using 'per-node' mode) */
+  perNodeFiles?: { [nodeId: string]: string };
+}
+
+/**
  * ListGraphRunsFilters for filtering graph runs in GET /api/v1/graphruns
  */
 export interface ListGraphRunsFilters {
