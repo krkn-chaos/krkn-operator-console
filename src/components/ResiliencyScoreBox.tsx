@@ -72,7 +72,7 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
             cursor: 'pointer',
           }}
         >
-          <span style={{ fontSize: '16px', fontWeight: 'bold' }}>⋯</span>
+          <span style={{ fontSize: '11px', fontWeight: 'bold' }}>⋯</span>
         </div>
       </Tooltip>
     );
@@ -95,8 +95,8 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
     <Tooltip content={tooltipContent}>
       <div
         style={{
-          width: '50px',
-          height: '50px',
+          width: '30px',
+          height: '30px',
           backgroundColor,
           color: 'white',
           display: 'flex',
@@ -106,7 +106,7 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
           cursor: 'pointer',
           transition: 'transform 0.2s',
           fontWeight: 'bold',
-          fontSize: '16px',
+          fontSize: '11px',
         }}
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -125,8 +125,8 @@ export const ResiliencyScoreNA: React.FC = () => {
     <Tooltip content="Resiliency score not available">
       <div
         style={{
-          width: '50px',
-          height: '50px',
+          width: '30px',
+          height: '30px',
           backgroundColor: '#495057', // Grigio scuro
           color: 'white',
           display: 'flex',
@@ -134,7 +134,7 @@ export const ResiliencyScoreNA: React.FC = () => {
           justifyContent: 'center',
           borderRadius: '8px',
           fontWeight: 'bold',
-          fontSize: '14px',
+          fontSize: '10px',
         }}
       >
         N/A

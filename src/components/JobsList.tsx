@@ -677,7 +677,7 @@ export function JobsList({
                           <DataListCell key="resiliency-score" width={1}>
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Score:</strong>
+                                <strong>Resiliency Score:</strong>
                               </div>
                               {item.resiliencyScoreEnabled ? (
                                 <ResiliencyScoreBox
