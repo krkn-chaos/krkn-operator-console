@@ -569,11 +569,6 @@ export function JobsList({
                 const isGraphExpanded = expandedGraphRunIds.has(item.graphRunName);
                 const phaseDisplay = getRunPhaseDisplay(item.phase);
 
-                // Aggregate job counts across all nodes
-                const successfulJobs = item.nodes.reduce((sum, node) => sum + node.successfulJobs, 0);
-                const failedJobs = item.nodes.reduce((sum, node) => sum + node.failedJobs, 0);
-                const runningJobs = item.nodes.reduce((sum, node) => sum + node.runningJobs, 0);
-
                 return (
                   <DataListItem key={item.graphRunName} isExpanded={isGraphExpanded}>
                     {/* GraphRun Summary Row */}
@@ -653,24 +648,6 @@ export function JobsList({
                                 <Label color="blue" icon={<TopologyIcon />}>
                                   {item.summary.completedNodes} / {item.summary.totalNodes}
                                 </Label>
-                              </div>
-                            </div>
-                          </DataListCell>,
-                          <DataListCell key="jobs-summary" width={2}>
-                            <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Jobs:</strong>
-                              </div>
-                              <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>✓</span> {successfulJobs}
-                                </span>
-                                <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>✗</span> {failedJobs}
-                                </span>
-                                <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>⟳</span> {runningJobs}
-                                </span>
                               </div>
                             </div>
                           </DataListCell>,

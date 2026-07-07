@@ -95,8 +95,8 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
     <Tooltip content={tooltipContent}>
       <div
         style={{
-          width: '30px',
-          height: '30px',
+          width: '35px',
+          height: '35px',
           backgroundColor,
           color: 'white',
           display: 'flex',
@@ -106,7 +106,7 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
           cursor: 'pointer',
           transition: 'transform 0.2s',
           fontWeight: 'bold',
-          fontSize: '11px',
+          fontSize: '12px',
         }}
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -125,8 +125,8 @@ export const ResiliencyScoreNA: React.FC = () => {
     <Tooltip content="Resiliency score not available">
       <div
         style={{
-          width: '30px',
-          height: '30px',
+          width: '35px',
+          height: '35px',
           backgroundColor: '#495057', // Grigio scuro
           color: 'white',
           display: 'flex',
