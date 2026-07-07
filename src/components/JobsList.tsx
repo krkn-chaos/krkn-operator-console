@@ -49,14 +49,27 @@ import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
 import { FileManagementModal } from './FileManagement';
+import { ResiliencyScoreBox, ResiliencyScoreNA } from './ResiliencyScoreBox';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState, GraphRunSummary } from '../types/api';
+import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState, GraphRunSummary, ResiliencyScoreResponse } from '../types/api';
 
 // Unified run item type - can be either a GraphRun or a standalone ScenarioRun
 type UnifiedRunItem =
-  | { type: 'graph'; graphRunName: string; nodes: ScenarioRunState[]; phase: ScenarioRunPhase; createdAt: string; ownerUserId?: string; summary: GraphRunSummary }
+  | {
+      type: 'graph';
+      graphRunName: string;
+      nodes: ScenarioRunState[];
+      phase: ScenarioRunPhase;
+      createdAt: string;
+      ownerUserId?: string;
+      summary: GraphRunSummary;
+      // Resiliency score fields
+      resiliencyScoreEnabled?: boolean;
+      resiliencyScoreBaseline?: number;
+      resiliencyScore?: ResiliencyScoreResponse;
+    }
   | { type: 'scenario'; run: ScenarioRunState };
 
 interface JobsListProps {
@@ -288,7 +301,23 @@ export function JobsList({
         pendingNodes: nodes.filter(n => n.phase === 'Pending').length,
       };
 
-      items.push({ type: 'graph', graphRunName, nodes, phase, createdAt, ownerUserId, summary });
+      // Get resiliency score fields from GraphRunState
+      const resiliencyScoreEnabled = graphRunState?.resiliencyScoreEnabled;
+      const resiliencyScoreBaseline = graphRunState?.resiliencyScoreBaseline;
+      const resiliencyScore = graphRunState?.resiliencyScore;
+
+      items.push({
+        type: 'graph',
+        graphRunName,
+        nodes,
+        phase,
+        createdAt,
+        ownerUserId,
+        summary,
+        resiliencyScoreEnabled,
+        resiliencyScoreBaseline,
+        resiliencyScore,
+      });
     });
 
     // Add standalone ScenarioRuns
@@ -643,6 +672,24 @@ export function JobsList({
                                   <span style={{ fontSize: '1.25rem' }}>⟳</span> {runningJobs}
                                 </span>
                               </div>
+                            </div>
+                          </DataListCell>,
+                          <DataListCell key="resiliency-score" width={1}>
+                            <div>
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                <strong>Score:</strong>
+                              </div>
+                              {item.resiliencyScoreEnabled ? (
+                                <ResiliencyScoreBox
+                                  score={item.resiliencyScore?.calculated}
+                                  baseline={item.resiliencyScoreBaseline}
+                                  status={item.resiliencyScore?.status}
+                                  enabled={true}
+                                  calculating={item.phase === 'Running' && !item.resiliencyScore}
+                                />
+                              ) : (
+                                <ResiliencyScoreNA />
+                              )}
                             </div>
                           </DataListCell>,
                           <DataListCell key="created" width={2}>

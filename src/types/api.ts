@@ -870,6 +870,11 @@ export interface GraphRunState {
   startTime?: string;
   /** When the graph run completed execution */
   completionTime?: string;
+
+  // Resiliency score fields (from GraphRunListItem)
+  resiliencyScoreEnabled?: boolean;
+  resiliencyScoreBaseline?: number;
+  resiliencyScore?: ResiliencyScoreResponse;
 }
 
 /**
