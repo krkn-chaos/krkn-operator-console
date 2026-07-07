@@ -85,7 +85,7 @@ export function RunWorkflowModal({
     });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (providedConfig?: ResiliencyScoreConfig) => {
     if (targetFetchState.status !== 'ready' || !targetFetchState.uuid) {
       showError('Missing target request', 'Target request ID is not available');
       return;
@@ -96,8 +96,11 @@ export function RunWorkflowModal({
       return;
     }
 
+    // Use provided config or state config
+    const configToUse = providedConfig || resiliencyConfig;
+
     // If resiliency score enabled but not configured, open modal
-    if (enableResiliencyScore && !resiliencyConfig) {
+    if (enableResiliencyScore && !configToUse) {
       setShowResiliencyModal(true);
       return;
     }
@@ -120,18 +123,18 @@ export function RunWorkflowModal({
 
     // Apply resiliency score file mappings to graph nodes
     const graph = { ...exportResult.graph };
-    if (resiliencyConfig) {
+    if (configToUse) {
       Object.keys(graph).forEach((nodeId) => {
         const node = graph[nodeId];
 
         // Determine fileId for this node
         let fileId: string | undefined;
-        if (resiliencyConfig.fileId) {
+        if (configToUse.fileId) {
           // Same file for all nodes
-          fileId = resiliencyConfig.fileId;
-        } else if (resiliencyConfig.perNodeFiles && resiliencyConfig.perNodeFiles[nodeId]) {
+          fileId = configToUse.fileId;
+        } else if (configToUse.perNodeFiles && configToUse.perNodeFiles[nodeId]) {
           // Per-node file selection
-          fileId = resiliencyConfig.perNodeFiles[nodeId];
+          fileId = configToUse.perNodeFiles[nodeId];
         }
 
         // Add to volumes if fileId exists
@@ -140,7 +143,7 @@ export function RunWorkflowModal({
             ...node,
             volumes: {
               ...(node.volumes || {}),
-              [fileId]: resiliencyConfig.mountPath,
+              [fileId]: configToUse.mountPath,
             },
           };
         }
@@ -158,10 +161,10 @@ export function RunWorkflowModal({
     try {
       // Build headers for resiliency score
       const headers: Record<string, string> = {};
-      if (resiliencyConfig) {
+      if (configToUse) {
         headers['X-Resiliency-Score'] = 'true';
-        headers['X-Resiliency-Baseline'] = resiliencyConfig.baseline.toString();
-        headers['X-Resiliency-Mount-Path'] = resiliencyConfig.mountPath;
+        headers['X-Resiliency-Baseline'] = configToUse.baseline.toString();
+        headers['X-Resiliency-Mount-Path'] = configToUse.mountPath;
       }
 
       const graphRun = await graphRunsApi.createGraphRun(request, headers);
@@ -180,8 +183,8 @@ export function RunWorkflowModal({
   const handleResiliencyConfigConfirm = (config: ResiliencyScoreConfig) => {
     setResiliencyConfig(config);
     setShowResiliencyModal(false);
-    // Automatically proceed with submission after config is saved
-    setTimeout(() => handleSubmit(), 100);
+    // Automatically proceed with submission, passing config directly to avoid race condition
+    handleSubmit(config);
   };
 
   // Render loading state
@@ -324,7 +327,7 @@ export function RunWorkflowModal({
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
             <Button
               variant="primary"
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               isDisabled={selectedClusters.length === 0 || isSubmitting}
               isLoading={isSubmitting}
               size="lg"
