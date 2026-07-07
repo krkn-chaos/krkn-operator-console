@@ -14,6 +14,7 @@ import {
   Text,
   ProgressStepper,
   ProgressStep,
+  Alert,
 } from '@patternfly/react-core';
 
 export interface WizardStepConfig {
@@ -28,6 +29,7 @@ interface WizardStepperProps {
   title: string;
   description?: string;
   steps: WizardStepConfig[];
+  validationWarnings?: string[];
   onClose: () => void;
   onSave: () => void;
 }
@@ -37,6 +39,7 @@ export function WizardStepper({
   title,
   description,
   steps,
+  validationWarnings = [],
   onClose,
   onSave,
 }: WizardStepperProps) {
@@ -136,6 +139,21 @@ export function WizardStepper({
           overflowY: 'auto',
           padding: '1.5rem'
         }}>
+          {/* Validation Warnings */}
+          {validationWarnings.length > 0 && (
+            <Alert
+              variant="warning"
+              title="Warning"
+              style={{ marginBottom: '1.5rem' }}
+            >
+              <ul>
+                {validationWarnings.map((warning, index) => (
+                  <li key={index}>{warning}</li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+
           {currentStep.component}
         </div>
 

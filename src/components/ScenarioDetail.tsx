@@ -15,6 +15,7 @@ import { useNotifications } from '../hooks';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
+import { FileSelector } from './FileSelector';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState } from '../types/api';
 
@@ -31,11 +32,38 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [conflictWarning, setConflictWarning] = useState<{
     clusterName: string;
     existingRuns: string[];
   } | null>(null);
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
+  const [fileReferences, setFileReferences] = useState<import('../types/api').FileReference[]>([]);
+  const [availableFiles, setAvailableFiles] = useState<import('../types/api').FileInfo[]>([]);
+  const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
+  const [pendingFileWarningShown, setPendingFileWarningShown] = useState(false);
+
+  // Load available files for file reference mapping
+  useEffect(() => {
+    async function loadFiles() {
+      try {
+        const response = await operatorApi.getAvailableFiles();
+        setAvailableFiles(response.files || []);
+      } catch (err) {
+        // Silently fail - file references will show fileId instead of fileName
+        console.error('[ScenarioDetail] Failed to load available files:', err);
+      }
+    }
+    loadFiles();
+  }, []);
+
+  // Reset warning when pending input is cleared
+  useEffect(() => {
+    if (!hasPendingFileInput && pendingFileWarningShown) {
+      setPendingFileWarningShown(false);
+      setValidationWarnings([]);
+    }
+  }, [hasPendingFileInput, pendingFileWarningShown]);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -130,7 +158,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handlePreview = () => {
+    // Check for pending file input BEFORE validation
+    if (hasPendingFileInput && !pendingFileWarningShown) {
+      setValidationWarnings([
+        'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
+      ]);
+      setPendingFileWarningShown(true);
+      return;
+    }
+
     if (validateForm()) {
+      setValidationWarnings([]); // Clear warnings when proceeding
       setShowPreview(true);
     }
   };
@@ -321,6 +359,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         kubeconfigPath: '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
+        fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
       };
 
@@ -421,6 +460,21 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         </Alert>
       )}
 
+      {/* Validation Warnings */}
+      {validationWarnings.length > 0 && (
+        <Alert
+          variant="warning"
+          title="Warning"
+          style={{ marginBottom: '1.5rem' }}
+        >
+          <ul>
+            {validationWarnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        </Alert>
+      )}
+
       {!showPreview ? (
         <>
           {/* Required Fields Section */}
@@ -431,6 +485,27 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 fields={scenarioDetail.fields.filter(field => field.required)}
                 values={scenarioFormValues || {}}
                 onChange={handleFormChange}
+              />
+            </CardBody>
+          </Card>
+
+          {/* File References Section */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardTitle>Managed Files</CardTitle>
+            <CardBody>
+              <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                Select centrally-managed files to mount in the scenario container.
+                The mount path must include the full file path (folder + filename), e.g., <code>/etc/config/file.yaml</code>.
+              </div>
+              <FileSelector
+                value={fileReferences}
+                onChange={(refs) => {
+                  setFileReferences(refs);
+                  // Reset warning when user adds/removes files
+                  setPendingFileWarningShown(false);
+                  setValidationWarnings([]);
+                }}
+                onPendingChange={setHasPendingFileInput}
               />
             </CardBody>
           </Card>
@@ -619,6 +694,33 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                             </Tr>
                           );
                         })}
+                    </Tbody>
+                  </Table>
+                </>
+              )}
+
+              {/* File References Preview */}
+              {fileReferences.length > 0 && (
+                <>
+                  <div style={{ marginTop: '2rem', marginBottom: '1rem', fontWeight: 'bold' }}>Managed Files</div>
+                  <Table variant="compact" borders={true}>
+                    <Thead>
+                      <Tr>
+                        <Th width={50}>File</Th>
+                        <Th width={50}>Mount Path</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {fileReferences.map((ref, index) => {
+                        const file = availableFiles.find(f => f.fileId === ref.fileId);
+                        const displayName = file?.fileName || ref.fileId;
+                        return (
+                          <Tr key={index}>
+                            <Td style={{ fontFamily: 'monospace' }}>{displayName}</Td>
+                            <Td style={{ fontFamily: 'monospace' }}>{ref.mountPath}</Td>
+                          </Tr>
+                        );
+                      })}
                     </Tbody>
                   </Table>
                 </>

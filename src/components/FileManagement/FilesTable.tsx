@@ -20,14 +20,14 @@ import {
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock } from 'react-icons/fi';
-import type { FileResponse } from '../../types/api';
+import type { FileInfo } from '../../types/api';
 
 interface FilesTableProps {
-  files: FileResponse[];
+  files: FileInfo[];
   fileTypes: Array<{ name: string; color: string }>;
   onCreateClick: () => void;
-  onEditClick: (file: FileResponse) => void;
-  onDeleteClick: (fileName: string) => void;
+  onEditClick: (file: FileInfo) => void;
+  onDeleteClick: (fileId: string) => void;
   onRefresh: () => void;
 }
 
@@ -45,7 +45,7 @@ export function FilesTable({
 
   const filteredFiles = filesList.filter(
     (file) =>
-      file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      file.fileId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       file.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -97,34 +97,37 @@ export function FilesTable({
         </ToolbarContent>
       </Toolbar>
 
-      <Table aria-label="Files table" borders>
+      <Table
+        aria-label="Files table"
+        borders
+        variant="compact"
+      >
         <Thead>
           <Tr>
-            <Th>Name</Th>
-            <Th>File</Th>
-            <Th>Type</Th>
-            <Th>Access</Th>
-            <Th>Actions</Th>
+            <Th width={40}>File Name</Th>
+            <Th width={15}>Type</Th>
+            <Th width={20}>Access</Th>
+            <Th width={25}>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
           {filteredFiles.map((file) => (
-            <Tr key={file.name}>
-              <Td dataLabel="Name">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
-                  <strong>{file.name}</strong>
-                </div>
-              </Td>
-              <Td dataLabel="File">
-                <code style={{
-                  fontSize: '0.875rem',
-                  padding: '0.125rem 0.25rem',
-                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                  borderRadius: '3px',
-                }}>
-                  {file.fileName}
-                </code>
+            <Tr key={file.fileId}>
+              <Td dataLabel="File Name">
+                <Tooltip content={file.description || 'No description'} position="top">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
+                    <code style={{
+                      fontSize: '0.875rem',
+                      padding: '0.125rem 0.25rem',
+                      backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                      borderRadius: '3px',
+                      cursor: 'help',
+                    }}>
+                      {file.fileName}
+                    </code>
+                  </div>
+                </Tooltip>
               </Td>
               <Td dataLabel="Type">
                 {file.fileType ? (
@@ -157,22 +160,24 @@ export function FilesTable({
                 )}
               </Td>
               <Td isActionCell>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', gap: '0', alignItems: 'center' }}>
                   <Tooltip content="Edit file">
                     <Button
                       variant="plain"
                       onClick={() => onEditClick(file)}
                       aria-label="Edit file"
                       icon={<FiEdit />}
+                      style={{ padding: '0.25rem' }}
                     />
                   </Tooltip>
                   <Tooltip content="Delete file">
                     <Button
                       variant="plain"
-                      onClick={() => onDeleteClick(file.name)}
+                      onClick={() => onDeleteClick(file.fileId)}
                       aria-label="Delete file"
                       isDanger
                       icon={<FiTrash2 />}
+                      style={{ padding: '0.25rem' }}
                     />
                   </Tooltip>
                 </div>

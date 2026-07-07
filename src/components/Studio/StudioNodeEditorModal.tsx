@@ -47,10 +47,14 @@ function StudioNodeEditorModalComponent({
   const [globalFormValues, setGlobalFormValues] = useState<ScenarioFormValues>({});
   const [globalTouchedFields, setGlobalTouchedFields] = useState<TouchedFields>({});
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
+  const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
 
   // Step 4: Node metadata
   const [newNodeId, setNewNodeId] = useState<string>('');
   const [nodeIdError, setNodeIdError] = useState<string | undefined>(undefined);
+  const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
+  const [pendingFileWarningShown, setPendingFileWarningShown] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
   // Track if we've initialized to prevent repeated initialization
   const hasInitialized = useRef(false);
@@ -78,6 +82,7 @@ function StudioNodeEditorModalComponent({
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
+      setVolumes(node.config.volumes || {});
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
       fetchScenarios(node.config.registryConfig);
@@ -89,6 +94,7 @@ function StudioNodeEditorModalComponent({
       setFormValues({});
       setGlobalFormValues({});
       setGlobalTouchedFields({});
+      setVolumes({});
       setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
       fetchScenarios({});
@@ -148,8 +154,25 @@ function StudioNodeEditorModalComponent({
     setScenarioDefaultValues({});
   }, [registryType, registryName]);
 
+  // Reset warning when pending input is cleared
+  useEffect(() => {
+    if (!hasPendingFileInput && pendingFileWarningShown) {
+      setPendingFileWarningShown(false);
+      setValidationWarnings([]);
+    }
+  }, [hasPendingFileInput, pendingFileWarningShown]);
+
   const handleSave = () => {
     if (!node || !selectedScenario || nodeIdError) return;
+
+    // Check for pending file input (file selected or path typed but not added)
+    if (hasPendingFileInput && !pendingFileWarningShown) {
+      setValidationWarnings([
+        'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
+      ]);
+      setPendingFileWarningShown(true);
+      return;
+    }
 
     // Build registryConfig from primitive
     const registryConfig: ScenariosRequest = registryName ? { registryName } : {};
@@ -167,6 +190,7 @@ function StudioNodeEditorModalComponent({
         scenarioFormValues: finalFormValues,
         globalFormValues,
         globalTouchedFields,
+        volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
       },
     };
 
@@ -246,6 +270,13 @@ function StudioNodeEditorModalComponent({
           onNodeIdChange={handleNodeIdChange}
           nodeIdError={nodeIdError}
           currentNodeId={node.nodeId}
+          volumes={volumes}
+          onVolumesChange={(vols) => {
+            setVolumes(vols);
+            setPendingFileWarningShown(false);
+            setValidationWarnings([]);
+          }}
+          onPendingChange={setHasPendingFileInput}
         />
       ),
       isNextDisabled: !!nodeIdError || !newNodeId,
@@ -258,6 +289,7 @@ function StudioNodeEditorModalComponent({
       title="Configure Chaos Scenario"
       description={`Configure node: ${node.nodeId}`}
       steps={steps}
+      validationWarnings={validationWarnings}
       onClose={handleClose}
       onSave={handleSave}
     />

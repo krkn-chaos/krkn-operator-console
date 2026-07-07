@@ -7,12 +7,12 @@
 
 import { Modal, ModalVariant } from '@patternfly/react-core';
 import { FileForm } from './FileForm';
-import type { FileResponse, FileTypeResponse } from '../../types/api';
+import type { FileInfo, FileTypeResponse } from '../../types/api';
 
 interface FileFormModalProps {
   isOpen: boolean;
   mode: 'create' | 'edit';
-  initialData?: FileResponse;
+  initialData?: FileInfo;
   availableFileTypes: FileTypeResponse[];
   onClose: () => void;
   onSuccess: () => void;

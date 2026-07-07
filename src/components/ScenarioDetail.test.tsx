@@ -831,4 +831,7 @@ describe('ScenarioDetail', () => {
       expect(screen.queryByText('Global Parameters (Modified)')).not.toBeInTheDocument();
     });
   });
+
+  // NOTE: FileSelector integration tests are in FileSelector.test.tsx
+  // Warning system for pending file input is tested at the component level
 });

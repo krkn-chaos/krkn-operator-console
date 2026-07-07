@@ -197,6 +197,17 @@ export interface ScenarioFileMount {
   content: string; // base64 encoded
 }
 
+/**
+ * FileReference - Reference to a centrally-managed file by UUID
+ * Used in ScenarioRunRequest to mount existing files without uploading content
+ */
+export interface FileReference {
+  /** File UUID from centrally-managed files */
+  fileId: string;
+  /** Absolute path where file should be mounted in pods */
+  mountPath: string;
+}
+
 export interface ScenarioRunRequest {
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
@@ -205,6 +216,8 @@ export interface ScenarioRunRequest {
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
+  /** References to centrally-managed files (optional) */
+  fileReferences?: FileReference[];
   /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
   registryName?: string;
 }
@@ -908,11 +921,11 @@ export interface StudioAutosave {
 // ============================================================================
 
 /**
- * FileResponse - ConfigMap-based file data
+ * FileResponse - ConfigMap-based file data (full details)
  */
 export interface FileResponse {
-  /** ConfigMap name (unique identifier) */
-  name: string;
+  /** File UUID (unique identifier) */
+  fileId: string;
   /** File name (ConfigMap key) */
   fileName: string;
   /** File content */
@@ -929,10 +942,9 @@ export interface FileResponse {
 
 /**
  * CreateFileRequest - Request to create a new file
+ * Note: fileId and ConfigMap name are auto-generated server-side
  */
 export interface CreateFileRequest {
-  /** ConfigMap name (RFC 1123 compliant) */
-  name: string;
   /** File name (ConfigMap key) */
   fileName: string;
   /** File content */
@@ -945,6 +957,16 @@ export interface CreateFileRequest {
   availableToAll: boolean;
   /** Optional file type classification */
   fileType?: string;
+}
+
+/**
+ * CreateFileResponse - Response from creating a file
+ */
+export interface CreateFileResponse {
+  /** Success message */
+  message: string;
+  /** Auto-generated file UUID */
+  fileId: string;
 }
 
 /**
@@ -966,7 +988,52 @@ export interface UpdateFileRequest {
 }
 
 /**
- * FilesListResponse - Response containing list of files
+ * UpdateFileResponse - Response from updating a file
+ */
+export interface UpdateFileResponse {
+  /** Success message */
+  message: string;
+  /** File UUID */
+  fileId: string;
+}
+
+/**
+ * FileInfo - Minimal file information for listings
+ */
+export interface FileInfo {
+  /** File UUID */
+  fileId: string;
+  /** File name */
+  fileName: string;
+  /** File description */
+  description?: string;
+  /** If true, available to all users */
+  availableToAll: boolean;
+  /** Groups that can access this file */
+  groups?: string[];
+  /** Optional file type classification */
+  fileType?: string;
+}
+
+/**
+ * AvailableFilesResponse - Response from GET /api/v1/files/available
+ */
+export interface AvailableFilesResponse {
+  /** Array of available files (minimal info) */
+  files: FileInfo[];
+}
+
+/**
+ * DeleteFileResponse - Response from deleting a file
+ */
+export interface DeleteFileResponse {
+  /** Success message */
+  message: string;
+}
+
+/**
+ * FilesListResponse - Response containing full file details
+ * @deprecated Use AvailableFilesResponse for listings, FileResponse for individual files
  */
 export interface FilesListResponse {
   /** Array of files */

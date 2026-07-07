@@ -34,11 +34,11 @@ import {
 import { FiPlus, FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
-import type { FileResponse, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
+import type { FileInfo, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
   mode: 'create' | 'edit';
-  initialData?: FileResponse;
+  initialData?: FileInfo;
   availableFileTypes: FileTypeResponse[];
   onSuccess: () => void;
   onCancel: () => void;
@@ -56,22 +56,13 @@ export function FileForm({
 }: FileFormProps) {
   const { isAdmin } = useRole();
 
-  const [name, setName] = useState(initialData?.name || '');
-  const [fileName, setFileName] = useState(initialData?.fileName || '');
-  const [content, setContent] = useState(initialData?.content || '');
-  const [description, setDescription] = useState(initialData?.description || '');
-  const [fileType, setFileType] = useState(initialData?.fileType || '');
-  const [accessType, setAccessType] = useState<'public' | 'group'>(() => {
-    // For edit mode: use existing value
-    if (initialData) {
-      return initialData.availableToAll ? 'public' : 'group';
-    }
-    // For create mode: default to public
-    return 'public';
-  });
-  const [selectedGroup, setSelectedGroup] = useState<string>(
-    initialData?.groups?.[0] || '' // Max 1 group
-  );
+  // State - will be populated from getFile() in edit mode
+  const [fileName, setFileName] = useState('');
+  const [content, setContent] = useState('');
+  const [description, setDescription] = useState('');
+  const [fileType, setFileType] = useState('');
+  const [accessType, setAccessType] = useState<'public' | 'group'>('public');
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
   const [groupsLoaded, setGroupsLoaded] = useState(false);
 
@@ -90,7 +81,7 @@ export function FileForm({
 
   // Load file details in edit mode
   useEffect(() => {
-    if (mode !== 'edit' || !initialData?.name) {
+    if (mode !== 'edit' || !initialData?.fileId) {
       return;
     }
 
@@ -99,7 +90,7 @@ export function FileForm({
       setError(null);
 
       try {
-        const file = await operatorApi.getFile(initialData!.name);
+        const file = await operatorApi.getFile(initialData!.fileId);
 
         // Pre-populate all fields
         setFileName(file.fileName);
@@ -127,7 +118,7 @@ export function FileForm({
     }
 
     loadFile();
-  }, [mode, initialData?.name]);
+  }, [mode, initialData]);
 
   // Load available groups
   useEffect(() => {
@@ -157,12 +148,6 @@ export function FileForm({
   // Validate form
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
-
-    if (!name.trim()) {
-      errors.name = 'Name is required';
-    } else if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name)) {
-      errors.name = 'Name must be RFC 1123 compliant (lowercase, numbers, hyphens)';
-    }
 
     if (!fileName.trim()) {
       errors.fileName = 'File name is required';
@@ -196,7 +181,6 @@ export function FileForm({
 
       if (mode === 'create') {
         const request: CreateFileRequest = {
-          name,
           fileName,
           content,
           description: description.trim() || undefined,
@@ -216,7 +200,7 @@ export function FileForm({
           fileType: fileType.trim() || undefined,
         };
 
-        await operatorApi.updateFile(name, request);
+        await operatorApi.updateFile(initialData!.fileId, request);
       }
 
       onSuccess();
@@ -253,32 +237,6 @@ export function FileForm({
           {error}
         </Alert>
       )}
-
-      <FormGroup label="Name" isRequired fieldId="file-name-input">
-        <TextInput
-          id="file-name-input"
-          value={name}
-          onChange={(_event, value) => setName(value)}
-          isDisabled={mode === 'edit'}
-          validated={validationErrors.name ? 'error' : 'default'}
-        />
-        {validationErrors.name && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{validationErrors.name}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-        {mode === 'create' && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>
-                ConfigMap name (RFC 1123: lowercase, numbers, hyphens)
-              </HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
 
       <FormGroup label="File Name" isRequired fieldId="filename-input">
         <TextInput

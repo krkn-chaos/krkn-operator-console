@@ -18,9 +18,12 @@ import type {
   TerminalResponse,
   AvailableCommandsResponse,
   FileResponse,
-  FilesListResponse,
+  AvailableFilesResponse,
   CreateFileRequest,
+  CreateFileResponse,
   UpdateFileRequest,
+  UpdateFileResponse,
+  DeleteFileResponse,
   GroupsListResponse,
   FileTypeResponse,
   FileTypesListResponse,
@@ -495,39 +498,40 @@ class OperatorApiClient extends BaseApiClient {
   /**
    * GET /api/v1/files/available
    * Get files available to the current user (based on groups)
-   * @returns Promise with response containing files array
+   * @returns Promise with response containing minimal file info array
    */
-  async getAvailableFiles(): Promise<FilesListResponse> {
-    return this.fetchJson<FilesListResponse>('/files/available');
+  async getAvailableFiles(): Promise<AvailableFilesResponse> {
+    return this.fetchJson<AvailableFilesResponse>('/files/available');
   }
 
   /**
    * GET /api/v1/files
    * Get all files (admin can see all, users see their groups)
-   * @returns Promise with response containing files array
+   * @returns Promise with response containing minimal file info array
+   * @deprecated Use getAvailableFiles() instead
    */
-  async getAllFiles(): Promise<FilesListResponse> {
-    return this.fetchJson<FilesListResponse>('/files');
+  async getAllFiles(): Promise<AvailableFilesResponse> {
+    return this.fetchJson<AvailableFilesResponse>('/files');
   }
 
   /**
-   * GET /api/v1/files/{name}
+   * GET /api/v1/files/{fileId}
    * Get details of a specific file
-   * @param name - ConfigMap name
-   * @returns Promise with file details
+   * @param fileId - File UUID
+   * @returns Promise with full file details
    */
-  async getFile(name: string): Promise<FileResponse> {
-    return this.fetchJson<FileResponse>(`/files/${encodeURIComponent(name)}`);
+  async getFile(fileId: string): Promise<FileResponse> {
+    return this.fetchJson<FileResponse>(`/files/${encodeURIComponent(fileId)}`);
   }
 
   /**
    * POST /api/v1/files
    * Create a new file (permissions enforced by backend)
    * @param request - File creation request
-   * @returns Promise with created file data
+   * @returns Promise with created file response (message + fileId)
    */
-  async createFile(request: CreateFileRequest): Promise<FileResponse> {
-    return this.fetchJson<FileResponse>('/files', {
+  async createFile(request: CreateFileRequest): Promise<CreateFileResponse> {
+    return this.fetchJson<CreateFileResponse>('/files', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
@@ -535,14 +539,14 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
-   * PUT /api/v1/files/{name}
+   * PUT /api/v1/files/{fileId}
    * Update an existing file (permissions enforced by backend)
-   * @param name - ConfigMap name
+   * @param fileId - File UUID
    * @param request - File update request
-   * @returns Promise with updated file data
+   * @returns Promise with update response (message + fileId)
    */
-  async updateFile(name: string, request: UpdateFileRequest): Promise<FileResponse> {
-    return this.fetchJson<FileResponse>(`/files/${encodeURIComponent(name)}`, {
+  async updateFile(fileId: string, request: UpdateFileRequest): Promise<UpdateFileResponse> {
+    return this.fetchJson<UpdateFileResponse>(`/files/${encodeURIComponent(fileId)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
@@ -550,13 +554,13 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
-   * DELETE /api/v1/files/{name}
+   * DELETE /api/v1/files/{fileId}
    * Delete a file (permissions enforced by backend)
-   * @param name - ConfigMap name
-   * @returns Promise that resolves when file is deleted
+   * @param fileId - File UUID
+   * @returns Promise with delete response (message)
    */
-  async deleteFile(name: string): Promise<void> {
-    await this.fetchJson<void>(`/files/${encodeURIComponent(name)}`, {
+  async deleteFile(fileId: string): Promise<DeleteFileResponse> {
+    return this.fetchJson<DeleteFileResponse>(`/files/${encodeURIComponent(fileId)}`, {
       method: 'DELETE',
     });
   }
