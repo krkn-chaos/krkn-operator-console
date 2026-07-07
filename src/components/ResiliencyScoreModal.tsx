@@ -17,9 +17,11 @@ import {
   FormGroup,
   TextInput,
   Radio,
+  MenuToggle,
+  MenuToggleElement,
   Select,
+  SelectList,
   SelectOption,
-  SelectVariant,
   FormHelperText,
   HelperText,
   HelperTextItem,
@@ -27,7 +29,7 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { operatorApi } from '../services/operatorApi';
-import type { ResiliencyScoreConfig, FileResponse } from '../types/api';
+import type { ResiliencyScoreConfig, FileInfo } from '../types/api';
 
 interface ResiliencyScoreModalProps {
   isOpen: boolean;
@@ -47,7 +49,7 @@ export function ResiliencyScoreModal({
   const [fileMode, setFileMode] = useState<'same' | 'per-node'>('same');
 
   // File selection state
-  const [availableFiles, setAvailableFiles] = useState<FileResponse[]>([]);
+  const [availableFiles, setAvailableFiles] = useState<FileInfo[]>([]);
   const [loadingFiles, setLoadingFiles] = useState<boolean>(false);
   const [selectedFileId, setSelectedFileId] = useState<string>('');
   const [perNodeFileIds, setPerNodeFileIds] = useState<{ [nodeId: string]: string }>({});
@@ -67,8 +69,8 @@ export function ResiliencyScoreModal({
     const fetchFiles = async () => {
       setLoadingFiles(true);
       try {
-        const files = await operatorApi.getAvailableFiles();
-        setAvailableFiles(files);
+        const response = await operatorApi.getAvailableFiles();
+        setAvailableFiles(response.files);
       } catch (error) {
         console.error('Failed to load files:', error);
         setAvailableFiles([]);
@@ -157,22 +159,6 @@ export function ResiliencyScoreModal({
     }
 
     onConfirm(config);
-  };
-
-  const handleFileSelect = (_event: React.MouseEvent | React.ChangeEvent, selection: string) => {
-    setSelectedFileId(selection);
-    setIsSelectOpen(false);
-  };
-
-  const handlePerNodeFileSelect = (nodeId: string, fileId: string) => {
-    setPerNodeFileIds(prev => ({
-      ...prev,
-      [nodeId]: fileId,
-    }));
-    setPerNodeSelectOpen(prev => ({
-      ...prev,
-      [nodeId]: false,
-    }));
   };
 
   const getFileNameById = (fileId: string): string => {
@@ -282,21 +268,37 @@ export function ResiliencyScoreModal({
         {fileMode === 'same' ? (
           <FormGroup label="Metrics File">
             <Select
-              variant={SelectVariant.single}
-              onToggle={(_event, isOpen) => setIsSelectOpen(isOpen)}
-              onSelect={handleFileSelect}
-              selections={selectedFileId}
               isOpen={isSelectOpen}
-              placeholderText={loadingFiles ? 'Loading files...' : 'Select a file'}
-              isDisabled={loadingFiles}
-              menuAppendTo="parent"
+              selected={selectedFileId}
+              onSelect={(_event, selection) => {
+                setSelectedFileId(selection as string);
+                setIsSelectOpen(false);
+              }}
+              onOpenChange={(isOpen) => setIsSelectOpen(isOpen)}
+              toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                <MenuToggle
+                  ref={toggleRef}
+                  onClick={() => setIsSelectOpen(!isSelectOpen)}
+                  isExpanded={isSelectOpen}
+                  isDisabled={loadingFiles}
+                  style={{ width: '100%' }}
+                >
+                  {selectedFileId
+                    ? getFileNameById(selectedFileId)
+                    : loadingFiles
+                    ? 'Loading files...'
+                    : 'Select a file'}
+                </MenuToggle>
+              )}
             >
-              {availableFiles.map(file => (
-                <SelectOption key={file.fileId} value={file.fileId}>
-                  {file.fileName}
-                  {file.description && ` - ${file.description}`}
-                </SelectOption>
-              ))}
+              <SelectList>
+                {availableFiles.map(file => (
+                  <SelectOption key={file.fileId} value={file.fileId}>
+                    {file.fileName}
+                    {file.description && ` - ${file.description}`}
+                  </SelectOption>
+                ))}
+              </SelectList>
             </Select>
             <FormHelperText>
               <HelperText>
@@ -316,23 +318,37 @@ export function ResiliencyScoreModal({
               nodeIds.map(nodeId => (
                 <FormGroup key={nodeId} label={`Node: ${nodeId}`} style={{ marginBottom: '1rem' }}>
                   <Select
-                    variant={SelectVariant.single}
-                    onToggle={(_event, isOpen) =>
-                      setPerNodeSelectOpen(prev => ({ ...prev, [nodeId]: isOpen }))
-                    }
-                    onSelect={(_event, selection) => handlePerNodeFileSelect(nodeId, selection as string)}
-                    selections={perNodeFileIds[nodeId]}
                     isOpen={perNodeSelectOpen[nodeId] || false}
-                    placeholderText={loadingFiles ? 'Loading files...' : 'Select a file'}
-                    isDisabled={loadingFiles}
-                    menuAppendTo="parent"
+                    selected={perNodeFileIds[nodeId]}
+                    onSelect={(_event, selection) => {
+                      setPerNodeFileIds(prev => ({ ...prev, [nodeId]: selection as string }));
+                      setPerNodeSelectOpen(prev => ({ ...prev, [nodeId]: false }));
+                    }}
+                    onOpenChange={(isOpen) => setPerNodeSelectOpen(prev => ({ ...prev, [nodeId]: isOpen }))}
+                    toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                      <MenuToggle
+                        ref={toggleRef}
+                        onClick={() => setPerNodeSelectOpen(prev => ({ ...prev, [nodeId]: !prev[nodeId] }))}
+                        isExpanded={perNodeSelectOpen[nodeId] || false}
+                        isDisabled={loadingFiles}
+                        style={{ width: '100%' }}
+                      >
+                        {perNodeFileIds[nodeId]
+                          ? getFileNameById(perNodeFileIds[nodeId])
+                          : loadingFiles
+                          ? 'Loading files...'
+                          : 'Select a file'}
+                      </MenuToggle>
+                    )}
                   >
-                    {availableFiles.map(file => (
-                      <SelectOption key={file.fileId} value={file.fileId}>
-                        {file.fileName}
-                        {file.description && ` - ${file.description}`}
-                      </SelectOption>
-                    ))}
+                    <SelectList>
+                      {availableFiles.map(file => (
+                        <SelectOption key={file.fileId} value={file.fileId}>
+                          {file.fileName}
+                          {file.description && ` - ${file.description}`}
+                        </SelectOption>
+                      ))}
+                    </SelectList>
                   </Select>
                   {perNodeFileIds[nodeId] && (
                     <FormHelperText>

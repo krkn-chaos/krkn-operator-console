@@ -12,11 +12,13 @@ import {
   Button,
   Alert,
   Spinner,
+  Checkbox,
 } from '@patternfly/react-core';
 import { ClusterMultiSelector } from '../ClusterMultiSelector';
+import { ResiliencyScoreModal } from '../ResiliencyScoreModal';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
-import type { SelectedCluster, CreateGraphRunRequest, Cluster } from '../../types/api';
+import type { SelectedCluster, CreateGraphRunRequest, Cluster, ResiliencyScoreConfig } from '../../types/api';
 import { useStudioContext } from './StudioContext';
 import { clearAutosave } from './studioAutosave';
 
@@ -39,15 +41,21 @@ export function RunWorkflowModal({
   onSuccess,
   targetFetchState,
 }: RunWorkflowModalProps) {
-  const { exportWorkflow } = useStudioContext();
+  const { exportWorkflow, workflow } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
+  const [showResiliencyModal, setShowResiliencyModal] = useState(false);
+  const [resiliencyConfig, setResiliencyConfig] = useState<ResiliencyScoreConfig | null>(null);
 
-  // Reset selected clusters when modal closes
+  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSelectedClusters([]);
+      setEnableResiliencyScore(false);
+      setShowResiliencyModal(false);
+      setResiliencyConfig(null);
     }
   }, [isOpen]);
 
@@ -88,6 +96,12 @@ export function RunWorkflowModal({
       return;
     }
 
+    // If resiliency score enabled but not configured, open modal
+    if (enableResiliencyScore && !resiliencyConfig) {
+      setShowResiliencyModal(true);
+      return;
+    }
+
     // Export workflow
     const exportResult = exportWorkflow();
     if ('error' in exportResult) {
@@ -104,8 +118,37 @@ export function RunWorkflowModal({
       targetClusters[cluster.operatorName].push(cluster.clusterName);
     });
 
+    // Apply resiliency score file mappings to graph nodes
+    const graph = { ...exportResult.graph };
+    if (resiliencyConfig) {
+      Object.keys(graph).forEach((nodeId) => {
+        const node = graph[nodeId];
+
+        // Determine fileId for this node
+        let fileId: string | undefined;
+        if (resiliencyConfig.fileId) {
+          // Same file for all nodes
+          fileId = resiliencyConfig.fileId;
+        } else if (resiliencyConfig.perNodeFiles && resiliencyConfig.perNodeFiles[nodeId]) {
+          // Per-node file selection
+          fileId = resiliencyConfig.perNodeFiles[nodeId];
+        }
+
+        // Add to volumes if fileId exists
+        if (fileId) {
+          graph[nodeId] = {
+            ...node,
+            volumes: {
+              ...(node.volumes || {}),
+              [fileId]: resiliencyConfig.mountPath,
+            },
+          };
+        }
+      });
+    }
+
     const request: CreateGraphRunRequest = {
-      graph: exportResult.graph,
+      graph,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
     };
@@ -113,7 +156,15 @@ export function RunWorkflowModal({
     setIsSubmitting(true);
 
     try {
-      const graphRun = await graphRunsApi.createGraphRun(request);
+      // Build headers for resiliency score
+      const headers: Record<string, string> = {};
+      if (resiliencyConfig) {
+        headers['X-Resiliency-Score'] = 'true';
+        headers['X-Resiliency-Baseline'] = resiliencyConfig.baseline.toString();
+        headers['X-Resiliency-Mount-Path'] = resiliencyConfig.mountPath;
+      }
+
+      const graphRun = await graphRunsApi.createGraphRun(request, headers);
       showSuccess('Workflow started', `GraphRun ${graphRun.name} created successfully`);
       // Clear autosave since workflow was successfully submitted
       clearAutosave();
@@ -124,6 +175,13 @@ export function RunWorkflowModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResiliencyConfigConfirm = (config: ResiliencyScoreConfig) => {
+    setResiliencyConfig(config);
+    setShowResiliencyModal(false);
+    // Automatically proceed with submission after config is saved
+    setTimeout(() => handleSubmit(), 100);
   };
 
   // Render loading state
@@ -236,6 +294,32 @@ export function RunWorkflowModal({
             showActions={false}
           />
 
+          {/* Resiliency Score option */}
+          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+            <Checkbox
+              id="enable-resiliency-score"
+              label="Calculate Resiliency Score"
+              description="Enable resiliency score calculation for this workflow execution"
+              isChecked={enableResiliencyScore}
+              onChange={(_event, checked) => {
+                setEnableResiliencyScore(checked);
+                if (!checked) {
+                  // Clear config when disabled
+                  setResiliencyConfig(null);
+                }
+              }}
+            />
+            {enableResiliencyScore && resiliencyConfig && (
+              <Alert
+                variant="info"
+                isInline
+                isPlain
+                title={`Baseline: ${resiliencyConfig.baseline}, Mount: ${resiliencyConfig.mountPath}`}
+                style={{ marginTop: '0.5rem' }}
+              />
+            )}
+          </div>
+
           {/* Custom actions aligned left */}
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
             <Button
@@ -253,6 +337,14 @@ export function RunWorkflowModal({
           </div>
         </>
       )}
+
+      {/* Resiliency Score Configuration Modal */}
+      <ResiliencyScoreModal
+        isOpen={showResiliencyModal}
+        nodeIds={workflow.nodes.map(n => n.nodeId)}
+        onClose={() => setShowResiliencyModal(false)}
+        onConfirm={handleResiliencyConfigConfirm}
+      />
     </Modal>
   );
 }

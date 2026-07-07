@@ -120,10 +120,11 @@ class GraphRunsApiClient extends BaseApiClient {
    * });
    * ```
    */
-  async createGraphRun(request: CreateGraphRunRequest): Promise<GraphRunDetail> {
+  async createGraphRun(request: CreateGraphRunRequest, headers?: Record<string, string>): Promise<GraphRunDetail> {
     return this.fetchJson<GraphRunDetail>('/graphruns', {
       method: 'POST',
       body: JSON.stringify(request),
+      headers,
     });
   }
 
