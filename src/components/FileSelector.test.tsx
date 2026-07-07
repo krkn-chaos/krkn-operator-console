@@ -69,7 +69,7 @@ describe('FileSelector', () => {
   });
 
   it('shows "No files available" when there are no files', async () => {
-    (operatorApi.getAvailableFiles as vi.Mock).mockResolvedValue({ files: [] });
+    vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({ files: [] });
 
     render(
       <FileSelector
@@ -299,7 +299,7 @@ describe('FileSelector', () => {
   });
 
   it('shows loading state while fetching files', () => {
-    (operatorApi.getAvailableFiles as vi.Mock).mockReturnValue(
+    vi.mocked(operatorApi.getAvailableFiles).mockReturnValue(
       new Promise(() => {}) // Never resolves
     );
 
@@ -315,11 +315,11 @@ describe('FileSelector', () => {
   });
 
   it('handles API error gracefully', async () => {
-    (operatorApi.getAvailableFiles as vi.Mock).mockRejectedValue(
+    vi.mocked(operatorApi.getAvailableFiles).mockRejectedValue(
       new Error('API Error')
     );
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
       <FileSelector

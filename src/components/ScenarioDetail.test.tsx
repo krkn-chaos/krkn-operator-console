@@ -836,7 +836,10 @@ describe('ScenarioDetail', () => {
     it('shows warning when file selected but not added on first preview attempt', async () => {
       const user = userEvent.setup();
 
-      renderScenarioDetail();
+      renderWithContext({
+        scenarioDetail: mockScenarioDetail,
+        scenarioFormValues: {},
+      });
 
       await waitFor(() => {
         expect(screen.getByText('node-cpu-hog')).toBeInTheDocument();
