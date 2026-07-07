@@ -84,7 +84,7 @@ describe('FileSelector', () => {
     });
   });
 
-  it('displays selected files', () => {
+  it('displays selected files', async () => {
     const selectedFiles: FileReference[] = [
       { fileId: 'file-1', mountPath: '/etc/config.yaml' },
     ];
@@ -97,7 +97,11 @@ describe('FileSelector', () => {
       />
     );
 
-    expect(screen.getByText(/config\.yaml → \/etc\/config\.yaml/i)).toBeInTheDocument();
+    await waitFor(() => {
+      // Files are displayed with full-width layout: "fileName → mountPath"
+      expect(screen.getByText(/config\.yaml/i)).toBeInTheDocument();
+      expect(screen.getByText(/\/etc\/config\.yaml/i)).toBeInTheDocument();
+    });
   });
 
   it('calls onPendingChange when file is selected', async () => {
@@ -152,7 +156,7 @@ describe('FileSelector', () => {
     });
 
     // Type invalid path (no leading /)
-    const pathInput = screen.getByPlaceholderText(/e\.g\., \/etc\/config/i);
+    const pathInput = screen.getByPlaceholderText(/\/path\/to\/mount/i);
     fireEvent.change(pathInput, { target: { value: 'etc/config.yaml' } });
 
     // Click Add
@@ -161,7 +165,7 @@ describe('FileSelector', () => {
 
     // Should show validation error
     await waitFor(() => {
-      expect(screen.getByText(/mount path must start with/i)).toBeInTheDocument();
+      expect(screen.getByText(/mount path must be absolute/i)).toBeInTheDocument();
     });
 
     // onChange should NOT be called
@@ -191,7 +195,7 @@ describe('FileSelector', () => {
     });
 
     // Type valid path
-    const pathInput = screen.getByPlaceholderText(/e\.g\., \/etc\/config/i);
+    const pathInput = screen.getByPlaceholderText(/\/path\/to\/mount/i);
     fireEvent.change(pathInput, { target: { value: '/etc/config.yaml' } });
 
     // Click Add
@@ -278,7 +282,7 @@ describe('FileSelector', () => {
     });
 
     // Type path
-    const pathInput = screen.getByPlaceholderText(/e\.g\., \/etc\/config/i);
+    const pathInput = screen.getByPlaceholderText(/\/path\/to\/mount/i);
     fireEvent.change(pathInput, { target: { value: '/etc/config.yaml' } });
 
     // Pending should be true now
@@ -315,7 +319,7 @@ describe('FileSelector', () => {
       new Error('API Error')
     );
 
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation();
 
     render(
       <FileSelector
