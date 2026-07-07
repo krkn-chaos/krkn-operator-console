@@ -118,7 +118,7 @@ export function FileForm({
     }
 
     loadFile();
-  }, [mode, initialData?.fileId]);
+  }, [mode, initialData]);
 
   // Load available groups
   useEffect(() => {
