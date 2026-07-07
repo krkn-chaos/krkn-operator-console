@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ResiliencyScoreModal } from './ResiliencyScoreModal';
 import { operatorApi } from '../services/operatorApi';
-import type { AvailableFilesResponse } from '../types/api';
+import type { AvailableFilesResponse, FileTypesListResponse } from '../types/api';
 
 vi.mock('../services/operatorApi');
 
@@ -17,15 +17,35 @@ describe('ResiliencyScoreModal', () => {
         fileId: 'file-1',
         fileName: 'metrics-baseline.yaml',
         description: 'Baseline metrics configuration',
-        createdAt: '2024-01-01T00:00:00Z',
-        createdBy: 'admin@example.com',
+        availableToAll: true,
+        fileType: 'metrics',
       },
       {
         fileId: 'file-2',
         fileName: 'metrics-advanced.yaml',
         description: 'Advanced metrics with custom rules',
+        availableToAll: false,
+        groups: ['team-a'],
+        fileType: 'config',
+      },
+    ],
+  };
+
+  const mockFileTypes: FileTypesListResponse = {
+    fileTypes: [
+      {
+        name: 'metrics',
+        color: '#0066cc',
+        icon: '',
+        usageCount: 5,
+        createdAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        name: 'config',
+        color: '#28a745',
+        icon: '',
+        usageCount: 3,
         createdAt: '2024-01-02T00:00:00Z',
-        createdBy: 'user@example.com',
       },
     ],
   };
@@ -33,6 +53,7 @@ describe('ResiliencyScoreModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue(mockFiles);
+    vi.mocked(operatorApi.getFileTypes).mockResolvedValue(mockFileTypes);
   });
 
   describe('Modal Rendering', () => {
@@ -305,7 +326,7 @@ describe('ResiliencyScoreModal', () => {
       await user.click(fileSelect);
 
       // Select first file
-      const fileOption = await screen.findByText('metrics-baseline.yaml - Baseline metrics configuration');
+      const fileOption = await screen.findByText('metrics-baseline.yaml');
       await user.click(fileOption);
 
       // Verify selection
@@ -334,7 +355,7 @@ describe('ResiliencyScoreModal', () => {
       // Select file
       const fileSelect = screen.getByText('Select a file');
       await user.click(fileSelect);
-      const fileOption = await screen.findByText('metrics-baseline.yaml - Baseline metrics configuration');
+      const fileOption = await screen.findByText('metrics-baseline.yaml');
       await user.click(fileOption);
 
       // Confirm
@@ -405,13 +426,13 @@ describe('ResiliencyScoreModal', () => {
       // Select file for node-1
       const node1Selects = screen.getAllByText('Select a file');
       await user.click(node1Selects[0]);
-      const file1Option = await screen.findByText('metrics-baseline.yaml - Baseline metrics configuration');
+      const file1Option = await screen.findByText('metrics-baseline.yaml');
       await user.click(file1Option);
 
       // Select file for node-2
       const node2Selects = screen.getAllByText('Select a file');
       await user.click(node2Selects[0]);
-      const file2Option = await screen.findByText('metrics-advanced.yaml - Advanced metrics with custom rules');
+      const file2Option = await screen.findByText('metrics-advanced.yaml');
       await user.click(file2Option);
 
       // Confirm

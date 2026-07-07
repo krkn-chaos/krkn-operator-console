@@ -515,6 +515,15 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
+   * GET /api/v1/file-types
+   * Get all file types with colors and metadata
+   * @returns Promise with file types list
+   */
+  async getFileTypes(): Promise<FileTypesListResponse> {
+    return this.fetchJson<FileTypesListResponse>('/file-types');
+  }
+
+  /**
    * GET /api/v1/files/{fileId}
    * Get details of a specific file
    * @param fileId - File UUID
@@ -568,15 +577,6 @@ class OperatorApiClient extends BaseApiClient {
   // ============================================================================
   // File Types Management API
   // ============================================================================
-
-  /**
-   * GET /api/v1/file-types
-   * Get all file types with usage statistics
-   * @returns Promise with response containing file types array
-   */
-  async getFileTypes(): Promise<FileTypesListResponse> {
-    return this.fetchJson<FileTypesListResponse>('/file-types');
-  }
 
   /**
    * GET /api/v1/file-types/{name}

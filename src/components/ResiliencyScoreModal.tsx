@@ -22,14 +22,16 @@ import {
   Select,
   SelectList,
   SelectOption,
+  SelectGroup,
   FormHelperText,
   HelperText,
   HelperTextItem,
   Alert,
+  Label,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { operatorApi } from '../services/operatorApi';
-import type { ResiliencyScoreConfig, FileInfo } from '../types/api';
+import type { ResiliencyScoreConfig, FileInfo, FileTypeResponse } from '../types/api';
 
 interface ResiliencyScoreModalProps {
   isOpen: boolean;
@@ -50,6 +52,7 @@ export function ResiliencyScoreModal({
 
   // File selection state
   const [availableFiles, setAvailableFiles] = useState<FileInfo[]>([]);
+  const [fileTypes, setFileTypes] = useState<FileTypeResponse[]>([]);
   const [loadingFiles, setLoadingFiles] = useState<boolean>(false);
   const [selectedFileId, setSelectedFileId] = useState<string>('');
   const [perNodeFileIds, setPerNodeFileIds] = useState<{ [nodeId: string]: string }>({});
@@ -62,24 +65,29 @@ export function ResiliencyScoreModal({
   const [baselineError, setBaselineError] = useState<string>('');
   const [mountPathError, setMountPathError] = useState<string>('');
 
-  // Load available files on mount
+  // Load available files and file types on mount
   useEffect(() => {
     if (!isOpen) return;
 
-    const fetchFiles = async () => {
+    const fetchData = async () => {
       setLoadingFiles(true);
       try {
-        const response = await operatorApi.getAvailableFiles();
-        setAvailableFiles(response.files);
+        const [filesResponse, typesResponse] = await Promise.all([
+          operatorApi.getAvailableFiles(),
+          operatorApi.getFileTypes(),
+        ]);
+        setAvailableFiles(filesResponse.files);
+        setFileTypes(typesResponse.fileTypes);
       } catch (error) {
         console.error('Failed to load files:', error);
         setAvailableFiles([]);
+        setFileTypes([]);
       } finally {
         setLoadingFiles(false);
       }
     };
 
-    fetchFiles();
+    fetchData();
   }, [isOpen]);
 
   // Reset state when modal closes
@@ -165,6 +173,42 @@ export function ResiliencyScoreModal({
     const file = availableFiles.find(f => f.fileId === fileId);
     return file?.fileName || fileId;
   };
+
+  const getFileTypeColor = (fileType: string | undefined): string => {
+    if (!fileType) return '';
+    const type = fileTypes.find(t => t.name === fileType);
+    return type?.color || '';
+  };
+
+  const groupFilesByType = (): { [type: string]: FileInfo[] } => {
+    const grouped: { [type: string]: FileInfo[] } = {};
+
+    availableFiles.forEach(file => {
+      const type = file.fileType || 'Other';
+      if (!grouped[type]) {
+        grouped[type] = [];
+      }
+      grouped[type].push(file);
+    });
+
+    return grouped;
+  };
+
+  const renderFileOption = (file: FileInfo) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <span>{file.fileName}</span>
+      {file.fileType && (
+        <Label color={getFileTypeColor(file.fileType) ? undefined : 'blue'} style={getFileTypeColor(file.fileType) ? { backgroundColor: getFileTypeColor(file.fileType), color: '#fff' } : {}}>
+          {file.fileType}
+        </Label>
+      )}
+      {file.description && (
+        <span style={{ fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
+          - {file.description}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <Modal
@@ -292,11 +336,14 @@ export function ResiliencyScoreModal({
               )}
             >
               <SelectList>
-                {availableFiles.map(file => (
-                  <SelectOption key={file.fileId} value={file.fileId}>
-                    {file.fileName}
-                    {file.description && ` - ${file.description}`}
-                  </SelectOption>
+                {Object.entries(groupFilesByType()).map(([type, files]) => (
+                  <SelectGroup key={type} label={type}>
+                    {files.map(file => (
+                      <SelectOption key={file.fileId} value={file.fileId}>
+                        {renderFileOption(file)}
+                      </SelectOption>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectList>
             </Select>
@@ -342,11 +389,14 @@ export function ResiliencyScoreModal({
                     )}
                   >
                     <SelectList>
-                      {availableFiles.map(file => (
-                        <SelectOption key={file.fileId} value={file.fileId}>
-                          {file.fileName}
-                          {file.description && ` - ${file.description}`}
-                        </SelectOption>
+                      {Object.entries(groupFilesByType()).map(([type, files]) => (
+                        <SelectGroup key={type} label={type}>
+                          {files.map(file => (
+                            <SelectOption key={file.fileId} value={file.fileId}>
+                              {renderFileOption(file)}
+                            </SelectOption>
+                          ))}
+                        </SelectGroup>
                       ))}
                     </SelectList>
                   </Select>
