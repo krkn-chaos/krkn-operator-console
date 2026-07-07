@@ -49,7 +49,6 @@ import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
 import { FileManagementModal } from './FileManagement';
-import { ResiliencyScoreBox, ResiliencyScoreNA } from './ResiliencyScoreBox';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
@@ -166,6 +165,25 @@ export function JobsList({
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
+  };
+
+  // Get resiliency score display with color based on ratio
+  const getResiliencyScoreDisplay = (score: number, baseline: number) => {
+    const ratio = score / baseline;
+
+    if (ratio >= 1.0) {
+      return { color: 'green' as const, label: score.toFixed(1), icon: <CheckCircleIcon /> };
+    }
+    if (ratio >= 0.95) {
+      return { color: 'green' as const, label: score.toFixed(1), icon: <CheckCircleIcon /> };
+    }
+    if (ratio >= 0.9) {
+      return { color: 'orange' as const, label: score.toFixed(1), icon: <ExclamationTriangleIcon /> };
+    }
+    if (ratio >= 0.8) {
+      return { color: 'orange' as const, label: score.toFixed(1), icon: <ExclamationTriangleIcon /> };
+    }
+    return { color: 'red' as const, label: score.toFixed(1), icon: <ExclamationCircleIcon /> };
   };
 
   const handleConfirmDeleteRun = async () => {
@@ -657,15 +675,20 @@ export function JobsList({
                                 <strong>Resiliency Score:</strong>
                               </div>
                               {item.resiliencyScoreEnabled ? (
-                                <ResiliencyScoreBox
-                                  score={item.resiliencyScore?.calculated}
-                                  baseline={item.resiliencyScoreBaseline}
-                                  status={item.resiliencyScore?.status}
-                                  enabled={true}
-                                  calculating={item.phase === 'Running' && !item.resiliencyScore}
-                                />
+                                item.resiliencyScore && item.resiliencyScoreBaseline ? (
+                                  <Label
+                                    color={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).color}
+                                    icon={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).icon}
+                                  >
+                                    {getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).label}
+                                  </Label>
+                                ) : (
+                                  <Label color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
+                                    Calculating...
+                                  </Label>
+                                )
                               ) : (
-                                <ResiliencyScoreNA />
+                                <Label color="grey">N/A</Label>
                               )}
                             </div>
                           </DataListCell>,
