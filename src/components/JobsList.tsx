@@ -669,7 +669,7 @@ export function JobsList({
                               </div>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="resiliency-score" width={1}>
+                          <DataListCell key="resiliency-score" width={2}>
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Resiliency Score:</strong>
