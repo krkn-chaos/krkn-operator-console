@@ -261,7 +261,19 @@ export interface JobsListResponse {
 // NEW API Types for ScenarioRun (CRD-based)
 
 export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed';
-export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed';
+// Note: the operator emits more phases than the happy path. A failed job that
+// exhausts its retries ends as 'MaxRetriesExceeded', a user-cancelled one as
+// 'Cancelled', and a job is briefly 'Retrying' between attempts. The console
+// must handle all of these (see getJobPhaseDisplay and the log viewer).
+export type ClusterJobPhase =
+  | 'Pending'
+  | 'Running'
+  | 'Retrying'
+  | 'Succeeded'
+  | 'Failed'
+  | 'MaxRetriesExceeded'
+  | 'Cancelled'
+  | 'Stopped';
 
 export interface ClusterJob {
   providerName: string; // Provider that owns this cluster (e.g., 'krkn-operator', 'krkn-operator-acm')

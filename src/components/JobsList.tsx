@@ -71,6 +71,11 @@ type UnifiedRunItem =
     }
   | { type: 'scenario'; run: ScenarioRunState };
 
+// Job phases in which the pod has finished. A failed run that exhausts retries
+// ends as 'MaxRetriesExceeded' (not 'Failed'), so it must be included here or its
+// logs and terminal treatment get lost.
+const TERMINAL_JOB_PHASES: ClusterJobPhase[] = ['Succeeded', 'Failed', 'MaxRetriesExceeded', 'Cancelled', 'Stopped'];
+
 interface JobsListProps {
   scenarioRuns: ScenarioRunState[];
   expandedRunIds: Set<string>;
@@ -158,10 +163,19 @@ export function JobsList({
         return { icon: <HourglassHalfIcon />, color: 'orange' as const, label: 'Pending' };
       case 'Running':
         return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'blue' as const, label: 'Running' };
+      case 'Retrying':
+        return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'blue' as const, label: 'Retrying' };
       case 'Succeeded':
         return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        // Terminal failure after all retries were exhausted - present it as a failure.
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed (retries exhausted)' };
+      case 'Cancelled':
+        return { icon: <ExclamationTriangleIcon />, color: 'orange' as const, label: 'Cancelled' };
+      case 'Stopped':
+        return { icon: <ExclamationTriangleIcon />, color: 'grey' as const, label: 'Stopped' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
@@ -1093,8 +1107,9 @@ export function JobsList({
                                             </div>
                                           </FlexItem>
 
-                                          {/* Logs for running, succeeded, and failed jobs */}
-                                          {['Running', 'Succeeded', 'Failed'].includes(job.phase) && (
+                                          {/* Logs for any job whose pod has started - running or terminal
+                                              (incl. failed/MaxRetriesExceeded/cancelled/stopped) */}
+                                          {(job.phase === 'Running' || TERMINAL_JOB_PHASES.includes(job.phase)) && (
                                             <FlexItem>
                                               <LogViewer
                                                 scenarioRunName={run.scenarioRunName}
@@ -1108,7 +1123,7 @@ export function JobsList({
                                           )}
 
                                           {/* Delete button for non-terminal jobs */}
-                                          {!['Succeeded', 'Failed'].includes(job.phase) && (
+                                          {!TERMINAL_JOB_PHASES.includes(job.phase) && (
                                             <FlexItem>
                                               <Button
                                                 variant="danger"
