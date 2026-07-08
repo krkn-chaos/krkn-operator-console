@@ -123,13 +123,13 @@ const mockClusters = {
 };
 
 const mockUsers = [
-  { userId: 'admin@preview.local', name: 'Preview', surname: 'User', role: 'admin', organization: 'Krkn', createdAt: '2026-06-01T00:00:00Z' },
-  { userId: 'user1@preview.local', name: 'Alice', surname: 'Engineer', role: 'user', organization: 'Krkn', createdAt: '2026-06-15T00:00:00Z' },
+  { userId: 'admin@preview.local', name: 'Preview', surname: 'User', role: 'admin', organization: 'Krkn', active: true, created: '2026-06-01T00:00:00Z', lastLogin: '2026-07-08T10:00:00Z' },
+  { userId: 'user1@preview.local', name: 'Alice', surname: 'Engineer', role: 'user', organization: 'Krkn', active: true, created: '2026-06-15T00:00:00Z', lastLogin: '2026-07-07T14:00:00Z' },
 ];
 
 const mockGroups = [
-  { name: 'chaos-engineers', description: 'Chaos engineering team', createdAt: '2026-06-01T00:00:00Z', memberCount: 2 },
-  { name: 'platform-team', description: 'Platform engineering', createdAt: '2026-06-10T00:00:00Z', memberCount: 1 },
+  { name: 'chaos-engineers', description: 'Chaos engineering team', createdAt: '2026-06-01T00:00:00Z', memberCount: 2, clusterPermissions: { 'https://api.staging-east.example.com:6443': { actions: ['view', 'run', 'cancel'] } } },
+  { name: 'platform-team', description: 'Platform engineering', createdAt: '2026-06-10T00:00:00Z', memberCount: 1, clusterPermissions: {} },
 ];
 
 const mockRegistries = [
@@ -143,8 +143,9 @@ const mockProviders = [
 ];
 
 const mockTargets = [
-  { uuid: 'target-001', name: 'staging-targets', status: 'ready', clusters: ['staging-us-east-1', 'staging-eu-west-1'], createdAt: '2026-07-01T12:00:00Z' },
-  { uuid: 'target-002', name: 'prod-targets', status: 'ready', clusters: ['prod-us-central1'], createdAt: '2026-06-30T08:00:00Z' },
+  { uuid: 'target-001', clusterName: 'staging-us-east-1', clusterAPIURL: 'https://api.staging-east.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z', operatorSource: 'krkn-operator' },
+  { uuid: 'target-002', clusterName: 'staging-eu-west-1', clusterAPIURL: 'https://api.staging-west.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z', operatorSource: 'krkn-operator' },
+  { uuid: 'target-003', clusterName: 'prod-us-central1', clusterAPIURL: 'https://api.prod.example.com:6443', secretType: 'token', ready: true, createdAt: '2026-06-30T08:00:00Z', operatorSource: 'krkn-operator' },
 ];
 
 const mockScenarios = [
