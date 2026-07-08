@@ -118,7 +118,8 @@ export function FileForm({
     }
 
     loadFile();
-  }, [mode, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, initialData?.name]); // initialData is intentionally not in deps - only name changes should trigger reload
 
   // Load available groups
   useEffect(() => {
