@@ -8,7 +8,7 @@
  * - Override mount path (default: /etc/krkn/metrics.yaml)
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   ModalVariant,
