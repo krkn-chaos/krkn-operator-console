@@ -310,8 +310,9 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
 
   // Cleanup validation timeouts on unmount
   useEffect(() => {
+    const timeouts = validationTimeouts.current;
     return () => {
-      Object.values(validationTimeouts.current).forEach(timeout => clearTimeout(timeout));
+      Object.values(timeouts).forEach(timeout => clearTimeout(timeout));
     };
   }, []);
 
