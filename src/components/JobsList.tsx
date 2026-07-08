@@ -675,7 +675,7 @@ export function JobsList({
                                 <strong>Resiliency Score:</strong>
                               </div>
                               {item.resiliencyScoreEnabled ? (
-                                item.resiliencyScore && item.resiliencyScoreBaseline ? (
+                                item.resiliencyScore && item.resiliencyScoreBaseline !== undefined ? (
                                   <Tooltip
                                     content={`Score: ${item.resiliencyScore.calculated.toFixed(1)} / Baseline: ${item.resiliencyScoreBaseline.toFixed(1)} (${item.resiliencyScore.status})`}
                                   >
