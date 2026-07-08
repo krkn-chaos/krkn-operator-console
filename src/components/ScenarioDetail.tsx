@@ -22,7 +22,13 @@ import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRe
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(btoa(reader.result as string));
+    reader.onload = () => {
+      try {
+        resolve(btoa(reader.result as string));
+      } catch (error) {
+        reject(new Error(`Failed to encode file ${file.name}: ${error instanceof Error ? error.message : 'Invalid character encoding'}`));
+      }
+    };
     reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
     reader.readAsText(file);
   });
