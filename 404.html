@@ -1,0 +1,6 @@
+<!DOCTYPE html><html><head><script>
+var seg = window.location.pathname.match(/^(\/[^/]+\/pr-preview\/pr-\d+\/)/);
+if (seg) { var rest = window.location.pathname.slice(seg[1].length);
+  window.location.replace(seg[1] + '?p=/' + rest + window.location.hash);
+}
+</script></head><body></body></html>
