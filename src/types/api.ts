@@ -737,6 +737,25 @@ export interface GraphRunSpec {
   targetClusters: { [providerName: string]: string[] };
   /** Email address of the user who created this graph run */
   ownerUserId?: string;
+
+  // Resiliency score configuration
+  resiliencyScoreEnabled?: boolean;
+  resiliencyMountPath?: string;
+  resiliencyScoreBaseline?: number;
+}
+
+/**
+ * ResiliencyScoreResponse represents the calculated resiliency score result
+ */
+export interface ResiliencyScoreResponse {
+  /** Final calculated score (0-100) */
+  calculated: number;
+  /** User-defined baseline (same as spec) */
+  baseline?: number;
+  /** Pass/fail/no-baseline status */
+  status: 'pass' | 'fail' | 'no-baseline';
+  /** Human-readable result message */
+  message?: string;
 }
 
 /**
@@ -755,6 +774,9 @@ export interface GraphRunStatus {
   startTime?: string;
   /** When the graph run completed */
   completionTime?: string;
+
+  // Resiliency score result (populated when run completes)
+  resiliencyScore?: ResiliencyScoreResponse;
 }
 
 /**
@@ -771,6 +793,11 @@ export interface GraphRunListItem {
   summary: GraphRunSummary;
   startTime?: string;
   completionTime?: string;
+
+  // Resiliency score fields
+  resiliencyScoreEnabled?: boolean;
+  resiliencyScoreBaseline?: number;
+  resiliencyScore?: ResiliencyScoreResponse;
 }
 
 /**
@@ -795,6 +822,20 @@ export interface CreateGraphRunRequest {
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
   targetClusters: { [providerName: string]: string[] };
+}
+
+/**
+ * ResiliencyScoreConfig - Configuration for resiliency score calculation
+ */
+export interface ResiliencyScoreConfig {
+  /** Baseline score value (float, >= 0) */
+  baseline: number;
+  /** Mount path for metrics file in container (default: /etc/krkn/metrics.yaml) */
+  mountPath: string;
+  /** Single file ID for all nodes (when using 'same file' mode) */
+  fileId?: string;
+  /** Per-node file mapping (when using 'per-node' mode) */
+  perNodeFiles?: { [nodeId: string]: string };
 }
 
 /**
@@ -829,6 +870,11 @@ export interface GraphRunState {
   startTime?: string;
   /** When the graph run completed execution */
   completionTime?: string;
+
+  // Resiliency score fields (from GraphRunListItem)
+  resiliencyScoreEnabled?: boolean;
+  resiliencyScoreBaseline?: number;
+  resiliencyScore?: ResiliencyScoreResponse;
 }
 
 /**

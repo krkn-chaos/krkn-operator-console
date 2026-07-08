@@ -146,6 +146,10 @@ export function useTargetPoller() {
             summary: run.summary,
             startTime: run.startTime,
             completionTime: run.completionTime,
+            // Resiliency score fields
+            resiliencyScoreEnabled: run.resiliencyScoreEnabled,
+            resiliencyScoreBaseline: run.resiliencyScoreBaseline,
+            resiliencyScore: run.resiliencyScore,
           }));
 
           dispatch({

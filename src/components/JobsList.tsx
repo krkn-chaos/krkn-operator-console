@@ -52,11 +52,23 @@ import { FileManagementModal } from './FileManagement';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState, GraphRunSummary } from '../types/api';
+import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState, GraphRunSummary, ResiliencyScoreResponse } from '../types/api';
 
 // Unified run item type - can be either a GraphRun or a standalone ScenarioRun
 type UnifiedRunItem =
-  | { type: 'graph'; graphRunName: string; nodes: ScenarioRunState[]; phase: ScenarioRunPhase; createdAt: string; ownerUserId?: string; summary: GraphRunSummary }
+  | {
+      type: 'graph';
+      graphRunName: string;
+      nodes: ScenarioRunState[];
+      phase: ScenarioRunPhase;
+      createdAt: string;
+      ownerUserId?: string;
+      summary: GraphRunSummary;
+      // Resiliency score fields
+      resiliencyScoreEnabled?: boolean;
+      resiliencyScoreBaseline?: number;
+      resiliencyScore?: ResiliencyScoreResponse;
+    }
   | { type: 'scenario'; run: ScenarioRunState };
 
 interface JobsListProps {
@@ -153,6 +165,25 @@ export function JobsList({
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
+  };
+
+  // Get resiliency score display with color based on ratio
+  const getResiliencyScoreDisplay = (score: number, baseline: number) => {
+    const ratio = score / baseline;
+
+    if (ratio >= 1.0) {
+      return { color: 'green' as const, label: score.toFixed(1), icon: <CheckCircleIcon /> };
+    }
+    if (ratio >= 0.95) {
+      return { color: 'green' as const, label: score.toFixed(1), icon: <CheckCircleIcon /> };
+    }
+    if (ratio >= 0.9) {
+      return { color: 'orange' as const, label: score.toFixed(1), icon: <ExclamationTriangleIcon /> };
+    }
+    if (ratio >= 0.8) {
+      return { color: 'orange' as const, label: score.toFixed(1), icon: <ExclamationTriangleIcon /> };
+    }
+    return { color: 'red' as const, label: score.toFixed(1), icon: <ExclamationCircleIcon /> };
   };
 
   const handleConfirmDeleteRun = async () => {
@@ -288,7 +319,23 @@ export function JobsList({
         pendingNodes: nodes.filter(n => n.phase === 'Pending').length,
       };
 
-      items.push({ type: 'graph', graphRunName, nodes, phase, createdAt, ownerUserId, summary });
+      // Get resiliency score fields from GraphRunState
+      const resiliencyScoreEnabled = graphRunState?.resiliencyScoreEnabled;
+      const resiliencyScoreBaseline = graphRunState?.resiliencyScoreBaseline;
+      const resiliencyScore = graphRunState?.resiliencyScore;
+
+      items.push({
+        type: 'graph',
+        graphRunName,
+        nodes,
+        phase,
+        createdAt,
+        ownerUserId,
+        summary,
+        resiliencyScoreEnabled,
+        resiliencyScoreBaseline,
+        resiliencyScore,
+      });
     });
 
     // Add standalone ScenarioRuns
@@ -540,11 +587,6 @@ export function JobsList({
                 const isGraphExpanded = expandedGraphRunIds.has(item.graphRunName);
                 const phaseDisplay = getRunPhaseDisplay(item.phase);
 
-                // Aggregate job counts across all nodes
-                const successfulJobs = item.nodes.reduce((sum, node) => sum + node.successfulJobs, 0);
-                const failedJobs = item.nodes.reduce((sum, node) => sum + node.failedJobs, 0);
-                const runningJobs = item.nodes.reduce((sum, node) => sum + node.runningJobs, 0);
-
                 return (
                   <DataListItem key={item.graphRunName} isExpanded={isGraphExpanded}>
                     {/* GraphRun Summary Row */}
@@ -627,22 +669,35 @@ export function JobsList({
                               </div>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="jobs-summary" width={2}>
+                          <DataListCell key="resiliency-score" width={2}>
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Jobs:</strong>
+                                <strong>Resiliency Score:</strong>
                               </div>
-                              <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>✓</span> {successfulJobs}
-                                </span>
-                                <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>✗</span> {failedJobs}
-                                </span>
-                                <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '1.25rem' }}>⟳</span> {runningJobs}
-                                </span>
-                              </div>
+                              {item.resiliencyScoreEnabled ? (
+                                item.resiliencyScore && item.resiliencyScoreBaseline !== undefined ? (
+                                  <Tooltip
+                                    content={`Score: ${item.resiliencyScore.calculated.toFixed(1)} / Baseline: ${item.resiliencyScoreBaseline.toFixed(1)} (${item.resiliencyScore.status})`}
+                                  >
+                                    <Label
+                                      color={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).color}
+                                      icon={getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).icon}
+                                    >
+                                      {getResiliencyScoreDisplay(item.resiliencyScore.calculated, item.resiliencyScoreBaseline).label}
+                                    </Label>
+                                  </Tooltip>
+                                ) : (
+                                  <Tooltip content="Score calculation in progress...">
+                                    <Label color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
+                                      Calculating...
+                                    </Label>
+                                  </Tooltip>
+                                )
+                              ) : (
+                                <Tooltip content="Resiliency score not enabled for this run">
+                                  <Label color="grey">N/A</Label>
+                                </Tooltip>
+                              )}
                             </div>
                           </DataListCell>,
                           <DataListCell key="created" width={2}>

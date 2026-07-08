@@ -12,11 +12,13 @@ import {
   Button,
   Alert,
   Spinner,
+  Checkbox,
 } from '@patternfly/react-core';
 import { ClusterMultiSelector } from '../ClusterMultiSelector';
+import { ResiliencyScoreModal } from '../ResiliencyScoreModal';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
-import type { SelectedCluster, CreateGraphRunRequest, Cluster } from '../../types/api';
+import type { SelectedCluster, CreateGraphRunRequest, Cluster, ResiliencyScoreConfig } from '../../types/api';
 import { useStudioContext } from './StudioContext';
 import { clearAutosave } from './studioAutosave';
 
@@ -39,15 +41,21 @@ export function RunWorkflowModal({
   onSuccess,
   targetFetchState,
 }: RunWorkflowModalProps) {
-  const { exportWorkflow } = useStudioContext();
+  const { exportWorkflow, workflow } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
+  const [showResiliencyModal, setShowResiliencyModal] = useState(false);
+  const [resiliencyConfig, setResiliencyConfig] = useState<ResiliencyScoreConfig | null>(null);
 
-  // Reset selected clusters when modal closes
+  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSelectedClusters([]);
+      setEnableResiliencyScore(false);
+      setShowResiliencyModal(false);
+      setResiliencyConfig(null);
     }
   }, [isOpen]);
 
@@ -77,7 +85,7 @@ export function RunWorkflowModal({
     });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (providedConfig?: ResiliencyScoreConfig) => {
     if (targetFetchState.status !== 'ready' || !targetFetchState.uuid) {
       showError('Missing target request', 'Target request ID is not available');
       return;
@@ -85,6 +93,15 @@ export function RunWorkflowModal({
 
     if (selectedClusters.length === 0) {
       showError('No clusters selected', 'Please select at least one cluster');
+      return;
+    }
+
+    // Use provided config or state config
+    const configToUse = providedConfig || resiliencyConfig;
+
+    // If resiliency score enabled but not configured, open modal
+    if (enableResiliencyScore && !configToUse) {
+      setShowResiliencyModal(true);
       return;
     }
 
@@ -104,8 +121,37 @@ export function RunWorkflowModal({
       targetClusters[cluster.operatorName].push(cluster.clusterName);
     });
 
+    // Apply resiliency score file mappings to graph nodes
+    const graph = { ...exportResult.graph };
+    if (configToUse) {
+      Object.keys(graph).forEach((nodeId) => {
+        const node = graph[nodeId];
+
+        // Determine fileId for this node
+        let fileId: string | undefined;
+        if (configToUse.fileId) {
+          // Same file for all nodes
+          fileId = configToUse.fileId;
+        } else if (configToUse.perNodeFiles && configToUse.perNodeFiles[nodeId]) {
+          // Per-node file selection
+          fileId = configToUse.perNodeFiles[nodeId];
+        }
+
+        // Add to volumes if fileId exists
+        if (fileId) {
+          graph[nodeId] = {
+            ...node,
+            volumes: {
+              ...(node.volumes || {}),
+              [fileId]: configToUse.mountPath,
+            },
+          };
+        }
+      });
+    }
+
     const request: CreateGraphRunRequest = {
-      graph: exportResult.graph,
+      graph,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
     };
@@ -113,7 +159,15 @@ export function RunWorkflowModal({
     setIsSubmitting(true);
 
     try {
-      const graphRun = await graphRunsApi.createGraphRun(request);
+      // Build headers for resiliency score
+      const headers: Record<string, string> = {};
+      if (configToUse) {
+        headers['X-Resiliency-Score'] = 'true';
+        headers['X-Resiliency-Baseline'] = configToUse.baseline.toString();
+        headers['X-Resiliency-Mount-Path'] = configToUse.mountPath;
+      }
+
+      const graphRun = await graphRunsApi.createGraphRun(request, headers);
       showSuccess('Workflow started', `GraphRun ${graphRun.name} created successfully`);
       // Clear autosave since workflow was successfully submitted
       clearAutosave();
@@ -124,6 +178,13 @@ export function RunWorkflowModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResiliencyConfigConfirm = (config: ResiliencyScoreConfig) => {
+    setResiliencyConfig(config);
+    setShowResiliencyModal(false);
+    // Automatically proceed with submission, passing config directly to avoid race condition
+    handleSubmit(config);
   };
 
   // Render loading state
@@ -236,11 +297,37 @@ export function RunWorkflowModal({
             showActions={false}
           />
 
+          {/* Resiliency Score option */}
+          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+            <Checkbox
+              id="enable-resiliency-score"
+              label="Calculate Resiliency Score"
+              description="Enable resiliency score calculation for this workflow execution"
+              isChecked={enableResiliencyScore}
+              onChange={(_event, checked) => {
+                setEnableResiliencyScore(checked);
+                if (!checked) {
+                  // Clear config when disabled
+                  setResiliencyConfig(null);
+                }
+              }}
+            />
+            {enableResiliencyScore && resiliencyConfig && (
+              <Alert
+                variant="info"
+                isInline
+                isPlain
+                title={`Baseline: ${resiliencyConfig.baseline}, Mount: ${resiliencyConfig.mountPath}`}
+                style={{ marginTop: '0.5rem' }}
+              />
+            )}
+          </div>
+
           {/* Custom actions aligned left */}
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
             <Button
               variant="primary"
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               isDisabled={selectedClusters.length === 0 || isSubmitting}
               isLoading={isSubmitting}
               size="lg"
@@ -253,6 +340,14 @@ export function RunWorkflowModal({
           </div>
         </>
       )}
+
+      {/* Resiliency Score Configuration Modal */}
+      <ResiliencyScoreModal
+        isOpen={showResiliencyModal}
+        nodeIds={workflow.nodes.map(n => n.nodeId)}
+        onClose={() => setShowResiliencyModal(false)}
+        onConfirm={handleResiliencyConfigConfirm}
+      />
     </Modal>
   );
 }
