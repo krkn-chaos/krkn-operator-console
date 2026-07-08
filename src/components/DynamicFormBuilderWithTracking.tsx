@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Form,
   FormGroup,
@@ -28,29 +28,85 @@ export function DynamicFormBuilderWithTracking({
   onChange
 }: DynamicFormBuilderWithTrackingProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const validationTimeouts = useRef<{ [key: string]: number }>({});
+
+  /**
+   * Safe regex test with timeout protection
+   * Prevents ReDoS attacks from externally-provided regex patterns
+   */
+  const safeRegexTest = useCallback((pattern: string, value: string): boolean => {
+    const MAX_REGEX_TIME = 100; // ms - prevent expensive backtracking
+    const MAX_INPUT_LENGTH = 10000; // chars - prevent long input attacks
+
+    // Reject excessively long input
+    if (value.length > MAX_INPUT_LENGTH) {
+      return false;
+    }
+
+    try {
+      const regex = new RegExp(pattern);
+      let timeoutOccurred = false;
+
+      // Set a timeout to abort long-running regex
+      const timeoutId = setTimeout(() => {
+        timeoutOccurred = true;
+      }, MAX_REGEX_TIME);
+
+      const result = regex.test(value);
+      clearTimeout(timeoutId);
+
+      // If timeout occurred, treat as validation failure
+      if (timeoutOccurred) {
+        console.warn(`Regex validation timed out for pattern: ${pattern}`);
+        return false;
+      }
+
+      return result;
+    } catch {
+      // Invalid regex in schema - skip validation
+      return true;
+    }
+  }, []);
+
+  // Cleanup validation timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(validationTimeouts.current).forEach(timeout => clearTimeout(timeout));
+    };
+  }, []);
 
   const handleChange = (variable: string, value: string | number | boolean | File) => {
     const newValues = { ...values, [variable]: value };
     const newTouchedFields = { ...touchedFields, [variable]: true };
     onChange(newValues, newTouchedFields);
 
+    // Clear existing validation timeout for this field
+    if (validationTimeouts.current[variable]) {
+      clearTimeout(validationTimeouts.current[variable]);
+    }
+
     const field = fields.find(f => f.variable === variable);
     if (field?.type === 'string' && typeof value === 'string' && value !== '') {
       const stringField = field as StringField;
       if (stringField.validator) {
-        try {
-          if (!new RegExp(stringField.validator).test(value)) {
-            setErrors({ ...errors, [variable]: stringField.validation_message || `Must match pattern: ${stringField.validator}` });
-            return;
+        // Debounce validation by 300ms to avoid expensive regex on every keystroke
+        validationTimeouts.current[variable] = setTimeout(() => {
+          if (!safeRegexTest(stringField.validator!, value)) {
+            setErrors(prev => ({
+              ...prev,
+              [variable]: stringField.validation_message || `Must match pattern: ${stringField.validator}`
+            }));
+          } else {
+            setErrors(prev => ({ ...prev, [variable]: '' }));
           }
-        } catch {
-          // invalid regex in schema — skip validation
-        }
+        }, 300);
+        return;
       }
     }
 
+    // Clear error immediately if field becomes empty or non-string
     if (errors[variable]) {
-      setErrors({ ...errors, [variable]: '' });
+      setErrors(prev => ({ ...prev, [variable]: '' }));
     }
   };
 
