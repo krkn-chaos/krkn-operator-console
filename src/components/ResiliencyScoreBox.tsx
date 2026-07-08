@@ -56,7 +56,7 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
   }
 
   // Calculating state (run in progress)
-  if (calculating || (enabled && !score)) {
+  if (calculating || (enabled && score === undefined)) {
     return (
       <Tooltip content="Score calculation in progress...">
         <div
@@ -79,7 +79,7 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
   }
 
   // Score calculated - at this point score must be defined
-  if (!score) {
+  if (score === undefined) {
     return <ResiliencyScoreNA />;
   }
 
