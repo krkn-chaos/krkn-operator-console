@@ -247,6 +247,7 @@ describe('graphRunsApi', () => {
       expect(mockFetchJson).toHaveBeenCalledWith('/graphruns', {
         method: 'POST',
         body: JSON.stringify(createRequest),
+        headers: undefined,
       });
       expect(result).toEqual(mockResponse);
     });
@@ -263,6 +264,57 @@ describe('graphRunsApi', () => {
       await expect(graphRunsApi.createGraphRun(invalidRequest)).rejects.toThrow(
         'graph is required and cannot be empty'
       );
+    });
+
+    it('should pass custom headers when provided', async () => {
+      const createRequest: CreateGraphRunRequest = {
+        graph: {
+          'node1': { name: 'test', image: 'test:latest' },
+        },
+        targetRequestId: 'target-123',
+        targetClusters: {
+          'krkn-operator': ['cluster1'],
+        },
+      };
+
+      const customHeaders = {
+        'X-Resiliency-Score': 'true',
+        'X-Resiliency-Baseline': '9.0',
+        'X-Resiliency-Mount-Path': '/etc/krkn/metrics.yaml',
+      };
+
+      const mockResponse: GraphRunDetail = {
+        name: 'graphrun-abc123',
+        namespace: 'krkn-operator',
+        creationTimestamp: '2026-05-25T10:00:00Z',
+        spec: {
+          ...createRequest,
+          ownerUserId: 'user1@example.com',
+        },
+        status: {
+          phase: 'Pending',
+          summary: {
+            totalNodes: 1,
+            completedNodes: 0,
+            runningNodes: 0,
+            failedNodes: 0,
+            pendingNodes: 1,
+          },
+          nodeStatuses: [],
+          resolvedLevels: [],
+        },
+      };
+
+      mockFetchJson.mockResolvedValue(mockResponse);
+
+      const result = await graphRunsApi.createGraphRun(createRequest, customHeaders);
+
+      expect(mockFetchJson).toHaveBeenCalledWith('/graphruns', {
+        method: 'POST',
+        body: JSON.stringify(createRequest),
+        headers: customHeaders,
+      });
+      expect(result).toEqual(mockResponse);
     });
 
     it('should handle permission errors', async () => {
