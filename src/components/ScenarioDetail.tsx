@@ -24,13 +24,18 @@ const readFileAsBase64 = (file: File): Promise<string> =>
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        resolve(btoa(reader.result as string));
+        const bytes = new Uint8Array(reader.result as ArrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        resolve(btoa(binary));
       } catch (error) {
         reject(new Error(`Failed to encode file ${file.name}: ${error instanceof Error ? error.message : 'Invalid character encoding'}`));
       }
     };
     reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   });
 
 interface ScenarioDetailProps {
