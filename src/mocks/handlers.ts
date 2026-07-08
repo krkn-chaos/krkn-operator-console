@@ -133,13 +133,13 @@ const mockGroups = [
 ];
 
 const mockRegistries = [
-  { name: 'default', url: 'quay.io/krkn-chaos', description: 'Default krkn scenario registry', createdAt: '2026-06-01T00:00:00Z' },
+  { name: 'default', registryUrl: 'quay.io', scenarioRepository: 'krkn-chaos/krkn-hub', authType: 'anonymous', description: 'Default krkn scenario registry', skipTls: false, insecure: false, groups: [], availableToAll: true, createdAt: '2026-06-01T00:00:00Z' },
 ];
 
 const mockProviders = [
-  { name: 'aws', active: true, description: 'Amazon Web Services' },
-  { name: 'gcp', active: true, description: 'Google Cloud Platform' },
-  { name: 'azure', active: false, description: 'Microsoft Azure' },
+  { name: 'aws', active: true, lastHeartbeat: '2026-07-08T10:00:00Z' },
+  { name: 'gcp', active: true, lastHeartbeat: '2026-07-08T09:55:00Z' },
+  { name: 'azure', active: false, lastHeartbeat: null },
 ];
 
 const mockTargets = [
@@ -364,7 +364,11 @@ export const handlers = [
     HttpResponse.json({ registries: mockRegistries }),
   ),
   http.get(`${BASE}/registries/available`, () =>
-    HttpResponse.json({ registries: mockRegistries }),
+    HttpResponse.json({
+      registries: [
+        { name: 'default', registryUrl: 'quay.io', scenarioRepository: 'krkn-chaos/krkn-hub', description: 'Default krkn scenario registry' },
+      ],
+    }),
   ),
   http.get(`${BASE}/registries/:name`, ({ params }) => {
     const r = mockRegistries.find((x) => x.name === params.name);
