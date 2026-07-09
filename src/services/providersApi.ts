@@ -11,7 +11,9 @@ import type {
   ProviderErrorResponse,
 } from '../types/provider';
 
-const API_BASE = '/api/v1';
+import { config } from '../config';
+
+const API_BASE = config.apiBaseUrl;
 
 class ProvidersApi extends BaseApiClient {
   constructor() {

@@ -8,7 +8,9 @@ import type {
   UserOperationResponse,
 } from '../types/api';
 
-const API_BASE = '/api/v1';
+import { config } from '../config';
+
+const API_BASE = config.apiBaseUrl;
 
 /**
  * Users API client for krkn-operator-console

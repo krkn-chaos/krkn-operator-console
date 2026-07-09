@@ -7,7 +7,9 @@ import type {
   TargetOperationResponse,
 } from '../types/api';
 
-const API_BASE = '/api/v1/operator';
+import { config } from '../config';
+
+const API_BASE = `${config.apiBaseUrl}/operator`;
 
 class TargetsApi extends BaseApiClient {
   constructor() {

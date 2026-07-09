@@ -91,7 +91,7 @@ export function DynamicFormBuilderWithTracking({
       const stringField = field as StringField;
       if (stringField.validator) {
         // Debounce validation by 300ms to avoid expensive regex on every keystroke
-        validationTimeouts.current[variable] = setTimeout(() => {
+        validationTimeouts.current[variable] = window.setTimeout(() => {
           if (!safeRegexTest(stringField.validator!, value)) {
             setErrors(prev => ({
               ...prev,
