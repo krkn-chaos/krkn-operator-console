@@ -16,7 +16,9 @@ import type {
 } from '../types/auth';
 import { AUTH_STORAGE_KEYS } from '../types/auth';
 
-const API_BASE = '/api/v1/auth';
+import { config } from '../config';
+
+const API_BASE = `${config.apiBaseUrl}/auth`;
 
 /**
  * Authentication service class

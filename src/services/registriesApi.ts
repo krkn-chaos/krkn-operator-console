@@ -9,7 +9,9 @@ import type {
   AvailableRegistriesResponse,
 } from '../types/api';
 
-const API_BASE = '/api/v1';
+import { config } from '../config';
+
+const API_BASE = config.apiBaseUrl;
 
 /**
  * Registries API client for krkn-operator-console

@@ -120,7 +120,7 @@ export function Login() {
 
   return (
     <PFLoginPage
-      brandImgSrc="/logo.png"
+      brandImgSrc={`${import.meta.env.BASE_URL}logo.png`}
       brandImgAlt="Krkn Operator"
       loginTitle="Log in to your account"
     >
