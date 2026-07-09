@@ -354,7 +354,7 @@ function App() {
             style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
           >
             <img
-              src="/logo.png"
+              src={`${import.meta.env.BASE_URL}logo.png`}
               alt="Krkn Logo"
               style={{ height: '32px', width: 'auto' }}
             />

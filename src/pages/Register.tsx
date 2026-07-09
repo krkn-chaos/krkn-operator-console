@@ -151,7 +151,7 @@ export function Register() {
 
   return (
     <PFLoginPage
-      brandImgSrc="/logo.png"
+      brandImgSrc={`${import.meta.env.BASE_URL}logo.png`}
       brandImgAlt="Krkn Operator"
       textContent="Chaos Engineering for Kubernetes"
       loginTitle="Create First Admin Account"
