@@ -2,16 +2,33 @@ name: Deploy Preview — Build
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 concurrency:
   group: preview-build-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
 jobs:
   build-preview:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-24.04
+    outputs:
+      is-fork: ${{ steps.check.outputs.is-fork }}
     steps:
+      - name: Check if fork
+        id: check
+        run: |
+          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+            echo "is-fork=true" >> $GITHUB_OUTPUT
+          else
+            echo "is-fork=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -31,6 +48,20 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Set deploy status to pending
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'pending',
+              context: 'Deploy Preview',
+              description: 'Building preview...',
+            });
+
       - name: Build for preview
         env:
           VITE_PREVIEW_MODE: 'true'
@@ -42,15 +73,128 @@ jobs:
           sed -i 's|<body>|<body><div id="preview-banner" style="background:#06c;color:#fff;padding:6px 16px;text-align:center;font-family:RedHatText,sans-serif;font-size:13px;position:relative;z-index:0">Deploy Preview — Backend API is not available in this environment</div>|' dist/index.html
           sed -i 's|<head>|<head><script>(function(){var p=new URLSearchParams(window.location.search).get("p");if(p){window.history.replaceState(null,"",window.location.pathname.replace(/\\/$/,"")+p+window.location.hash);}})();</script>|' dist/index.html
 
-      - name: Save PR metadata
-        run: |
-          mkdir -p dist/.preview-meta
-          echo "${{ github.event.pull_request.number }}" > dist/.preview-meta/pr-number
-          echo "${{ github.event.pull_request.head.sha }}" > dist/.preview-meta/head-sha
-
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
         with:
           name: preview-build-pr-${{ github.event.pull_request.number }}
           path: dist/
           retention-days: 1
+
+      # --- Direct deploy for same-repo PRs (fork PRs use the publish workflow) ---
+      - name: Deploy to gh-pages
+        if: steps.check.outputs.is-fork == 'false'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: pr-preview/pr-${{ github.event.pull_request.number }}
+          keep_files: true
+
+      - name: Ensure support files on gh-pages
+        if: steps.check.outputs.is-fork == 'false'
+        run: |
+          AUTH_URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          TEMP=$(mktemp -d)
+          git clone --branch gh-pages --single-branch --depth 1 "$AUTH_URL" "$TEMP" 2>/dev/null || exit 0
+          cd "$TEMP"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          CHANGED=false
+          if [ ! -f .nojekyll ]; then touch .nojekyll; CHANGED=true; fi
+          if [ ! -f index.html ]; then
+            echo '<html><body>Deploy previews are served from subdirectories.</body></html>' > index.html
+            CHANGED=true
+          fi
+          if [ ! -f 404.html ]; then
+            cat > 404.html << 'SPAEOF'
+          <!DOCTYPE html><html><head><script>
+          var seg = window.location.pathname.match(/^(\/[^/]+\/pr-preview\/pr-\d+\/)/);
+          if (seg) { var rest = window.location.pathname.slice(seg[1].length);
+            window.location.replace(seg[1] + '?p=/' + rest + window.location.hash);
+          }
+          </script></head><body></body></html>
+          SPAEOF
+            CHANGED=true
+          fi
+          if [ "$CHANGED" = true ]; then
+            git add -A && git commit -m "Add GitHub Pages support files" && git push
+          fi
+
+      - name: Comment on PR
+        if: steps.check.outputs.is-fork == 'false'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha.substring(0, 7);
+            const owner = context.payload.repository.owner.login;
+            const repo = context.payload.repository.name;
+            const previewUrl = `https://${owner}.github.io/${repo}/pr-preview/pr-${prNumber}/`;
+            const logoUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/public/logo.png`;
+
+            const body = [
+              '<!-- deploy-preview-bot -->',
+              `<img src="${logoUrl}" alt="krkn" width="20" align="top"> **Deploy Preview**`,
+              '',
+              '| Name | Detail |',
+              '|------|--------|',
+              `| **Preview URL** | [${previewUrl}](${previewUrl}) |`,
+              `| **Latest commit** | \`${sha}\` |`,
+              `| **Status** | :rocket: Ready |`,
+              '',
+              '> This is a static preview — API-dependent features use mock data.',
+            ].join('\n');
+
+            const marker = '<!-- deploy-preview-bot -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: prNumber,
+            });
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' && c.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: prNumber, body });
+            }
+
+      - name: Set deploy status
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isFork = '${{ steps.check.outputs.is-fork }}' === 'true';
+            if (isFork) return;
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.payload.repository.owner.login;
+            const repo = context.payload.repository.name;
+            const previewUrl = `https://${owner}.github.io/${repo}/pr-preview/pr-${prNumber}/`;
+            const isSuccess = '${{ job.status }}' === 'success';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner, repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: isSuccess ? 'success' : 'failure',
+              target_url: isSuccess ? previewUrl : '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',
+              context: 'Deploy Preview',
+              description: isSuccess ? 'Preview is ready!' : 'Preview deployment failed',
+            });
+
+  cleanup:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Remove preview
+        run: |
+          AUTH_URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          TEMP=$(mktemp -d)
+          git clone --branch gh-pages --single-branch --depth 1 "$AUTH_URL" "$TEMP" 2>/dev/null || exit 0
+          cd "$TEMP"
+          PR_DIR="pr-preview/pr-${{ github.event.pull_request.number }}"
+          if [ -d "$PR_DIR" ]; then
+            rm -rf "$PR_DIR"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A && git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}" && git push
+          fi
