@@ -69,7 +69,7 @@ export interface CreateTargetRequest {
   password?: string;
 }
 
-export interface UpdateTargetRequest extends CreateTargetRequest {}
+export interface UpdateTargetRequest extends CreateTargetRequest { }
 
 export interface TargetResponse {
   uuid: string;
@@ -220,6 +220,8 @@ export interface ScenarioRunRequest {
   fileReferences?: FileReference[];
   /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
   registryName?: string;
+  /** Optional custom label for the run, displayed in the runs list */
+  customRunName?: string;
 }
 
 export interface TargetJobResult {
@@ -297,6 +299,7 @@ export interface ScenarioRunStatusResponse {
   registryName?: string; // Name of private registry used (null for public Quay registry)
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
+  customRunName?: string; // User-provided label for the run
 }
 
 // Internal state for tracking scenario runs
@@ -314,6 +317,7 @@ export interface ScenarioRunState {
   registryName?: string; // Name of private registry used (null for public Quay registry)
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
+  customRunName?: string; // User-provided label for the run
 }
 
 // User Management Types

@@ -48,6 +48,7 @@ export function useScenarioRunsPoller() {
             registryName: updated.registryName || run.registryName,
             graphRunName: updated.graphRunName || run.graphRunName,
             graphNodeId: updated.graphNodeId || run.graphNodeId,
+            customRunName: updated.customRunName || run.customRunName,
           };
 
           // Only update if there are changes
@@ -111,6 +112,7 @@ export function useScenarioRunsPoller() {
           registryName: updated.registryName || run.registryName,
           graphRunName: updated.graphRunName || run.graphRunName,
           graphNodeId: updated.graphNodeId || run.graphNodeId,
+          customRunName: updated.customRunName || run.customRunName,
         };
 
         if (hasChanges(run, updatedState)) {
@@ -132,6 +134,7 @@ function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
   if (prev.runningJobs !== next.runningJobs) return true;
   if (prev.successfulJobs !== next.successfulJobs) return true;
   if (prev.failedJobs !== next.failedJobs) return true;
+  if (prev.customRunName !== next.customRunName) return true;
 
   // Check cluster job phase changes
   for (let i = 0; i < prev.clusterJobs.length; i++) {
