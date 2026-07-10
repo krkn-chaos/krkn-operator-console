@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Deploy Preview — Build"]
     types: [completed]
-  pull_request:
+  pull_request_target:
     types: [closed]
 
 permissions:
@@ -17,7 +17,7 @@ jobs:
   deploy:
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'pull_request' && github.event.action == 'closed')
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed')
     runs-on: ubuntu-24.04
     concurrency:
       group: preview-publish
@@ -28,7 +28,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            if (context.eventName === 'pull_request') {
+            if (context.eventName === 'pull_request_target') {
               core.setOutput('number', context.payload.pull_request.number);
               core.setOutput('head_sha', context.payload.pull_request.head.sha);
               core.setOutput('action', 'closed');
@@ -99,7 +99,14 @@ jobs:
         run: |
           AUTH_URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           TEMP=$(mktemp -d)
-          git clone --branch gh-pages --single-branch --depth 1 "$AUTH_URL" "$TEMP" 2>/dev/null || exit 0
+
+          if git ls-remote --heads "$AUTH_URL" gh-pages | grep -q gh-pages; then
+            git clone --branch gh-pages --single-branch --depth 1 "$AUTH_URL" "$TEMP"
+          else
+            echo "::warning::gh-pages branch does not exist yet — support files will be added on next deploy"
+            exit 0
+          fi
+
           cd "$TEMP"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -129,7 +136,13 @@ jobs:
         run: |
           AUTH_URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           TEMP=$(mktemp -d)
-          git clone --branch gh-pages --single-branch --depth 1 "$AUTH_URL" "$TEMP" 2>/dev/null || exit 0
+
+          if ! git ls-remote --heads "$AUTH_URL" gh-pages | grep -q gh-pages; then
+            echo "::warning::gh-pages branch does not exist — nothing to clean up"
+            exit 0
+          fi
+
+          git clone --branch gh-pages --single-branch --depth 1 "$AUTH_URL" "$TEMP"
           cd "$TEMP"
           PR_DIR="pr-preview/pr-${{ steps.pr.outputs.number }}"
           if [ -d "$PR_DIR" ]; then
@@ -137,6 +150,8 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add -A && git commit -m "Remove preview for PR #${{ steps.pr.outputs.number }}" && git push
+          else
+            echo "No preview directory found at $PR_DIR — already cleaned up"
           fi
 
       - name: Comment on PR
