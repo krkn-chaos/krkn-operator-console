@@ -359,7 +359,7 @@ function App() {
               style={{ height: '32px', width: 'auto' }}
             />
             <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white' }}>
-              Krkn Operator Console
+              Krkn Operator Console (preview test)
             </div>
           </div>
         </MastheadBrand>
