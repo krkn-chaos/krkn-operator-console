@@ -34,27 +34,31 @@ jobs:
               core.setOutput('action', 'closed');
               return;
             }
-            // workflow_run event — find the PR
+            // workflow_run event — find the PR matching the exact head SHA
+            const headSha = context.payload.workflow_run.head_sha;
             const prs = context.payload.workflow_run.pull_requests;
             if (prs && prs.length > 0) {
-              core.setOutput('number', prs[0].number);
-              core.setOutput('head_sha', context.payload.workflow_run.head_sha);
+              const match = prs.find(pr => pr.head.sha === headSha) || prs[0];
+              core.setOutput('number', match.number);
+              core.setOutput('head_sha', headSha);
               core.setOutput('action', 'deploy');
               return;
             }
-            // Fallback: search for PR by head SHA
-            const { data: searchResult } = await github.rest.pulls.list({
+            // Fallback: search for PR by head branch, then verify SHA
+            const headLabel = `${context.payload.workflow_run.head_repository.owner.login}:${context.payload.workflow_run.head_branch}`;
+            const { data: candidates } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              head: `${context.payload.workflow_run.head_repository.owner.login}:${context.payload.workflow_run.head_branch}`,
+              head: headLabel,
             });
-            if (searchResult.length > 0) {
-              core.setOutput('number', searchResult[0].number);
-              core.setOutput('head_sha', context.payload.workflow_run.head_sha);
+            const match = candidates.find(pr => pr.head.sha === headSha);
+            if (match) {
+              core.setOutput('number', match.number);
+              core.setOutput('head_sha', headSha);
               core.setOutput('action', 'deploy');
             } else {
-              core.setFailed('Could not find PR for this workflow run');
+              core.setFailed(`No open PR with head ${headLabel} at SHA ${headSha}`);
             }
 
       - name: Set deploy status to pending
