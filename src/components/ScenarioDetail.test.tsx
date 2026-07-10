@@ -767,6 +767,72 @@ describe('ScenarioDetail', () => {
         expect(operatorApi.runScenario).toHaveBeenCalled();
       });
     });
+
+    it('should send customRunName from the submitted request, not component state, when confirming a conflict', async () => {
+      const user = userEvent.setup();
+      const mockActiveRunsWithConflict: ActiveRunsResponse = {
+        totalActiveRuns: 1,
+        totalClusters: 1,
+        clusterRuns: { cluster1: ['existing-run-1'] },
+      };
+
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRunsWithConflict);
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      // Advance to preview, then type a custom run name before running
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      const runNameInput = screen.getByPlaceholderText('e.g. nightly-pod-disruption-test');
+      await user.type(runNameInput, 'original-run-label');
+
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      // Conflict modal appears; confirm to proceed
+      await waitFor(() => expect(screen.getByRole('button', { name: /Continue/i })).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /Continue/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ customRunName: 'original-run-label' })
+        );
+      });
+    });
+
+    it('should store customRunName from the submitted request in the new run state', async () => {
+      const user = userEvent.setup();
+      const mockActiveRunsNoConflict: ActiveRunsResponse = {
+        totalActiveRuns: 0,
+        totalClusters: 0,
+        clusterRuns: {},
+      };
+      // Status response does not echo back customRunName (simulates a delayed/incomplete response)
+      const statusWithoutCustomName: ScenarioRunStatusResponse = { ...mockStatusResponse, customRunName: undefined };
+
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(statusWithoutCustomName);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRunsNoConflict);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      const runNameInput = screen.getByPlaceholderText('e.g. nightly-pod-disruption-test');
+      await user.type(runNameInput, 'my-run-label');
+
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(mockDispatch).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'ADD_SCENARIO_RUN',
+            payload: expect.objectContaining({
+              run: expect.objectContaining({ customRunName: 'my-run-label' }),
+            }),
+          })
+        );
+      });
+    });
   });
 
   describe('Back Navigation', () => {

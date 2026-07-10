@@ -9,6 +9,11 @@ import {
   Spinner,
   Modal,
   ModalVariant,
+  FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
+  TextInput,
 } from '@patternfly/react-core';
 import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
@@ -64,6 +69,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [availableFiles, setAvailableFiles] = useState<import('../types/api').FileInfo[]>([]);
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
+  const [customRunName, setCustomRunName] = useState('');
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -240,6 +246,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         createdAt: new Date().toISOString(),
         ownerUserId: statusResponse.ownerUserId,
         registryName: statusResponse.registryName,
+        customRunName: statusResponse.customRunName || runRequest.customRunName,
       };
 
       // Dispatch creation event
@@ -285,9 +292,15 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         0 // Don't auto-dismiss - user must close manually
       );
     } catch (error) {
-      setValidationErrors([
-        error instanceof Error ? error.message : 'Failed to run scenario',
-      ]);
+      const msg = error instanceof Error ? error.message : 'Failed to run scenario';
+      const isConflict = msg.includes('409') || msg.toLowerCase().includes('conflict');
+      if (isConflict && customRunName.trim()) {
+        setValidationErrors([
+          `A run named "${customRunName.trim()}" already exists. Please choose a different name.`,
+        ]);
+      } else {
+        setValidationErrors([msg]);
+      }
     }
   };
 
@@ -374,7 +387,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         environment,
         files: files.length > 0 ? files : undefined,
         fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
-        registryName: registryConfig?.registryName,
+        registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
+        customRunName: customRunName.trim() || undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -694,6 +708,30 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   </Table>
                 </>
               )}
+            </CardBody>
+          </Card>
+
+          {/* Custom Run Name */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardBody>
+              <FormGroup
+                label="Run name (optional)"
+                fieldId="custom-run-name"
+              >
+                <TextInput
+                  id="custom-run-name"
+                  type="text"
+                  value={customRunName}
+                  onChange={(_event, value) => setCustomRunName(value)}
+                  placeholder="e.g. nightly-pod-disruption-test"
+                  isDisabled={isSubmitting}
+                />
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>A custom label for this run. If left blank, a name is generated automatically.</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              </FormGroup>
             </CardBody>
           </Card>
 

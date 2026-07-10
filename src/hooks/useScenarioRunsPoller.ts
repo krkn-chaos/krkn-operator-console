@@ -191,7 +191,7 @@ export function useScenarioRunsPoller() {
     if (!run) return;
 
     if (!state.pausedPollingRunIds.has(runToRefresh) ||
-        ['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)) {
+      ['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)) {
       return;
     }
 
@@ -213,6 +213,7 @@ export function useScenarioRunsPoller() {
           registryName: updated.registryName || run.registryName,
           graphRunName: updated.graphRunName || run.graphRunName,
           graphNodeId: updated.graphNodeId || run.graphNodeId,
+          customRunName: updated.customRunName || run.customRunName,
         };
 
         if (hasChanges(run, updatedState)) {
@@ -231,6 +232,7 @@ function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
   if (prev.runningJobs !== next.runningJobs) return true;
   if (prev.successfulJobs !== next.successfulJobs) return true;
   if (prev.failedJobs !== next.failedJobs) return true;
+  if (prev.customRunName !== next.customRunName) return true;
 
   if (prev.clusterJobs.length !== next.clusterJobs.length) return true;
 
