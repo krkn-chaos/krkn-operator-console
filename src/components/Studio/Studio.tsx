@@ -15,7 +15,9 @@ import {
   Title,
   Card,
   CardBody,
+  Button,
 } from '@patternfly/react-core';
+import { ArrowLeftIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../../context/AppContext';
 import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
 import { StudioProvider, useStudioContext } from './StudioContext';
@@ -76,6 +78,15 @@ function StudioContent() {
     <>
       {/* Header */}
       <div style={{ marginBottom: '1.5rem' }}>
+        <Button
+          variant="link"
+          icon={<ArrowLeftIcon />}
+          isInline
+          onClick={() => dispatch({ type: 'JOBS_LIST_READY' })}
+          style={{ marginBottom: '0.5rem', paddingLeft: 0 }}
+        >
+          Back to Runs
+        </Button>
         <Title headingLevel="h1" size="2xl">
           Chaos Studio
         </Title>
