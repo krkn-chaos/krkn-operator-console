@@ -1,5 +1,5 @@
 import { render, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LogViewer } from './LogViewer';
 import { authService } from '../services/authService';
 
@@ -39,9 +39,15 @@ class MockWebSocket {
 
 beforeEach(() => {
   MockWebSocket.instances = [];
-  (globalThis as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
+  // stubGlobal records the previous WebSocket so unstubAllGlobals can restore it,
+  // instead of leaving the mock installed on globalThis after this file's tests.
+  vi.stubGlobal('WebSocket', MockWebSocket);
   vi.clearAllMocks();
   (authService.getToken as ReturnType<typeof vi.fn>).mockReturnValue('test-token');
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('LogViewer terminal phase handling', () => {

@@ -1107,9 +1107,11 @@ export function JobsList({
                                             </div>
                                           </FlexItem>
 
-                                          {/* Logs for any job whose pod has started - running or terminal
-                                              (incl. failed/MaxRetriesExceeded/cancelled/stopped) */}
-                                          {(job.phase === 'Running' || TERMINAL_JOB_PHASES.includes(job.phase)) && (
+                                          {/* Logs for any job whose pod has started - running, retrying, or
+                                              terminal (incl. failed/MaxRetriesExceeded/cancelled/stopped).
+                                              'Pending' is the only phase with no pod yet, so it's the sole
+                                              phase without a log viewer. */}
+                                          {(job.phase === 'Running' || job.phase === 'Retrying' || TERMINAL_JOB_PHASES.includes(job.phase)) && (
                                             <FlexItem>
                                               <LogViewer
                                                 scenarioRunName={run.scenarioRunName}
