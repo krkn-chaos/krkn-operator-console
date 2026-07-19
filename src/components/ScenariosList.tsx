@@ -46,7 +46,7 @@ export function ScenariosList() {
   const [copiedDigest, setCopiedDigest] = useState<string | null>(null);
   // Category filter — empty set means "show all". Multi-select so users can
   // narrow to one or several scenario types.
-  const [selectedCategories, setSelectedCategories] = useState<Set<ScenarioCategoryKey>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<ScenarioCategoryKey>>(() => new Set());
 
   const toggleCategory = (key: ScenarioCategoryKey) => {
     setSelectedCategories((prev) => {
