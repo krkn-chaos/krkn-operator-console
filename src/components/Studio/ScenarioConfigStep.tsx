@@ -12,7 +12,7 @@ import {
   Card,
   CardTitle,
   CardBody,
-  Checkbox,
+  ExpandableSection,
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from '../DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from '../DynamicFormBuilderWithTracking';
@@ -199,20 +199,14 @@ export function ScenarioConfigStep({
         </CardBody>
       </Card>
 
-      {/* Optional Fields Toggle */}
-      <div style={{ marginTop: '1.5rem' }}>
-        <Checkbox
-          id="show-optional-fields"
-          label="Add optional parameters"
-          isChecked={showOptionalFields}
-          onChange={(_event, checked) => setShowOptionalFields(checked)}
-        />
-      </div>
-
-      {/* Optional Fields Section */}
-      {showOptionalFields && (
-        <Card style={{ marginTop: '1.5rem' }}>
-          <CardTitle>Optional Parameters</CardTitle>
+      {/* Optional Parameters Expandable */}
+      <ExpandableSection
+        style={{ marginTop: '1.5rem' }}
+        toggleText="Optional Parameters"
+        isExpanded={showOptionalFields}
+        onToggle={(_event, isExpanded) => setShowOptionalFields(isExpanded)}
+      >
+        <Card>
           <CardBody>
             {optionalFields.length > 0 ? (
               <DynamicFormBuilder
@@ -227,65 +221,55 @@ export function ScenarioConfigStep({
             )}
           </CardBody>
         </Card>
-      )}
+      </ExpandableSection>
 
-      {/* Global Parameters Toggle */}
-      <div style={{ marginTop: '1.5rem' }}>
-        <Checkbox
-          id="show-global-parameters"
-          label="Add global parameters"
-          isChecked={showGlobalParameters}
-          onChange={(_event, checked) => setShowGlobalParameters(checked)}
-        />
-      </div>
-
-      {/* Global Parameters Section */}
-      {showGlobalParameters && (
-        <>
-          {loadingGlobals ? (
-            <Card style={{ marginTop: '1.5rem' }}>
-              <CardBody>
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                  <Spinner size="lg" />
-                  <div style={{ marginTop: '1rem' }}>Loading global parameters...</div>
-                </div>
-              </CardBody>
-            </Card>
-          ) : scenarioGlobals ? (
-            <>
-              {/* Required Global Fields */}
-              {requiredGlobalFields.length > 0 && (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardTitle>Required Global Parameters</CardTitle>
-                  <CardBody>
-                    <DynamicFormBuilderWithTracking
-                      fields={requiredGlobalFields}
-                      values={globalFormValues}
-                      touchedFields={globalTouchedFields}
-                      onChange={onGlobalFormChange}
-                    />
-                  </CardBody>
-                </Card>
-              )}
-
-              {/* Optional Global Fields */}
-              {optionalGlobalFields.length > 0 && (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardTitle>Optional Global Parameters</CardTitle>
-                  <CardBody>
-                    <DynamicFormBuilderWithTracking
-                      fields={optionalGlobalFields}
-                      values={globalFormValues}
-                      touchedFields={globalTouchedFields}
-                      onChange={onGlobalFormChange}
-                    />
-                  </CardBody>
-                </Card>
-              )}
-            </>
-          ) : null}
-        </>
-      )}
+      {/* Global Parameters Expandable */}
+      <ExpandableSection
+        style={{ marginTop: '1.5rem' }}
+        toggleText="Global Parameters"
+        isExpanded={showGlobalParameters}
+        onToggle={(_event, isExpanded) => setShowGlobalParameters(isExpanded)}
+      >
+        {loadingGlobals ? (
+          <Card>
+            <CardBody>
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <Spinner size="lg" />
+                <div style={{ marginTop: '1rem' }}>Loading global parameters...</div>
+              </div>
+            </CardBody>
+          </Card>
+        ) : scenarioGlobals ? (
+          <>
+            {requiredGlobalFields.length > 0 && (
+              <Card style={{ marginBottom: '1rem' }}>
+                <CardTitle>Required Global Parameters</CardTitle>
+                <CardBody>
+                  <DynamicFormBuilderWithTracking
+                    fields={requiredGlobalFields}
+                    values={globalFormValues}
+                    touchedFields={globalTouchedFields}
+                    onChange={onGlobalFormChange}
+                  />
+                </CardBody>
+              </Card>
+            )}
+            {optionalGlobalFields.length > 0 && (
+              <Card>
+                <CardTitle>Optional Global Parameters</CardTitle>
+                <CardBody>
+                  <DynamicFormBuilderWithTracking
+                    fields={optionalGlobalFields}
+                    values={globalFormValues}
+                    touchedFields={globalTouchedFields}
+                    onChange={onGlobalFormChange}
+                  />
+                </CardBody>
+              </Card>
+            )}
+          </>
+        ) : null}
+      </ExpandableSection>
     </div>
   );
 }
