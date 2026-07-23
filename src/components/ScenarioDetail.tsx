@@ -7,7 +7,7 @@ import {
   Button,
   Alert,
   Spinner,
-  Checkbox,
+  ExpandableSection,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
@@ -510,20 +510,14 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             </CardBody>
           </Card>
 
-          {/* Optional Fields Toggle */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <Checkbox
-              id="show-optional-fields"
-              label="Add optional parameters"
-              isChecked={showOptionalFields}
-              onChange={(_event, checked) => setShowOptionalFields(checked)}
-            />
-          </div>
-
-          {/* Optional Fields Section */}
-          {showOptionalFields && (
-            <Card style={{ marginTop: '1.5rem' }}>
-              <CardTitle>Optional Parameters</CardTitle>
+          {/* Optional Parameters Expandable */}
+          <ExpandableSection
+            style={{ marginTop: '1.5rem' }}
+            toggleText="Optional Parameters"
+            isExpanded={showOptionalFields}
+            onToggle={(_event, isExpanded) => setShowOptionalFields(isExpanded)}
+          >
+            <Card>
               <CardBody>
                 {scenarioDetail.fields.filter(field => !field.required).length > 0 ? (
                   <DynamicFormBuilder
@@ -538,65 +532,55 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 )}
               </CardBody>
             </Card>
-          )}
+          </ExpandableSection>
 
-          {/* Global Parameters Toggle */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <Checkbox
-              id="show-global-parameters"
-              label="Add global parameters"
-              isChecked={showGlobalParameters}
-              onChange={(_event, checked) => setShowGlobalParameters(checked)}
-            />
-          </div>
-
-          {/* Global Parameters Section */}
-          {showGlobalParameters && (
-            <>
-              {!scenarioGlobals ? (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardBody>
-                    <div style={{ textAlign: 'center', padding: '2rem' }}>
-                      <Spinner size="lg" />
-                      <div style={{ marginTop: '1rem' }}>Loading global parameters...</div>
-                    </div>
-                  </CardBody>
-                </Card>
-              ) : (
-                <>
-                  {/* Required Global Fields */}
-                  {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
-                    <Card style={{ marginTop: '1.5rem' }}>
-                      <CardTitle>Required Global Parameters</CardTitle>
-                      <CardBody>
-                        <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => field.required)}
-                          values={globalFormValues || {}}
-                          touchedFields={globalTouchedFields || {}}
-                          onChange={handleGlobalFormChange}
-                        />
-                      </CardBody>
-                    </Card>
-                  )}
-
-                  {/* Optional Global Fields */}
-                  {scenarioGlobals.fields.filter(field => !field.required).length > 0 && (
-                    <Card style={{ marginTop: '1.5rem' }}>
-                      <CardTitle>Optional Global Parameters</CardTitle>
-                      <CardBody>
-                        <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => !field.required)}
-                          values={globalFormValues || {}}
-                          touchedFields={globalTouchedFields || {}}
-                          onChange={handleGlobalFormChange}
-                        />
-                      </CardBody>
-                    </Card>
-                  )}
-                </>
-              )}
-            </>
-          )}
+          {/* Global Parameters Expandable */}
+          <ExpandableSection
+            style={{ marginTop: '1.5rem' }}
+            toggleText="Global Parameters"
+            isExpanded={showGlobalParameters}
+            onToggle={(_event, isExpanded) => setShowGlobalParameters(isExpanded)}
+          >
+            {!scenarioGlobals ? (
+              <Card>
+                <CardBody>
+                  <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    <Spinner size="lg" />
+                    <div style={{ marginTop: '1rem' }}>Loading global parameters...</div>
+                  </div>
+                </CardBody>
+              </Card>
+            ) : (
+              <>
+                {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
+                  <Card style={{ marginBottom: '1rem' }}>
+                    <CardTitle>Required Global Parameters</CardTitle>
+                    <CardBody>
+                      <DynamicFormBuilderWithTracking
+                        fields={scenarioGlobals.fields.filter(field => field.required)}
+                        values={globalFormValues || {}}
+                        touchedFields={globalTouchedFields || {}}
+                        onChange={handleGlobalFormChange}
+                      />
+                    </CardBody>
+                  </Card>
+                )}
+                {scenarioGlobals.fields.filter(field => !field.required).length > 0 && (
+                  <Card>
+                    <CardTitle>Optional Global Parameters</CardTitle>
+                    <CardBody>
+                      <DynamicFormBuilderWithTracking
+                        fields={scenarioGlobals.fields.filter(field => !field.required)}
+                        values={globalFormValues || {}}
+                        touchedFields={globalTouchedFields || {}}
+                        onChange={handleGlobalFormChange}
+                      />
+                    </CardBody>
+                  </Card>
+                )}
+              </>
+            )}
+          </ExpandableSection>
 
           {/* Preview Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
