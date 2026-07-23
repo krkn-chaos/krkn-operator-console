@@ -147,6 +147,7 @@ export function Login() {
         passwordValue={password}
         onChangePassword={(_, value) => setPassword(value)}
         isValidPassword={!errorMessage}
+        isShowPasswordEnabled
         isLoginButtonDisabled={isLoading}
         loginButtonLabel={isLoading ? 'Logging in...' : 'Log in'}
         onLoginButtonClick={handleSubmit}
