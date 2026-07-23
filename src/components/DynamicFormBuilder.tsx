@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Form,
   FormGroup,
+  SearchInput,
   TextInput,
   FormSelect,
   FormSelectOption,
@@ -10,6 +11,7 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
+  Title,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, StringField, EnumField } from '../types/api';
@@ -24,6 +26,23 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const initializedFieldsKey = useRef<string>('');
   const validationTimeouts = useRef<{ [key: string]: number }>({});
+
+  const disabledFields = useMemo(() => {
+    const disabled = new Set<string>();
+    for (const field of fields) {
+      if (
+        field.mutually_excludes &&
+        field.type === 'enum' &&
+        (field as EnumField).allowed_values === 'true,false'
+      ) {
+        const currentValue = values[field.variable] ?? field.default ?? '';
+        if (currentValue === 'true' || currentValue === true) {
+          disabled.add(field.mutually_excludes);
+        }
+      }
+    }
+    return disabled;
+  }, [fields, values]);
 
   /**
    * Safe regex test with timeout protection
@@ -65,6 +84,15 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
 
   const handleChange = (variable: string, value: string | number | boolean | File) => {
     const newValues = { ...values, [variable]: value };
+
+    const changedField = fields.find(f => f.variable === variable);
+    if (changedField?.mutually_excludes && (value === 'true' || value === true)) {
+      const excludedField = fields.find(f => f.variable === changedField.mutually_excludes);
+      if (excludedField) {
+        newValues[changedField.mutually_excludes] = excludedField.default ?? '';
+      }
+    }
+
     onChange(newValues);
 
     // Clear existing validation timeout for this field
@@ -97,14 +125,14 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
     }
   };
 
-  const renderField = (field: ScenarioField) => {
+  const renderField = (field: ScenarioField, isFieldDisabled: boolean = false) => {
     const value = values[field.variable] ?? field.default ?? '';
     const error = errors[field.variable];
     const validated = error ? 'error' : 'default';
 
     switch (field.type) {
       case 'string': {
-        const stringField = field as StringField; // Cast to access validator/validation_message
+        const stringField = field as StringField;
         return (
           <FormGroup
             key={field.variable}
@@ -120,6 +148,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               validated={validated}
               placeholder={field.default}
               autoComplete={field.secret ? 'off' : undefined}
+              isDisabled={isFieldDisabled}
             />
             {field.description && (
               <FormHelperText>
@@ -165,6 +194,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
               placeholder={field.default}
+              isDisabled={isFieldDisabled}
             />
             {field.description && (
               <FormHelperText>
@@ -186,10 +216,8 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
         );
 
       case 'enum': {
-        // Type narrowing: cast to EnumField to access allowed_values and separator
         const enumField = field as EnumField;
 
-        // Validate that enum field has required properties
         if (!enumField.allowed_values || !enumField.separator) {
           return (
             <FormGroup
@@ -229,6 +257,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               value={value as string}
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
+              isDisabled={isFieldDisabled}
             >
               {!field.required && <FormSelectOption key="empty" value="" label="Select an option" />}
               {options.map((option: string) => (
@@ -264,6 +293,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               description={field.description}
               isChecked={value === true || value === 'true'}
               onChange={(_event, checked) => handleChange(field.variable, checked)}
+              isDisabled={isFieldDisabled}
             />
           </FormGroup>
         );
@@ -283,6 +313,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
               filename={(value as File)?.name || ''}
               onFileInputChange={(_event, file: File) => handleChange(field.variable, file)}
               validated={validated}
+              isDisabled={isFieldDisabled}
             />
             {field.description && (
               <FormHelperText>
@@ -319,14 +350,12 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
   // Initialize form values with defaults
   // Only initialize once per unique fields configuration
   useEffect(() => {
-    // Create a stable key from fields including defaults, types, and secret flags
-    // to detect changes to field metadata, not just variable names
-    const fieldsKey = fields
+    const valueFields = fields.filter(f => f.type !== 'group');
+    const fieldsKey = valueFields
       .map(f => `${f.variable}:${f.type}:${f.default}:${f.secret}`)
       .sort()
       .join(',');
 
-    // Skip if already initialized for these exact fields
     if (initializedFieldsKey.current === fieldsKey) {
       return;
     }
@@ -334,14 +363,124 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
     initializedFieldsKey.current = fieldsKey;
 
     const initialValues: ScenarioFormValues = {};
-    fields.forEach((field) => {
+    valueFields.forEach((field) => {
       if (field.default !== undefined) {
         initialValues[field.variable] = field.default;
       }
     });
     onChange({ ...initialValues, ...values });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fields]); // Only run when fields change, not when onChange or values change
+  }, [fields]);
 
-  return <Form>{fields.map((field) => renderField(field))}</Form>;
+  const groupMembers = useMemo(() => {
+    const members = new Map<string, ScenarioField[]>();
+    for (const field of fields) {
+      if (field.type !== 'group' && field.group) {
+        const list = members.get(field.group) || [];
+        list.push(field);
+        members.set(field.group, list);
+      }
+    }
+    return members;
+  }, [fields]);
+
+  return (
+    <Form>
+      {fields.map((field) => {
+        if (field.type === 'group') {
+          const members = groupMembers.get(field.variable) || [];
+          return (
+            <ScrollableFieldGroup
+              key={field.variable}
+              groupField={field}
+              members={members}
+              disabledFields={disabledFields}
+              renderField={renderField}
+            />
+          );
+        }
+        if (field.group) {
+          return null;
+        }
+        return renderField(field, disabledFields.has(field.variable));
+      })}
+    </Form>
+  );
+}
+
+const GROUP_CONTAINER_HEIGHT = 400;
+
+function ScrollableFieldGroup({
+  groupField,
+  members,
+  disabledFields,
+  renderField,
+}: {
+  groupField: ScenarioField;
+  members: ScenarioField[];
+  disabledFields: Set<string>;
+  renderField: (field: ScenarioField, isDisabled: boolean) => React.ReactNode;
+}) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search) return members;
+    const lower = search.toLowerCase();
+    return members.filter(
+      (m) =>
+        m.short_description.toLowerCase().includes(lower) ||
+        m.variable.toLowerCase().includes(lower)
+    );
+  }, [members, search]);
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--pf-v5-global--BorderColor--100)',
+        borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+        marginBottom: '1rem',
+      }}
+    >
+      <div
+        style={{
+          borderLeft: '4px solid var(--pf-v5-global--primary-color--100)',
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid var(--pf-v5-global--BorderColor--100)',
+          background: 'var(--pf-v5-global--BackgroundColor--200)',
+        }}
+      >
+        <Title headingLevel="h2" size="xl" id={`group-${groupField.variable}-title`}>
+          {groupField.short_description}
+        </Title>
+        <p style={{ marginTop: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+          {groupField.description}
+        </p>
+      </div>
+      <div style={{ padding: '1rem' }}>
+        <SearchInput
+          placeholder="Filter fields..."
+          value={search}
+          onChange={(_event, value) => setSearch(value)}
+          onClear={() => setSearch('')}
+          style={{ marginBottom: '0.75rem' }}
+        />
+        <div
+          style={{
+            maxHeight: `${GROUP_CONTAINER_HEIGHT}px`,
+            overflowY: 'auto',
+          }}
+        >
+          {filtered.length > 0 ? (
+            filtered.map((m) => renderField(m, disabledFields.has(m.variable)))
+          ) : (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>No fields match your search.</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

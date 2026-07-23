@@ -113,6 +113,8 @@ function mapCustomSchemaType(type: number | string): FieldType {
         return 'enum';
       case 'boolean':
         return 'boolean';
+      case 'group':
+        return 'group';
       default:
         return 'string';
     }
@@ -157,6 +159,9 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
         type: fieldType,
         default: customField.default,
         required: customField.required,
+        secret: customField.secret,
+        group: customField.group,
+        mutually_excludes: customField.mutually_excludes,
       } as ScenarioField;
 
       // Add enum-specific fields

@@ -53,7 +53,9 @@ export interface CustomSchemaField {
   separator?: string;
   allowed_values?: string;
   required?: boolean;
-  secret?: boolean; // For password fields
+  secret?: boolean;
+  group?: string;
+  mutually_excludes?: string;
 }
 
 // Provider config data from GET /provider-config/{uuid}

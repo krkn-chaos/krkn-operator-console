@@ -113,7 +113,7 @@ export interface ScenariosResponse {
 
 // Scenario Detail Types
 
-export type FieldType = 'string' | 'enum' | 'number' | 'file' | 'file_base64' | 'boolean';
+export type FieldType = 'string' | 'enum' | 'number' | 'file' | 'file_base64' | 'boolean' | 'group';
 
 export interface BaseField {
   name: string;
@@ -125,6 +125,8 @@ export interface BaseField {
   required?: boolean;
   type: FieldType;
   secret?: boolean;
+  group?: string;
+  mutually_excludes?: string;
 }
 
 export interface StringField extends BaseField {
@@ -155,7 +157,11 @@ export interface BooleanField extends BaseField {
   type: 'boolean';
 }
 
-export type ScenarioField = StringField | EnumField | NumberField | FileField | FileBase64Field | BooleanField;
+export interface GroupField extends BaseField {
+  type: 'group';
+}
+
+export type ScenarioField = StringField | EnumField | NumberField | FileField | FileBase64Field | BooleanField | GroupField;
 
 export interface ScenarioDetail {
   name: string;

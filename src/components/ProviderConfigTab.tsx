@@ -37,10 +37,14 @@ export function ProviderConfigTab({ provider, schema, uuid }: ProviderConfigTabP
 
     setIsSubmitting(true);
     try {
-      // Serialize all values to strings as required by API
+      const groupVariables = new Set(
+        schema.fields.filter(f => f.type === 'group').map(f => f.variable)
+      );
       const serializedValues: { [key: string]: string } = {};
       Object.entries(formValues).forEach(([key, value]) => {
-        serializedValues[key] = String(value);
+        if (!groupVariables.has(key)) {
+          serializedValues[key] = String(value);
+        }
       });
 
       await providersApi.submitProviderConfig(uuid, provider.name, serializedValues);
