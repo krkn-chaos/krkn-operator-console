@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardTitle,
@@ -7,7 +7,6 @@ import {
   Button,
   Alert,
   Spinner,
-  Checkbox,
   Modal,
   ModalVariant,
 } from '@patternfly/react-core';
@@ -16,9 +15,9 @@ import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { useNotifications } from '../hooks';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
-import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { FileSelector } from './FileSelector';
+import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField } from '../types/api';
 
@@ -53,6 +52,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [showPreview, setShowPreview] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
+  const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [conflictWarning, setConflictWarning] = useState<{
@@ -108,32 +108,48 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   }, [scenarioName, registryConfig, dispatch]);
 
   useEffect(() => {
+    if (!showGlobalParameters || scenarioGlobals) {
+      return;
+    }
+
+    let mounted = true;
+
     const fetchGlobalParameters = async () => {
-      if (!showGlobalParameters || scenarioGlobals) {
-        return;
-      }
+      setLoadingGlobals(true);
 
       try {
         const globals = await operatorApi.getScenarioGlobals(
           scenarioName,
           registryConfig || {}
         );
-        dispatch({
-          type: 'SCENARIO_GLOBALS_SUCCESS',
-          payload: { scenarioGlobals: globals }
-        });
+        if (mounted) {
+          dispatch({
+            type: 'SCENARIO_GLOBALS_SUCCESS',
+            payload: { scenarioGlobals: globals }
+          });
+        }
       } catch (error) {
-        dispatch({
-          type: 'SCENARIO_GLOBALS_ERROR',
-          payload: {
-            message: error instanceof Error ? error.message : 'Failed to load global parameters',
-            type: 'api_error',
-          },
-        });
+        if (mounted) {
+          dispatch({
+            type: 'SCENARIO_GLOBALS_ERROR',
+            payload: {
+              message: error instanceof Error ? error.message : 'Failed to load global parameters',
+              type: 'api_error',
+            },
+          });
+        }
+      } finally {
+        if (mounted) {
+          setLoadingGlobals(false);
+        }
       }
     };
 
     fetchGlobalParameters();
+
+    return () => {
+      mounted = false;
+    };
   }, [showGlobalParameters, scenarioName, registryConfig, scenarioGlobals, dispatch]);
 
   const handleFormChange = (values: ScenarioFormValues) => {
@@ -316,7 +332,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         }
       }
 
-      if (showGlobalParameters && scenarioGlobals && globalTouchedFields && globalFormValues) {
+      const hasGlobalChanges = globalTouchedFields && Object.values(globalTouchedFields).some(Boolean);
+      if (hasGlobalChanges && scenarioGlobals && globalFormValues) {
         for (const field of scenarioGlobals.fields) {
           if (!globalTouchedFields[field.variable]) continue;
           const value = globalFormValues[field.variable];
@@ -403,6 +420,21 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       setIsSubmitting(false);
     }
   };
+
+  const optionalFields = useMemo(
+    () => scenarioDetail?.fields.filter(field => !field.required) || [],
+    [scenarioDetail?.fields]
+  );
+
+  const requiredGlobalFields = useMemo(
+    () => scenarioGlobals?.fields.filter(field => field.required) || [],
+    [scenarioGlobals?.fields]
+  );
+
+  const optionalGlobalFields = useMemo(
+    () => scenarioGlobals?.fields.filter(field => !field.required) || [],
+    [scenarioGlobals?.fields]
+  );
 
   if (!scenarioDetail) {
     return (
@@ -519,93 +551,21 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             </CardBody>
           </Card>
 
-          {/* Optional Fields Toggle */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <Checkbox
-              id="show-optional-fields"
-              label="Add optional parameters"
-              isChecked={showOptionalFields}
-              onChange={(_event, checked) => setShowOptionalFields(checked)}
-            />
-          </div>
-
-          {/* Optional Fields Section */}
-          {showOptionalFields && (
-            <Card style={{ marginTop: '1.5rem' }}>
-              <CardTitle>Optional Parameters</CardTitle>
-              <CardBody>
-                {scenarioDetail.fields.filter(field => !field.required).length > 0 ? (
-                  <DynamicFormBuilder
-                    fields={scenarioDetail.fields.filter(field => !field.required)}
-                    values={scenarioFormValues || {}}
-                    onChange={handleFormChange}
-                  />
-                ) : (
-                  <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
-                    No optional parameters available for this scenario
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Global Parameters Toggle */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <Checkbox
-              id="show-global-parameters"
-              label="Add global parameters"
-              isChecked={showGlobalParameters}
-              onChange={(_event, checked) => setShowGlobalParameters(checked)}
-            />
-          </div>
-
-          {/* Global Parameters Section */}
-          {showGlobalParameters && (
-            <>
-              {!scenarioGlobals ? (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardBody>
-                    <div style={{ textAlign: 'center', padding: '2rem' }}>
-                      <Spinner size="lg" />
-                      <div style={{ marginTop: '1rem' }}>Loading global parameters...</div>
-                    </div>
-                  </CardBody>
-                </Card>
-              ) : (
-                <>
-                  {/* Required Global Fields */}
-                  {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
-                    <Card style={{ marginTop: '1.5rem' }}>
-                      <CardTitle>Required Global Parameters</CardTitle>
-                      <CardBody>
-                        <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => field.required)}
-                          values={globalFormValues || {}}
-                          touchedFields={globalTouchedFields || {}}
-                          onChange={handleGlobalFormChange}
-                        />
-                      </CardBody>
-                    </Card>
-                  )}
-
-                  {/* Optional Global Fields */}
-                  {scenarioGlobals.fields.filter(field => !field.required).length > 0 && (
-                    <Card style={{ marginTop: '1.5rem' }}>
-                      <CardTitle>Optional Global Parameters</CardTitle>
-                      <CardBody>
-                        <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => !field.required)}
-                          values={globalFormValues || {}}
-                          touchedFields={globalTouchedFields || {}}
-                          onChange={handleGlobalFormChange}
-                        />
-                      </CardBody>
-                    </Card>
-                  )}
-                </>
-              )}
-            </>
-          )}
+          <ScenarioParameterSections
+            optionalFields={optionalFields}
+            formValues={scenarioFormValues || {}}
+            onFormChange={handleFormChange}
+            requiredGlobalFields={requiredGlobalFields}
+            optionalGlobalFields={optionalGlobalFields}
+            globalFormValues={globalFormValues || {}}
+            globalTouchedFields={globalTouchedFields || {}}
+            onGlobalFormChange={handleGlobalFormChange}
+            loadingGlobals={loadingGlobals}
+            showOptionalFields={showOptionalFields}
+            onToggleOptional={(isExpanded) => setShowOptionalFields(isExpanded)}
+            showGlobalParameters={showGlobalParameters}
+            onToggleGlobal={(isExpanded) => setShowGlobalParameters(isExpanded)}
+          />
 
           {/* Preview Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>

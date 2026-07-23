@@ -253,44 +253,45 @@ describe('ScenarioDetail', () => {
   });
 
   describe('Optional Fields Section', () => {
-    it('should render optional fields checkbox', () => {
+    it('should render optional parameters toggle', () => {
       renderWithContext();
 
-      expect(screen.getByLabelText('Add optional parameters')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Optional Parameters/i })).toBeInTheDocument();
     });
 
-    it('should show optional fields when checkbox clicked', async () => {
+    it('should expand optional fields when toggle clicked', async () => {
       const user = userEvent.setup();
       renderWithContext();
 
-      const checkbox = screen.getByLabelText('Add optional parameters');
-      await user.click(checkbox);
+      const toggle = screen.getByRole('button', { name: /Optional Parameters/i });
+      await user.click(toggle);
 
-      expect(screen.getByText('Optional Parameters')).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
     });
 
     it('should hide optional fields by default', () => {
       renderWithContext();
 
-      expect(screen.queryByText('Optional Parameters')).not.toBeInTheDocument();
+      const toggle = screen.getByRole('button', { name: /Optional Parameters/i });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
     });
   });
 
   describe('Global Parameters Section', () => {
-    it('should render global parameters checkbox', () => {
+    it('should render global parameters toggle', () => {
       renderWithContext();
 
-      expect(screen.getByLabelText('Add global parameters')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Global Parameters/i })).toBeInTheDocument();
     });
 
-    it('should fetch global parameters when checkbox clicked', async () => {
+    it('should fetch global parameters when toggle expanded', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.getScenarioGlobals).mockResolvedValueOnce(mockScenarioGlobals);
 
       renderWithContext();
 
-      const checkbox = screen.getByLabelText('Add global parameters');
-      await user.click(checkbox);
+      const toggle = screen.getByRole('button', { name: /Global Parameters/i });
+      await user.click(toggle);
 
       await waitFor(() => {
         expect(operatorApi.getScenarioGlobals).toHaveBeenCalledWith('pod-scenarios', {});
@@ -312,8 +313,8 @@ describe('ScenarioDetail', () => {
 
       renderWithContext();
 
-      const checkbox = screen.getByLabelText('Add global parameters');
-      await user.click(checkbox);
+      const toggle = screen.getByRole('button', { name: /Global Parameters/i });
+      await user.click(toggle);
 
       expect(screen.getByText('Loading global parameters...')).toBeInTheDocument();
 
@@ -332,8 +333,8 @@ describe('ScenarioDetail', () => {
 
       renderWithContext();
 
-      const checkbox = screen.getByLabelText('Add global parameters');
-      await user.click(checkbox);
+      const toggle = screen.getByRole('button', { name: /Global Parameters/i });
+      await user.click(toggle);
 
       await waitFor(() => {
         expect(mockDispatch).toHaveBeenCalledWith({
@@ -350,8 +351,8 @@ describe('ScenarioDetail', () => {
       const user = userEvent.setup();
       renderWithContext({ scenarioGlobals: mockScenarioGlobals });
 
-      const checkbox = screen.getByLabelText('Add global parameters');
-      await user.click(checkbox);
+      const toggle = screen.getByRole('button', { name: /Global Parameters/i });
+      await user.click(toggle);
 
       // Should not call API again
       expect(operatorApi.getScenarioGlobals).not.toHaveBeenCalled();
@@ -797,8 +798,8 @@ describe('ScenarioDetail', () => {
       });
 
       // Enable global parameters first
-      const globalParamsCheckbox = screen.getByLabelText(/Add global parameters/i);
-      await user.click(globalParamsCheckbox);
+      const globalParamsToggle = screen.getByRole('button', { name: /Global Parameters/i });
+      await user.click(globalParamsToggle);
 
       const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
       await user.click(previewButton);

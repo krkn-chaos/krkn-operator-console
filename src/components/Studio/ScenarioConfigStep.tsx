@@ -12,10 +12,9 @@ import {
   Card,
   CardTitle,
   CardBody,
-  Checkbox,
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from '../DynamicFormBuilder';
-import { DynamicFormBuilderWithTracking } from '../DynamicFormBuilderWithTracking';
+import { ScenarioParameterSections } from '../ScenarioParameterSections';
 import { operatorApi } from '../../services/operatorApi';
 import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields } from '../../types/api';
 
@@ -199,93 +198,21 @@ export function ScenarioConfigStep({
         </CardBody>
       </Card>
 
-      {/* Optional Fields Toggle */}
-      <div style={{ marginTop: '1.5rem' }}>
-        <Checkbox
-          id="show-optional-fields"
-          label="Add optional parameters"
-          isChecked={showOptionalFields}
-          onChange={(_event, checked) => setShowOptionalFields(checked)}
-        />
-      </div>
-
-      {/* Optional Fields Section */}
-      {showOptionalFields && (
-        <Card style={{ marginTop: '1.5rem' }}>
-          <CardTitle>Optional Parameters</CardTitle>
-          <CardBody>
-            {optionalFields.length > 0 ? (
-              <DynamicFormBuilder
-                fields={optionalFields}
-                values={formValues}
-                onChange={onFormChange}
-              />
-            ) : (
-              <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
-                No optional parameters available for this scenario
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Global Parameters Toggle */}
-      <div style={{ marginTop: '1.5rem' }}>
-        <Checkbox
-          id="show-global-parameters"
-          label="Add global parameters"
-          isChecked={showGlobalParameters}
-          onChange={(_event, checked) => setShowGlobalParameters(checked)}
-        />
-      </div>
-
-      {/* Global Parameters Section */}
-      {showGlobalParameters && (
-        <>
-          {loadingGlobals ? (
-            <Card style={{ marginTop: '1.5rem' }}>
-              <CardBody>
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                  <Spinner size="lg" />
-                  <div style={{ marginTop: '1rem' }}>Loading global parameters...</div>
-                </div>
-              </CardBody>
-            </Card>
-          ) : scenarioGlobals ? (
-            <>
-              {/* Required Global Fields */}
-              {requiredGlobalFields.length > 0 && (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardTitle>Required Global Parameters</CardTitle>
-                  <CardBody>
-                    <DynamicFormBuilderWithTracking
-                      fields={requiredGlobalFields}
-                      values={globalFormValues}
-                      touchedFields={globalTouchedFields}
-                      onChange={onGlobalFormChange}
-                    />
-                  </CardBody>
-                </Card>
-              )}
-
-              {/* Optional Global Fields */}
-              {optionalGlobalFields.length > 0 && (
-                <Card style={{ marginTop: '1.5rem' }}>
-                  <CardTitle>Optional Global Parameters</CardTitle>
-                  <CardBody>
-                    <DynamicFormBuilderWithTracking
-                      fields={optionalGlobalFields}
-                      values={globalFormValues}
-                      touchedFields={globalTouchedFields}
-                      onChange={onGlobalFormChange}
-                    />
-                  </CardBody>
-                </Card>
-              )}
-            </>
-          ) : null}
-        </>
-      )}
+      <ScenarioParameterSections
+        optionalFields={optionalFields}
+        formValues={formValues}
+        onFormChange={onFormChange}
+        requiredGlobalFields={requiredGlobalFields}
+        optionalGlobalFields={optionalGlobalFields}
+        globalFormValues={globalFormValues}
+        globalTouchedFields={globalTouchedFields}
+        onGlobalFormChange={onGlobalFormChange}
+        loadingGlobals={loadingGlobals}
+        showOptionalFields={showOptionalFields}
+        onToggleOptional={(isExpanded) => setShowOptionalFields(isExpanded)}
+        showGlobalParameters={showGlobalParameters}
+        onToggleGlobal={(isExpanded) => setShowGlobalParameters(isExpanded)}
+      />
     </div>
   );
 }
