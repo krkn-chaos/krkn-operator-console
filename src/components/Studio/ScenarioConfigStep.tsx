@@ -13,11 +13,18 @@ import {
   CardTitle,
   CardBody,
   Checkbox,
+  FormGroup,
+  FormSelect,
+  FormSelectOption,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from '../DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from '../DynamicFormBuilderWithTracking';
 import { operatorApi } from '../../services/operatorApi';
-import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields } from '../../types/api';
+import { elasticsearchApi } from '../../services/elasticsearchApi';
+import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig } from '../../types/api';
 
 interface ScenarioConfigStepProps {
   scenarioName: string;
@@ -47,6 +54,9 @@ export function ScenarioConfigStep({
   const [error, setError] = useState<string | null>(null);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
+  const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
+  const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
+  const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
   // Fetch scenario detail when scenario changes
   useEffect(() => {
@@ -134,6 +144,42 @@ export function ScenarioConfigStep({
       mounted = false;
     };
   }, [showGlobalParameters, scenarioName, scenarioGlobals, registryName]); // Only primitive dependencies
+
+  // Load ES configs once when global parameters are first shown
+  useEffect(() => {
+    if (!showGlobalParameters) return;
+    elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => {});
+  }, [showGlobalParameters]);
+
+  const hasEsGlobalFields = scenarioGlobals?.fields.some(
+    (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
+  ) ?? false;
+
+  const applyEsConfig = (configName: string) => {
+    setSelectedEsConfigName(configName);
+    if (!configName) return;
+    const cfg = esConfigs.find((c) => c.name === configName);
+    if (!cfg) return;
+
+    setAppliedEsConfigName(configName);
+    const patch: ScenarioFormValues = {
+      ...globalFormValues,
+      ENABLE_ES: 'True',
+      ES_SERVER: cfg.host ?? '',
+      ES_PORT: String(cfg.port ?? 9200),
+      ES_USERNAME: cfg.username ?? '',
+      ES_METRICS_INDEX: cfg.metricsIndex ?? '',
+      ES_ALERTS_INDEX: cfg.alertsIndex ?? '',
+      ES_TELEMETRY_INDEX: cfg.telemetryIndex ?? '',
+    };
+
+    const touched: TouchedFields = { ...globalTouchedFields };
+    for (const key of Object.keys(patch)) {
+      touched[key] = true;
+    }
+
+    onGlobalFormChange(patch, touched);
+  };
 
   // Memoize filtered field arrays to prevent infinite loops
   // MUST be before any conditional returns (hooks order must be consistent)
@@ -253,6 +299,37 @@ export function ScenarioConfigStep({
             </Card>
           ) : scenarioGlobals ? (
             <>
+              {/* ES Config Picker - only shown when globals contain ES fields */}
+              {hasEsGlobalFields && esConfigs.length > 0 && (
+                <Card style={{ marginTop: '1.5rem' }}>
+                  <CardTitle>Load Elasticsearch Config</CardTitle>
+                  <CardBody>
+                    <FormGroup label="Load from saved config" fieldId="es-config-picker">
+                      <FormSelect
+                        id="es-config-picker"
+                        value={selectedEsConfigName}
+                        onChange={(_e, v) => applyEsConfig(v)}
+                        style={{ maxWidth: '500px' }}
+                      >
+                        <FormSelectOption value="" label="Select a saved Elasticsearch config…" />
+                        {esConfigs.map((c) => (
+                          <FormSelectOption key={c.name} value={c.name} label={`${c.name} — ${c.host}`} />
+                        ))}
+                      </FormSelect>
+                      {appliedEsConfigName && (
+                        <FormHelperText>
+                          <HelperText>
+                            <HelperTextItem variant="success">
+                              ES_PASSWORD will be injected automatically from &quot;{appliedEsConfigName}&quot;
+                            </HelperTextItem>
+                          </HelperText>
+                        </FormHelperText>
+                      )}
+                    </FormGroup>
+                  </CardBody>
+                </Card>
+              )}
+
               {/* Required Global Fields */}
               {requiredGlobalFields.length > 0 && (
                 <Card style={{ marginTop: '1.5rem' }}>
@@ -263,6 +340,7 @@ export function ScenarioConfigStep({
                       values={globalFormValues}
                       touchedFields={globalTouchedFields}
                       onChange={onGlobalFormChange}
+                      disabledFields={appliedEsConfigName ? ['ES_PASSWORD'] : []}
                     />
                   </CardBody>
                 </Card>
@@ -278,6 +356,7 @@ export function ScenarioConfigStep({
                       values={globalFormValues}
                       touchedFields={globalTouchedFields}
                       onChange={onGlobalFormChange}
+                      disabledFields={appliedEsConfigName ? ['ES_PASSWORD'] : []}
                     />
                   </CardBody>
                 </Card>

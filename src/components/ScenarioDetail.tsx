@@ -8,6 +8,12 @@ import {
   Alert,
   Spinner,
   Checkbox,
+  FormGroup,
+  FormSelect,
+  FormSelectOption,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
@@ -17,7 +23,9 @@ import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { FileSelector } from './FileSelector';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField } from '../types/api';
+import { elasticsearchApi } from '../services/elasticsearchApi';
+
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig } from '../types/api';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -84,6 +92,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       setValidationWarnings([]);
     }
   }, [hasPendingFileInput, pendingFileWarningShown]);
+  const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
+  const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
+  const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -140,6 +151,52 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
     fetchGlobalParameters();
   }, [showGlobalParameters, scenarioName, registryConfig, scenarioGlobals, dispatch]);
+
+  // Load ES configs once when global parameters are first shown
+  useEffect(() => {
+    if (!showGlobalParameters) return;
+    elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
+  }, [showGlobalParameters]);
+
+  // Ensures fields whose variable name contains "PASSWORD" are always rendered as secret inputs,
+  // regardless of whether the scenario definition sets secret:true.
+  const withSecretNormalized = (fields: NonNullable<typeof scenarioGlobals>['fields']) =>
+    fields.map((f) =>
+      f.variable.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
+    );
+
+  // Returns true when the loaded globals contain at least one ES-related variable
+  const hasEsGlobalFields = scenarioGlobals?.fields.some(
+    (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
+  ) ?? false;
+
+  const applyEsConfig = (configName: string) => {
+    setSelectedEsConfigName(configName);
+    if (!configName) return;
+    const cfg = esConfigs.find((c) => c.name === configName);
+    if (!cfg) return;
+
+    // Password is injected server-side via elasticsearchConfigName — never sent by the client.
+    setAppliedEsConfigName(configName);
+    const patch: ScenarioFormValues = {
+      ...globalFormValues,
+      ENABLE_ES: 'True',
+      ES_SERVER: cfg.host ?? '',
+      ES_PORT: String(cfg.port ?? 9200),
+      ES_USERNAME: cfg.username ?? '',
+      ES_METRICS_INDEX: cfg.metricsIndex ?? '',
+      ES_ALERTS_INDEX: cfg.alertsIndex ?? '',
+      ES_TELEMETRY_INDEX: cfg.telemetryIndex ?? '',
+    };
+
+    // Mark each applied field as touched so it is included in the run request
+    const touched: TouchedFields = { ...(globalTouchedFields || {}) };
+    for (const key of Object.keys(patch)) {
+      touched[key] = true;
+    }
+
+    dispatch({ type: 'UPDATE_GLOBAL_FORM', payload: { formValues: patch, touchedFields: touched } });
+  };
 
   const handleFormChange = (values: ScenarioFormValues) => {
     dispatch({
@@ -355,6 +412,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         targetClusters[cluster.operatorName].push(cluster.clusterName);
       });
 
+      // When a saved ES config is used, the backend injects ES_PASSWORD server-side.
+      if (appliedEsConfigName) {
+        delete environment['ES_PASSWORD'];
+      }
+
+      // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid,
         targetClusters,
@@ -363,7 +426,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         kubeconfigPath: '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
-        registryName: registryConfig?.registryName,
+        registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
+        elasticsearchConfigName: appliedEsConfigName || undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -564,16 +628,55 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 </Card>
               ) : (
                 <>
+                  {/* ES Config Picker - only shown when globals contain ES fields */}
+                  {hasEsGlobalFields && esConfigs.length > 0 && (
+                    <Card style={{ marginTop: '1.5rem' }}>
+                      <CardTitle>Load Elasticsearch Config</CardTitle>
+                      <CardBody>
+                        <FormGroup
+                          label="Load from saved config"
+                          fieldId="es-config-picker"
+                        >
+                          <FormSelect
+                            id="es-config-picker"
+                            value={selectedEsConfigName}
+                            onChange={(_e, v) => applyEsConfig(v)}
+                            style={{ maxWidth: '500px' }}
+                          >
+                            <FormSelectOption value="" label="Select a saved Elasticsearch config…" />
+                            {esConfigs.map((c) => (
+                              <FormSelectOption
+                                key={c.name}
+                                value={c.name}
+                                label={`${c.name} — ${c.host}`}
+                              />
+                            ))}
+                          </FormSelect>
+                          {appliedEsConfigName && (
+                            <FormHelperText>
+                              <HelperText>
+                                <HelperTextItem variant="success">
+                                  ES_PASSWORD will be injected automatically from &quot;{appliedEsConfigName}&quot;
+                                </HelperTextItem>
+                              </HelperText>
+                            </FormHelperText>
+                          )}
+                        </FormGroup>
+                      </CardBody>
+                    </Card>
+                  )}
+
                   {/* Required Global Fields */}
                   {scenarioGlobals.fields.filter(field => field.required).length > 0 && (
                     <Card style={{ marginTop: '1.5rem' }}>
                       <CardTitle>Required Global Parameters</CardTitle>
                       <CardBody>
                         <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => field.required)}
+                          fields={withSecretNormalized(scenarioGlobals.fields.filter(field => field.required))}
                           values={globalFormValues || {}}
                           touchedFields={globalTouchedFields || {}}
                           onChange={handleGlobalFormChange}
+                          disabledFields={appliedEsConfigName ? ['ES_PASSWORD'] : []}
                         />
                       </CardBody>
                     </Card>
@@ -585,10 +688,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                       <CardTitle>Optional Global Parameters</CardTitle>
                       <CardBody>
                         <DynamicFormBuilderWithTracking
-                          fields={scenarioGlobals.fields.filter(field => !field.required)}
+                          fields={withSecretNormalized(scenarioGlobals.fields.filter(field => !field.required))}
                           values={globalFormValues || {}}
                           touchedFields={globalTouchedFields || {}}
                           onChange={handleGlobalFormChange}
+                          disabledFields={appliedEsConfigName ? ['ES_PASSWORD'] : []}
                         />
                       </CardBody>
                     </Card>
