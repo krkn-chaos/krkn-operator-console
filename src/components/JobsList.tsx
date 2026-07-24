@@ -32,6 +32,7 @@ import {
   Dropdown,
   DropdownList,
   DropdownItem,
+  TextInput,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -118,6 +119,10 @@ export function JobsList({
   const [ownerFilter, setOwnerFilter] = useState<string>('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
+  const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
+  const [sortField, setSortField] = useState<'date' | 'runName'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [isSortSelectOpen, setIsSortSelectOpen] = useState(false);
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
   const [isFileManagementOpen, setIsFileManagementOpen] = useState(false);
@@ -226,11 +231,18 @@ export function JobsList({
     new Set(scenarioRuns.map((run) => run.ownerUserId).filter((id): id is string => !!id))
   ).sort();
 
-  // Filter scenario runs by owner and date range
+  // Filter scenario runs by owner, date range, and custom run name
   const filteredScenarioRuns = scenarioRuns.filter((run) => {
     // Owner filter (exact match)
     if (ownerFilter && run.ownerUserId !== ownerFilter) {
       return false;
+    }
+
+    // Custom run name filter (case-insensitive substring match on customRunName or scenarioRunName)
+    if (customRunNameFilter) {
+      const needle = customRunNameFilter.toLowerCase();
+      const haystack = (run.customRunName || run.scenarioRunName).toLowerCase();
+      if (!haystack.includes(needle)) return false;
     }
 
     // Date range filter
@@ -343,13 +355,25 @@ export function JobsList({
       items.push({ type: 'scenario', run });
     });
 
-    // Sort by createdAt descending (most recent first)
+    // Sort by selected field
     return items.sort((a, b) => {
-      const aDate = a.type === 'graph' ? a.createdAt : a.run.createdAt;
-      const bDate = b.type === 'graph' ? b.createdAt : b.run.createdAt;
-      return bDate.localeCompare(aDate); // Reversed for descending
+      let cmp = 0;
+      if (sortField === 'runName') {
+        const aName = a.type === 'graph'
+          ? a.graphRunName
+          : (a.run.customRunName || a.run.scenarioRunName);
+        const bName = b.type === 'graph'
+          ? b.graphRunName
+          : (b.run.customRunName || b.run.scenarioRunName);
+        cmp = aName.localeCompare(bName);
+      } else {
+        const aDate = a.type === 'graph' ? a.createdAt : a.run.createdAt;
+        const bDate = b.type === 'graph' ? b.createdAt : b.run.createdAt;
+        cmp = aDate.localeCompare(bDate);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [filteredScenarioRuns, _graphRuns]);
+  }, [filteredScenarioRuns, _graphRuns, sortField, sortDir]);
 
   return (
     <Card>
@@ -432,8 +456,8 @@ export function JobsList({
           error={activeRunsError}
         />
 
-        {/* Filters Box (Admin Only) */}
-        {isAdmin && (uniqueOwners.length > 0 || scenarioRuns.length > 0) && (
+        {/* Filters Box */}
+        {scenarioRuns.length > 0 && (
           <Card
             isCompact
             style={{
@@ -454,8 +478,64 @@ export function JobsList({
                 }
               `}</style>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                {/* Owner Filter - Search with Autocomplete */}
-                {uniqueOwners.length > 0 && (
+                {/* Run Name Filter */}
+                <div>
+                  <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
+                    Filter by Run Name:
+                  </div>
+                  <TextInput
+                    type="text"
+                    value={customRunNameFilter}
+                    onChange={(_event, value) => setCustomRunNameFilter(value)}
+                    placeholder="Search by run name…"
+                    aria-label="Filter by run name"
+                    style={{ width: '222px' }}
+                  />
+                </div>
+
+                {/* Sort Controls */}
+                <div>
+                  <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
+                    Sort by:
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <Select
+                      isOpen={isSortSelectOpen}
+                      onOpenChange={(isOpen) => setIsSortSelectOpen(isOpen)}
+                      onSelect={(_event, value) => {
+                        setSortField(value as 'date' | 'runName');
+                        setIsSortSelectOpen(false);
+                      }}
+                      toggle={(toggleRef) => (
+                        <MenuToggle
+                          ref={toggleRef}
+                          onClick={() => setIsSortSelectOpen(!isSortSelectOpen)}
+                          isExpanded={isSortSelectOpen}
+                          style={{ width: '130px' }}
+                          className="custom-select-toggle"
+                        >
+                          {sortField === 'date' ? 'Date' : 'Run Name'}
+                        </MenuToggle>
+                      )}
+                    >
+                      <SelectList>
+                        <SelectOption value="date">Date</SelectOption>
+                        <SelectOption value="runName">Run Name</SelectOption>
+                      </SelectList>
+                    </Select>
+                    <Button
+                      variant="plain"
+                      aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+                      onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                      style={{ padding: '0.375rem 0.5rem' }}
+                    >
+                      {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Owner Filter - Search with Autocomplete (Admin Only) */}
+                {isAdmin && uniqueOwners.length > 0 && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       Filter by User:
@@ -502,8 +582,8 @@ export function JobsList({
                   </div>
                 )}
 
-                {/* Date From Filter */}
-                {scenarioRuns.length > 0 && (
+                {/* Date From Filter (Admin Only) */}
+                {isAdmin && scenarioRuns.length > 0 && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       From Date:
@@ -521,8 +601,8 @@ export function JobsList({
                   </div>
                 )}
 
-                {/* Date To Filter */}
-                {scenarioRuns.length > 0 && (
+                {/* Date To Filter (Admin Only) */}
+                {isAdmin && scenarioRuns.length > 0 && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       To Date:
@@ -542,7 +622,7 @@ export function JobsList({
               </div>
 
               {/* Clear filters button */}
-              {(ownerFilter || dateFrom || dateTo) && (
+              {(ownerFilter || dateFrom || dateTo || customRunNameFilter) && (
                 <div style={{ marginTop: '1rem' }}>
                   <Button
                     variant="link"
@@ -551,6 +631,7 @@ export function JobsList({
                       setOwnerFilter('');
                       setDateFrom('');
                       setDateTo('');
+                      setCustomRunNameFilter('');
                     }}
                   >
                     Clear all filters
@@ -838,20 +919,52 @@ export function JobsList({
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Run Name:</strong>
                             </div>
-                            <code
-                              style={{
-                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                padding: '0.125rem 0.5rem',
-                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                display: 'inline-block',
-                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {run.scenarioRunName}
-                            </code>
+                            {run.customRunName ? (
+                              <>
+                                <code
+                                  style={{
+                                    fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                    fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                    padding: '0.125rem 0.5rem',
+                                    borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                    display: 'inline-block',
+                                    border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                    whiteSpace: 'nowrap',
+                                    marginBottom: '0.25rem',
+                                  }}
+                                >
+                                  {run.customRunName}
+                                </code>
+                                <div>
+                                  <code
+                                    style={{
+                                      fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                      fontSize: 'var(--pf-v5-global--FontSize--xs)',
+                                      color: 'var(--pf-v5-global--Color--200)',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {run.scenarioRunName}
+                                  </code>
+                                </div>
+                              </>
+                            ) : (
+                              <code
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {run.scenarioRunName}
+                              </code>
+                            )}
                           </div>
                         </DataListCell>,
                         <DataListCell key="jobs-summary" width={2}>
@@ -1094,7 +1207,7 @@ export function JobsList({
                                           </FlexItem>
 
                                           {/* Logs for running, succeeded, and failed jobs */}
-                                          {['Running', 'Succeeded', 'Failed'].includes(job.phase) && (
+                                          {['Running', 'Succeeded', 'Failed'].includes(job.phase) && job.jobId && (
                                             <FlexItem>
                                               <LogViewer
                                                 scenarioRunName={run.scenarioRunName}

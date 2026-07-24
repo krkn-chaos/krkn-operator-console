@@ -187,6 +187,7 @@ export function useTargetPoller() {
             registryName: run.registryName,
             graphRunName: run.graphRunName, // Name of parent GraphRun (if part of a graph)
             graphNodeId: run.graphNodeId, // Node ID within the graph (if part of a graph)
+            customRunName: run.customRunName,
           };
         });
 
@@ -217,6 +218,7 @@ export function useTargetPoller() {
                 registryName: details.registryName || run.registryName,
                 graphRunName: details.graphRunName || run.graphRunName,
                 graphNodeId: details.graphNodeId || run.graphNodeId,
+                customRunName: details.customRunName || run.customRunName,
               };
 
               dispatch({
