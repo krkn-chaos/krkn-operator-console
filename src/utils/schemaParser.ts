@@ -93,6 +93,10 @@ export function parseJsonSchema(schemaString: string): ScenarioField[] {
   }
 }
 
+function toBool(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
 /**
  * Convert custom schema field type to ScenarioField type
  * Supports both numeric and string types:
@@ -158,8 +162,8 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
         variable: customField.variable,
         type: fieldType,
         default: customField.default,
-        required: customField.required,
-        secret: customField.secret,
+        required: toBool(customField.required),
+        secret: toBool(customField.secret),
         group: customField.group,
         mutually_excludes: customField.mutually_excludes,
       } as ScenarioField;

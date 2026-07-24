@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import {
   Form,
   FormGroup,
@@ -30,14 +30,17 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
   const disabledFields = useMemo(() => {
     const disabled = new Set<string>();
     for (const field of fields) {
-      if (
-        field.mutually_excludes &&
-        field.type === 'enum' &&
-        (field as EnumField).allowed_values === 'true,false'
-      ) {
-        const currentValue = values[field.variable] ?? field.default ?? '';
-        if (currentValue === 'true' || currentValue === true) {
-          disabled.add(field.mutually_excludes);
+      if (field.mutually_excludes && field.type === 'enum') {
+        const enumField = field as EnumField;
+        const opts = enumField.allowed_values
+          .split(enumField.separator)
+          .map((o) => o.trim())
+          .sort();
+        if (opts.length === 2 && opts[0] === 'false' && opts[1] === 'true') {
+          const currentValue = values[field.variable] ?? field.default ?? '';
+          if (currentValue === 'true' || currentValue === true) {
+            disabled.add(field.mutually_excludes);
+          }
         }
       }
     }
@@ -419,7 +422,7 @@ function ScrollableFieldGroup({
   groupField: ScenarioField;
   members: ScenarioField[];
   disabledFields: Set<string>;
-  renderField: (field: ScenarioField, isDisabled: boolean) => React.ReactNode;
+  renderField: (field: ScenarioField, isDisabled: boolean) => ReactNode;
 }) {
   const [search, setSearch] = useState('');
 
