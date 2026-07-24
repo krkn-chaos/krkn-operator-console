@@ -84,22 +84,15 @@ export function TargetsList() {
   };
 
   const handleFormSubmit = async (data: CreateTargetRequest | UpdateTargetRequest) => {
-    try {
-      if (editingTarget) {
-        await targetsApi.updateTarget(editingTarget.uuid, data as UpdateTargetRequest);
-        showSuccess('Target updated', `Target "${data.clusterName}" has been updated successfully`);
-      } else {
-        await targetsApi.createTarget(data as CreateTargetRequest);
-        showSuccess('Target created', `Target "${data.clusterName}" has been created successfully`);
-      }
-      setIsFormOpen(false);
-      await loadTargets();
-    } catch (error) {
-      showError(
-        editingTarget ? 'Failed to update target' : 'Failed to create target',
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+    if (editingTarget) {
+      await targetsApi.updateTarget(editingTarget.uuid, data as UpdateTargetRequest);
+      showSuccess('Target updated', `Target "${data.clusterName}" has been updated successfully`);
+    } else {
+      await targetsApi.createTarget(data as CreateTargetRequest);
+      showSuccess('Target created', `Target "${data.clusterName}" has been created successfully`);
     }
+    setIsFormOpen(false);
+    await loadTargets();
   };
 
   const handleFormCancel = () => {

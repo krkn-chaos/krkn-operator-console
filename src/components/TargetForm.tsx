@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   Form,
   FormGroup,
   TextInput,
@@ -30,6 +31,7 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -72,6 +74,8 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
   };
 
   const handleSubmit = async () => {
+    setApiError(null);
+
     if (!validate()) {
       return;
     }
@@ -128,6 +132,8 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
 
     try {
       await onSubmit(data);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
       setSubmitting(false);
     }
@@ -135,6 +141,9 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
 
   return (
     <Form>
+      {apiError && (
+        <Alert variant="danger" isInline title={apiError} style={{ marginBottom: '1rem' }} />
+      )}
       <FormGroup label="Cluster Name" isRequired fieldId="cluster-name">
         <TextInput
           id="cluster-name"
