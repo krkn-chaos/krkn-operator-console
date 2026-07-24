@@ -105,7 +105,7 @@ describe('DynamicFormBuilder', () => {
       const values: ScenarioFormValues = { PROXY: 'true', SECRET: 'a' };
       render(<DynamicFormBuilder fields={fields} values={values} onChange={vi.fn()} />);
 
-      const secretSelect = screen.getByRole('combobox', { name: /Secret/i }) as HTMLSelectElement;
+      const secretSelect = screen.getByRole('combobox', { name: /Secret/i });
       expect(secretSelect).toBeDisabled();
     });
 
@@ -117,7 +117,7 @@ describe('DynamicFormBuilder', () => {
       const values: ScenarioFormValues = { PROXY: 'false', SECRET: 'a' };
       render(<DynamicFormBuilder fields={fields} values={values} onChange={vi.fn()} />);
 
-      const secretSelect = screen.getByRole('combobox', { name: /Secret/i }) as HTMLSelectElement;
+      const secretSelect = screen.getByRole('combobox', { name: /Secret/i });
       expect(secretSelect).not.toBeDisabled();
     });
 
@@ -129,7 +129,7 @@ describe('DynamicFormBuilder', () => {
       const values: ScenarioFormValues = { PROXY: 'true', SECRET: 'a' };
       render(<DynamicFormBuilder fields={fields} values={values} onChange={vi.fn()} />);
 
-      const secretSelect = screen.getByRole('combobox', { name: /Secret/i }) as HTMLSelectElement;
+      const secretSelect = screen.getByRole('combobox', { name: /Secret/i });
       expect(secretSelect).toBeDisabled();
     });
 
@@ -141,7 +141,7 @@ describe('DynamicFormBuilder', () => {
       const values: ScenarioFormValues = { PROXY: 'true', SECRET: 'a' };
       render(<DynamicFormBuilder fields={fields} values={values} onChange={vi.fn()} />);
 
-      const secretSelect = screen.getByRole('combobox', { name: /Secret/i }) as HTMLSelectElement;
+      const secretSelect = screen.getByRole('combobox', { name: /Secret/i });
       expect(secretSelect).toBeDisabled();
     });
 
@@ -152,7 +152,7 @@ describe('DynamicFormBuilder', () => {
       ];
       render(<DynamicFormBuilder fields={fields} values={{}} onChange={vi.fn()} />);
 
-      const secretSelect = screen.getByRole('combobox', { name: /Secret/i }) as HTMLSelectElement;
+      const secretSelect = screen.getByRole('combobox', { name: /Secret/i });
       expect(secretSelect).toBeDisabled();
     });
 
@@ -166,11 +166,22 @@ describe('DynamicFormBuilder', () => {
       const values: ScenarioFormValues = { PROXY: 'false', SECRET: 'workmgr' };
       render(<DynamicFormBuilder fields={fields} values={values} onChange={onChange} />);
 
-      const proxySelect = screen.getByRole('combobox', { name: /Proxy/i });
-      await user.selectOptions(proxySelect, 'true');
+      const proxyToggle = screen.getByRole('checkbox', { name: /Proxy/i });
+      await user.click(proxyToggle);
 
       const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0];
+      expect(lastCall.PROXY).toBe('true');
       expect(lastCall.SECRET).toBe('app-mgr');
+    });
+
+    it('should render boolean enum as a Switch toggle', () => {
+      const fields: ScenarioField[] = [
+        makeEnumField('TOGGLE', 'My Toggle', { allowed_values: 'true,false', default: 'false' }),
+      ];
+      render(<DynamicFormBuilder fields={fields} values={{}} onChange={vi.fn()} />);
+
+      expect(screen.getByRole('checkbox', { name: /My Toggle/i })).toBeInTheDocument();
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     });
   });
 

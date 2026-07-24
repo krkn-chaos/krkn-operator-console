@@ -12,6 +12,7 @@ import {
   HelperText,
   HelperTextItem,
   Title,
+  Switch,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, StringField, EnumField } from '../types/api';
@@ -248,6 +249,30 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
         }
 
         const options = enumField.allowed_values.split(enumField.separator).map((opt: string) => opt.trim());
+        const sortedOpts = [...options].sort();
+        const isBooleanEnum = sortedOpts.length === 2 && sortedOpts[0] === 'false' && sortedOpts[1] === 'true';
+
+        if (isBooleanEnum) {
+          return (
+            <FormGroup key={field.variable} fieldId={field.variable}>
+              <Switch
+                id={field.variable}
+                label={field.short_description}
+                isChecked={value === 'true' || value === true}
+                onChange={(_event, checked) => handleChange(field.variable, checked ? 'true' : 'false')}
+                isDisabled={isFieldDisabled}
+              />
+              {field.description && (
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>{field.description}</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
+            </FormGroup>
+          );
+        }
+
         return (
           <FormGroup
             key={field.variable}
