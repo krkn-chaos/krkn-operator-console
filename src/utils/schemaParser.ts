@@ -93,6 +93,10 @@ export function parseJsonSchema(schemaString: string): ScenarioField[] {
   }
 }
 
+function toBool(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
 /**
  * Convert custom schema field type to ScenarioField type
  * Supports both numeric and string types:
@@ -113,6 +117,8 @@ function mapCustomSchemaType(type: number | string): FieldType {
         return 'enum';
       case 'boolean':
         return 'boolean';
+      case 'group':
+        return 'group';
       default:
         return 'string';
     }
@@ -156,7 +162,10 @@ export function parseCustomSchema(schemaString: string): ScenarioField[] {
         variable: customField.variable,
         type: fieldType,
         default: customField.default,
-        required: customField.required,
+        required: toBool(customField.required),
+        secret: toBool(customField.secret),
+        group: customField.group,
+        mutually_excludes: customField.mutually_excludes,
       } as ScenarioField;
 
       // Add enum-specific fields

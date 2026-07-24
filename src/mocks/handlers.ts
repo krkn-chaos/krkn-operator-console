@@ -397,16 +397,29 @@ export const handlers = [
   ),
   http.get(`${BASE}/provider-config/:uuid`, () =>
     HttpResponse.json({
+      uuid: 'mock-provider-config-001',
+      status: 'Completed',
       config_data: {
         aws: {
-          'config-schema': {
-            type: 'object',
-            properties: {
-              region: { type: 'string', description: 'AWS Region', default: 'us-east-1' },
-              access_key: { type: 'string', description: 'AWS Access Key' },
-            },
-          },
-          'config-map': { region: 'us-east-1' },
+          'config-schema': JSON.stringify((() => {
+            const groups = [
+              { name: 'ACM_SECRET_GROUP', short_description: 'ACM/OCM Secret Selection', description: 'Select secrets for direct API connection to managed clusters.', variable: 'ACM_SECRET_GROUP', type: 'group', required: 'false', secret: 'false' },
+              { name: 'ACM_USE_PROXY_GROUP', short_description: 'Cluster Proxy Configuration', description: 'Enable cluster proxy connection for managed clusters. Activating proxy overrides the secret selection.', variable: 'ACM_USE_PROXY_GROUP', type: 'group', required: 'false', secret: 'false' },
+            ];
+            const clusterNames = [
+              'local-cluster', ...Array.from({ length: 30 }, (_, i) => `managed-cluster-${i + 1}`)
+            ];
+            const secrets = clusterNames.map(c => {
+              const varName = c.replace(/-/g, '_').toUpperCase();
+              return { name: `ACM_SECRET_${varName}`, short_description: `Secret for ${c}`, description: `Select the secret for ${c} authentication.`, variable: `ACM_SECRET_${varName}`, default: 'application-manager', separator: ',', allowed_values: 'application-manager,klusterlet-addon-workmgr-log', mutually_excludes: `ACM_USE_PROXY_${varName}`, group: 'ACM_SECRET_GROUP', type: 'enum', required: true, secret: false };
+            });
+            const proxies = clusterNames.map((c, i) => {
+              const varName = c.replace(/-/g, '_').toUpperCase();
+              return { name: `ACM_USE_PROXY_${varName}`, short_description: `Proxy mode for ${c}`, description: `Enable cluster proxy for ${c} instead of direct API access.`, variable: `ACM_USE_PROXY_${varName}`, default: i % 3 === 0 ? 'true' : 'false', separator: ',', allowed_values: 'true,false', mutually_excludes: `ACM_SECRET_${varName}`, group: 'ACM_USE_PROXY_GROUP', type: 'enum', required: false, secret: false };
+            });
+            return [...groups, ...secrets, ...proxies];
+          })()),
+          'config-map': 'krkn-acm-config',
           namespace: 'krkn-operator-system',
         },
       },
