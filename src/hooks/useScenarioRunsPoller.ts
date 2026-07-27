@@ -22,49 +22,6 @@ export function useScenarioRunsPoller() {
   const initialFetchDoneRef = useRef(false);
   const fetchedDetailsRef = useRef<Set<string>>(new Set());
 
-  const fetchInitialScenarioRuns = useCallback(async () => {
-    if (initialFetchDoneRef.current) return;
-    initialFetchDoneRef.current = true;
-
-    try {
-      const scenarioRuns = await operatorApi.listScenarioRuns();
-
-      const scenarioRunStates: ScenarioRunState[] = scenarioRuns.map((run) => {
-        const scenarioName = run.scenarioName || run.scenarioRunName.replace(/-[a-f0-9]{8}$/, '');
-        return {
-          scenarioRunName: run.scenarioRunName,
-          scenarioName,
-          phase: run.phase,
-          totalTargets: run.totalTargets,
-          successfulJobs: run.successfulJobs,
-          failedJobs: run.failedJobs,
-          runningJobs: run.runningJobs,
-          clusterJobs: run.clusterJobs || [],
-          createdAt: run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || new Date().toISOString(),
-          ownerUserId: run.ownerUserId,
-          registryName: run.registryName,
-          graphRunName: run.graphRunName,
-          graphNodeId: run.graphNodeId,
-        };
-      });
-
-      dispatch({
-        type: 'LOAD_SCENARIO_RUNS_SUCCESS',
-        payload: { runs: scenarioRunStates },
-      });
-
-      // Fetch details for runs without clusterJobs
-      const runsWithoutJobs = scenarioRunStates.filter(
-        (run) => !run.clusterJobs || run.clusterJobs.length === 0
-      );
-      for (const run of runsWithoutJobs) {
-        fetchRunDetails(run.scenarioRunName, run);
-      }
-    } catch {
-      initialFetchDoneRef.current = false;
-    }
-  }, [dispatch]);
-
   const fetchRunDetails = useCallback(async (runName: string, base: ScenarioRunState) => {
     if (fetchedDetailsRef.current.has(runName)) return;
     fetchedDetailsRef.current.add(runName);
@@ -98,6 +55,48 @@ export function useScenarioRunsPoller() {
       fetchedDetailsRef.current.delete(runName);
     }
   }, [dispatch]);
+
+  const fetchInitialScenarioRuns = useCallback(async () => {
+    if (initialFetchDoneRef.current) return;
+    initialFetchDoneRef.current = true;
+
+    try {
+      const scenarioRuns = await operatorApi.listScenarioRuns();
+
+      const scenarioRunStates: ScenarioRunState[] = scenarioRuns.map((run) => {
+        const scenarioName = run.scenarioName || run.scenarioRunName.replace(/-[a-f0-9]{8}$/, '');
+        return {
+          scenarioRunName: run.scenarioRunName,
+          scenarioName,
+          phase: run.phase,
+          totalTargets: run.totalTargets,
+          successfulJobs: run.successfulJobs,
+          failedJobs: run.failedJobs,
+          runningJobs: run.runningJobs,
+          clusterJobs: run.clusterJobs || [],
+          createdAt: run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || new Date().toISOString(),
+          ownerUserId: run.ownerUserId,
+          registryName: run.registryName,
+          graphRunName: run.graphRunName,
+          graphNodeId: run.graphNodeId,
+        };
+      });
+
+      dispatch({
+        type: 'LOAD_SCENARIO_RUNS_SUCCESS',
+        payload: { runs: scenarioRunStates },
+      });
+
+      const runsWithoutJobs = scenarioRunStates.filter(
+        (run) => !run.clusterJobs || run.clusterJobs.length === 0
+      );
+      for (const run of runsWithoutJobs) {
+        fetchRunDetails(run.scenarioRunName, run);
+      }
+    } catch {
+      initialFetchDoneRef.current = false;
+    }
+  }, [dispatch, fetchRunDetails]);
 
   const handleMessage = useCallback((message: ServerMessage) => {
     if (message.resource !== 'run') return;
