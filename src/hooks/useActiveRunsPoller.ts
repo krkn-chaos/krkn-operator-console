@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
+import { useWebSocket } from './useWebSocket';
+import { websocketService } from '../services/websocketService';
 import type { ActiveRunsResponse } from '../types/api';
+import type { ServerMessage } from '../types/websocket';
 
 /**
- * Hook to poll active runs dashboard data
- * Polls every 2 seconds ONLY when on jobs_list page
- * Automatically stops polling when navigating away
+ * Hook for dashboard active runs data.
+ * Initial load via REST (once), then real-time updates via WebSocket.
+ * Only active when on jobs_list page.
  *
  * @returns Object containing activeRuns data, loading state, and error state
  */
@@ -16,43 +19,45 @@ export function useActiveRunsPoller() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Only poll when on jobs_list page
-    const shouldPoll = state.phase === 'jobs_list';
+  const shouldConnect = state.phase === 'jobs_list';
+  const initialFetchDoneRef = useRef(false);
 
-    if (!shouldPoll) {
-      return;
+  const fetchInitialData = useCallback(async () => {
+    if (initialFetchDoneRef.current) return;
+    initialFetchDoneRef.current = true;
+
+    try {
+      const data = await operatorApi.getActiveRuns();
+      setActiveRuns(data);
+      setError(null);
+      setLoading(false);
+    } catch (err) {
+      initialFetchDoneRef.current = false;
+      setError(err instanceof Error ? err.message : 'Failed to fetch active runs');
+      setLoading(false);
     }
+  }, []);
 
-    let mounted = true;
+  const handleMessage = useCallback((message: ServerMessage) => {
+    if (message.resource !== 'dashboard') return;
 
-    const fetchActiveRuns = async () => {
-      try {
-        const data = await operatorApi.getActiveRuns();
-        if (mounted) {
-          setActiveRuns(data);
-          setError(null);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to fetch active runs');
-          setLoading(false);
-        }
-      }
-    };
+    const data = message.data as ActiveRunsResponse;
+    setActiveRuns(data);
+    setError(null);
+    setLoading(false);
+  }, []);
 
-    // Initial fetch
-    fetchActiveRuns();
+  const wsUrl = websocketService.buildResourceUrl('dashboard/active-runs');
+  const { connectionState } = useWebSocket('dashboard-active-runs', wsUrl, handleMessage, {
+    disabled: !shouldConnect,
+  });
 
-    // Poll every 2 seconds
-    const intervalId = setInterval(fetchActiveRuns, 2000);
-
-    return () => {
-      mounted = false;
-      clearInterval(intervalId);
-    };
-  }, [state.phase]); // Re-run when phase changes
+  useEffect(() => {
+    if (connectionState === 'connected' && shouldConnect) {
+      fetchInitialData();
+      websocketService.subscribe('dashboard-active-runs', 'dashboard');
+    }
+  }, [connectionState, shouldConnect, fetchInitialData]);
 
   return { activeRuns, loading, error };
 }

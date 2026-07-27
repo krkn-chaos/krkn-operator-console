@@ -270,53 +270,6 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
-   * Build WebSocket URL for job logs using jobId (NEW API - CORRECT PATH)
-   * @param scenarioRunName - Scenario run name
-   * @param jobId - Job ID to get logs from
-   * @param follow - Whether to follow/stream logs (default: true)
-   * @returns WebSocket URL for log streaming
-   */
-  getJobLogsWebSocketUrl(
-    scenarioRunName: string,
-    jobId: string,
-    follow: boolean = true
-  ): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const params = new URLSearchParams();
-    if (follow) params.append('follow', 'true');
-
-    const path = `/api/v1/scenarios/run/${encodeURIComponent(scenarioRunName)}/jobs/${encodeURIComponent(jobId)}/logs`;
-    const queryString = params.toString();
-
-    return queryString
-      ? `${protocol}//${host}${path}?${queryString}`
-      : `${protocol}//${host}${path}`;
-  }
-
-  /**
-   * Build WebSocket URL for scenario run logs
-   * @deprecated Use getJobLogsWebSocketUrl() instead - this uses clusterName which is incorrect
-   * @param scenarioRunName - Scenario run name
-   * @param clusterName - Cluster name to get logs from
-   * @param follow - Whether to follow/stream logs (default: true)
-   * @returns WebSocket URL for log streaming
-   */
-  getScenarioRunLogsUrl(
-    scenarioRunName: string,
-    clusterName: string,
-    follow: boolean = true
-  ): string {
-    const params = new URLSearchParams();
-    if (follow) params.append('follow', 'true');
-
-    const path = `/scenarios/run/${encodeURIComponent(scenarioRunName)}/logs/${encodeURIComponent(clusterName)}`;
-    const queryString = params.toString();
-
-    return queryString ? `${this.baseUrl}${path}?${queryString}` : `${this.baseUrl}${path}`;
-  }
-
-  /**
    * GET /api/v1/scenarios/run
    * List all scenario runs (NEW API)
    * @returns Promise with scenario runs array

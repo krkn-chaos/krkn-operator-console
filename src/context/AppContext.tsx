@@ -129,18 +129,38 @@ function appReducer(state: AppState, action: AppAction): AppState {
       // Just for tracking - actual run added via ADD_SCENARIO_RUN
       return state;
 
-    case 'ADD_SCENARIO_RUN':
+    case 'ADD_SCENARIO_RUN': {
+      const incoming = action.payload.run;
+      const existingRun = state.scenarioRuns.find(
+        r => r.scenarioRunName === incoming.scenarioRunName
+      );
+      if (existingRun) {
+        const merged = {
+          ...incoming,
+          clusterJobs: incoming.clusterJobs.length > 0 ? incoming.clusterJobs : existingRun.clusterJobs,
+        };
+        return {
+          ...state,
+          scenarioRuns: state.scenarioRuns.map(r =>
+            r.scenarioRunName === incoming.scenarioRunName ? merged : r
+          ),
+        };
+      }
       return {
         ...state,
-        scenarioRuns: [...state.scenarioRuns, action.payload.run],
+        scenarioRuns: [incoming, ...state.scenarioRuns],
       };
+    }
 
     case 'UPDATE_SCENARIO_RUN': {
-      const updatedRuns = state.scenarioRuns.map(run =>
-        run.scenarioRunName === action.payload.run.scenarioRunName
-          ? action.payload.run
-          : run
-      );
+      const updatedRuns = state.scenarioRuns.map(run => {
+        if (run.scenarioRunName !== action.payload.run.scenarioRunName) return run;
+        const inc = action.payload.run;
+        return {
+          ...inc,
+          clusterJobs: inc.clusterJobs.length > 0 ? inc.clusterJobs : run.clusterJobs,
+        };
+      });
 
       // Clean up expandedClusterJobs to remove deleted jobs
       const allJobIds = new Set(
@@ -233,10 +253,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return state; // Graph run created notification - actual data comes via polling
 
     case 'ADD_GRAPH_RUN': {
-      // Add new graph run if not already present
-      const exists = state.graphRuns.some(r => r.name === action.payload.run.name);
-      if (exists) {
-        return state;
+      const graphRunExists = state.graphRuns.some(r => r.name === action.payload.run.name);
+      if (graphRunExists) {
+        return {
+          ...state,
+          graphRuns: state.graphRuns.map(r =>
+            r.name === action.payload.run.name ? action.payload.run : r
+          ),
+        };
       }
       return {
         ...state,

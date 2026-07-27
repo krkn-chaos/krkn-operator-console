@@ -1,39 +1,67 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ReactNode } from 'react';
 import { useActiveRunsPoller } from './useActiveRunsPoller';
 import { operatorApi } from '../services/operatorApi';
 import { AppProvider } from '../context/AppContext';
 import type { ActiveRunsResponse } from '../types/api';
+import type { ConnectionState, ServerMessage } from '../types/websocket';
 
 vi.mock('../services/operatorApi');
 
-// Wrapper component to provide AppContext
+const mockConnect = vi.fn((_id: string) => _id);
+const mockDisconnect = vi.fn();
+const mockSubscribe = vi.fn();
+const mockOnMessage = vi.fn();
+const mockOffMessage = vi.fn();
+const mockOnStateChange = vi.fn();
+const mockOffStateChange = vi.fn();
+const mockGetState = vi.fn<() => ConnectionState>(() => 'disconnected');
+const mockBuildResourceUrl = vi.fn(() => 'ws://localhost/api/v2/ws/dashboard/active-runs');
+
+vi.mock('../services/websocketService', () => ({
+  websocketService: {
+    connect: (...args: Parameters<typeof mockConnect>) => mockConnect(...args),
+    disconnect: (...args: Parameters<typeof mockDisconnect>) => mockDisconnect(...args),
+    subscribe: (...args: Parameters<typeof mockSubscribe>) => mockSubscribe(...args),
+    unsubscribe: vi.fn(),
+    onMessage: (...args: Parameters<typeof mockOnMessage>) => mockOnMessage(...args),
+    offMessage: (...args: Parameters<typeof mockOffMessage>) => mockOffMessage(...args),
+    onRawMessage: vi.fn(),
+    offRawMessage: vi.fn(),
+    onStateChange: (...args: Parameters<typeof mockOnStateChange>) => mockOnStateChange(...args),
+    offStateChange: (...args: Parameters<typeof mockOffStateChange>) => mockOffStateChange(...args),
+    getState: (...args: Parameters<typeof mockGetState>) => mockGetState(...args),
+    hasConnection: vi.fn(() => false),
+    buildResourceUrl: (...args: Parameters<typeof mockBuildResourceUrl>) => mockBuildResourceUrl(...args),
+  },
+}));
+
 function AppProviderWrapper({ children }: { children: ReactNode }) {
   return <AppProvider>{children}</AppProvider>;
 }
 
 describe('useActiveRunsPoller', () => {
+  let capturedMessageHandler: ((msg: ServerMessage) => void) | null = null;
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedMessageHandler = null;
+
+    mockGetState.mockReturnValue('disconnected');
+    mockOnStateChange.mockImplementation(() => {});
+    mockOnMessage.mockImplementation((_id: string, handler: (msg: ServerMessage) => void) => {
+      capturedMessageHandler = handler;
+    });
   });
 
   afterEach(() => {
-    vi.clearAllTimers();
-    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  it('should fetch active runs on mount', async () => {
-    const mockData: ActiveRunsResponse = {
-      totalActiveRuns: 2,
-      totalClusters: 2,
-      clusterRuns: {
-        'cluster1': ['run1'],
-        'cluster2': ['run2'],
-      },
-    };
-
-    vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockData);
+  it('should start in loading state', () => {
+    vi.mocked(operatorApi.getActiveRuns).mockResolvedValue({
+      totalActiveRuns: 0, totalClusters: 0, clusterRuns: {},
+    });
 
     const { result } = renderHook(() => useActiveRunsPoller(), {
       wrapper: AppProviderWrapper,
@@ -41,19 +69,16 @@ describe('useActiveRunsPoller', () => {
 
     expect(result.current.loading).toBe(true);
     expect(result.current.activeRuns).toBe(null);
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    }, { timeout: 3000 });
-
-    expect(result.current.activeRuns).toEqual(mockData);
-    expect(result.current.error).toBe(null);
-    expect(operatorApi.getActiveRuns).toHaveBeenCalled();
   });
 
-  it('should handle API errors', async () => {
-    const errorMessage = 'Failed to fetch active runs';
-    vi.mocked(operatorApi.getActiveRuns).mockRejectedValue(new Error(errorMessage));
+  it('should fetch initial data when connected', async () => {
+    const mockData: ActiveRunsResponse = {
+      totalActiveRuns: 2,
+      totalClusters: 3,
+      clusterRuns: { 'cluster1': ['run1'] },
+    };
+    vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockData);
+    mockGetState.mockReturnValue('connected');
 
     const { result } = renderHook(() => useActiveRunsPoller(), {
       wrapper: AppProviderWrapper,
@@ -61,42 +86,70 @@ describe('useActiveRunsPoller', () => {
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-    }, { timeout: 3000 });
+    });
 
-    expect(result.current.error).toBe(errorMessage);
-    expect(result.current.activeRuns).toBe(null);
+    expect(result.current.activeRuns).toEqual(mockData);
+    expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(1);
   });
 
-  it('should cleanup on unmount', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it('should update data when receiving WebSocket message', async () => {
+    vi.mocked(operatorApi.getActiveRuns).mockResolvedValue({
+      totalActiveRuns: 0, totalClusters: 0, clusterRuns: {},
+    });
+    mockGetState.mockReturnValue('connected');
 
-    const mockData: ActiveRunsResponse = {
-      totalActiveRuns: 0,
-      totalClusters: 0,
-      clusterRuns: {},
-    };
-
-    vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockData);
-
-    const { result, unmount } = renderHook(() => useActiveRunsPoller(), {
+    const { result } = renderHook(() => useActiveRunsPoller(), {
       wrapper: AppProviderWrapper,
     });
 
-    // Wait for initial fetch to complete with all state updates
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.activeRuns).toEqual(mockData);
     });
 
-    const callCountBeforeUnmount = vi.mocked(operatorApi.getActiveRuns).mock.calls.length;
+    const updatedData: ActiveRunsResponse = {
+      totalActiveRuns: 3,
+      totalClusters: 2,
+      clusterRuns: { 'cluster1': ['run1', 'run2', 'run3'] },
+    };
 
-    // Unmount the hook
+    act(() => {
+      capturedMessageHandler?.({
+        resource: 'dashboard',
+        id: 'active-runs',
+        event: 'updated',
+        data: updatedData,
+      });
+    });
+
+    expect(result.current.activeRuns).toEqual(updatedData);
+  });
+
+  it('should connect to WebSocket', () => {
+    vi.mocked(operatorApi.getActiveRuns).mockResolvedValue({
+      totalActiveRuns: 0, totalClusters: 0, clusterRuns: {},
+    });
+
+    renderHook(() => useActiveRunsPoller(), {
+      wrapper: AppProviderWrapper,
+    });
+
+    expect(mockConnect).toHaveBeenCalledWith(
+      'dashboard-active-runs',
+      'ws://localhost/api/v2/ws/dashboard/active-runs',
+      { subscriptionMode: true }
+    );
+  });
+
+  it('should cleanup on unmount', () => {
+    vi.mocked(operatorApi.getActiveRuns).mockResolvedValue({
+      totalActiveRuns: 0, totalClusters: 0, clusterRuns: {},
+    });
+
+    const { unmount } = renderHook(() => useActiveRunsPoller(), {
+      wrapper: AppProviderWrapper,
+    });
+
     unmount();
-
-    // Advance timers to trigger any scheduled intervals
-    await vi.advanceTimersByTimeAsync(5000);
-
-    // Should not have called again after unmount
-    expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(callCountBeforeUnmount);
+    expect(mockDisconnect).toHaveBeenCalledWith('dashboard-active-runs');
   });
 });

@@ -1,53 +1,75 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { Card, CardTitle, CardBody, Button, Alert, AlertGroup, AlertActionCloseButton, Flex, FlexItem, Checkbox } from '@patternfly/react-core';
 import { CopyIcon } from '@patternfly/react-icons';
 import Anser from 'anser';
-import { authService } from '../services/authService';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { websocketService } from '../services/websocketService';
+import type { RawMessageHandler } from '../types/websocket';
 
 interface LogViewerProps {
-  scenarioRunName: string; // ScenarioRun name
-  jobId: string;           // Job ID - required for WebSocket path
-  clusterName: string;     // Cluster name - for display only
+  scenarioRunName: string;
+  jobId: string;
+  clusterName: string;
   podName: string;
   status: string;
   compact?: boolean;
 }
 
-// Global connection tracking to prevent StrictMode duplicates
-// Maps jobId -> { ws: WebSocket, refCount: number }
-// refCount tracks how many component instances are using this connection
-const activeConnections = new Map<string, { ws: WebSocket; refCount: number }>();
-
-export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status, compact = false }: LogViewerProps) {
+export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, podName, status, compact = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [showCopyAlert, setShowCopyAlert] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-  const reconnectAttemptsRef = useRef<number>(0);
-  const isCleanedUpRef = useRef<boolean>(false);
   const isFirstMessageRef = useRef<boolean>(true);
-  // Ignore flag pattern: prevents duplicate connections in StrictMode
-  // Set to true when we successfully reuse an existing connection
-  const didReuseConnectionRef = useRef<boolean>(false);
 
-  const maxReconnectAttempts = 3; // Ridotto per fallire prima e provare HTTP
+  const isPending = status === 'Pending';
+  const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
+  const follow = !isTerminal;
 
-  // Copy logs to clipboard
+  const connectionId = `logs-${jobId}`;
+  const wsUrl = websocketService.buildJobLogsUrl(scenarioRunName, jobId, follow);
+
+  // Set initial status message
+  useEffect(() => {
+    if (isPending) {
+      setLogs(['Waiting for pod to start...']);
+    } else if (!isTerminal) {
+      isFirstMessageRef.current = true;
+      setLogs(['Connecting to log stream...']);
+    }
+  }, [isPending, isTerminal]);
+
+  const handleRawMessage: RawMessageHandler = useCallback((data: string) => {
+    if (data.startsWith('ERROR:')) {
+      setLogs(prev => [...prev, `⚠️  ${data}`]);
+      return;
+    }
+
+    setLogs(prev => {
+      if (isFirstMessageRef.current && prev[0] === 'Connecting to log stream...') {
+        isFirstMessageRef.current = false;
+        return [data];
+      }
+      return [...prev, data];
+    });
+  }, []);
+
+  useWebSocket(connectionId, wsUrl, handleRawMessage, {
+    disabled: isPending,
+    subscriptionMode: false,
+  });
+
   const handleCopyLogs = async () => {
     try {
-      // Strip ANSI codes for clipboard
       const plainText = logs.map(log => Anser.ansiToText(log)).join('\n');
       await navigator.clipboard.writeText(plainText);
       setShowCopyAlert(true);
       setTimeout(() => setShowCopyAlert(false), 3000);
-    } catch (err) {
+    } catch {
       // Silent failure
     }
   };
 
-  // Convert ANSI codes to HTML
   const renderAnsiLog = (log: string, index: number) => {
     const ansiParsed = Anser.ansiToJson(log, { use_classes: false });
     return (
@@ -69,206 +91,18 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
     );
   };
 
-  // Auto-scroll to bottom when new logs arrive (only if following)
-  // useLayoutEffect runs synchronously after DOM mutations but before paint
   useLayoutEffect(() => {
     if (isFollowing && logsContainerRef.current && logs.length > 0) {
-      // Scroll to bottom immediately after DOM update
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
   }, [logs, isFollowing]);
 
-  // Handle follow toggle
   const handleFollowToggle = (checked: boolean) => {
     setIsFollowing(checked);
-
-    // If enabling follow, scroll to bottom immediately
     if (checked && logsContainerRef.current) {
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
   };
-
-  // WebSocket connection management
-  useEffect(() => {
-    // Don't start streaming if job hasn't started yet
-    if (status === 'Pending') {
-      setLogs(['Waiting for pod to start...']);
-      return;
-    }
-
-    // StrictMode guard: check global connection map
-    // This persists across StrictMode's double-mount, preventing duplicates
-    const existing = activeConnections.get(jobId);
-    if (existing && (existing.ws.readyState === WebSocket.CONNECTING || existing.ws.readyState === WebSocket.OPEN)) {
-      // Reuse existing connection - increment reference count
-      existing.refCount++;
-      wsRef.current = existing.ws;
-      didReuseConnectionRef.current = true;
-      return;
-    }
-
-    // If job is in terminal state, don't follow (get static logs)
-    const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
-
-    if (!isTerminal) {
-      setLogs(['Connecting to log stream...']);
-    }
-
-    isCleanedUpRef.current = false;
-    isFirstMessageRef.current = true;
-
-    const connectWebSocket = () => {
-      // Don't reconnect if component is unmounted
-      if (isCleanedUpRef.current) {
-        return;
-      }
-
-      // Don't reconnect terminal jobs (but allow initial connection)
-      if (isTerminal && reconnectAttemptsRef.current > 0) {
-        return;
-      }
-
-      // Build WebSocket URL - NEW: uses scenarioRunName + clusterName
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const follow = !isTerminal;
-
-      // Get JWT token for authentication
-      const token = authService.getToken();
-      if (!token) {
-        setLogs(['⚠️  Authentication required. Please login again.']);
-        return;
-      }
-
-      // NEW URL structure: /scenarios/run/{scenarioRunName}/jobs/{jobId}/logs
-      const wsUrl = `${protocol}//${host}/api/v1/scenarios/run/${encodeURIComponent(scenarioRunName)}/jobs/${encodeURIComponent(jobId)}/logs?follow=${follow}`;
-
-      try {
-        // Use WebSocket subprotocol to pass JWT token securely
-        // Protocol format: "access_token.{token}"
-        // Backend will receive this in Sec-WebSocket-Protocol header and must:
-        // 1. Split on first '.' to separate prefix from token
-        // 2. Validate the token part
-        // 3. Accept connection with Sec-WebSocket-Protocol: access_token
-        const wsProtocol = `access_token.${token}`;
-
-        const ws = new WebSocket(wsUrl, wsProtocol);
-        wsRef.current = ws;
-        // Register in global map with refCount=1 (first mount using this connection)
-        activeConnections.set(jobId, { ws, refCount: 1 });
-        // Mark that this mount created the connection (not reused)
-        didReuseConnectionRef.current = false;
-
-        ws.onopen = () => {
-          reconnectAttemptsRef.current = 0; // Reset on successful connection
-        };
-
-        ws.onmessage = (event) => {
-          const message = event.data;
-
-          // Check if it's an error message
-          if (message.startsWith('ERROR:')) {
-            setLogs(prev => [...prev, `⚠️  ${message}`]);
-            return;
-          }
-
-          // Regular log line
-          setLogs(prev => {
-            // Replace "Connecting..." message on first data
-            if (isFirstMessageRef.current && prev[0] === 'Connecting to log stream...') {
-              isFirstMessageRef.current = false;
-              return [message];
-            }
-            return [...prev, message];
-          });
-        };
-
-        ws.onerror = () => {
-          // Error handling is done in onclose
-        };
-
-        ws.onclose = (event) => {
-          // Remove from global map only if refCount reaches 0
-          const existing = activeConnections.get(jobId);
-          if (existing && existing.ws === ws) {
-            activeConnections.delete(jobId);
-          }
-
-          // Authentication failure (code 1002 = protocol error, 1008 = policy violation)
-          if (event.code === 1002 || event.code === 1008) {
-            setLogs(prev => [...prev, '', '⚠️  Authentication failed. Please check backend WebSocket implementation.']);
-            return;
-          }
-
-          // Normal closure (code 1000)
-          if (event.code === 1000) {
-            return;
-          }
-
-          // Unexpected closure - attempt reconnect if not terminal and not cleaned up
-          if (!isTerminal && !isCleanedUpRef.current) {
-            scheduleReconnect(2000);
-          }
-        };
-      } catch (error) {
-        if (!isTerminal && !isCleanedUpRef.current) {
-          scheduleReconnect(2000);
-        }
-      }
-    };
-
-    const scheduleReconnect = (baseDelay: number) => {
-      if (isCleanedUpRef.current || isTerminal) {
-        return;
-      }
-
-      reconnectAttemptsRef.current++;
-
-      if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-        setLogs(prev => [...prev, '', '⚠️  Max reconnection attempts reached. Please refresh the page.']);
-        return;
-      }
-
-      // Exponential backoff: delay * 1.5^(attempts-1), capped at 30 seconds
-      const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttemptsRef.current - 1), 30000);
-
-      reconnectTimeoutRef.current = window.setTimeout(() => {
-        connectWebSocket();
-      }, delay);
-    };
-
-    // Start initial connection
-    connectWebSocket();
-
-    // Cleanup on unmount or when dependencies change
-    return () => {
-      isCleanedUpRef.current = true;
-
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-
-      if (wsRef.current) {
-        const existing = activeConnections.get(jobId);
-        if (existing && existing.ws === wsRef.current) {
-          // Decrement reference count
-          existing.refCount--;
-
-          // Only close and remove if this was the last reference
-          if (existing.refCount <= 0) {
-            wsRef.current.close(1000, 'Component unmounted');
-            // Removal from Map happens in ws.onclose handler
-          }
-        } else if (!didReuseConnectionRef.current) {
-          // Fallback: close if we created it but it's not in the map (shouldn't happen)
-          wsRef.current.close(1000, 'Component unmounted');
-        }
-
-        wsRef.current = null;
-      }
-    };
-  }, [scenarioRunName, jobId, clusterName, status]);
 
   return (
     <>

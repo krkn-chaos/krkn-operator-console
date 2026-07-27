@@ -272,46 +272,57 @@ export function JobsList({
     // Build unified items
     const items: UnifiedRunItem[] = [];
 
-    // Add GraphRuns (join with graphRuns state to get summary)
-    graphRunsMap.forEach((nodes, graphRunName) => {
-      // Find matching GraphRunState to get summary
-      const graphRunState = _graphRuns.find(gr => gr.name === graphRunName);
+    // Add GraphRuns from state (even if no nodes yet - WebSocket sends GraphRun before nodes)
+    _graphRuns.forEach((graphRunState) => {
+      const nodes = graphRunsMap.get(graphRunState.name) || [];
 
-      // Use phase from GraphRunState if available, otherwise calculate from nodes
+      // Remove from map so we don't add it twice
+      graphRunsMap.delete(graphRunState.name);
+
       // Map GraphRun phase ('Completed') to ScenarioRun phase ('Succeeded')
       let phase: ScenarioRunPhase = 'Pending';
-      if (graphRunState) {
-        // Map GraphRun phases to ScenarioRun phases
-        if (graphRunState.phase === 'Completed') {
-          phase = 'Succeeded';
-        } else if (graphRunState.phase === 'Pending' || graphRunState.phase === 'Running' ||
-                   graphRunState.phase === 'Failed' || graphRunState.phase === 'PartiallyFailed') {
-          phase = graphRunState.phase;
-        }
-      } else {
-        const hasFailed = nodes.some((n) => n.phase === 'Failed');
-        const hasPartiallyFailed = nodes.some((n) => n.phase === 'PartiallyFailed');
-        const hasRunning = nodes.some((n) => n.phase === 'Running');
-        const allSucceeded = nodes.every((n) => n.phase === 'Succeeded');
-
-        if (hasFailed || hasPartiallyFailed) {
-          phase = 'Failed';
-        } else if (allSucceeded) {
-          phase = 'Succeeded';
-        } else if (hasRunning) {
-          phase = 'Running';
-        }
+      if (graphRunState.phase === 'Completed') {
+        phase = 'Succeeded';
+      } else if (graphRunState.phase === 'Pending' || graphRunState.phase === 'Running' ||
+                 graphRunState.phase === 'Failed' || graphRunState.phase === 'PartiallyFailed') {
+        phase = graphRunState.phase;
       }
 
-      // Use GraphRunState data if available
-      const createdAt = graphRunState?.creationTimestamp || nodes.reduce((earliest, node) =>
+      items.push({
+        type: 'graph',
+        graphRunName: graphRunState.name,
+        nodes,
+        phase,
+        createdAt: graphRunState.creationTimestamp,
+        ownerUserId: graphRunState.ownerUserId,
+        summary: graphRunState.summary,
+        resiliencyScoreEnabled: graphRunState.resiliencyScoreEnabled,
+        resiliencyScoreBaseline: graphRunState.resiliencyScoreBaseline,
+        resiliencyScore: graphRunState.resiliencyScore,
+      });
+    });
+
+    // Add orphaned GraphRuns (nodes without GraphRunState - shouldn't happen with WebSocket)
+    graphRunsMap.forEach((nodes, graphRunName) => {
+      const hasFailed = nodes.some((n) => n.phase === 'Failed');
+      const hasPartiallyFailed = nodes.some((n) => n.phase === 'PartiallyFailed');
+      const hasRunning = nodes.some((n) => n.phase === 'Running');
+      const allSucceeded = nodes.every((n) => n.phase === 'Succeeded');
+
+      let phase: ScenarioRunPhase = 'Pending';
+      if (hasFailed || hasPartiallyFailed) {
+        phase = 'Failed';
+      } else if (allSucceeded) {
+        phase = 'Succeeded';
+      } else if (hasRunning) {
+        phase = 'Running';
+      }
+
+      const createdAt = nodes.reduce((earliest, node) =>
         node.createdAt < earliest ? node.createdAt : earliest
       , nodes[0].createdAt);
 
-      const ownerUserId = graphRunState?.ownerUserId || nodes[0].ownerUserId;
-
-      // Use summary from GraphRunState (has correct totalNodes)
-      const summary = graphRunState?.summary || {
+      const summary = {
         totalNodes: nodes.length,
         completedNodes: nodes.filter(n => n.phase === 'Succeeded').length,
         runningNodes: nodes.filter(n => n.phase === 'Running').length,
@@ -319,22 +330,14 @@ export function JobsList({
         pendingNodes: nodes.filter(n => n.phase === 'Pending').length,
       };
 
-      // Get resiliency score fields from GraphRunState
-      const resiliencyScoreEnabled = graphRunState?.resiliencyScoreEnabled;
-      const resiliencyScoreBaseline = graphRunState?.resiliencyScoreBaseline;
-      const resiliencyScore = graphRunState?.resiliencyScore;
-
       items.push({
         type: 'graph',
         graphRunName,
         nodes,
         phase,
         createdAt,
-        ownerUserId,
+        ownerUserId: nodes[0].ownerUserId,
         summary,
-        resiliencyScoreEnabled,
-        resiliencyScoreBaseline,
-        resiliencyScore,
       });
     });
 
@@ -347,7 +350,7 @@ export function JobsList({
     return items.sort((a, b) => {
       const aDate = a.type === 'graph' ? a.createdAt : a.run.createdAt;
       const bDate = b.type === 'graph' ? b.createdAt : b.run.createdAt;
-      return bDate.localeCompare(aDate); // Reversed for descending
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
   }, [filteredScenarioRuns, _graphRuns]);
 

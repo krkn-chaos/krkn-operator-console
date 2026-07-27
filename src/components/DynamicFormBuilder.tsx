@@ -25,7 +25,7 @@ interface DynamicFormBuilderProps {
 
 export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuilderProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const initializedFieldsKey = useRef<string>('');
+  const initializedFieldsKey = useRef<string | null>(null);
   const validationTimeouts = useRef<{ [key: string]: number }>({});
 
   const disabledFields = useMemo(() => {
