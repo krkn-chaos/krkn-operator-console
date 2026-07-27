@@ -6,3 +6,5 @@ export { useActiveRunsPoller } from './useActiveRunsPoller';
 export { useClusterDiscovery } from './useClusterDiscovery';
 export { useScenariosFetch } from './useScenariosFetch';
 export { useStudioTargetFetch } from './useStudioTargetFetch';
+export { useWebSocket } from './useWebSocket';
+export { useScenarioRunDetail } from './useScenarioRunDetail';
