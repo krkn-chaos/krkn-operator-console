@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { websocketService } from '../services/websocketService';
 import { operatorApi } from '../services';
@@ -9,6 +9,9 @@ import type { ScenarioRunStatusResponse } from '../types/api';
  * Hook to receive real-time scenario run DETAIL updates via WebSocket.
  * Subscribes to "run-detail" resource type which includes full clusterJobs array.
  *
+ * Initial data comes from WebSocket snapshot (sent automatically on subscribe).
+ * No REST call needed - backend sends snapshot immediately.
+ *
  * Use this when displaying a single run's full details (e.g., accordion expanded).
  * For lightweight list view, use useScenarioRunsPoller instead.
  *
@@ -18,29 +21,11 @@ import type { ScenarioRunStatusResponse } from '../types/api';
 export function useScenarioRunDetail(scenarioRunName: string | null) {
   const [runDetail, setRunDetail] = useState<ScenarioRunStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const initialFetchDoneRef = useRef(false);
 
   // Reset when scenarioRunName changes
   useEffect(() => {
     if (scenarioRunName) {
       setRunDetail(null);
-      initialFetchDoneRef.current = false;
-    }
-  }, [scenarioRunName]);
-
-  // Fetch initial data via REST
-  const fetchDetail = useCallback(async () => {
-    if (!scenarioRunName || initialFetchDoneRef.current) return;
-
-    setIsLoading(true);
-    try {
-      const detail = await operatorApi.getScenarioRunStatus(scenarioRunName);
-      setRunDetail(detail);
-      initialFetchDoneRef.current = true;
-    } catch (error) {
-      console.error('[useScenarioRunDetail] Failed to fetch initial data:', error);
-    } finally {
-      setIsLoading(false);
     }
   }, [scenarioRunName]);
 
@@ -72,21 +57,18 @@ export function useScenarioRunDetail(scenarioRunName: string | null) {
   );
 
   // Subscribe to this specific run when connected
+  // Backend automatically sends snapshot on subscribe - no REST call needed!
   useEffect(() => {
     if (!scenarioRunName || connectionState !== 'connected') return;
 
-    // Subscribe to run-detail for this specific run
     websocketService.subscribe(
       `run-detail-${scenarioRunName}`,
       'run-detail',
       [scenarioRunName]
     );
+  }, [scenarioRunName, connectionState]);
 
-    // Fetch initial data
-    fetchDetail();
-  }, [scenarioRunName, connectionState, fetchDetail]);
-
-  // Manual refetch
+  // Manual refetch via REST (fallback only if WebSocket disconnected)
   const refetch = useCallback(async () => {
     if (!scenarioRunName) return;
 
