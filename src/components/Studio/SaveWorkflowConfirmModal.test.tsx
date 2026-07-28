@@ -44,11 +44,11 @@ describe('SaveWorkflowConfirmModal', () => {
     vi.mocked(useNotifications).mockReturnValue({
       showSuccess: mockShowSuccess,
       showError: mockShowError,
-    } as any);
+    } as unknown as ReturnType<typeof useNotifications>);
   });
 
   it('does not render when isOpen is false', () => {
-    vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as any);
+    vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as unknown as ReturnType<typeof useStudioContext>);
 
     render(
       <SaveWorkflowConfirmModal
@@ -62,7 +62,7 @@ describe('SaveWorkflowConfirmModal', () => {
   });
 
   it('shows workflow name in modal text', () => {
-    vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as any);
+    vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as unknown as ReturnType<typeof useStudioContext>);
 
     render(
       <SaveWorkflowConfirmModal
@@ -81,7 +81,7 @@ describe('SaveWorkflowConfirmModal', () => {
     const mockSave = vi.fn().mockResolvedValue(undefined);
 
     vi.mocked(useStudioContext).mockReturnValue(
-      buildMockContext({ saveWorkflowToCluster: mockSave }) as any,
+      buildMockContext({ saveWorkflowToCluster: mockSave }) as unknown as ReturnType<typeof useStudioContext>,
     );
 
     render(
@@ -104,7 +104,7 @@ describe('SaveWorkflowConfirmModal', () => {
     const mockSave = vi.fn().mockResolvedValue(undefined);
 
     vi.mocked(useStudioContext).mockReturnValue(
-      buildMockContext({ saveWorkflowToCluster: mockSave }) as any,
+      buildMockContext({ saveWorkflowToCluster: mockSave }) as unknown as ReturnType<typeof useStudioContext>,
     );
 
     render(
@@ -133,7 +133,7 @@ describe('SaveWorkflowConfirmModal', () => {
     const mockSave = vi.fn().mockRejectedValue(new Error('Server error'));
 
     vi.mocked(useStudioContext).mockReturnValue(
-      buildMockContext({ saveWorkflowToCluster: mockSave }) as any,
+      buildMockContext({ saveWorkflowToCluster: mockSave }) as unknown as ReturnType<typeof useStudioContext>,
     );
 
     render(
@@ -160,7 +160,7 @@ describe('SaveWorkflowConfirmModal', () => {
     const mockSave = vi.fn().mockRejectedValue('something went wrong');
 
     vi.mocked(useStudioContext).mockReturnValue(
-      buildMockContext({ saveWorkflowToCluster: mockSave }) as any,
+      buildMockContext({ saveWorkflowToCluster: mockSave }) as unknown as ReturnType<typeof useStudioContext>,
     );
 
     render(
@@ -184,7 +184,7 @@ describe('SaveWorkflowConfirmModal', () => {
   it('calls onClose when Cancel is clicked', async () => {
     const user = userEvent.setup();
 
-    vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as any);
+    vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as unknown as ReturnType<typeof useStudioContext>);
 
     render(
       <SaveWorkflowConfirmModal
@@ -207,7 +207,7 @@ describe('SaveWorkflowConfirmModal', () => {
       buildMockContext({
         savedFile: null,
         saveWorkflowToCluster: mockSave,
-      }) as any,
+      }) as unknown as ReturnType<typeof useStudioContext>,
     );
 
     render(

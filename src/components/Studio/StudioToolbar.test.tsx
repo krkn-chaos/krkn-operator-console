@@ -54,7 +54,7 @@ describe('StudioToolbar', () => {
     vi.mocked(useNotifications).mockReturnValue({
       showSuccess: vi.fn(),
       showError: mockShowError,
-    } as any);
+    } as unknown as ReturnType<typeof useNotifications>);
   });
 
   describe('Save button text', () => {
@@ -66,7 +66,7 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -89,7 +89,7 @@ describe('StudioToolbar', () => {
             savedAt: '2024-01-01',
           },
           isDirty: false,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -112,7 +112,7 @@ describe('StudioToolbar', () => {
             savedAt: '2024-01-01',
           },
           isDirty: true,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -135,7 +135,7 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 3,
           },
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -166,7 +166,7 @@ describe('StudioToolbar', () => {
             savedAt: '2024-01-01',
           },
           isDirty: true,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -197,7 +197,7 @@ describe('StudioToolbar', () => {
           },
           isDirty: true,
           saveWorkflowToCluster: mockSave,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -232,7 +232,7 @@ describe('StudioToolbar', () => {
             savedAt: '2024-01-01',
           },
           isDirty: true,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -271,7 +271,7 @@ describe('StudioToolbar', () => {
           },
           isDirty: true,
           saveWorkflowToCluster: mockSave,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -297,7 +297,7 @@ describe('StudioToolbar', () => {
             nextNodeNumber: 2,
           },
           isEditingDetails: true,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -307,7 +307,7 @@ describe('StudioToolbar', () => {
     });
 
     it('disables save button when workflow has no nodes', () => {
-      vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as any);
+      vi.mocked(useStudioContext).mockReturnValue(buildMockContext() as unknown as ReturnType<typeof useStudioContext>);
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
 
@@ -327,7 +327,7 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -344,7 +344,7 @@ describe('StudioToolbar', () => {
       const mockAddNode = vi.fn();
 
       vi.mocked(useStudioContext).mockReturnValue(
-        buildMockContext({ addNode: mockAddNode }) as any,
+        buildMockContext({ addNode: mockAddNode }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -366,7 +366,7 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
@@ -393,7 +393,7 @@ describe('StudioToolbar', () => {
             savedAt: '2024-01-01',
           },
           isDirty: true,
-        }) as any,
+        }) as unknown as ReturnType<typeof useStudioContext>,
       );
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
