@@ -35,6 +35,23 @@ import type { GroupResponse } from '../../types/api';
 
 const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
+/**
+ * Expandable panel showing workflow metadata (name, description, visibility, last saved).
+ *
+ * Renders inside the Workflow Templates card. Supports read-only and inline-edit modes
+ * controlled by `isEditingDetails` from StudioContext. When editing starts the panel
+ * auto-expands and the toggle is locked until the user saves or cancels.
+ *
+ * Visibility options depend on the user's role:
+ * - Admins can choose Public or any group.
+ * - Non-admins see Public + their own groups (or Public only if they have no groups).
+ *
+ * @example
+ * ```tsx
+ * // Rendered inside a StudioProvider with a loaded workflow:
+ * <WorkflowDetailsPanel />
+ * ```
+ */
 export function WorkflowDetailsPanel() {
   const { savedFile, setSavedFile, workflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
   const { showSuccess, showError } = useNotifications();

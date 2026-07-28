@@ -18,6 +18,22 @@ import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import type { FileInfo } from '../../types/api';
 
+/**
+ * Dropdown select for loading saved workflow templates from the cluster.
+ *
+ * Fetches available templates (filePurpose='workflow-template') on open and
+ * provides a searchable list. The toggle label shows the loaded workflow's
+ * file name when one is active, or "Load Workflow" otherwise.
+ *
+ * Prompts the user for confirmation only when there are unsaved changes
+ * (dirty saved workflow or unsaved canvas with nodes).
+ *
+ * @example
+ * ```tsx
+ * // Used inside StudioProvider, typically in the Workflow Templates card:
+ * <LoadWorkflowSelect />
+ * ```
+ */
 export function LoadWorkflowSelect() {
   const { workflow, loadWorkflow, savedFile, isDirty } = useStudioContext();
   const { showSuccess, showError } = useNotifications();

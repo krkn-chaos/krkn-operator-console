@@ -40,6 +40,26 @@ interface SaveWorkflowModalProps {
   onSuccess: () => void;
 }
 
+/**
+ * Modal for saving a new workflow template to the cluster.
+ *
+ * Collects a file name (alphanumeric + hyphens/underscores/dots), optional
+ * description, and visibility setting (Public or Group-scoped). Admins can
+ * choose any group; non-admins see only their own groups.
+ *
+ * On save, creates a new file via `operatorApi.createFile` with
+ * `filePurpose='workflow-template'` and stores the resulting metadata in
+ * StudioContext via `setSavedFile`.
+ *
+ * @example
+ * ```tsx
+ * <SaveWorkflowModal
+ *   isOpen={showSaveModal}
+ *   onClose={() => setShowSaveModal(false)}
+ *   onSuccess={() => setShowSaveModal(false)}
+ * />
+ * ```
+ */
 export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowModalProps) {
   const { workflow, setSavedFile } = useStudioContext();
   const { showSuccess, showError } = useNotifications();

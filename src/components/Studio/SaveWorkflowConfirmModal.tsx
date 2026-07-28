@@ -14,6 +14,22 @@ interface SaveWorkflowConfirmModalProps {
   onSuccess: () => void;
 }
 
+/**
+ * Confirmation modal for updating an already-saved workflow on the cluster.
+ *
+ * Shown when the user clicks "Save to Cluster" on a workflow that already has
+ * a cluster file. Calls `saveWorkflowToCluster` from StudioContext, which
+ * persists the current canvas state and updates the saved snapshot.
+ *
+ * @example
+ * ```tsx
+ * <SaveWorkflowConfirmModal
+ *   isOpen={showConfirm}
+ *   onClose={() => setShowConfirm(false)}
+ *   onSuccess={() => setShowConfirm(false)}
+ * />
+ * ```
+ */
 export function SaveWorkflowConfirmModal({ isOpen, onClose, onSuccess }: SaveWorkflowConfirmModalProps) {
   const { savedFile, saveWorkflowToCluster } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
