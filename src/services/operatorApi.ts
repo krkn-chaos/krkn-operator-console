@@ -453,8 +453,9 @@ class OperatorApiClient extends BaseApiClient {
    * Get files available to the current user (based on groups)
    * @returns Promise with response containing minimal file info array
    */
-  async getAvailableFiles(): Promise<AvailableFilesResponse> {
-    return this.fetchJson<AvailableFilesResponse>('/files/available');
+  async getAvailableFiles(filePurpose?: string): Promise<AvailableFilesResponse> {
+    const query = filePurpose ? `?filePurpose=${encodeURIComponent(filePurpose)}` : '';
+    return this.fetchJson<AvailableFilesResponse>(`/files/available${query}`);
   }
 
   /**

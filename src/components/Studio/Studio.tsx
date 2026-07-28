@@ -15,6 +15,7 @@ import {
   Title,
   Card,
   CardBody,
+  CardTitle,
   Button,
 } from '@patternfly/react-core';
 import { ArrowLeftIcon } from '@patternfly/react-icons';
@@ -27,11 +28,13 @@ import { StudioCanvas } from './StudioCanvas';
 import { StudioRecoveryModal } from './StudioRecoveryModal';
 import { StudioNodeEditorModal } from './StudioNodeEditorModal';
 import { RunWorkflowModal } from './RunWorkflowModal';
+import { LoadWorkflowSelect } from './LoadWorkflowSelect';
+import { WorkflowDetailsPanel } from './WorkflowDetailsPanel';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
   const { dispatch } = useAppContext();
-  const { updateNode } = useStudioContext();
+  const { updateNode, workflow, savedFile, isDirty } = useStudioContext();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isRunWorkflowOpen, setIsRunWorkflowOpen] = useState(false);
@@ -52,6 +55,20 @@ function StudioContent() {
     setIsEditorOpen(false);
     setSelectedNode(null);
   }, [updateNode]);
+
+  const handleBackToRuns = useCallback(() => {
+    if (workflow.nodes.length === 0) {
+      dispatch({ type: 'JOBS_LIST_READY' });
+      return;
+    }
+    if (savedFile && isDirty) {
+      if (!confirm('You have unsaved changes. Leave without saving?')) return;
+    } else if (!savedFile) {
+      if (!confirm('You have an unsaved workflow. Leave without saving?')) return;
+      clearAutosave();
+    }
+    dispatch({ type: 'JOBS_LIST_READY' });
+  }, [dispatch, workflow.nodes.length, savedFile, isDirty]);
 
   const handleRunWorkflow = useCallback(() => {
     // Blur the active element to prevent aria-hidden warning
@@ -77,12 +94,12 @@ function StudioContent() {
   return (
     <>
       {/* Header */}
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div style={{ marginBottom: '1rem' }}>
         <Button
           variant="link"
           icon={<ArrowLeftIcon />}
           isInline
-          onClick={() => dispatch({ type: 'JOBS_LIST_READY' })}
+          onClick={handleBackToRuns}
           style={{ marginBottom: '0.5rem', paddingLeft: 0 }}
         >
           Back to Runs
@@ -94,6 +111,15 @@ function StudioContent() {
           Design complex chaos workflows with visual dependency graphs
         </p>
       </div>
+
+      {/* Workflow load + details */}
+      <Card style={{ marginBottom: '1rem' }}>
+        <CardTitle>Workflow Templates</CardTitle>
+        <CardBody>
+          <LoadWorkflowSelect />
+          <WorkflowDetailsPanel />
+        </CardBody>
+      </Card>
 
       {/* Content */}
       <Card>

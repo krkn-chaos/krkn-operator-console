@@ -1,14 +1,4 @@
-/**
- * StudioToolbar - Toolbar with workflow actions
- *
- * Provides:
- * - Add Scenario button
- * - Run Workflow
- * - Export to JSON
- * - Save to Cluster (mock)
- * - Clear All
- */
-
+import { useState } from 'react';
 import {
   Toolbar,
   ToolbarContent,
@@ -17,20 +7,27 @@ import {
 } from '@patternfly/react-core';
 import { PlusCircleIcon, DownloadIcon, SaveIcon, TrashIcon } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
+import { operatorApi } from '../../services/operatorApi';
 import { useStudioContext } from './StudioContext';
+import { useNotifications } from '../../hooks';
+import { SaveWorkflowModal } from './SaveWorkflowModal';
+import { SaveWorkflowConfirmModal } from './SaveWorkflowConfirmModal';
 
 interface StudioToolbarProps {
   onRunWorkflow: () => void;
 }
 
 export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
-  const { addNode, exportWorkflow, clearWorkflow, workflow } = useStudioContext();
+  const { addNode, exportWorkflow, clearWorkflow, workflow, savedFile, setSavedFile, isDirty, isEditingDetails } = useStudioContext();
+  const { showError } = useNotifications();
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const handleExport = () => {
     const result = exportWorkflow();
 
     if ('error' in result) {
-      alert(result.error); // TODO: Replace with toast notification
+      alert(result.error);
       return;
     }
 
@@ -43,10 +40,34 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
     URL.revokeObjectURL(url);
   };
 
-  const handleSaveToCluster = async () => {
-    // Mock - will implement later
-    await new Promise(r => setTimeout(r, 1000));
-    alert('Save to cluster functionality will be implemented in a future phase');
+  const handleSave = () => {
+    if (savedFile) {
+      setIsConfirmModalOpen(true);
+    } else {
+      setIsSaveModalOpen(true);
+    }
+  };
+
+  const handleRunWithGuard = async () => {
+    if (savedFile && isDirty) {
+      if (confirm('You have unsaved changes. Save before running?')) {
+        try {
+          await operatorApi.updateFile(savedFile.fileId, {
+            fileName: savedFile.fileName,
+            content: JSON.stringify(workflow),
+            description: savedFile.description,
+            availableToAll: savedFile.availableToAll,
+            groups: savedFile.groups,
+            filePurpose: 'workflow-template',
+          });
+          setSavedFile({ ...savedFile, savedAt: new Date().toISOString() });
+        } catch (err) {
+          showError('Save failed', err instanceof Error ? err.message : 'Failed to save workflow');
+          return;
+        }
+      }
+    }
+    onRunWorkflow();
   };
 
   const handleClearAll = () => {
@@ -58,66 +79,80 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
   };
 
   return (
-    <Toolbar>
-      <ToolbarContent>
-        <ToolbarItem>
-          <Button
-            variant="primary"
-            icon={<PlusCircleIcon />}
-            onClick={addNode}
-          >
-            Add Scenario
-          </Button>
-        </ToolbarItem>
+    <>
+      <Toolbar>
+        <ToolbarContent>
+          <ToolbarItem>
+            <Button
+              variant="primary"
+              icon={<PlusCircleIcon />}
+              onClick={addNode}
+            >
+              Add Scenario
+            </Button>
+          </ToolbarItem>
 
-        <ToolbarItem>
-          <Button
-            variant="primary"
-            icon={<HiOutlineRocketLaunch />}
-            onClick={onRunWorkflow}
-            isDisabled={workflow.nodes.length === 0}
-          >
-            Run Workflow
-          </Button>
-        </ToolbarItem>
+          <ToolbarItem>
+            <Button
+              variant="primary"
+              icon={<HiOutlineRocketLaunch />}
+              onClick={handleRunWithGuard}
+              isDisabled={workflow.nodes.length === 0}
+            >
+              Run Workflow
+            </Button>
+          </ToolbarItem>
 
-        <ToolbarItem variant="separator" />
+          <ToolbarItem variant="separator" />
 
-        <ToolbarItem>
-          <Button
-            variant="secondary"
-            icon={<DownloadIcon />}
-            onClick={handleExport}
-            isDisabled={workflow.nodes.length === 0}
-          >
-            Export JSON
-          </Button>
-        </ToolbarItem>
+          <ToolbarItem>
+            <Button
+              variant="secondary"
+              icon={<DownloadIcon />}
+              onClick={handleExport}
+              isDisabled={workflow.nodes.length === 0}
+            >
+              Export JSON
+            </Button>
+          </ToolbarItem>
 
-        <ToolbarItem>
-          <Button
-            variant="secondary"
-            icon={<SaveIcon />}
-            onClick={handleSaveToCluster}
-            isDisabled={workflow.nodes.length === 0}
-          >
-            Save to Cluster
-          </Button>
-        </ToolbarItem>
+          <ToolbarItem>
+            <Button
+              variant="secondary"
+              icon={<SaveIcon />}
+              onClick={handleSave}
+              isDisabled={workflow.nodes.length === 0 || isEditingDetails}
+            >
+              Save to Cluster
+            </Button>
+          </ToolbarItem>
 
-        <ToolbarItem variant="separator" />
+          <ToolbarItem variant="separator" />
 
-        <ToolbarItem>
-          <Button
-            variant="danger"
-            icon={<TrashIcon />}
-            onClick={handleClearAll}
-            isDisabled={workflow.nodes.length === 0}
-          >
-            Clear All
-          </Button>
-        </ToolbarItem>
-      </ToolbarContent>
-    </Toolbar>
+          <ToolbarItem>
+            <Button
+              variant="danger"
+              icon={<TrashIcon />}
+              onClick={handleClearAll}
+              isDisabled={workflow.nodes.length === 0}
+            >
+              Clear All
+            </Button>
+          </ToolbarItem>
+        </ToolbarContent>
+      </Toolbar>
+
+      <SaveWorkflowModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        onSuccess={() => setIsSaveModalOpen(false)}
+      />
+
+      <SaveWorkflowConfirmModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onSuccess={() => setIsConfirmModalOpen(false)}
+      />
+    </>
   );
 }

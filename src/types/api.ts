@@ -990,6 +990,8 @@ export interface FileResponse {
   availableToAll: boolean;
   /** Optional file type classification */
   fileType?: string;
+  /** Optional file purpose (e.g., 'workflow-template') */
+  filePurpose?: string;
 }
 
 /**
@@ -1009,6 +1011,8 @@ export interface CreateFileRequest {
   availableToAll: boolean;
   /** Optional file type classification */
   fileType?: string;
+  /** Optional file purpose (e.g., 'workflow-template') */
+  filePurpose?: string;
 }
 
 /**
@@ -1037,6 +1041,8 @@ export interface UpdateFileRequest {
   availableToAll: boolean;
   /** Optional file type classification */
   fileType?: string;
+  /** Optional file purpose (e.g., 'workflow-template') */
+  filePurpose?: string;
 }
 
 /**
@@ -1065,6 +1071,8 @@ export interface FileInfo {
   groups?: string[];
   /** Optional file type classification */
   fileType?: string;
+  /** Optional file purpose (e.g., 'workflow-template') */
+  filePurpose?: string;
 }
 
 /**
