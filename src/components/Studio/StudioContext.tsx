@@ -10,6 +10,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode, useRef } from 'react';
 import type { StudioNode, StudioEdge, StudioWorkflow, StudioAutosave, GraphScenarioNode } from '../../types/api';
+import { operatorApi } from '../../services/operatorApi';
 import { AUTOSAVE_VERSION, saveAutosave, clearAutosave } from './studioAutosave';
 
 const AUTOSAVE_INTERVAL = 30000; // 30 seconds
@@ -37,6 +38,7 @@ interface StudioContextType {
   exportWorkflow: () => { graph: { [nodeId: string]: GraphScenarioNode }; metadata: { exportedAt: string; nodeCount: number } } | { error: string };
   clearWorkflow: () => void;
   setSavedFile: (meta: SavedFileMetadata, workflowSnapshot?: StudioWorkflow) => void;
+  saveWorkflowToCluster: () => Promise<void>;
   clearSavedFile: () => void;
   loadWorkflow: (workflow: StudioWorkflow, meta: SavedFileMetadata) => void;
   isDirty: boolean;
@@ -343,6 +345,23 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
     clearAutosave();
   }, []);
 
+  const saveWorkflowToCluster = useCallback(async () => {
+    const file = savedFileRef.current;
+    if (!file) throw new Error('No saved file to update');
+    const snapshot = { ...workflowRef.current };
+    await operatorApi.updateFile(file.fileId, {
+      fileName: file.fileName,
+      content: JSON.stringify(snapshot),
+      description: file.description,
+      availableToAll: file.availableToAll,
+      groups: file.groups,
+      filePurpose: 'workflow-template',
+    });
+    setSavedFileState({ ...file, savedAt: new Date().toISOString() });
+    setLastSavedSnapshot(JSON.stringify(snapshot));
+    clearAutosave();
+  }, []);
+
   const clearSavedFile = useCallback(() => {
     setSavedFileState(null);
   }, []);
@@ -380,6 +399,7 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
     exportWorkflow,
     clearWorkflow,
     setSavedFile,
+    saveWorkflowToCluster,
     clearSavedFile,
     loadWorkflow,
     isDirty,
@@ -399,6 +419,7 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
     exportWorkflow,
     clearWorkflow,
     setSavedFile,
+    saveWorkflowToCluster,
     clearSavedFile,
     loadWorkflow,
     isDirty,

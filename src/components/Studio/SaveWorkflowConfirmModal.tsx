@@ -5,7 +5,6 @@ import {
   Button,
   Spinner,
 } from '@patternfly/react-core';
-import { operatorApi } from '../../services/operatorApi';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
 
@@ -16,25 +15,16 @@ interface SaveWorkflowConfirmModalProps {
 }
 
 export function SaveWorkflowConfirmModal({ isOpen, onClose, onSuccess }: SaveWorkflowConfirmModalProps) {
-  const { workflow, savedFile, setSavedFile } = useStudioContext();
+  const { savedFile, saveWorkflowToCluster } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [isSaving, setIsSaving] = useState(false);
 
   const handleUpdate = async () => {
     if (!savedFile) return;
 
-    const snapshotAtSave = { ...workflow };
     setIsSaving(true);
     try {
-      await operatorApi.updateFile(savedFile.fileId, {
-        fileName: savedFile.fileName,
-        content: JSON.stringify(snapshotAtSave),
-        description: savedFile.description,
-        availableToAll: savedFile.availableToAll,
-        groups: savedFile.groups,
-        filePurpose: 'workflow-template',
-      });
-      setSavedFile({ ...savedFile, savedAt: new Date().toISOString() }, snapshotAtSave);
+      await saveWorkflowToCluster();
       showSuccess('Workflow updated', `"${savedFile.fileName}" updated successfully`);
       onClose();
       onSuccess();

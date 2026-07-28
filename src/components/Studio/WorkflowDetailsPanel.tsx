@@ -68,6 +68,7 @@ export function WorkflowDetailsPanel() {
 
   useEffect(() => {
     if (isEditingDetails && savedFile) {
+      setIsExpanded(true);
       setEditName(savedFile.fileName);
       setEditDescription(savedFile.description || '');
       setEditAccessType(savedFile.availableToAll ? 'public' : 'group');

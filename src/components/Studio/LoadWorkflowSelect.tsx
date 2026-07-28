@@ -19,7 +19,7 @@ import { useNotifications } from '../../hooks';
 import type { FileInfo } from '../../types/api';
 
 export function LoadWorkflowSelect() {
-  const { workflow, loadWorkflow, savedFile } = useStudioContext();
+  const { workflow, loadWorkflow, savedFile, isDirty } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,9 +45,9 @@ export function LoadWorkflowSelect() {
   const handleSelect = async (_event: React.MouseEvent | undefined, fileId: string | number | undefined) => {
     if (!fileId || typeof fileId !== 'string') return;
 
-    const hasUnsavedWork = workflow.nodes.length > 0;
-    if (hasUnsavedWork) {
-      if (!confirm('Loading a workflow will replace the current canvas. Continue?')) {
+    const hasUnsavedChanges = (savedFile && isDirty) || (!savedFile && workflow.nodes.length > 0);
+    if (hasUnsavedChanges) {
+      if (!confirm('You have unsaved changes. Loading a new workflow will discard them. Continue?')) {
         return;
       }
     }

@@ -23,7 +23,7 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { ArrowLeftIcon, PencilAltIcon, TrashIcon } from '@patternfly/react-icons';
+import { ArrowLeftIcon, PencilAltIcon, TrashIcon, ExclamationTriangleIcon, SaveIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../../context/AppContext';
 import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
 import { useNotifications } from '../../hooks';
@@ -42,13 +42,17 @@ import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
   const { dispatch } = useAppContext();
-  const { updateNode, workflow, savedFile, isDirty, clearSavedFile, clearWorkflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const { updateNode, workflow, savedFile, isDirty, saveWorkflowToCluster, clearSavedFile, clearWorkflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isRunWorkflowOpen, setIsRunWorkflowOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isSavingBeforeLeave, setIsSavingBeforeLeave] = useState(false);
+  const [leaveReason, setLeaveReason] = useState<'dirty' | 'unsaved' | 'editing'>('dirty');
+  const pendingLeaveAction = useRef<(() => void) | null>(null);
   const targetFetch = useStudioTargetFetch();
 
   const workflowRef = useRef(workflow);
@@ -57,21 +61,60 @@ function StudioContent() {
   savedFileRef.current = savedFile;
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
+  const isEditingDetailsRef = useRef(isEditingDetails);
+  isEditingDetailsRef.current = isEditingDetails;
 
   useEffect(() => {
-    studioLeaveGuard.current = () => {
+    studioLeaveGuard.current = (proceed: () => void) => {
+      if (isEditingDetailsRef.current) {
+        pendingLeaveAction.current = proceed;
+        setLeaveReason('editing');
+        setIsLeaveModalOpen(true);
+        return false;
+      }
       if (workflowRef.current.nodes.length === 0) return true;
       if (savedFileRef.current && isDirtyRef.current) {
-        return confirm('You have unsaved changes. Leave without saving?');
+        pendingLeaveAction.current = proceed;
+        setLeaveReason('dirty');
+        setIsLeaveModalOpen(true);
+        return false;
       }
       if (!savedFileRef.current) {
-        const allowed = confirm('You have an unsaved workflow. Leave without saving?');
-        if (allowed) clearAutosave();
-        return allowed;
+        pendingLeaveAction.current = proceed;
+        setLeaveReason('unsaved');
+        setIsLeaveModalOpen(true);
+        return false;
       }
       return true;
     };
     return () => { studioLeaveGuard.current = null; };
+  }, []);
+
+  const handleLeaveWithoutSaving = useCallback(() => {
+    if (leaveReason === 'unsaved') clearAutosave();
+    if (leaveReason === 'editing') setIsEditingDetails(false);
+    setIsLeaveModalOpen(false);
+    pendingLeaveAction.current?.();
+    pendingLeaveAction.current = null;
+  }, [leaveReason, setIsEditingDetails]);
+
+  const handleSaveAndLeave = useCallback(async () => {
+    setIsSavingBeforeLeave(true);
+    try {
+      await saveWorkflowToCluster();
+      setIsLeaveModalOpen(false);
+      pendingLeaveAction.current?.();
+      pendingLeaveAction.current = null;
+    } catch (err) {
+      showError('Save failed', err instanceof Error ? err.message : 'Failed to save workflow');
+    } finally {
+      setIsSavingBeforeLeave(false);
+    }
+  }, [saveWorkflowToCluster, showError]);
+
+  const handleCancelLeave = useCallback(() => {
+    setIsLeaveModalOpen(false);
+    pendingLeaveAction.current = null;
   }, []);
 
   const handleDeleteWorkflow = useCallback(async () => {
@@ -107,8 +150,9 @@ function StudioContent() {
   }, [updateNode]);
 
   const handleBackToRuns = useCallback(() => {
-    if (studioLeaveGuard.current && !studioLeaveGuard.current()) return;
-    dispatch({ type: 'JOBS_LIST_READY' });
+    const proceed = () => dispatch({ type: 'JOBS_LIST_READY' });
+    if (studioLeaveGuard.current && !studioLeaveGuard.current(proceed)) return;
+    proceed();
   }, [dispatch]);
 
   const handleRunWorkflow = useCallback(() => {
@@ -162,25 +206,22 @@ function StudioContent() {
               <LoadWorkflowSelect />
             </FlexItem>
             {savedFile && !isEditingDetails && (
-              <>
-                <FlexItem>
-                  <Button
-                    variant="plain"
-                    icon={<PencilAltIcon />}
-                    onClick={() => setIsEditingDetails(true)}
-                    aria-label="Edit workflow details"
-                  />
-                </FlexItem>
-                <FlexItem>
-                  <Button
-                    variant="plain"
-                    icon={<TrashIcon />}
-                    onClick={() => setIsDeleteModalOpen(true)}
-                    aria-label="Delete workflow"
-                    style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
-                  />
-                </FlexItem>
-              </>
+              <FlexItem>
+                <Button
+                  variant="plain"
+                  icon={<PencilAltIcon />}
+                  onClick={() => setIsEditingDetails(true)}
+                  aria-label="Edit workflow details"
+                  style={{ padding: '0.25rem' }}
+                />
+                <Button
+                  variant="plain"
+                  icon={<TrashIcon />}
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  aria-label="Delete workflow"
+                  style={{ color: 'var(--pf-v5-global--danger-color--100)', padding: '0.25rem' }}
+                />
+              </FlexItem>
             )}
           </Flex>
           <WorkflowDetailsPanel />
@@ -211,6 +252,51 @@ function StudioContent() {
         <p>
           Are you sure you want to delete the workflow <strong>&laquo;{savedFile?.fileName}&raquo;</strong> from the cluster?
           This will also clear the current canvas.
+        </p>
+      </Modal>
+
+      {/* Leave Guard Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title={leaveReason === 'editing' ? 'Editing in progress' : 'Unsaved changes'}
+        titleIconVariant={ExclamationTriangleIcon}
+        isOpen={isLeaveModalOpen}
+        onClose={() => !isSavingBeforeLeave && handleCancelLeave()}
+        actions={
+          leaveReason === 'dirty'
+            ? [
+                <Button
+                  key="save-leave"
+                  variant="primary"
+                  icon={isSavingBeforeLeave ? <Spinner size="sm" /> : <SaveIcon />}
+                  onClick={handleSaveAndLeave}
+                  isDisabled={isSavingBeforeLeave}
+                >
+                  {isSavingBeforeLeave ? 'Saving...' : 'Save & Leave'}
+                </Button>,
+                <Button key="leave" variant="secondary" onClick={handleLeaveWithoutSaving} isDisabled={isSavingBeforeLeave}>
+                  Leave without saving
+                </Button>,
+                <Button key="cancel" variant="link" onClick={handleCancelLeave} isDisabled={isSavingBeforeLeave}>
+                  Cancel
+                </Button>,
+              ]
+            : [
+                <Button key="leave" variant="primary" onClick={handleLeaveWithoutSaving}>
+                  {leaveReason === 'editing' ? 'Discard & Leave' : 'Leave without saving'}
+                </Button>,
+                <Button key="cancel" variant="link" onClick={handleCancelLeave}>
+                  Cancel
+                </Button>,
+              ]
+        }
+      >
+        <p>
+          {leaveReason === 'editing' && 'You are editing workflow details. Your changes will be lost.'}
+          {leaveReason === 'dirty' && (
+            <>The workflow <strong>&laquo;{savedFile?.fileName}&raquo;</strong> has unsaved changes.</>
+          )}
+          {leaveReason === 'unsaved' && 'You have an unsaved workflow on the canvas. It will be lost if you leave.'}
         </p>
       </Modal>
 

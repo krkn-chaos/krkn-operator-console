@@ -260,15 +260,16 @@ function App() {
     }
   };
 
-  const checkStudioGuard = (): boolean => {
+  const checkStudioGuard = (proceed: () => void): boolean => {
     if (state.phase !== 'studio') return true;
-    if (studioLeaveGuard.current && !studioLeaveGuard.current()) return false;
+    if (studioLeaveGuard.current && !studioLeaveGuard.current(proceed)) return false;
     return true;
   };
 
   const handleNavigateToSettings = () => {
-    if (!checkStudioGuard()) return;
-    dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
   };
 
   const handleNavigateToStudio = () => {
@@ -276,8 +277,9 @@ function App() {
   };
 
   const handleNavigateToHome = () => {
-    if (!checkStudioGuard()) return;
-    dispatch({ type: 'JOBS_LIST_READY' });
+    const proceed = () => dispatch({ type: 'JOBS_LIST_READY' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
   };
 
   const handleLogout = () => {

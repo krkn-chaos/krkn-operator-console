@@ -12,7 +12,6 @@ import {
 } from '@patternfly/react-core';
 import { PlusCircleIcon, DownloadIcon, SaveIcon, TrashIcon, ExclamationCircleIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
-import { operatorApi } from '../../services/operatorApi';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { SaveWorkflowModal } from './SaveWorkflowModal';
@@ -23,7 +22,7 @@ interface StudioToolbarProps {
 }
 
 export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
-  const { addNode, exportWorkflow, clearWorkflow, workflow, savedFile, setSavedFile, isDirty, isEditingDetails } = useStudioContext();
+  const { addNode, exportWorkflow, clearWorkflow, workflow, savedFile, saveWorkflowToCluster, isDirty, isEditingDetails } = useStudioContext();
   const { showError } = useNotifications();
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -85,18 +84,9 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
 
   const handleSaveAndRun = async () => {
     if (!savedFile) return;
-    const snapshotAtSave = { ...workflow };
     setIsSavingBeforeRun(true);
     try {
-      await operatorApi.updateFile(savedFile.fileId, {
-        fileName: savedFile.fileName,
-        content: JSON.stringify(snapshotAtSave),
-        description: savedFile.description,
-        availableToAll: savedFile.availableToAll,
-        groups: savedFile.groups,
-        filePurpose: 'workflow-template',
-      });
-      setSavedFile({ ...savedFile, savedAt: new Date().toISOString() }, snapshotAtSave);
+      await saveWorkflowToCluster();
       setIsUnsavedModalOpen(false);
       onRunWorkflow();
     } catch (err) {
@@ -164,7 +154,7 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
               onClick={handleSave}
               isDisabled={workflow.nodes.length === 0 || isEditingDetails}
             >
-              Save to Cluster
+              {savedFile && isDirty ? 'Update Workflow' : 'Save to Cluster'}
             </Button>
           </ToolbarItem>
 
