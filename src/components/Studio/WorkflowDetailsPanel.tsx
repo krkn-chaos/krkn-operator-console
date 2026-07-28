@@ -399,47 +399,37 @@ export function WorkflowDetailsPanel() {
     <>
       <div style={{ marginBottom: '1rem' }}>
         <ExpandableSection
-          toggleContent={
-            <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
-              <FlexItem>{isExpanded ? 'Workflow details' : `Workflow details — ${savedFile.fileName}`}</FlexItem>
-              {isExpanded && !isEditingDetails && (
-                <>
-                  <FlexItem>
-                    <Button
-                      variant="plain"
-                      size="sm"
-                      icon={<PencilAltIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEditing();
-                      }}
-                      aria-label="Edit workflow details"
-                      style={{ padding: '0 0.25rem' }}
-                    />
-                  </FlexItem>
-                  <FlexItem>
-                    <Button
-                      variant="plain"
-                      size="sm"
-                      icon={<TrashIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsDeleteModalOpen(true);
-                      }}
-                      aria-label="Delete workflow"
-                      style={{ padding: '0 0.25rem', color: 'var(--pf-v5-global--danger-color--100)' }}
-                    />
-                  </FlexItem>
-                </>
-              )}
-            </Flex>
-          }
+          toggleContent={isExpanded ? 'Workflow details' : `Workflow details — ${savedFile.fileName}`}
           isExpanded={isExpanded}
           onToggle={(_e, expanded) => {
             if (isEditingDetails) return;
             setIsExpanded(expanded);
           }}
         >
+          {!isEditingDetails && (
+            <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} spaceItems={{ default: 'spaceItemsSm' }} style={{ marginBottom: '0.5rem' }}>
+              <FlexItem>
+                <Button
+                  variant="plain"
+                  size="sm"
+                  icon={<PencilAltIcon />}
+                  onClick={startEditing}
+                  aria-label="Edit workflow details"
+                  style={{ padding: '0 0.25rem' }}
+                />
+              </FlexItem>
+              <FlexItem>
+                <Button
+                  variant="plain"
+                  size="sm"
+                  icon={<TrashIcon />}
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  aria-label="Delete workflow"
+                  style={{ padding: '0 0.25rem', color: 'var(--pf-v5-global--danger-color--100)' }}
+                />
+              </FlexItem>
+            </Flex>
+          )}
           {isEditingDetails ? renderEditable() : renderReadOnly()}
         </ExpandableSection>
       </div>

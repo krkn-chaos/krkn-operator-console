@@ -4,8 +4,13 @@ import {
   ToolbarContent,
   ToolbarItem,
   Button,
+  Modal,
+  ModalVariant,
+  List,
+  ListItem,
+  Spinner,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, DownloadIcon, SaveIcon, TrashIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, DownloadIcon, SaveIcon, TrashIcon, ExclamationCircleIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { operatorApi } from '../../services/operatorApi';
 import { useStudioContext } from './StudioContext';
@@ -22,6 +27,9 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
   const { showError } = useNotifications();
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
+  const [isSavingBeforeRun, setIsSavingBeforeRun] = useState(false);
 
   const handleExport = () => {
     const result = exportWorkflow();
@@ -48,25 +56,71 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
     }
   };
 
-  const handleRunWithGuard = async () => {
-    if (savedFile && isDirty) {
-      if (confirm('You have unsaved changes. Save before running?')) {
-        try {
-          await operatorApi.updateFile(savedFile.fileId, {
-            fileName: savedFile.fileName,
-            content: JSON.stringify(workflow),
-            description: savedFile.description,
-            availableToAll: savedFile.availableToAll,
-            groups: savedFile.groups,
-            filePurpose: 'workflow-template',
-          });
-          setSavedFile({ ...savedFile, savedAt: new Date().toISOString() });
-        } catch (err) {
-          showError('Save failed', err instanceof Error ? err.message : 'Failed to save workflow');
-          return;
-        }
+  const validateWorkflow = (): string[] => {
+    const errors: string[] = [];
+
+    const unconfigured = workflow.nodes.filter(n => n.status !== 'configured');
+    if (unconfigured.length > 0) {
+      errors.push(
+        `${unconfigured.length} node(s) not configured: ${unconfigured.map(n => n.nodeId).join(', ')}`
+      );
+    }
+
+    if (workflow.nodes.length >= 2) {
+      const connectedNodeIds = new Set<string>();
+      for (const edge of workflow.edges) {
+        connectedNodeIds.add(edge.source);
+        connectedNodeIds.add(edge.target);
+      }
+      const disconnected = workflow.nodes.filter(n => !connectedNodeIds.has(n.nodeId));
+      if (disconnected.length > 0) {
+        errors.push(
+          `${disconnected.length} node(s) not connected: ${disconnected.map(n => n.nodeId).join(', ')}`
+        );
       }
     }
+
+    return errors;
+  };
+
+  const handleRunWithGuard = () => {
+    const errors = validateWorkflow();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
+    if (savedFile && isDirty) {
+      setIsUnsavedModalOpen(true);
+      return;
+    }
+    onRunWorkflow();
+  };
+
+  const handleSaveAndRun = async () => {
+    if (!savedFile) return;
+    setIsSavingBeforeRun(true);
+    try {
+      await operatorApi.updateFile(savedFile.fileId, {
+        fileName: savedFile.fileName,
+        content: JSON.stringify(workflow),
+        description: savedFile.description,
+        availableToAll: savedFile.availableToAll,
+        groups: savedFile.groups,
+        filePurpose: 'workflow-template',
+      });
+      setSavedFile({ ...savedFile, savedAt: new Date().toISOString() });
+      setIsUnsavedModalOpen(false);
+      onRunWorkflow();
+    } catch (err) {
+      showError('Save failed', err instanceof Error ? err.message : 'Failed to save workflow');
+    } finally {
+      setIsSavingBeforeRun(false);
+    }
+  };
+
+  const handleRunWithoutSaving = () => {
+    setIsUnsavedModalOpen(false);
     onRunWorkflow();
   };
 
@@ -153,6 +207,66 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
         onClose={() => setIsConfirmModalOpen(false)}
         onSuccess={() => setIsConfirmModalOpen(false)}
       />
+
+      <Modal
+        variant={ModalVariant.small}
+        title="Unsaved changes"
+        titleIconVariant={ExclamationTriangleIcon}
+        isOpen={isUnsavedModalOpen}
+        onClose={() => !isSavingBeforeRun && setIsUnsavedModalOpen(false)}
+        actions={[
+          <Button
+            key="save-run"
+            variant="primary"
+            icon={isSavingBeforeRun ? <Spinner size="sm" /> : <SaveIcon />}
+            onClick={handleSaveAndRun}
+            isDisabled={isSavingBeforeRun}
+          >
+            {isSavingBeforeRun ? 'Saving...' : 'Save & Run'}
+          </Button>,
+          <Button
+            key="run"
+            variant="secondary"
+            onClick={handleRunWithoutSaving}
+            isDisabled={isSavingBeforeRun}
+          >
+            Run without saving
+          </Button>,
+          <Button
+            key="cancel"
+            variant="link"
+            onClick={() => setIsUnsavedModalOpen(false)}
+            isDisabled={isSavingBeforeRun}
+          >
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          The workflow <strong>&laquo;{savedFile?.fileName}&raquo;</strong> has unsaved changes.
+          Would you like to save before running?
+        </p>
+      </Modal>
+
+      <Modal
+        variant={ModalVariant.small}
+        title="Cannot run workflow"
+        titleIconVariant={ExclamationCircleIcon}
+        isOpen={validationErrors.length > 0}
+        onClose={() => setValidationErrors([])}
+        actions={[
+          <Button key="ok" variant="primary" onClick={() => setValidationErrors([])}>
+            OK
+          </Button>,
+        ]}
+      >
+        <p style={{ marginBottom: '0.5rem' }}>Please fix the following issues before running:</p>
+        <List>
+          {validationErrors.map((err, i) => (
+            <ListItem key={i}>{err}</ListItem>
+          ))}
+        </List>
+      </Modal>
     </>
   );
 }

@@ -10,7 +10,7 @@
  * - Autosave/Recovery
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Title,
   Card,
@@ -30,6 +30,7 @@ import { StudioNodeEditorModal } from './StudioNodeEditorModal';
 import { RunWorkflowModal } from './RunWorkflowModal';
 import { LoadWorkflowSelect } from './LoadWorkflowSelect';
 import { WorkflowDetailsPanel } from './WorkflowDetailsPanel';
+import { studioLeaveGuard } from './studioLeaveGuard';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
@@ -39,6 +40,29 @@ function StudioContent() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isRunWorkflowOpen, setIsRunWorkflowOpen] = useState(false);
   const targetFetch = useStudioTargetFetch();
+
+  const workflowRef = useRef(workflow);
+  workflowRef.current = workflow;
+  const savedFileRef = useRef(savedFile);
+  savedFileRef.current = savedFile;
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
+  useEffect(() => {
+    studioLeaveGuard.current = () => {
+      if (workflowRef.current.nodes.length === 0) return true;
+      if (savedFileRef.current && isDirtyRef.current) {
+        return confirm('You have unsaved changes. Leave without saving?');
+      }
+      if (!savedFileRef.current) {
+        const allowed = confirm('You have an unsaved workflow. Leave without saving?');
+        if (allowed) clearAutosave();
+        return allowed;
+      }
+      return true;
+    };
+    return () => { studioLeaveGuard.current = null; };
+  }, []);
 
   const handleNodeClick = useCallback((node: StudioNode) => {
     setSelectedNode(node);
@@ -57,18 +81,9 @@ function StudioContent() {
   }, [updateNode]);
 
   const handleBackToRuns = useCallback(() => {
-    if (workflow.nodes.length === 0) {
-      dispatch({ type: 'JOBS_LIST_READY' });
-      return;
-    }
-    if (savedFile && isDirty) {
-      if (!confirm('You have unsaved changes. Leave without saving?')) return;
-    } else if (!savedFile) {
-      if (!confirm('You have an unsaved workflow. Leave without saving?')) return;
-      clearAutosave();
-    }
+    if (studioLeaveGuard.current && !studioLeaveGuard.current()) return;
     dispatch({ type: 'JOBS_LIST_READY' });
-  }, [dispatch, workflow.nodes.length, savedFile, isDirty]);
+  }, [dispatch]);
 
   const handleRunWorkflow = useCallback(() => {
     // Blur the active element to prevent aria-hidden warning

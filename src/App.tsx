@@ -9,6 +9,7 @@ import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly, QuakeTerminal, Studio } from './components';
+import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { UserForm } from './components/UserForm';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
@@ -259,7 +260,14 @@ function App() {
     }
   };
 
+  const checkStudioGuard = (): boolean => {
+    if (state.phase !== 'studio') return true;
+    if (studioLeaveGuard.current && !studioLeaveGuard.current()) return false;
+    return true;
+  };
+
   const handleNavigateToSettings = () => {
+    if (!checkStudioGuard()) return;
     dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
   };
 
@@ -268,6 +276,7 @@ function App() {
   };
 
   const handleNavigateToHome = () => {
+    if (!checkStudioGuard()) return;
     dispatch({ type: 'JOBS_LIST_READY' });
   };
 
