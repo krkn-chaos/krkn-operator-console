@@ -68,7 +68,7 @@ class WebSocketService {
    */
   connect(connectionId: string, url: string, options?: WebSocketConnectionOptions): string {
     const existing = this.connections.get(connectionId);
-    if (existing && !existing.isCleanedUp &&
+    if (existing && !existing.isCleanedUp && existing.ws &&
         (existing.ws.readyState === WebSocket.CONNECTING || existing.ws.readyState === WebSocket.OPEN)) {
       existing.refCount++;
       return connectionId;
@@ -133,7 +133,7 @@ class WebSocketService {
       conn.subscriptions.push(sub);
     }
 
-    if (conn.ws.readyState === WebSocket.OPEN) {
+    if (conn.ws?.readyState === WebSocket.OPEN) {
       this.sendClientMessage(conn, { action: 'subscribe', resource, ids });
     }
   }
@@ -149,7 +149,7 @@ class WebSocketService {
       s => !(s.resource === resource && JSON.stringify(s.ids) === JSON.stringify(ids))
     );
 
-    if (conn.ws.readyState === WebSocket.OPEN) {
+    if (conn.ws?.readyState === WebSocket.OPEN) {
       this.sendClientMessage(conn, { action: 'unsubscribe', resource, ids });
     }
   }
@@ -231,6 +231,7 @@ class WebSocketService {
     const token = authService.getToken();
     if (!token) {
       this.setState(conn, 'error');
+      this.connections.delete(connectionId);
       return;
     }
 
@@ -330,7 +331,7 @@ class WebSocketService {
   }
 
   private sendClientMessage(conn: ManagedConnection, message: ClientMessage): void {
-    if (conn.ws.readyState === WebSocket.OPEN) {
+    if (conn.ws?.readyState === WebSocket.OPEN) {
       conn.ws.send(JSON.stringify(message));
     }
   }

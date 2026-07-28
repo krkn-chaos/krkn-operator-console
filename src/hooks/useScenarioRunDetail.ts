@@ -22,24 +22,19 @@ export function useScenarioRunDetail(scenarioRunName: string | null) {
   const [runDetail, setRunDetail] = useState<ScenarioRunStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Reset when scenarioRunName changes
+  // Reset when scenarioRunName changes (including when disabled)
   useEffect(() => {
-    if (scenarioRunName) {
-      setRunDetail(null);
-    }
+    setRunDetail(null);
   }, [scenarioRunName]);
 
   // WebSocket message handler
   const handleMessage = useCallback((message: ServerMessage) => {
     if (message.resource !== 'run-detail') return;
 
-    console.log('[useScenarioRunDetail] Received message:', message);
-
     if (message.event === 'updated' || message.event === 'created') {
       const data = message.data as ScenarioRunStatusResponse;
       setRunDetail(data);
     } else if (message.event === 'deleted') {
-      console.log('[useScenarioRunDetail] Run deleted, clearing detail');
       setRunDetail(null);
     }
   }, []);
@@ -76,8 +71,8 @@ export function useScenarioRunDetail(scenarioRunName: string | null) {
     try {
       const detail = await operatorApi.getScenarioRunStatus(scenarioRunName);
       setRunDetail(detail);
-    } catch (error) {
-      console.error('[useScenarioRunDetail] Failed to refetch:', error);
+    } catch {
+      // Silent failure — caller can retry
     } finally {
       setIsLoading(false);
     }
