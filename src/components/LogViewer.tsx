@@ -107,8 +107,15 @@ export function LogViewer({ scenarioRunName, jobId, clusterName, podName, status
       return;
     }
 
-    // If job is in terminal state, don't follow (get static logs)
-    const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
+    // If job is in a terminal state, don't follow (get static logs).
+    // A run that fails and exhausts retries ends as "MaxRetriesExceeded", and a
+    // cancelled one as "Cancelled" - both are terminal and must show their logs.
+    const isTerminal =
+      status === 'Succeeded' ||
+      status === 'Failed' ||
+      status === 'Stopped' ||
+      status === 'MaxRetriesExceeded' ||
+      status === 'Cancelled';
 
     if (!isTerminal) {
       setLogs(['Connecting to log stream...']);
