@@ -36,7 +36,7 @@ interface StudioContextType {
   validateNodeId: (nodeId: string, excludeId?: string) => { valid: boolean; error?: string };
   exportWorkflow: () => { graph: { [nodeId: string]: GraphScenarioNode }; metadata: { exportedAt: string; nodeCount: number } } | { error: string };
   clearWorkflow: () => void;
-  setSavedFile: (meta: SavedFileMetadata) => void;
+  setSavedFile: (meta: SavedFileMetadata, workflowSnapshot?: StudioWorkflow) => void;
   clearSavedFile: () => void;
   loadWorkflow: (workflow: StudioWorkflow, meta: SavedFileMetadata) => void;
   isDirty: boolean;
@@ -337,9 +337,9 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
     };
   }, [workflow]);
 
-  const setSavedFile = useCallback((meta: SavedFileMetadata) => {
+  const setSavedFile = useCallback((meta: SavedFileMetadata, workflowSnapshot?: StudioWorkflow) => {
     setSavedFileState(meta);
-    setLastSavedSnapshot(JSON.stringify(workflowRef.current));
+    setLastSavedSnapshot(JSON.stringify(workflowSnapshot ?? workflowRef.current));
     clearAutosave();
   }, []);
 
@@ -351,6 +351,7 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
     setWorkflow(newWorkflow);
     setSavedFileState(meta);
     setLastSavedSnapshot(JSON.stringify(newWorkflow));
+    setIsEditingDetails(false);
     clearAutosave();
   }, []);
 

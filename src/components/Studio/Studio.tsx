@@ -17,10 +17,17 @@ import {
   CardBody,
   CardTitle,
   Button,
+  Flex,
+  FlexItem,
+  Modal,
+  ModalVariant,
+  Spinner,
 } from '@patternfly/react-core';
-import { ArrowLeftIcon } from '@patternfly/react-icons';
+import { ArrowLeftIcon, PencilAltIcon, TrashIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../../context/AppContext';
 import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
+import { useNotifications } from '../../hooks';
+import { operatorApi } from '../../services/operatorApi';
 import { StudioProvider, useStudioContext } from './StudioContext';
 import { loadAutosave, clearAutosave } from './studioAutosave';
 import { StudioToolbar } from './StudioToolbar';
@@ -35,10 +42,13 @@ import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
   const { dispatch } = useAppContext();
-  const { updateNode, workflow, savedFile, isDirty } = useStudioContext();
+  const { updateNode, workflow, savedFile, isDirty, clearSavedFile, clearWorkflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const { showSuccess, showError } = useNotifications();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isRunWorkflowOpen, setIsRunWorkflowOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const targetFetch = useStudioTargetFetch();
 
   const workflowRef = useRef(workflow);
@@ -63,6 +73,22 @@ function StudioContent() {
     };
     return () => { studioLeaveGuard.current = null; };
   }, []);
+
+  const handleDeleteWorkflow = useCallback(async () => {
+    if (!savedFile) return;
+    setIsDeleting(true);
+    try {
+      await operatorApi.deleteFile(savedFile.fileId);
+      showSuccess('Workflow deleted', `"${savedFile.fileName}" deleted from cluster`);
+      setIsDeleteModalOpen(false);
+      clearSavedFile();
+      clearWorkflow();
+    } catch (err) {
+      showError('Delete failed', err instanceof Error ? err.message : 'Failed to delete workflow');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [savedFile, clearSavedFile, clearWorkflow, showSuccess, showError]);
 
   const handleNodeClick = useCallback((node: StudioNode) => {
     setSelectedNode(node);
@@ -131,10 +157,62 @@ function StudioContent() {
       <Card style={{ marginBottom: '1rem' }}>
         <CardTitle>Workflow Templates</CardTitle>
         <CardBody>
-          <LoadWorkflowSelect />
+          <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
+            <FlexItem>
+              <LoadWorkflowSelect />
+            </FlexItem>
+            {savedFile && !isEditingDetails && (
+              <>
+                <FlexItem>
+                  <Button
+                    variant="plain"
+                    icon={<PencilAltIcon />}
+                    onClick={() => setIsEditingDetails(true)}
+                    aria-label="Edit workflow details"
+                  />
+                </FlexItem>
+                <FlexItem>
+                  <Button
+                    variant="plain"
+                    icon={<TrashIcon />}
+                    onClick={() => setIsDeleteModalOpen(true)}
+                    aria-label="Delete workflow"
+                    style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                  />
+                </FlexItem>
+              </>
+            )}
+          </Flex>
           <WorkflowDetailsPanel />
         </CardBody>
       </Card>
+
+      {/* Delete Workflow Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Delete Workflow"
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        actions={[
+          <Button
+            key="delete"
+            variant="danger"
+            onClick={handleDeleteWorkflow}
+            isDisabled={isDeleting}
+            icon={isDeleting ? <Spinner size="sm" /> : undefined}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setIsDeleteModalOpen(false)} isDisabled={isDeleting}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          Are you sure you want to delete the workflow <strong>&laquo;{savedFile?.fileName}&raquo;</strong> from the cluster?
+          This will also clear the current canvas.
+        </p>
+      </Modal>
 
       {/* Content */}
       <Card>

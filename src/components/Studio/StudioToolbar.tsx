@@ -66,20 +66,6 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
       );
     }
 
-    if (workflow.nodes.length >= 2) {
-      const connectedNodeIds = new Set<string>();
-      for (const edge of workflow.edges) {
-        connectedNodeIds.add(edge.source);
-        connectedNodeIds.add(edge.target);
-      }
-      const disconnected = workflow.nodes.filter(n => !connectedNodeIds.has(n.nodeId));
-      if (disconnected.length > 0) {
-        errors.push(
-          `${disconnected.length} node(s) not connected: ${disconnected.map(n => n.nodeId).join(', ')}`
-        );
-      }
-    }
-
     return errors;
   };
 
@@ -99,17 +85,18 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
 
   const handleSaveAndRun = async () => {
     if (!savedFile) return;
+    const snapshotAtSave = { ...workflow };
     setIsSavingBeforeRun(true);
     try {
       await operatorApi.updateFile(savedFile.fileId, {
         fileName: savedFile.fileName,
-        content: JSON.stringify(workflow),
+        content: JSON.stringify(snapshotAtSave),
         description: savedFile.description,
         availableToAll: savedFile.availableToAll,
         groups: savedFile.groups,
         filePurpose: 'workflow-template',
       });
-      setSavedFile({ ...savedFile, savedAt: new Date().toISOString() });
+      setSavedFile({ ...savedFile, savedAt: new Date().toISOString() }, snapshotAtSave);
       setIsUnsavedModalOpen(false);
       onRunWorkflow();
     } catch (err) {

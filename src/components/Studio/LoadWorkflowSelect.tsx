@@ -16,10 +16,10 @@ import { FolderOpenIcon } from '@patternfly/react-icons';
 import { operatorApi } from '../../services/operatorApi';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
-import type { FileInfo, StudioWorkflow } from '../../types/api';
+import type { FileInfo } from '../../types/api';
 
 export function LoadWorkflowSelect() {
-  const { workflow, loadWorkflow } = useStudioContext();
+  const { workflow, loadWorkflow, savedFile } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,8 +55,8 @@ export function LoadWorkflowSelect() {
     setIsLoadingWorkflow(true);
     try {
       const file = await operatorApi.getFile(fileId);
-      const parsed: StudioWorkflow = JSON.parse(file.content);
-      if (!parsed.nodes || !parsed.edges) {
+      const parsed = JSON.parse(file.content);
+      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges) || typeof parsed.nextNodeNumber !== 'number') {
         throw new Error('Invalid workflow format');
       }
       loadWorkflow(parsed, {
@@ -98,7 +98,7 @@ export function LoadWorkflowSelect() {
           isDisabled={isLoadingWorkflow}
           icon={isLoadingWorkflow ? <Spinner size="sm" /> : <FolderOpenIcon />}
         >
-          {isLoadingWorkflow ? 'Loading...' : 'Load Workflow'}
+          {isLoadingWorkflow ? 'Loading...' : savedFile ? savedFile.fileName : 'Load Workflow'}
         </MenuToggle>
       )}
     >

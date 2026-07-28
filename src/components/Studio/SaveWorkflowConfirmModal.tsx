@@ -23,17 +23,18 @@ export function SaveWorkflowConfirmModal({ isOpen, onClose, onSuccess }: SaveWor
   const handleUpdate = async () => {
     if (!savedFile) return;
 
+    const snapshotAtSave = { ...workflow };
     setIsSaving(true);
     try {
       await operatorApi.updateFile(savedFile.fileId, {
         fileName: savedFile.fileName,
-        content: JSON.stringify(workflow),
+        content: JSON.stringify(snapshotAtSave),
         description: savedFile.description,
         availableToAll: savedFile.availableToAll,
         groups: savedFile.groups,
         filePurpose: 'workflow-template',
       });
-      setSavedFile({ ...savedFile, savedAt: new Date().toISOString() });
+      setSavedFile({ ...savedFile, savedAt: new Date().toISOString() }, snapshotAtSave);
       showSuccess('Workflow updated', `"${savedFile.fileName}" updated successfully`);
       onClose();
       onSuccess();

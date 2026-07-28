@@ -24,10 +24,8 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
-  Modal,
-  ModalVariant,
 } from '@patternfly/react-core';
-import { PencilAltIcon, CheckIcon, TimesIcon, TrashIcon } from '@patternfly/react-icons';
+import { CheckIcon, TimesIcon } from '@patternfly/react-icons';
 import { FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useStudioContext } from './StudioContext';
@@ -38,13 +36,11 @@ import type { GroupResponse } from '../../types/api';
 const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
 export function WorkflowDetailsPanel() {
-  const { savedFile, setSavedFile, clearSavedFile, clearWorkflow, workflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const { savedFile, setSavedFile, workflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const [isExpanded, setIsExpanded] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -70,6 +66,17 @@ export function WorkflowDetailsPanel() {
     }
   }, [isAdmin, availableGroups, editAccessType, editSelectedGroup]);
 
+  useEffect(() => {
+    if (isEditingDetails && savedFile) {
+      setEditName(savedFile.fileName);
+      setEditDescription(savedFile.description || '');
+      setEditAccessType(savedFile.availableToAll ? 'public' : 'group');
+      setEditSelectedGroup(savedFile.groups?.[0] || '');
+      setValidationErrors({});
+      setGroupsLoaded(false);
+    }
+  }, [isEditingDetails, savedFile]);
+
   if (!savedFile) return null;
 
   const formatTimestamp = (iso: string): string => {
@@ -78,16 +85,6 @@ export function WorkflowDetailsPanel() {
     } catch {
       return iso;
     }
-  };
-
-  const startEditing = () => {
-    setEditName(savedFile.fileName);
-    setEditDescription(savedFile.description || '');
-    setEditAccessType(savedFile.availableToAll ? 'public' : 'group');
-    setEditSelectedGroup(savedFile.groups?.[0] || '');
-    setValidationErrors({});
-    setGroupsLoaded(false);
-    setIsEditingDetails(true);
   };
 
   const cancelEditing = () => {
@@ -114,12 +111,13 @@ export function WorkflowDetailsPanel() {
 
     const trimmedName = editName.trim();
     const groupsArray = editAccessType === 'group' && editSelectedGroup ? [editSelectedGroup] : [];
+    const snapshotAtSave = { ...workflow };
 
     setIsSaving(true);
     try {
       await operatorApi.updateFile(savedFile.fileId, {
         fileName: trimmedName,
-        content: JSON.stringify(workflow),
+        content: JSON.stringify(snapshotAtSave),
         description: editDescription.trim() || undefined,
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
@@ -132,28 +130,13 @@ export function WorkflowDetailsPanel() {
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
         savedAt: new Date().toISOString(),
-      });
+      }, snapshotAtSave);
       showSuccess('Workflow updated', `"${trimmedName}" updated successfully`);
       setIsEditingDetails(false);
     } catch (err) {
       showError('Update failed', err instanceof Error ? err.message : 'Failed to update workflow');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      await operatorApi.deleteFile(savedFile.fileId);
-      showSuccess('Workflow deleted', `"${savedFile.fileName}" deleted from cluster`);
-      setIsDeleteModalOpen(false);
-      clearSavedFile();
-      clearWorkflow();
-    } catch (err) {
-      showError('Delete failed', err instanceof Error ? err.message : 'Failed to delete workflow');
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -396,69 +379,17 @@ export function WorkflowDetailsPanel() {
   );
 
   return (
-    <>
-      <div style={{ marginBottom: '1rem' }}>
-        <ExpandableSection
-          toggleContent={isExpanded ? 'Workflow details' : `Workflow details — ${savedFile.fileName}`}
-          isExpanded={isExpanded}
-          onToggle={(_e, expanded) => {
-            if (isEditingDetails) return;
-            setIsExpanded(expanded);
-          }}
-        >
-          {!isEditingDetails && (
-            <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} spaceItems={{ default: 'spaceItemsSm' }} style={{ marginBottom: '0.5rem' }}>
-              <FlexItem>
-                <Button
-                  variant="plain"
-                  size="sm"
-                  icon={<PencilAltIcon />}
-                  onClick={startEditing}
-                  aria-label="Edit workflow details"
-                  style={{ padding: '0 0.25rem' }}
-                />
-              </FlexItem>
-              <FlexItem>
-                <Button
-                  variant="plain"
-                  size="sm"
-                  icon={<TrashIcon />}
-                  onClick={() => setIsDeleteModalOpen(true)}
-                  aria-label="Delete workflow"
-                  style={{ padding: '0 0.25rem', color: 'var(--pf-v5-global--danger-color--100)' }}
-                />
-              </FlexItem>
-            </Flex>
-          )}
-          {isEditingDetails ? renderEditable() : renderReadOnly()}
-        </ExpandableSection>
-      </div>
-
-      <Modal
-        variant={ModalVariant.small}
-        title="Delete Workflow"
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        actions={[
-          <Button
-            key="delete"
-            variant="danger"
-            onClick={handleDelete}
-            isDisabled={isDeleting}
-            icon={isDeleting ? <Spinner size="sm" /> : undefined}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </Button>,
-          <Button key="cancel" variant="link" onClick={() => setIsDeleteModalOpen(false)} isDisabled={isDeleting}>
-            Cancel
-          </Button>,
-        ]}
+    <div style={{ marginTop: '0.75rem' }}>
+      <ExpandableSection
+        toggleContent={isExpanded ? 'Workflow details' : `Workflow details — ${savedFile.fileName}`}
+        isExpanded={isExpanded}
+        onToggle={(_e, expanded) => {
+          if (isEditingDetails) return;
+          setIsExpanded(expanded);
+        }}
       >
-        <p>
-          Are you sure you want to delete the workflow <strong>&laquo;{savedFile.fileName}&raquo;</strong> from the cluster?
-          This will also clear the current canvas.
-        </p>
-      </Modal>
-    </>
+        {isEditingDetails ? renderEditable() : renderReadOnly()}
+      </ExpandableSection>
+    </div>
   );
 }
