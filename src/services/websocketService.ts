@@ -231,7 +231,6 @@ class WebSocketService {
     const token = authService.getToken();
     if (!token) {
       this.setState(conn, 'error');
-      this.connections.delete(connectionId);
       return;
     }
 
