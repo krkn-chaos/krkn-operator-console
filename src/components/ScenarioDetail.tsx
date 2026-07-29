@@ -8,7 +8,10 @@ import {
   Alert,
   Spinner,
   Checkbox,
+  Modal,
+  ModalVariant,
 } from '@patternfly/react-core';
+import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { useNotifications } from '../hooks';
@@ -51,7 +54,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [conflictWarning, setConflictWarning] = useState<{
     clusterName: string;
@@ -61,7 +63,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [fileReferences, setFileReferences] = useState<import('../types/api').FileReference[]>([]);
   const [availableFiles, setAvailableFiles] = useState<import('../types/api').FileInfo[]>([]);
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
-  const [pendingFileWarningShown, setPendingFileWarningShown] = useState(false);
+  const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -77,13 +79,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     loadFiles();
   }, []);
 
-  // Reset warning when pending input is cleared
-  useEffect(() => {
-    if (!hasPendingFileInput && pendingFileWarningShown) {
-      setPendingFileWarningShown(false);
-      setValidationWarnings([]);
-    }
-  }, [hasPendingFileInput, pendingFileWarningShown]);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -191,17 +186,15 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handlePreview = () => {
-    // Check for pending file input BEFORE validation
-    if (hasPendingFileInput && !pendingFileWarningShown) {
-      setValidationWarnings([
-        'You have unsaved changes in the Managed Files section. Click "Add" to include the file, or clear the selection to proceed without it.',
-      ]);
-      setPendingFileWarningShown(true);
+    if (hasPendingFileInput) {
+      setIsPendingFileModalOpen(true);
       return;
     }
+    proceedToPreview();
+  };
 
+  const proceedToPreview = () => {
     if (validateForm()) {
-      setValidationWarnings([]); // Clear warnings when proceeding
       setShowPreview(true);
     }
   };
@@ -363,6 +356,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         kubeconfigPath: '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
+        fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
         registryName: registryConfig?.registryName,
       };
 
@@ -460,20 +454,40 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         </Alert>
       )}
 
-      {/* Validation Warnings */}
-      {validationWarnings.length > 0 && (
-        <Alert
-          variant="warning"
-          title="Warning"
-          style={{ marginBottom: '1.5rem' }}
-        >
-          <ul>
-            {validationWarnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
-        </Alert>
-      )}
+      {/* Pending File Warning Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Pending file not added"
+        titleIconVariant={ExclamationTriangleIcon}
+        isOpen={isPendingFileModalOpen}
+        onClose={() => setIsPendingFileModalOpen(false)}
+        actions={[
+          <Button
+            key="continue"
+            variant="primary"
+            onClick={() => {
+              setIsPendingFileModalOpen(false);
+              proceedToPreview();
+            }}
+          >
+            Continue without adding
+          </Button>,
+          <Button
+            key="cancel"
+            variant="link"
+            onClick={() => setIsPendingFileModalOpen(false)}
+          >
+            Go back
+          </Button>,
+        ]}
+      >
+        <p>
+          You have selected a file in the Managed Files section but you haven&apos;t clicked
+          the <strong>&laquo;Add&raquo;</strong> button yet. The file will <strong>not</strong> be
+          included in the run unless you go back and click <strong>&laquo;Add&raquo;</strong> to
+          confirm it.
+        </p>
+      </Modal>
 
       {!showPreview ? (
         <>
@@ -499,12 +513,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               </div>
               <FileSelector
                 value={fileReferences}
-                onChange={(refs) => {
-                  setFileReferences(refs);
-                  // Reset warning when user adds/removes files
-                  setPendingFileWarningShown(false);
-                  setValidationWarnings([]);
-                }}
+                onChange={setFileReferences}
                 onPendingChange={setHasPendingFileInput}
               />
             </CardBody>
