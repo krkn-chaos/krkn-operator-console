@@ -27,7 +27,8 @@ import {
 } from '@patternfly/react-core';
 import { FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
-import { useStudioContext } from './StudioContext';
+import { workflowsApi } from '../../services/workflowsApi';
+import { useStudioContext, buildGraph } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { useRole } from '../../hooks/useRole';
 import type { GroupResponse } from '../../types/api';
@@ -47,9 +48,8 @@ interface SaveWorkflowModalProps {
  * description, and visibility setting (Public or Group-scoped). Admins can
  * choose any group; non-admins see only their own groups.
  *
- * On save, creates a new file via `operatorApi.createFile` with
- * `filePurpose='workflow-template'` and stores the resulting metadata in
- * StudioContext via `setSavedFile`.
+ * On save, creates a new workflow via `workflowsApi.createWorkflow` and stores
+ * the resulting metadata in StudioContext via `setSavedWorkflow`.
  *
  * @example
  * ```tsx
@@ -61,7 +61,7 @@ interface SaveWorkflowModalProps {
  * ```
  */
 export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowModalProps) {
-  const { workflow, setSavedFile } = useStudioContext();
+  const { workflow, setSavedWorkflow } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
 
@@ -112,17 +112,17 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
 
     setIsSaving(true);
     try {
-      const response = await operatorApi.createFile({
-        fileName: trimmedName,
-        content: JSON.stringify(workflow),
+      const response = await workflowsApi.createWorkflow({
+        workflowName: trimmedName,
+        graph: buildGraph(workflow),
+        studioLayout: workflow,
         description: description.trim() || undefined,
         availableToAll: accessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
-        filePurpose: 'workflow-template',
       });
-      setSavedFile({
-        fileId: response.fileId,
-        fileName: trimmedName,
+      setSavedWorkflow({
+        workflowId: response.workflowId,
+        workflowName: trimmedName,
         description: description.trim() || undefined,
         availableToAll: accessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,

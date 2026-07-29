@@ -1101,6 +1101,71 @@ export interface FilesListResponse {
 }
 
 // ============================================================================
+// Workflow Templates API Types
+// ============================================================================
+
+export interface WorkflowInfo {
+  workflowId: string;
+  workflowName: string;
+  description?: string;
+  fileType?: string;
+  nodeCount?: number;
+}
+
+export interface AvailableWorkflowsResponse {
+  workflows: WorkflowInfo[];
+}
+
+export interface WorkflowResponse {
+  workflowId: string;
+  workflowName: string;
+  graph: { [nodeId: string]: GraphScenarioNode };
+  studioLayout?: StudioWorkflow;
+  description?: string;
+  availableToAll: boolean;
+  groups?: string[];
+  fileType?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+export interface CreateWorkflowRequest {
+  workflowName: string;
+  graph: { [nodeId: string]: GraphScenarioNode };
+  studioLayout?: StudioWorkflow;
+  description?: string;
+  availableToAll: boolean;
+  groups?: string[];
+  fileType?: string;
+}
+
+export interface CreateWorkflowResponse {
+  message: string;
+  workflowId: string;
+}
+
+export interface UpdateWorkflowRequest {
+  workflowName: string;
+  graph: { [nodeId: string]: GraphScenarioNode };
+  studioLayout?: StudioWorkflow;
+  description?: string;
+  availableToAll: boolean;
+  groups?: string[];
+  fileType?: string;
+}
+
+export interface UpdateWorkflowResponse {
+  message: string;
+  workflowId: string;
+}
+
+export interface DeleteWorkflowResponse {
+  message: string;
+}
+
+// ============================================================================
 // Groups API Types
 // ============================================================================
 

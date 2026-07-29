@@ -33,7 +33,7 @@ vi.mock('./SaveWorkflowConfirmModal', () => ({
 function buildMockContext(overrides: Record<string, unknown> = {}) {
   return {
     workflow: { nodes: [], edges: [], nextNodeNumber: 1 },
-    savedFile: null,
+    savedWorkflow: null,
     isDirty: false,
     isEditingDetails: false,
     addNode: vi.fn(),
@@ -82,9 +82,9 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-          savedFile: {
-            fileId: 'f1',
-            fileName: 'my-workflow',
+          savedWorkflow: {
+            workflowId: 'w1',
+            workflowName: 'my-workflow',
             availableToAll: true,
             savedAt: '2024-01-01',
           },
@@ -97,7 +97,7 @@ describe('StudioToolbar', () => {
       expect(screen.getByText('Save Workflow')).toBeInTheDocument();
     });
 
-    it('shows "Update Workflow" when savedFile exists and isDirty is true', () => {
+    it('shows "Update Workflow" when savedWorkflow exists and isDirty is true', () => {
       vi.mocked(useStudioContext).mockReturnValue(
         buildMockContext({
           workflow: {
@@ -105,9 +105,9 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-          savedFile: {
-            fileId: 'f1',
-            fileName: 'my-workflow',
+          savedWorkflow: {
+            workflowId: 'w1',
+            workflowName: 'my-workflow',
             availableToAll: true,
             savedAt: '2024-01-01',
           },
@@ -149,7 +149,7 @@ describe('StudioToolbar', () => {
   });
 
   describe('Unsaved changes modal', () => {
-    it('shows unsaved changes modal when savedFile exists and isDirty', async () => {
+    it('shows unsaved changes modal when savedWorkflow exists and isDirty', async () => {
       const user = userEvent.setup();
 
       vi.mocked(useStudioContext).mockReturnValue(
@@ -159,9 +159,9 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-          savedFile: {
-            fileId: 'f1',
-            fileName: 'my-workflow',
+          savedWorkflow: {
+            workflowId: 'w1',
+            workflowName: 'my-workflow',
             availableToAll: true,
             savedAt: '2024-01-01',
           },
@@ -189,9 +189,9 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-          savedFile: {
-            fileId: 'f1',
-            fileName: 'my-workflow',
+          savedWorkflow: {
+            workflowId: 'w1',
+            workflowName: 'my-workflow',
             availableToAll: true,
             savedAt: '2024-01-01',
           },
@@ -225,9 +225,9 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-          savedFile: {
-            fileId: 'f1',
-            fileName: 'my-workflow',
+          savedWorkflow: {
+            workflowId: 'w1',
+            workflowName: 'my-workflow',
             availableToAll: true,
             savedAt: '2024-01-01',
           },
@@ -263,9 +263,9 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-          savedFile: {
-            fileId: 'f1',
-            fileName: 'my-workflow',
+          savedWorkflow: {
+            workflowId: 'w1',
+            workflowName: 'my-workflow',
             availableToAll: true,
             savedAt: '2024-01-01',
           },
@@ -356,7 +356,7 @@ describe('StudioToolbar', () => {
   });
 
   describe('Save button behavior', () => {
-    it('opens SaveWorkflowModal when no savedFile exists', async () => {
+    it('opens SaveWorkflowModal when no savedWorkflow exists', async () => {
       const user = userEvent.setup();
 
       vi.mocked(useStudioContext).mockReturnValue(
@@ -376,7 +376,7 @@ describe('StudioToolbar', () => {
       expect(screen.getByTestId('save-workflow-modal')).toBeInTheDocument();
     });
 
-    it('opens SaveWorkflowConfirmModal when savedFile exists', async () => {
+    it('opens SaveWorkflowConfirmModal when savedWorkflow exists', async () => {
       const user = userEvent.setup();
 
       vi.mocked(useStudioContext).mockReturnValue(
@@ -386,9 +386,9 @@ describe('StudioToolbar', () => {
             edges: [],
             nextNodeNumber: 2,
           },
-          savedFile: {
-            fileId: 'f1',
-            fileName: 'my-workflow',
+          savedWorkflow: {
+            workflowId: 'w1',
+            workflowName: 'my-workflow',
             availableToAll: true,
             savedAt: '2024-01-01',
           },

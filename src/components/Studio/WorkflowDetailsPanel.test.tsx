@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { WorkflowDetailsPanel } from './WorkflowDetailsPanel';
 import { useStudioContext } from './StudioContext';
+import { workflowsApi } from '../../services/workflowsApi';
 import { operatorApi } from '../../services/operatorApi';
 
 vi.mock('./StudioContext', () => ({
   useStudioContext: vi.fn(),
+  buildGraph: vi.fn(() => ({})),
 }));
 
 vi.mock('../../hooks', () => ({
@@ -20,21 +22,26 @@ vi.mock('../../hooks/useRole', () => ({
   useRole: vi.fn(() => ({ isAdmin: true })),
 }));
 
+vi.mock('../../services/workflowsApi', () => ({
+  workflowsApi: {
+    updateWorkflow: vi.fn(),
+  },
+}));
+
 vi.mock('../../services/operatorApi', () => ({
   operatorApi: {
     getGroups: vi.fn(),
-    updateFile: vi.fn(),
   },
 }));
 
 const mockShowSuccess = vi.fn();
 const mockShowError = vi.fn();
-const mockSetSavedFile = vi.fn();
+const mockSetSavedWorkflow = vi.fn();
 const mockSetIsEditingDetails = vi.fn();
 
-const baseSavedFile = {
-  fileId: 'f1',
-  fileName: 'test-workflow',
+const baseSavedWorkflow = {
+  workflowId: 'w1',
+  workflowName: 'test-workflow',
   description: 'A test workflow',
   availableToAll: true,
   groups: undefined as string[] | undefined,
@@ -49,8 +56,8 @@ const baseWorkflow = {
 
 function makeContext(overrides: Partial<ReturnType<typeof useStudioContext>> = {}) {
   return {
-    savedFile: baseSavedFile,
-    setSavedFile: mockSetSavedFile,
+    savedWorkflow: baseSavedWorkflow,
+    setSavedWorkflow: mockSetSavedWorkflow,
     workflow: baseWorkflow,
     isEditingDetails: false,
     setIsEditingDetails: mockSetIsEditingDetails,
@@ -62,12 +69,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(useStudioContext).mockReturnValue(makeContext());
   vi.mocked(operatorApi.getGroups).mockResolvedValue({ groups: [] });
-  vi.mocked(operatorApi.updateFile).mockResolvedValue({ message: 'ok', fileId: 'f1' });
+  vi.mocked(workflowsApi.updateWorkflow).mockResolvedValue({ message: 'ok', workflowId: 'w1' });
 });
 
 describe('WorkflowDetailsPanel', () => {
-  it('returns null when no savedFile', () => {
-    vi.mocked(useStudioContext).mockReturnValue(makeContext({ savedFile: null }));
+  it('returns null when no savedWorkflow', () => {
+    vi.mocked(useStudioContext).mockReturnValue(makeContext({ savedWorkflow: null }));
 
     const { container } = render(<WorkflowDetailsPanel />);
     expect(container.innerHTML).toBe('');
@@ -88,7 +95,7 @@ describe('WorkflowDetailsPanel', () => {
   it('shows "No description" in italics when description is empty', () => {
     vi.mocked(useStudioContext).mockReturnValue(
       makeContext({
-        savedFile: { ...baseSavedFile, description: undefined },
+        savedWorkflow: { ...baseSavedWorkflow, description: undefined },
       })
     );
 
@@ -99,7 +106,7 @@ describe('WorkflowDetailsPanel', () => {
   it('shows group label when not public', () => {
     vi.mocked(useStudioContext).mockReturnValue(
       makeContext({
-        savedFile: { ...baseSavedFile, availableToAll: false, groups: ['team-alpha'] },
+        savedWorkflow: { ...baseSavedWorkflow, availableToAll: false, groups: ['team-alpha'] },
       })
     );
 
@@ -148,7 +155,7 @@ describe('WorkflowDetailsPanel', () => {
 
     render(<WorkflowDetailsPanel />);
 
-    // Name input should be pre-filled with savedFile.fileName
+    // Name input should be pre-filled with savedWorkflow.workflowName
     const nameInput = screen.getByDisplayValue('test-workflow');
     expect(nameInput).toBeInTheDocument();
 
@@ -186,8 +193,8 @@ describe('WorkflowDetailsPanel', () => {
       expect(screen.getByText('Name is required')).toBeInTheDocument();
     });
 
-    // updateFile should NOT have been called
-    expect(operatorApi.updateFile).not.toHaveBeenCalled();
+    // updateWorkflow should NOT have been called
+    expect(workflowsApi.updateWorkflow).not.toHaveBeenCalled();
   });
 
   it('shows validation error for invalid filename characters', async () => {
@@ -212,7 +219,7 @@ describe('WorkflowDetailsPanel', () => {
     });
   });
 
-  it('save button calls operatorApi.updateFile and setSavedFile', async () => {
+  it('save button calls workflowsApi.updateWorkflow and setSavedWorkflow', async () => {
     const user = userEvent.setup();
 
     vi.mocked(useStudioContext).mockReturnValue(
@@ -230,17 +237,16 @@ describe('WorkflowDetailsPanel', () => {
     await user.click(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
-      expect(operatorApi.updateFile).toHaveBeenCalledWith('f1', expect.objectContaining({
-        fileName: 'updated-workflow',
-        filePurpose: 'workflow-template',
+      expect(workflowsApi.updateWorkflow).toHaveBeenCalledWith('w1', expect.objectContaining({
+        workflowName: 'updated-workflow',
         availableToAll: true,
       }));
     });
 
-    expect(mockSetSavedFile).toHaveBeenCalledWith(
+    expect(mockSetSavedWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({
-        fileId: 'f1',
-        fileName: 'updated-workflow',
+        workflowId: 'w1',
+        workflowName: 'updated-workflow',
         availableToAll: true,
         savedAt: expect.any(String),
       }),
@@ -261,7 +267,7 @@ describe('WorkflowDetailsPanel', () => {
   it('shows error notification when save fails', async () => {
     const user = userEvent.setup();
 
-    vi.mocked(operatorApi.updateFile).mockRejectedValue(new Error('Server error'));
+    vi.mocked(workflowsApi.updateWorkflow).mockRejectedValue(new Error('Server error'));
 
     vi.mocked(useStudioContext).mockReturnValue(
       makeContext({ isEditingDetails: true })

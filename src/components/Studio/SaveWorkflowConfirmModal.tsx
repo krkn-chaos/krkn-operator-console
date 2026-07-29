@@ -31,17 +31,17 @@ interface SaveWorkflowConfirmModalProps {
  * ```
  */
 export function SaveWorkflowConfirmModal({ isOpen, onClose, onSuccess }: SaveWorkflowConfirmModalProps) {
-  const { savedFile, saveWorkflowToCluster } = useStudioContext();
+  const { savedWorkflow, saveWorkflowToCluster } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [isSaving, setIsSaving] = useState(false);
 
   const handleUpdate = async () => {
-    if (!savedFile) return;
+    if (!savedWorkflow) return;
 
     setIsSaving(true);
     try {
       await saveWorkflowToCluster();
-      showSuccess('Workflow updated', `"${savedFile.fileName}" updated successfully`);
+      showSuccess('Workflow updated', `"${savedWorkflow.workflowName}" updated successfully`);
       onClose();
       onSuccess();
     } catch (err) {
@@ -73,7 +73,7 @@ export function SaveWorkflowConfirmModal({ isOpen, onClose, onSuccess }: SaveWor
       ]}
     >
       <p>
-        Are you sure you want to update the workflow <strong>&laquo;{savedFile?.fileName}&raquo;</strong>?
+        Are you sure you want to update the workflow <strong>&laquo;{savedWorkflow?.workflowName}&raquo;</strong>?
       </p>
     </Modal>
   );

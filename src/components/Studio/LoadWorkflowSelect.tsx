@@ -13,17 +13,17 @@ import {
 } from '@patternfly/react-core';
 import { FiX } from 'react-icons/fi';
 import { FolderOpenIcon } from '@patternfly/react-icons';
-import { operatorApi } from '../../services/operatorApi';
+import { workflowsApi } from '../../services/workflowsApi';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
-import type { FileInfo } from '../../types/api';
+import type { WorkflowInfo } from '../../types/api';
 
 /**
  * Dropdown select for loading saved workflow templates from the cluster.
  *
- * Fetches available templates (filePurpose='workflow-template') on open and
- * provides a searchable list. The toggle label shows the loaded workflow's
- * file name when one is active, or "Load Workflow" otherwise.
+ * Fetches available templates via `workflowsApi.getAvailableWorkflows` on open
+ * and provides a searchable list. The toggle label shows the loaded workflow's
+ * name when one is active, or "Load Workflow" otherwise.
  *
  * Prompts the user for confirmation only when there are unsaved changes
  * (dirty saved workflow or unsaved canvas with nodes).
@@ -35,11 +35,11 @@ import type { FileInfo } from '../../types/api';
  * ```
  */
 export function LoadWorkflowSelect() {
-  const { workflow, loadWorkflow, savedFile, isDirty } = useStudioContext();
+  const { workflow, loadWorkflow, savedWorkflow, isDirty } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [templates, setTemplates] = useState<FileInfo[]>([]);
+  const [templates, setTemplates] = useState<WorkflowInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(false);
   const fetchedRef = useRef(false);
@@ -48,8 +48,8 @@ export function LoadWorkflowSelect() {
     if (isOpen && !fetchedRef.current) {
       fetchedRef.current = true;
       setIsLoading(true);
-      operatorApi.getAvailableFiles('workflow-template')
-        .then(response => setTemplates(response.files || []))
+      workflowsApi.getAvailableWorkflows()
+        .then(response => setTemplates(response.workflows || []))
         .catch(() => setTemplates([]))
         .finally(() => setIsLoading(false));
     }
@@ -58,10 +58,10 @@ export function LoadWorkflowSelect() {
     }
   }, [isOpen]);
 
-  const handleSelect = async (_event: React.MouseEvent | undefined, fileId: string | number | undefined) => {
-    if (!fileId || typeof fileId !== 'string') return;
+  const handleSelect = async (_event: React.MouseEvent | undefined, workflowId: string | number | undefined) => {
+    if (!workflowId || typeof workflowId !== 'string') return;
 
-    const hasUnsavedChanges = (savedFile && isDirty) || (!savedFile && workflow.nodes.length > 0);
+    const hasUnsavedChanges = (savedWorkflow && isDirty) || (!savedWorkflow && workflow.nodes.length > 0);
     if (hasUnsavedChanges) {
       if (!confirm('You have unsaved changes. Loading a new workflow will discard them. Continue?')) {
         return;
@@ -70,20 +70,22 @@ export function LoadWorkflowSelect() {
 
     setIsLoadingWorkflow(true);
     try {
-      const file = await operatorApi.getFile(fileId);
-      const parsed = JSON.parse(file.content);
-      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges) || typeof parsed.nextNodeNumber !== 'number') {
+      const wfResponse = await workflowsApi.getWorkflow(workflowId);
+
+      const canvas = wfResponse.studioLayout;
+      if (!canvas || !Array.isArray(canvas.nodes) || !Array.isArray(canvas.edges) || typeof canvas.nextNodeNumber !== 'number') {
         throw new Error('Invalid workflow format');
       }
-      loadWorkflow(parsed, {
-        fileId,
-        fileName: file.fileName,
-        description: file.description,
-        availableToAll: file.availableToAll,
-        groups: file.groups,
+
+      loadWorkflow(canvas, {
+        workflowId: wfResponse.workflowId,
+        workflowName: wfResponse.workflowName,
+        description: wfResponse.description,
+        availableToAll: wfResponse.availableToAll,
+        groups: wfResponse.groups,
         savedAt: new Date().toISOString(),
       });
-      showSuccess('Workflow loaded', `"${file.fileName}" loaded successfully`);
+      showSuccess('Workflow loaded', `"${wfResponse.workflowName}" loaded successfully`);
     } catch (err) {
       showError('Load failed', err instanceof Error ? err.message : 'Failed to load workflow');
     } finally {
@@ -94,7 +96,7 @@ export function LoadWorkflowSelect() {
   };
 
   const filtered = templates.filter(t =>
-    t.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.workflowName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -114,7 +116,7 @@ export function LoadWorkflowSelect() {
           isDisabled={isLoadingWorkflow}
           icon={isLoadingWorkflow ? <Spinner size="sm" /> : <FolderOpenIcon />}
         >
-          {isLoadingWorkflow ? 'Loading...' : savedFile ? savedFile.fileName : 'Load Workflow'}
+          {isLoadingWorkflow ? 'Loading...' : savedWorkflow ? savedWorkflow.workflowName : 'Load Workflow'}
         </MenuToggle>
       )}
     >
@@ -148,9 +150,9 @@ export function LoadWorkflowSelect() {
           </SelectOption>
         ) : (
           filtered.map(t => (
-            <SelectOption key={t.fileId} value={t.fileId}>
+            <SelectOption key={t.workflowId} value={t.workflowId}>
               <div>
-                <div style={{ fontWeight: 600 }}>{t.fileName}</div>
+                <div style={{ fontWeight: 600 }}>{t.workflowName}</div>
                 {t.description && (
                   <div style={{ fontSize: '0.85em', color: 'var(--pf-v5-global--Color--200)' }}>
                     {t.description}

@@ -38,7 +38,7 @@ interface StudioToolbarProps {
  * ```
  */
 export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
-  const { addNode, exportWorkflow, clearWorkflow, workflow, savedFile, saveWorkflowToCluster, isDirty, isEditingDetails } = useStudioContext();
+  const { addNode, exportWorkflow, clearWorkflow, workflow, savedWorkflow, saveWorkflowToCluster, isDirty, isEditingDetails } = useStudioContext();
   const { showError } = useNotifications();
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -64,7 +64,7 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
   };
 
   const handleSave = () => {
-    if (savedFile) {
+    if (savedWorkflow) {
       setIsConfirmModalOpen(true);
     } else {
       setIsSaveModalOpen(true);
@@ -91,7 +91,7 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
       return;
     }
 
-    if (savedFile && isDirty) {
+    if (savedWorkflow && isDirty) {
       setIsUnsavedModalOpen(true);
       return;
     }
@@ -99,7 +99,7 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
   };
 
   const handleSaveAndRun = async () => {
-    if (!savedFile) return;
+    if (!savedWorkflow) return;
     setIsSavingBeforeRun(true);
     try {
       await saveWorkflowToCluster();
@@ -236,7 +236,7 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
         ]}
       >
         <p>
-          The workflow <strong>&laquo;{savedFile?.fileName}&raquo;</strong> has unsaved changes.
+          The workflow <strong>&laquo;{savedWorkflow?.workflowName}&raquo;</strong> has unsaved changes.
           Would you like to save before running?
         </p>
       </Modal>

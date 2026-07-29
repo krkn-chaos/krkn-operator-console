@@ -19,9 +19,9 @@ vi.mock('../../hooks', () => ({
 
 function buildMockContext(overrides: Record<string, unknown> = {}) {
   return {
-    savedFile: {
-      fileId: 'f1',
-      fileName: 'my-workflow',
+    savedWorkflow: {
+      workflowId: 'w1',
+      workflowName: 'my-workflow',
       description: 'A test workflow',
       availableToAll: true,
       savedAt: '2024-01-01',
@@ -199,13 +199,13 @@ describe('SaveWorkflowConfirmModal', () => {
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call saveWorkflowToCluster when savedFile is null', async () => {
+  it('does not call saveWorkflowToCluster when savedWorkflow is null', async () => {
     const user = userEvent.setup();
     const mockSave = vi.fn().mockResolvedValue(undefined);
 
     vi.mocked(useStudioContext).mockReturnValue(
       buildMockContext({
-        savedFile: null,
+        savedWorkflow: null,
         saveWorkflowToCluster: mockSave,
       }) as unknown as ReturnType<typeof useStudioContext>,
     );

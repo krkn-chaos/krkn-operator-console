@@ -28,7 +28,8 @@ import {
 import { CheckIcon, TimesIcon } from '@patternfly/react-icons';
 import { FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
-import { useStudioContext } from './StudioContext';
+import { workflowsApi } from '../../services/workflowsApi';
+import { useStudioContext, buildGraph } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { useRole } from '../../hooks/useRole';
 import type { GroupResponse } from '../../types/api';
@@ -53,7 +54,7 @@ const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
  * ```
  */
 export function WorkflowDetailsPanel() {
-  const { savedFile, setSavedFile, workflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const { savedWorkflow, setSavedWorkflow, workflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const [isExpanded, setIsExpanded] = useState(true);
@@ -84,18 +85,18 @@ export function WorkflowDetailsPanel() {
   }, [isAdmin, availableGroups, editAccessType, editSelectedGroup]);
 
   useEffect(() => {
-    if (isEditingDetails && savedFile) {
+    if (isEditingDetails && savedWorkflow) {
       setIsExpanded(true);
-      setEditName(savedFile.fileName);
-      setEditDescription(savedFile.description || '');
-      setEditAccessType(savedFile.availableToAll ? 'public' : 'group');
-      setEditSelectedGroup(savedFile.groups?.[0] || '');
+      setEditName(savedWorkflow.workflowName);
+      setEditDescription(savedWorkflow.description || '');
+      setEditAccessType(savedWorkflow.availableToAll ? 'public' : 'group');
+      setEditSelectedGroup(savedWorkflow.groups?.[0] || '');
       setValidationErrors({});
       setGroupsLoaded(false);
     }
-  }, [isEditingDetails, savedFile]);
+  }, [isEditingDetails, savedWorkflow]);
 
-  if (!savedFile) return null;
+  if (!savedWorkflow) return null;
 
   const formatTimestamp = (iso: string): string => {
     try {
@@ -133,17 +134,17 @@ export function WorkflowDetailsPanel() {
 
     setIsSaving(true);
     try {
-      await operatorApi.updateFile(savedFile.fileId, {
-        fileName: trimmedName,
-        content: JSON.stringify(snapshotAtSave),
+      await workflowsApi.updateWorkflow(savedWorkflow.workflowId, {
+        workflowName: trimmedName,
+        graph: buildGraph(snapshotAtSave),
+        studioLayout: snapshotAtSave,
         description: editDescription.trim() || undefined,
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
-        filePurpose: 'workflow-template',
       });
-      setSavedFile({
-        ...savedFile,
-        fileName: trimmedName,
+      setSavedWorkflow({
+        ...savedWorkflow,
+        workflowName: trimmedName,
         description: editDescription.trim() || undefined,
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
@@ -162,27 +163,27 @@ export function WorkflowDetailsPanel() {
     <DescriptionList isHorizontal isCompact>
       <DescriptionListGroup>
         <DescriptionListTerm>Name</DescriptionListTerm>
-        <DescriptionListDescription>{savedFile.fileName}</DescriptionListDescription>
+        <DescriptionListDescription>{savedWorkflow.workflowName}</DescriptionListDescription>
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Description</DescriptionListTerm>
         <DescriptionListDescription>
-          {savedFile.description || <span style={{ color: 'var(--pf-v5-global--Color--200)', fontStyle: 'italic' }}>No description</span>}
+          {savedWorkflow.description || <span style={{ color: 'var(--pf-v5-global--Color--200)', fontStyle: 'italic' }}>No description</span>}
         </DescriptionListDescription>
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Visibility</DescriptionListTerm>
         <DescriptionListDescription>
-          {savedFile.availableToAll ? (
+          {savedWorkflow.availableToAll ? (
             <Label color="green" isCompact>Public</Label>
           ) : (
-            <Label color="blue" isCompact>{savedFile.groups?.[0] || 'Group'}</Label>
+            <Label color="blue" isCompact>{savedWorkflow.groups?.[0] || 'Group'}</Label>
           )}
         </DescriptionListDescription>
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Last saved</DescriptionListTerm>
-        <DescriptionListDescription>{formatTimestamp(savedFile.savedAt)}</DescriptionListDescription>
+        <DescriptionListDescription>{formatTimestamp(savedWorkflow.savedAt)}</DescriptionListDescription>
       </DescriptionListGroup>
     </DescriptionList>
   );
@@ -365,7 +366,7 @@ export function WorkflowDetailsPanel() {
         </DescriptionListGroup>
         <DescriptionListGroup>
           <DescriptionListTerm>Last saved</DescriptionListTerm>
-          <DescriptionListDescription>{formatTimestamp(savedFile.savedAt)}</DescriptionListDescription>
+          <DescriptionListDescription>{formatTimestamp(savedWorkflow.savedAt)}</DescriptionListDescription>
         </DescriptionListGroup>
       </DescriptionList>
 
@@ -399,7 +400,7 @@ export function WorkflowDetailsPanel() {
   return (
     <div style={{ marginTop: '0.75rem' }}>
       <ExpandableSection
-        toggleContent={isExpanded ? 'Workflow details' : `Workflow details — ${savedFile.fileName}`}
+        toggleContent={isExpanded ? 'Workflow details' : `Workflow details — ${savedWorkflow.workflowName}`}
         isExpanded={isExpanded}
         onToggle={(_e, expanded) => {
           if (isEditingDetails) return;

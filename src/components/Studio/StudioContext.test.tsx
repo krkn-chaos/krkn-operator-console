@@ -4,28 +4,29 @@
  * Covers:
  * - isDirty computation
  * - saveWorkflowToCluster (cluster persistence)
- * - setSavedFile (metadata + snapshot capture)
+ * - setSavedWorkflow (metadata + snapshot capture)
  * - loadWorkflow (full state hydration)
  * - clearWorkflow (reset to empty)
- * - Conditional autosave (localStorage only when no cluster file)
+ * - Conditional autosave (localStorage only when no cluster workflow)
  * - Node CRUD operations
  * - Edge management with validation
  * - exportWorkflow
+ * - buildGraph helper
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ReactNode } from 'react';
-import { StudioProvider, useStudioContext } from './StudioContext';
+import { StudioProvider, useStudioContext, buildGraph } from './StudioContext';
 import type { StudioWorkflow, StudioNode, StudioEdge } from '../../types/api';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('../../services/operatorApi', () => ({
-  operatorApi: {
-    updateFile: vi.fn().mockResolvedValue({ message: 'ok', fileId: 'f-1' }),
+vi.mock('../../services/workflowsApi', () => ({
+  workflowsApi: {
+    updateWorkflow: vi.fn().mockResolvedValue({ message: 'ok', workflowId: 'w-1' }),
   },
 }));
 
@@ -36,7 +37,7 @@ vi.mock('./studioAutosave', () => ({
   loadAutosave: vi.fn().mockReturnValue(null),
 }));
 
-import { operatorApi } from '../../services/operatorApi';
+import { workflowsApi } from '../../services/workflowsApi';
 import { saveAutosave, clearAutosave } from './studioAutosave';
 
 // ---------------------------------------------------------------------------
@@ -71,11 +72,11 @@ function makeConfiguredNode(nodeId: string, overrides?: Partial<StudioNode>): St
   };
 }
 
-/** Reusable SavedFileMetadata factory. */
-function makeSavedFile(overrides?: Record<string, unknown>) {
+/** Reusable SavedWorkflowMetadata factory. */
+function makeSavedWorkflow(overrides?: Record<string, unknown>) {
   return {
-    fileId: 'f-1',
-    fileName: 'my-workflow.json',
+    workflowId: 'w-1',
+    workflowName: 'my-workflow',
     description: 'test workflow',
     availableToAll: true,
     groups: [] as string[],
@@ -97,26 +98,26 @@ describe('StudioContext', () => {
   // 1. isDirty computation
   // =========================================================================
   describe('isDirty', () => {
-    it('returns false when there is no savedFile', () => {
+    it('returns false when there is no savedWorkflow', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
       expect(result.current.isDirty).toBe(false);
     });
 
-    it('returns false immediately after setSavedFile (snapshot matches workflow)', () => {
+    it('returns false immediately after setSavedWorkflow (snapshot matches workflow)', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
 
       expect(result.current.isDirty).toBe(false);
     });
 
-    it('returns true when the workflow changes after setSavedFile', () => {
+    it('returns true when the workflow changes after setSavedWorkflow', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
 
       // Mutate workflow by adding a node
@@ -136,7 +137,7 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.loadWorkflow(wf, makeSavedFile());
+        result.current.loadWorkflow(wf, makeSavedWorkflow());
       });
 
       expect(result.current.isDirty).toBe(false);
@@ -151,7 +152,7 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.loadWorkflow(wf, makeSavedFile());
+        result.current.loadWorkflow(wf, makeSavedWorkflow());
       });
       act(() => {
         result.current.addNode();
@@ -160,11 +161,11 @@ describe('StudioContext', () => {
       expect(result.current.isDirty).toBe(true);
     });
 
-    it('returns false after clearWorkflow (no savedFile)', () => {
+    it('returns false after clearWorkflow (no savedWorkflow)', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
       act(() => {
         result.current.addNode();
@@ -181,7 +182,7 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
       act(() => {
         result.current.addNode();
@@ -200,23 +201,23 @@ describe('StudioContext', () => {
   // 2. saveWorkflowToCluster
   // =========================================================================
   describe('saveWorkflowToCluster', () => {
-    it('throws if there is no savedFile', async () => {
+    it('throws if there is no savedWorkflow', async () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       await expect(
         act(async () => {
           await result.current.saveWorkflowToCluster();
         })
-      ).rejects.toThrow('No saved file to update');
+      ).rejects.toThrow('No saved workflow to update');
     });
 
-    it('calls operatorApi.updateFile with the correct payload', async () => {
+    it('calls workflowsApi.updateWorkflow with the correct payload', async () => {
       const wf: StudioWorkflow = {
         nodes: [makeConfiguredNode('node-a')],
         edges: [],
         nextNodeNumber: 2,
       };
-      const meta = makeSavedFile({ groups: ['team-a'] });
+      const meta = makeSavedWorkflow({ groups: ['team-a'] });
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
@@ -227,38 +228,37 @@ describe('StudioContext', () => {
         await result.current.saveWorkflowToCluster();
       });
 
-      expect(operatorApi.updateFile).toHaveBeenCalledOnce();
-      const [fileId, payload] = vi.mocked(operatorApi.updateFile).mock.calls[0];
-      expect(fileId).toBe('f-1');
-      expect(payload.fileName).toBe('my-workflow.json');
-      expect(payload.filePurpose).toBe('workflow-template');
+      expect(workflowsApi.updateWorkflow).toHaveBeenCalledOnce();
+      const [workflowId, payload] = vi.mocked(workflowsApi.updateWorkflow).mock.calls[0];
+      expect(workflowId).toBe('w-1');
+      expect(payload.workflowName).toBe('my-workflow');
       expect(payload.availableToAll).toBe(true);
       expect(payload.groups).toEqual(['team-a']);
-
-      // content is a JSON-serialised workflow
-      const parsed = JSON.parse(payload.content);
-      expect(parsed.nodes).toHaveLength(1);
-      expect(parsed.nodes[0].nodeId).toBe('node-a');
+      expect(payload.graph).toBeDefined();
+      expect(payload.graph['node-a']).toBeDefined();
+      expect(payload.graph['node-a'].name).toBe('scenario-node-a');
+      expect(payload.studioLayout).toBeDefined();
+      expect(payload.studioLayout!.nodes).toHaveLength(1);
     });
 
-    it('updates savedFile timestamp after successful save', async () => {
+    it('updates savedWorkflow timestamp after successful save', async () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
-      const meta = makeSavedFile();
+      const meta = makeSavedWorkflow();
 
       act(() => {
-        result.current.setSavedFile(meta);
+        result.current.setSavedWorkflow(meta);
       });
 
-      const beforeSave = result.current.savedFile?.savedAt;
+      const beforeSave = result.current.savedWorkflow?.savedAt;
 
       await act(async () => {
         await result.current.saveWorkflowToCluster();
       });
 
-      expect(result.current.savedFile?.savedAt).not.toBe(beforeSave);
+      expect(result.current.savedWorkflow?.savedAt).not.toBe(beforeSave);
       // Should be an ISO-8601 string
-      expect(new Date(result.current.savedFile!.savedAt).toISOString()).toBe(
-        result.current.savedFile!.savedAt
+      expect(new Date(result.current.savedWorkflow!.savedAt).toISOString()).toBe(
+        result.current.savedWorkflow!.savedAt
       );
     });
 
@@ -266,31 +266,31 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
 
       await act(async () => {
         await result.current.saveWorkflowToCluster();
       });
 
-      // clearAutosave called once by setSavedFile and once by saveWorkflowToCluster
+      // clearAutosave called once by setSavedWorkflow and once by saveWorkflowToCluster
       expect(clearAutosave).toHaveBeenCalled();
     });
   });
 
   // =========================================================================
-  // 3. setSavedFile
+  // 3. setSavedWorkflow
   // =========================================================================
-  describe('setSavedFile', () => {
-    it('stores the metadata and makes it accessible via savedFile', () => {
+  describe('setSavedWorkflow', () => {
+    it('stores the metadata and makes it accessible via savedWorkflow', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
-      const meta = makeSavedFile();
+      const meta = makeSavedWorkflow();
 
       act(() => {
-        result.current.setSavedFile(meta);
+        result.current.setSavedWorkflow(meta);
       });
 
-      expect(result.current.savedFile).toEqual(meta);
+      expect(result.current.savedWorkflow).toEqual(meta);
     });
 
     it('captures the current workflow as the snapshot (isDirty stays false)', () => {
@@ -302,7 +302,7 @@ describe('StudioContext', () => {
       });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
 
       expect(result.current.isDirty).toBe(false);
@@ -319,7 +319,7 @@ describe('StudioContext', () => {
 
       // The current workflow is empty but we pass an explicit snapshot
       act(() => {
-        result.current.setSavedFile(makeSavedFile(), explicitSnapshot);
+        result.current.setSavedWorkflow(makeSavedWorkflow(), explicitSnapshot);
       });
 
       // Current workflow does NOT match the explicit snapshot, so isDirty should be true
@@ -330,7 +330,7 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
 
       expect(clearAutosave).toHaveBeenCalled();
@@ -350,7 +350,7 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.loadWorkflow(wf, makeSavedFile());
+        result.current.loadWorkflow(wf, makeSavedWorkflow());
       });
 
       expect(result.current.workflow.nodes).toHaveLength(2);
@@ -358,8 +358,8 @@ describe('StudioContext', () => {
       expect(result.current.workflow.nextNodeNumber).toBe(3);
     });
 
-    it('sets savedFile metadata', () => {
-      const meta = makeSavedFile({ fileName: 'loaded.json' });
+    it('sets savedWorkflow metadata', () => {
+      const meta = makeSavedWorkflow({ workflowName: 'loaded-workflow' });
       const wf: StudioWorkflow = { nodes: [], edges: [], nextNodeNumber: 1 };
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
@@ -367,7 +367,7 @@ describe('StudioContext', () => {
         result.current.loadWorkflow(wf, meta);
       });
 
-      expect(result.current.savedFile?.fileName).toBe('loaded.json');
+      expect(result.current.savedWorkflow?.workflowName).toBe('loaded-workflow');
     });
 
     it('captures the loaded workflow as the snapshot (isDirty is false)', () => {
@@ -379,7 +379,7 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.loadWorkflow(wf, makeSavedFile());
+        result.current.loadWorkflow(wf, makeSavedWorkflow());
       });
 
       expect(result.current.isDirty).toBe(false);
@@ -396,7 +396,7 @@ describe('StudioContext', () => {
       act(() => {
         result.current.loadWorkflow(
           { nodes: [], edges: [], nextNodeNumber: 1 },
-          makeSavedFile()
+          makeSavedWorkflow()
         );
       });
 
@@ -409,7 +409,7 @@ describe('StudioContext', () => {
       act(() => {
         result.current.loadWorkflow(
           { nodes: [], edges: [], nextNodeNumber: 1 },
-          makeSavedFile()
+          makeSavedWorkflow()
         );
       });
 
@@ -440,25 +440,25 @@ describe('StudioContext', () => {
       expect(result.current.workflow.nextNodeNumber).toBe(1);
     });
 
-    it('clears savedFile', () => {
+    it('clears savedWorkflow', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
-      expect(result.current.savedFile).not.toBeNull();
+      expect(result.current.savedWorkflow).not.toBeNull();
 
       act(() => {
         result.current.clearWorkflow();
       });
-      expect(result.current.savedFile).toBeNull();
+      expect(result.current.savedWorkflow).toBeNull();
     });
 
     it('clears the snapshot (isDirty becomes false)', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
         result.current.addNode();
       });
 
@@ -492,7 +492,7 @@ describe('StudioContext', () => {
       vi.useRealTimers();
     });
 
-    it('saves to localStorage when nodes exist and savedFile is null', () => {
+    it('saves to localStorage when nodes exist and savedWorkflow is null', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
@@ -510,14 +510,14 @@ describe('StudioContext', () => {
       expect(call.version).toBe('1.0');
     });
 
-    it('does NOT save when savedFile is set (workflow is cluster-managed)', () => {
+    it('does NOT save when savedWorkflow is set (workflow is cluster-managed)', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
         result.current.addNode();
       });
       act(() => {
-        result.current.setSavedFile(makeSavedFile());
+        result.current.setSavedWorkflow(makeSavedWorkflow());
       });
 
       vi.mocked(saveAutosave).mockClear();
@@ -556,10 +556,10 @@ describe('StudioContext', () => {
   });
 
   // =========================================================================
-  // 7. clearSavedFile
+  // 7. clearSavedWorkflow
   // =========================================================================
-  describe('clearSavedFile', () => {
-    it('sets savedFile to null without resetting workflow', () => {
+  describe('clearSavedWorkflow', () => {
+    it('sets savedWorkflow to null without resetting workflow', () => {
       const wf: StudioWorkflow = {
         nodes: [makeConfiguredNode('keep-me')],
         edges: [],
@@ -568,14 +568,14 @@ describe('StudioContext', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
 
       act(() => {
-        result.current.loadWorkflow(wf, makeSavedFile());
+        result.current.loadWorkflow(wf, makeSavedWorkflow());
       });
 
       act(() => {
-        result.current.clearSavedFile();
+        result.current.clearSavedWorkflow();
       });
 
-      expect(result.current.savedFile).toBeNull();
+      expect(result.current.savedWorkflow).toBeNull();
       expect(result.current.workflow.nodes).toHaveLength(1);
     });
   });
@@ -1104,6 +1104,49 @@ describe('StudioContext', () => {
       expect(result.current.workflow.nodes).toHaveLength(0);
       expect(result.current.workflow.edges).toHaveLength(0);
       expect(result.current.workflow.nextNodeNumber).toBe(1);
+    });
+  });
+
+  // =========================================================================
+  // 16. buildGraph helper
+  // =========================================================================
+  describe('buildGraph', () => {
+    it('builds graph from configured nodes only', () => {
+      const wf: StudioWorkflow = {
+        nodes: [
+          makeConfiguredNode('node-a'),
+          { nodeId: 'node-b', status: 'unconfigured', position: { x: 0, y: 0 } },
+          makeConfiguredNode('node-c'),
+        ],
+        edges: [{ id: 'node-a-node-c', source: 'node-a', target: 'node-c' }],
+        nextNodeNumber: 4,
+      };
+
+      const graph = buildGraph(wf);
+      expect(Object.keys(graph)).toHaveLength(2);
+      expect(graph['node-a']).toBeDefined();
+      expect(graph['node-c']).toBeDefined();
+      expect(graph['node-b']).toBeUndefined();
+      expect(graph['node-c'].depends_on).toBe('node-a');
+      expect(graph['node-a'].depends_on).toBeUndefined();
+    });
+
+    it('returns empty graph for empty workflow', () => {
+      const graph = buildGraph({ nodes: [], edges: [], nextNodeNumber: 1 });
+      expect(Object.keys(graph)).toHaveLength(0);
+    });
+
+    it('includes env from scenarioFormValues and globalFormValues', () => {
+      const node = makeConfiguredNode('env-node');
+      node.config!.globalFormValues = { GLOBAL_KEY: 'global_val' };
+      const wf: StudioWorkflow = {
+        nodes: [node],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+
+      const graph = buildGraph(wf);
+      expect(graph['env-node'].env).toEqual({ KEY: 'val', GLOBAL_KEY: 'global_val' });
     });
   });
 });
