@@ -24,12 +24,12 @@ interface StudioToolbarProps {
 /**
  * Toolbar for Chaos Studio canvas actions.
  *
- * Provides buttons for: Add Scenario, Run Workflow, Export JSON, Save to Cluster,
+ * Provides buttons for: Add Scenario, Run Workflow, Export JSON, Save Workflow,
  * and Clear All. Includes pre-run validation (blocks unconfigured nodes) and an
  * unsaved-changes guard with Save & Run / Run without saving options.
  *
  * The save button label changes dynamically:
- * - "Save to Cluster" for new workflows or clean saved workflows.
+ * - "Save Workflow" for new workflows or clean saved workflows.
  * - "Update Workflow" when a saved workflow has pending changes.
  *
  * @example
@@ -170,7 +170,7 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
               onClick={handleSave}
               isDisabled={workflow.nodes.length === 0 || isEditingDetails}
             >
-              {savedFile && isDirty ? 'Update Workflow' : 'Save to Cluster'}
+              {savedFile && isDirty ? 'Update Workflow' : 'Save Workflow'}
             </Button>
           </ToolbarItem>
 

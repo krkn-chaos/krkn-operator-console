@@ -58,7 +58,7 @@ describe('StudioToolbar', () => {
   });
 
   describe('Save button text', () => {
-    it('shows "Save to Cluster" when no savedFile', () => {
+    it('shows "Save Workflow" when no savedFile', () => {
       vi.mocked(useStudioContext).mockReturnValue(
         buildMockContext({
           workflow: {
@@ -71,10 +71,10 @@ describe('StudioToolbar', () => {
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
 
-      expect(screen.getByText('Save to Cluster')).toBeInTheDocument();
+      expect(screen.getByText('Save Workflow')).toBeInTheDocument();
     });
 
-    it('shows "Save to Cluster" when savedFile exists but isDirty is false', () => {
+    it('shows "Save Workflow" when savedFile exists but isDirty is false', () => {
       vi.mocked(useStudioContext).mockReturnValue(
         buildMockContext({
           workflow: {
@@ -94,7 +94,7 @@ describe('StudioToolbar', () => {
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
 
-      expect(screen.getByText('Save to Cluster')).toBeInTheDocument();
+      expect(screen.getByText('Save Workflow')).toBeInTheDocument();
     });
 
     it('shows "Update Workflow" when savedFile exists and isDirty is true', () => {
@@ -302,7 +302,7 @@ describe('StudioToolbar', () => {
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
 
-      const saveButton = screen.getByText('Save to Cluster').closest('button')!;
+      const saveButton = screen.getByText('Save Workflow').closest('button')!;
       expect(saveButton).toBeDisabled();
     });
 
@@ -311,7 +311,7 @@ describe('StudioToolbar', () => {
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
 
-      const saveButton = screen.getByText('Save to Cluster').closest('button')!;
+      const saveButton = screen.getByText('Save Workflow').closest('button')!;
       expect(saveButton).toBeDisabled();
     });
   });
@@ -371,7 +371,7 @@ describe('StudioToolbar', () => {
 
       render(<StudioToolbar onRunWorkflow={mockOnRunWorkflow} />);
 
-      await user.click(screen.getByText('Save to Cluster'));
+      await user.click(screen.getByText('Save Workflow'));
 
       expect(screen.getByTestId('save-workflow-modal')).toBeInTheDocument();
     });
