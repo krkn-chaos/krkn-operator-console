@@ -832,6 +832,214 @@ describe('ScenarioDetail', () => {
     });
   });
 
-  // NOTE: FileSelector integration tests are in FileSelector.test.tsx
-  // Warning system for pending file input is tested at the component level
+  describe('File References in Run Request', () => {
+    const mockCreateResponse: CreateScenarioRunResponse = {
+      scenarioRunName: 'test-run-456',
+      targetClusters: { 'krkn-operator': ['cluster1'] },
+      totalTargets: 1,
+    };
+
+    const mockStatusResponse: ScenarioRunStatusResponse = {
+      scenarioRunName: 'test-run-456',
+      phase: 'Running',
+      totalTargets: 1,
+      successfulJobs: 0,
+      failedJobs: 0,
+      runningJobs: 1,
+      clusterJobs: [],
+    };
+
+    const mockActiveRuns: ActiveRunsResponse = {
+      totalActiveRuns: 0,
+      totalClusters: 0,
+      clusterRuns: {},
+    };
+
+    it('should include fileReferences in run request when files are added', async () => {
+      const user = userEvent.setup();
+
+      vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+        files: [
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+        ],
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      // Wait for FileSelector to load available files
+      await waitFor(() => {
+        expect(operatorApi.getAvailableFiles).toHaveBeenCalled();
+      });
+
+      // Open the file select dropdown and choose a file
+      const fileToggle = await screen.findByText('Select a file');
+      await user.click(fileToggle);
+      const fileOption = await screen.findByText('metrics.yaml');
+      await user.click(fileOption);
+
+      // Type mount path
+      const mountInput = screen.getByPlaceholderText('/path/to/mount/file.yaml');
+      await user.type(mountInput, '/etc/krkn/metrics.yaml');
+
+      // Click Add
+      await user.click(screen.getByRole('button', { name: /Add/i }));
+
+      // Preview
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      expect(screen.getByText('Configuration Preview')).toBeInTheDocument();
+
+      // Run
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fileReferences: [{ fileId: 'file-1', mountPath: '/etc/krkn/metrics.yaml' }],
+          })
+        );
+      });
+    });
+
+    it('should not include fileReferences when no files are added', async () => {
+      const user = userEvent.setup();
+
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fileReferences: undefined,
+          })
+        );
+      });
+    });
+  });
+
+  describe('Pending File Warning Modal', () => {
+    it('should show modal when preview clicked with pending file input', async () => {
+      const user = userEvent.setup();
+
+      vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+        files: [
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+        ],
+      });
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitFor(() => {
+        expect(operatorApi.getAvailableFiles).toHaveBeenCalled();
+      });
+
+      // Select a file but do NOT click Add
+      const fileToggle = await screen.findByText('Select a file');
+      await user.click(fileToggle);
+      const fileOption = await screen.findByText('metrics.yaml');
+      await user.click(fileOption);
+
+      // Click Preview — modal should appear
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      expect(screen.getByText('Pending file not added')).toBeInTheDocument();
+      expect(screen.getByText(/haven't clicked/)).toBeInTheDocument();
+    });
+
+    it('should show modal when only mount path is typed without selecting a file', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      // Type only mount path, no file selected
+      const mountInput = screen.getByPlaceholderText('/path/to/mount/file.yaml');
+      await user.type(mountInput, '/etc/krkn/config.yaml');
+
+      // Click Preview — modal should appear
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      expect(screen.getByText('Pending file not added')).toBeInTheDocument();
+    });
+
+    it('should return to form when "Go back" is clicked', async () => {
+      const user = userEvent.setup();
+
+      vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+        files: [
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+        ],
+      });
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitFor(() => {
+        expect(operatorApi.getAvailableFiles).toHaveBeenCalled();
+      });
+
+      const fileToggle = await screen.findByText('Select a file');
+      await user.click(fileToggle);
+      await user.click(await screen.findByText('metrics.yaml'));
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      expect(screen.getByText('Pending file not added')).toBeInTheDocument();
+
+      // Click "Go back"
+      await user.click(screen.getByRole('button', { name: /Go back/i }));
+
+      // Modal should close, preview should NOT appear
+      expect(screen.queryByText('Pending file not added')).not.toBeInTheDocument();
+      expect(screen.queryByText('Configuration Preview')).not.toBeInTheDocument();
+      expect(screen.getByText('Required Parameters')).toBeInTheDocument();
+    });
+
+    it('should proceed to preview when "Continue without adding" is clicked', async () => {
+      const user = userEvent.setup();
+
+      vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+        files: [
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+        ],
+      });
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitFor(() => {
+        expect(operatorApi.getAvailableFiles).toHaveBeenCalled();
+      });
+
+      const fileToggle = await screen.findByText('Select a file');
+      await user.click(fileToggle);
+      await user.click(await screen.findByText('metrics.yaml'));
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      expect(screen.getByText('Pending file not added')).toBeInTheDocument();
+
+      // Click "Continue without adding"
+      await user.click(screen.getByRole('button', { name: /Continue without adding/i }));
+
+      // Should proceed to preview
+      expect(screen.queryByText('Pending file not added')).not.toBeInTheDocument();
+      expect(screen.getByText('Configuration Preview')).toBeInTheDocument();
+    });
+  });
 });
