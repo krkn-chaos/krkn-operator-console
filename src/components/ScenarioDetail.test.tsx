@@ -860,7 +860,7 @@ describe('ScenarioDetail', () => {
 
       vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
         files: [
-          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config', availableToAll: true },
         ],
       });
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
@@ -935,7 +935,7 @@ describe('ScenarioDetail', () => {
 
       vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
         files: [
-          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config', availableToAll: true },
         ],
       });
 
@@ -982,7 +982,7 @@ describe('ScenarioDetail', () => {
 
       vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
         files: [
-          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config', availableToAll: true },
         ],
       });
 
@@ -1015,7 +1015,7 @@ describe('ScenarioDetail', () => {
 
       vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
         files: [
-          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config' },
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config', availableToAll: true },
         ],
       });
 
