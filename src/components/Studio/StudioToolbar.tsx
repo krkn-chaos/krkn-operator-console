@@ -170,7 +170,7 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
               onClick={handleSave}
               isDisabled={workflow.nodes.length === 0 || isEditingDetails}
             >
-              {savedFile && isDirty ? 'Update Workflow' : 'Save Workflow'}
+              {savedWorkflow && isDirty ? 'Update Workflow' : 'Save Workflow'}
             </Button>
           </ToolbarItem>
 

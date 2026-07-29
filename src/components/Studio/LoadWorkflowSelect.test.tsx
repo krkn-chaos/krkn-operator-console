@@ -253,4 +253,103 @@ describe('LoadWorkflowSelect', () => {
       expect(mockShowError).toHaveBeenCalledWith('Load failed', 'Invalid workflow format');
     });
   });
+
+  it('shows descriptive error when workflow has no studioLayout (graph-only)', async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(workflowsApi.getWorkflow).mockResolvedValue({
+      workflowId: 'w1',
+      workflowName: 'my-workflow',
+      graph: { 'node-1': { image: 'img', volumes: {}, env: {} } },
+      availableToAll: true,
+    });
+
+    render(<LoadWorkflowSelect />);
+
+    await user.click(screen.getByText('Load Workflow'));
+    await waitFor(() => {
+      expect(screen.getByText('my-workflow')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('my-workflow'));
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith(
+        'Load failed',
+        'This workflow has no studio layout and cannot be opened in the visual editor'
+      );
+    });
+  });
+
+  it('uses backend updatedAt timestamp for savedAt', async () => {
+    const user = userEvent.setup();
+
+    const validLayout = {
+      nodes: [{ nodeId: 'n1', status: 'configured' as const, position: { x: 0, y: 0 } }],
+      edges: [],
+      nextNodeNumber: 2,
+    };
+
+    vi.mocked(workflowsApi.getWorkflow).mockResolvedValue({
+      workflowId: 'w1',
+      workflowName: 'my-workflow',
+      graph: {},
+      studioLayout: validLayout,
+      availableToAll: true,
+      updatedAt: '2025-06-15T10:30:00Z',
+      createdAt: '2025-06-01T08:00:00Z',
+    });
+
+    render(<LoadWorkflowSelect />);
+
+    await user.click(screen.getByText('Load Workflow'));
+    await waitFor(() => {
+      expect(screen.getByText('my-workflow')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('my-workflow'));
+
+    await waitFor(() => {
+      expect(mockLoadWorkflow).toHaveBeenCalledWith(
+        validLayout,
+        expect.objectContaining({
+          savedAt: '2025-06-15T10:30:00Z',
+        })
+      );
+    });
+  });
+
+  it('falls back to createdAt when updatedAt is absent', async () => {
+    const user = userEvent.setup();
+
+    const validLayout = {
+      nodes: [{ nodeId: 'n1', status: 'configured' as const, position: { x: 0, y: 0 } }],
+      edges: [],
+      nextNodeNumber: 2,
+    };
+
+    vi.mocked(workflowsApi.getWorkflow).mockResolvedValue({
+      workflowId: 'w1',
+      workflowName: 'my-workflow',
+      graph: {},
+      studioLayout: validLayout,
+      availableToAll: true,
+      createdAt: '2025-06-01T08:00:00Z',
+    });
+
+    render(<LoadWorkflowSelect />);
+
+    await user.click(screen.getByText('Load Workflow'));
+    await waitFor(() => {
+      expect(screen.getByText('my-workflow')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('my-workflow'));
+
+    await waitFor(() => {
+      expect(mockLoadWorkflow).toHaveBeenCalledWith(
+        validLayout,
+        expect.objectContaining({
+          savedAt: '2025-06-01T08:00:00Z',
+        })
+      );
+    });
+  });
 });

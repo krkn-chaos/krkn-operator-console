@@ -73,8 +73,11 @@ export function LoadWorkflowSelect() {
       const wfResponse = await workflowsApi.getWorkflow(workflowId);
 
       const canvas = wfResponse.studioLayout;
-      if (!canvas || !Array.isArray(canvas.nodes) || !Array.isArray(canvas.edges) || typeof canvas.nextNodeNumber !== 'number') {
+      if (canvas && (!Array.isArray(canvas.nodes) || !Array.isArray(canvas.edges) || typeof canvas.nextNodeNumber !== 'number')) {
         throw new Error('Invalid workflow format');
+      }
+      if (!canvas) {
+        throw new Error('This workflow has no studio layout and cannot be opened in the visual editor');
       }
 
       loadWorkflow(canvas, {
@@ -83,7 +86,7 @@ export function LoadWorkflowSelect() {
         description: wfResponse.description,
         availableToAll: wfResponse.availableToAll,
         groups: wfResponse.groups,
-        savedAt: new Date().toISOString(),
+        savedAt: wfResponse.updatedAt || wfResponse.createdAt || new Date().toISOString(),
       });
       showSuccess('Workflow loaded', `"${wfResponse.workflowName}" loaded successfully`);
     } catch (err) {
