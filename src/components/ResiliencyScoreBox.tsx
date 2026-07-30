@@ -10,9 +10,11 @@
 
 import React from 'react';
 import { Tooltip } from '@patternfly/react-core';
+import type { GraphClusterScore } from '../types/api';
+import { getScoreColor } from '../utils/resiliency';
 
 interface ResiliencyScoreBoxProps {
-  /** Calculated score value */
+  /** Calculated score value (aggregate/average for multi-cluster) */
   score?: number;
   /** Baseline target value */
   baseline?: number;
@@ -22,6 +24,8 @@ interface ResiliencyScoreBoxProps {
   enabled?: boolean;
   /** Whether the run is still in progress */
   calculating?: boolean;
+  /** Per-cluster score breakdown (multi-cluster support) */
+  clusterScores?: GraphClusterScore[];
 }
 
 export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
@@ -30,25 +34,9 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
   status,
   enabled = true,
   calculating = false,
+  clusterScores,
 }) => {
-  /**
-   * Formula Opzione 2: 5-level color gradient based on score/baseline ratio
-   *
-   * >= 100%: Dark green (excellent)
-   * 95-100%: Light green (good)
-   * 90-95%: Yellow (warning)
-   * 80-90%: Orange (poor)
-   * < 80%: Red (critical)
-   */
-  const getScoreColor = (score: number, baseline: number): string => {
-    const ratio = score / baseline;
-
-    if (ratio >= 1.0) return '#28a745'; // 🟢 Verde scuro - excellent
-    if (ratio >= 0.95) return '#5cb85c'; // 🟢 Verde chiaro - good (95-100%)
-    if (ratio >= 0.9) return '#ffc107'; // 🟡 Giallo - warning (90-95%)
-    if (ratio >= 0.8) return '#fd7e14'; // 🟠 Arancione - poor (80-90%)
-    return '#dc3545'; // 🔴 Rosso - critical (< 80%)
-  };
+  const isMultiCluster = (clusterScores?.length ?? 0) > 1;
 
   // Not enabled - return null (no box displayed)
   if (!enabled) {
@@ -87,7 +75,25 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
     ? getScoreColor(score, baseline)
     : '#17a2b8'; // Blu se no baseline
 
-  const tooltipContent = baseline
+  const tooltipContent = isMultiCluster ? (
+    <div style={{ maxWidth: '260px' }}>
+      <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
+        Overall Score: {score.toFixed(1)}{baseline ? ` / Baseline: ${baseline.toFixed(1)}` : ''} ({status || 'unknown'})
+      </div>
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.3)', paddingTop: '4px' }}>
+        <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '3px' }}>Per-Cluster:</div>
+        {clusterScores!.map(cs => {
+          const clusterColor = cs.baseline ? getScoreColor(cs.calculated, cs.baseline) : '#17a2b8';
+          return (
+            <div key={cs.clusterName} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>{cs.clusterName}</span>
+              <span style={{ fontWeight: 'bold', fontSize: '11px', color: clusterColor }}>{cs.calculated.toFixed(1)} ({cs.status})</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : baseline
     ? `Score: ${score.toFixed(1)} / Baseline: ${baseline.toFixed(1)} (${status || 'unknown'})`
     : `Score: ${score.toFixed(1)} (no baseline)`;
 
@@ -100,18 +106,20 @@ export const ResiliencyScoreBox: React.FC<ResiliencyScoreBoxProps> = ({
           backgroundColor,
           color: 'white',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: '8px',
           cursor: 'pointer',
           transition: 'transform 0.2s',
           fontWeight: 'bold',
-          fontSize: '12px',
+          fontSize: isMultiCluster ? '10px' : '12px',
         }}
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       >
         {score.toFixed(1)}
+        {isMultiCluster && <span style={{ fontSize: '7px', opacity: 0.8, lineHeight: 1 }}>avg</span>}
       </div>
     </Tooltip>
   );

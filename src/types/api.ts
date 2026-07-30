@@ -306,7 +306,8 @@ export interface ScenarioRunStatusResponse {
   registryName?: string; // Name of private registry used (null for public Quay registry)
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
-  customRunName?: string; // User-provided label for the run
+  customRunName?: string;
+  resiliencyScores?: ClusterResiliencyScore[];
 }
 
 // Internal state for tracking scenario runs
@@ -419,16 +420,13 @@ export interface AppState {
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: ScenarioRunState[];
   scenarioRunsRefreshTrigger: number; // Increment to force immediate refresh
-  scenarioRunToRefresh: string | null; // Specific run name to refresh (null = refresh all)
   pollingRunNames: Set<string>;
-  pausedPollingRunIds: Set<string>; // Runs with polling paused (accordion open)
   expandedRunIds: Set<string>;
   expandedClusterJobs: Set<string>; // jobId
 
   // Graph runs list (GraphRun orchestration)
   graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
-  pausedGraphPollingIds: Set<string>; // Graph runs with polling paused (accordion open)
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
@@ -475,7 +473,6 @@ export type AppAction =
   | { type: 'SCENARIO_RUN_CREATED'; payload: { scenarioRunName: string; targetClusters: { [providerName: string]: string[] }; totalTargets: number; scenarioName: string } }
   | { type: 'ADD_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
   | { type: 'UPDATE_SCENARIO_RUN'; payload: { run: ScenarioRunState } }
-  | { type: 'REFRESH_SCENARIO_RUN'; payload: { scenarioRunName: string } } // Manual refresh for paused run
   | { type: 'LOAD_SCENARIO_RUNS_SUCCESS'; payload: { runs: ScenarioRunState[] } }
   | { type: 'TOGGLE_RUN_ACCORDION'; payload: { scenarioRunName: string } }
   | { type: 'TOGGLE_CLUSTER_JOB_ACCORDION'; payload: { jobId: string } }
@@ -718,8 +715,10 @@ export interface NodeStatus {
   dependsOn?: string[];
   /** Additional information about the node status */
   message?: string;
-  /** Individual resiliency score for this node (only present when resiliency scoring is enabled) */
-  resiliencyScore?: number;
+  /** Per-cluster resiliency scores for this node (multi-cluster support) */
+  resiliencyScores?: ClusterResiliencyScore[];
+  /** Average resiliency score across all clusters (convenience field from backend) */
+  resiliencyScoreAvg?: number;
 }
 
 /**
@@ -758,7 +757,8 @@ export interface GraphRunSpec {
 }
 
 /**
- * ResiliencyScoreResponse represents the calculated resiliency score result
+ * ResiliencyScoreResponse represents the calculated resiliency score result (single-cluster)
+ * @deprecated Use GraphClusterScore for multi-cluster support
  */
 export interface ResiliencyScoreResponse {
   /** Final calculated score (0-100) */
@@ -769,6 +769,34 @@ export interface ResiliencyScoreResponse {
   status: 'pass' | 'fail' | 'no-baseline';
   /** Human-readable result message */
   message?: string;
+}
+
+/**
+ * ClusterResiliencyScore represents a per-node, per-cluster resiliency score
+ */
+export interface ClusterResiliencyScore {
+  /** Name of the cluster this score was calculated on */
+  clusterName: string;
+  /** Resiliency score value (0-100) */
+  score: number;
+}
+
+/**
+ * GraphClusterScore represents the overall resiliency score for a single cluster
+ */
+export interface GraphClusterScore {
+  /** Name of the cluster */
+  clusterName: string;
+  /** Final calculated score for this cluster (0-100) */
+  calculated: number;
+  /** User-defined baseline */
+  baseline?: number;
+  /** Pass/fail/no-baseline status for this cluster */
+  status: 'pass' | 'fail' | 'no-baseline';
+  /** Human-readable result message */
+  message?: string;
+  /** Per-node score contributions within this cluster (nodeId -> score) */
+  nodeContributions?: Record<string, number>;
 }
 
 /**
@@ -788,8 +816,8 @@ export interface GraphRunStatus {
   /** When the graph run completed */
   completionTime?: string;
 
-  // Resiliency score result (populated when run completes)
-  resiliencyScore?: ResiliencyScoreResponse;
+  // Resiliency score results per cluster (populated when run completes)
+  resiliencyScores?: GraphClusterScore[];
 }
 
 /**
@@ -810,7 +838,7 @@ export interface GraphRunListItem {
   // Resiliency score fields
   resiliencyScoreEnabled?: boolean;
   resiliencyScoreBaseline?: number;
-  resiliencyScore?: ResiliencyScoreResponse;
+  resiliencyScores?: GraphClusterScore[];
 }
 
 /**
@@ -887,7 +915,7 @@ export interface GraphRunState {
   // Resiliency score fields (from GraphRunListItem)
   resiliencyScoreEnabled?: boolean;
   resiliencyScoreBaseline?: number;
-  resiliencyScore?: ResiliencyScoreResponse;
+  resiliencyScores?: GraphClusterScore[];
 }
 
 /**

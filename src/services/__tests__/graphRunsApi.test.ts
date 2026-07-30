@@ -121,7 +121,7 @@ describe('graphRunsApi', () => {
           completionTime: '2026-05-25T10:15:00Z',
           resiliencyScoreEnabled: true,
           resiliencyScoreBaseline: 80.0,
-          resiliencyScore: { calculated: 87.5, baseline: 80.0, status: 'pass', message: 'Meets baseline' },
+          resiliencyScores: [{ clusterName: 'staging-us-east-1', calculated: 87.5, baseline: 80.0, status: 'pass', message: 'Meets baseline', nodeContributions: {} }],
         },
       ];
 
@@ -131,8 +131,8 @@ describe('graphRunsApi', () => {
 
       expect(result[0].resiliencyScoreEnabled).toBe(true);
       expect(result[0].resiliencyScoreBaseline).toBe(80.0);
-      expect(result[0].resiliencyScore?.calculated).toBe(87.5);
-      expect(result[0].resiliencyScore?.status).toBe('pass');
+      expect(result[0].resiliencyScores?.[0].calculated).toBe(87.5);
+      expect(result[0].resiliencyScores?.[0].status).toBe('pass');
     });
 
     it('should throw error on API failure', async () => {
@@ -237,7 +237,8 @@ describe('graphRunsApi', () => {
               scenarioRunRef: 'sr-001',
               startTime: '2026-05-25T10:01:00Z',
               completionTime: '2026-05-25T10:05:00Z',
-              resiliencyScore: 95.0,
+              resiliencyScores: [{ clusterName: 'cluster1', score: 95.0 }],
+              resiliencyScoreAvg: 95.0,
             },
             {
               nodeId: 'node2',
@@ -247,13 +248,14 @@ describe('graphRunsApi', () => {
               startTime: '2026-05-25T10:06:00Z',
               completionTime: '2026-05-25T10:12:00Z',
               dependsOn: ['node1'],
-              resiliencyScore: 72.3,
+              resiliencyScores: [{ clusterName: 'cluster1', score: 72.3 }],
+              resiliencyScoreAvg: 72.3,
             },
           ],
           resolvedLevels: [['node1'], ['node2']],
           startTime: '2026-05-25T10:01:00Z',
           completionTime: '2026-05-25T10:12:00Z',
-          resiliencyScore: { calculated: 83.7, baseline: 80.0, status: 'pass', message: 'Score 83.7 meets baseline 80.0' },
+          resiliencyScores: [{ clusterName: 'cluster1', calculated: 83.7, baseline: 80.0, status: 'pass', message: 'Score 83.7 meets baseline 80.0', nodeContributions: { 'node1': 95.0, 'node2': 72.3 } }],
         },
       };
 
@@ -263,10 +265,63 @@ describe('graphRunsApi', () => {
 
       expect(result.spec.resiliencyScoreEnabled).toBe(true);
       expect(result.spec.resiliencyScoreBaseline).toBe(80.0);
-      expect(result.status.resiliencyScore?.calculated).toBe(83.7);
-      expect(result.status.resiliencyScore?.status).toBe('pass');
-      expect(result.status.nodeStatuses[0].resiliencyScore).toBe(95.0);
-      expect(result.status.nodeStatuses[1].resiliencyScore).toBe(72.3);
+      expect(result.status.resiliencyScores?.[0].calculated).toBe(83.7);
+      expect(result.status.resiliencyScores?.[0].status).toBe('pass');
+      expect(result.status.nodeStatuses[0].resiliencyScores?.[0].score).toBe(95.0);
+      expect(result.status.nodeStatuses[1].resiliencyScores?.[0].score).toBe(72.3);
+    });
+
+    it('should return multi-cluster resiliency scores', async () => {
+      const mockGraphRun: GraphRunDetail = {
+        name: 'graphrun-multi-cluster',
+        namespace: 'krkn-operator',
+        creationTimestamp: '2026-05-25T10:00:00Z',
+        spec: {
+          graph: {
+            'node1': { name: 'pod-kill', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios' },
+          },
+          targetRequestId: 'target-123',
+          targetClusters: { 'krkn-operator': ['cluster1', 'cluster2'] },
+          ownerUserId: 'user1@example.com',
+          resiliencyScoreEnabled: true,
+          resiliencyScoreBaseline: 80.0,
+        },
+        status: {
+          phase: 'Completed',
+          summary: { totalNodes: 1, completedNodes: 1, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+          nodeStatuses: [
+            {
+              nodeId: 'node1',
+              nodeName: 'pod-kill',
+              phase: 'Completed',
+              resiliencyScores: [
+                { clusterName: 'cluster1', score: 95.0 },
+                { clusterName: 'cluster2', score: 72.3 },
+              ],
+              resiliencyScoreAvg: 83.65,
+            },
+          ],
+          resolvedLevels: [['node1']],
+          startTime: '2026-05-25T10:01:00Z',
+          completionTime: '2026-05-25T10:12:00Z',
+          resiliencyScores: [
+            { clusterName: 'cluster1', calculated: 95.0, baseline: 80.0, status: 'pass', message: 'Meets baseline', nodeContributions: { 'node1': 95.0 } },
+            { clusterName: 'cluster2', calculated: 72.3, baseline: 80.0, status: 'fail', message: 'Below baseline', nodeContributions: { 'node1': 72.3 } },
+          ],
+        },
+      };
+
+      mockFetchJson.mockResolvedValue(mockGraphRun);
+
+      const result = await graphRunsApi.getGraphRun('graphrun-multi-cluster');
+
+      expect(result.status.resiliencyScores).toHaveLength(2);
+      expect(result.status.resiliencyScores?.[0].clusterName).toBe('cluster1');
+      expect(result.status.resiliencyScores?.[0].calculated).toBe(95.0);
+      expect(result.status.resiliencyScores?.[1].clusterName).toBe('cluster2');
+      expect(result.status.resiliencyScores?.[1].status).toBe('fail');
+      expect(result.status.nodeStatuses[0].resiliencyScores).toHaveLength(2);
+      expect(result.status.nodeStatuses[0].resiliencyScoreAvg).toBe(83.65);
     });
 
     it('should encode special characters in graph run name', async () => {

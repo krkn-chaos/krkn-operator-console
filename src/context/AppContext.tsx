@@ -12,16 +12,13 @@ const initialState: AppState = {
   // Scenario runs list (NEW: ScenarioRun-centric)
   scenarioRuns: [],
   scenarioRunsRefreshTrigger: 0,
-  scenarioRunToRefresh: null,
   pollingRunNames: new Set<string>(),
-  pausedPollingRunIds: new Set<string>(), // Runs with polling paused (accordion open)
   expandedRunIds: new Set<string>(),
   expandedClusterJobs: new Set<string>(),
 
   // Graph runs list (GraphRun orchestration)
   graphRuns: [],
   expandedGraphRunIds: new Set<string>(),
-  pausedGraphPollingIds: new Set<string>(),
 
   // Workflow state
   clusters: null,
@@ -177,26 +174,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
-    case 'REFRESH_SCENARIO_RUN':
-      // Trigger manual refresh for a specific run (used when polling paused)
-      // The actual refresh is handled by useScenarioRunsPoller watching this trigger
-      return {
-        ...state,
-        scenarioRunsRefreshTrigger: state.scenarioRunsRefreshTrigger + 1,
-        scenarioRunToRefresh: action.payload.scenarioRunName,
-      };
-
     case 'LOAD_SCENARIO_RUNS_SUCCESS': {
-      // Clean up pausedPollingRunIds and expandedRunIds to remove deleted runs
       const currentRunIds = new Set(action.payload.runs.map(run => run.scenarioRunName));
-      const cleanedPausedPolling = new Set(
-        Array.from(state.pausedPollingRunIds).filter(id => currentRunIds.has(id))
-      );
       const cleanedExpandedRuns = new Set(
         Array.from(state.expandedRunIds).filter(id => currentRunIds.has(id))
       );
 
-      // Clean up expandedClusterJobs to remove deleted jobs
       const allJobIds = new Set(
         action.payload.runs.flatMap(run => run.clusterJobs.map(job => job.jobId))
       );
@@ -207,7 +190,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         scenarioRuns: action.payload.runs,
-        pausedPollingRunIds: cleanedPausedPolling,
         expandedRunIds: cleanedExpandedRuns,
         expandedClusterJobs: cleanedExpandedJobs,
         error: null,
@@ -216,22 +198,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'TOGGLE_RUN_ACCORDION': {
       const newExpandedRuns = new Set(state.expandedRunIds);
-      const newPausedPolling = new Set(state.pausedPollingRunIds);
 
       if (newExpandedRuns.has(action.payload.scenarioRunName)) {
-        // Closing accordion - remove from expanded and paused
         newExpandedRuns.delete(action.payload.scenarioRunName);
-        newPausedPolling.delete(action.payload.scenarioRunName);
       } else {
-        // Opening accordion - add to expanded and paused
         newExpandedRuns.add(action.payload.scenarioRunName);
-        newPausedPolling.add(action.payload.scenarioRunName);
       }
 
       return {
         ...state,
         expandedRunIds: newExpandedRuns,
-        pausedPollingRunIds: newPausedPolling,
       };
     }
 
@@ -287,22 +263,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'TOGGLE_GRAPH_RUN_ACCORDION': {
       const newExpandedGraphRuns = new Set(state.expandedGraphRunIds);
-      const newPausedGraphPolling = new Set(state.pausedGraphPollingIds);
 
       if (newExpandedGraphRuns.has(action.payload.graphRunName)) {
-        // Closing accordion - remove from expanded and paused
         newExpandedGraphRuns.delete(action.payload.graphRunName);
-        newPausedGraphPolling.delete(action.payload.graphRunName);
       } else {
-        // Opening accordion - add to expanded and paused
         newExpandedGraphRuns.add(action.payload.graphRunName);
-        newPausedGraphPolling.add(action.payload.graphRunName);
       }
 
       return {
         ...state,
         expandedGraphRunIds: newExpandedGraphRuns,
-        pausedGraphPollingIds: newPausedGraphPolling,
       };
     }
 
@@ -312,9 +282,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         graphRuns: state.graphRuns.filter(run => run.name !== action.payload.graphRunName),
         expandedGraphRunIds: new Set(
           [...state.expandedGraphRunIds].filter(id => id !== action.payload.graphRunName)
-        ),
-        pausedGraphPollingIds: new Set(
-          [...state.pausedGraphPollingIds].filter(id => id !== action.payload.graphRunName)
         ),
       };
 

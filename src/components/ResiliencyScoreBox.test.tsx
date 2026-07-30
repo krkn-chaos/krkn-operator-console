@@ -68,6 +68,33 @@ describe('ResiliencyScoreBox', () => {
   });
 });
 
+describe('ResiliencyScoreBox - Multi-Cluster', () => {
+  it('shows avg label for multi-cluster scores', () => {
+    const clusterScores = [
+      { clusterName: 'cluster-a', calculated: 90, baseline: 80, status: 'pass' as const, message: '', nodeContributions: {} },
+      { clusterName: 'cluster-b', calculated: 70, baseline: 80, status: 'fail' as const, message: '', nodeContributions: {} },
+    ];
+    render(<ResiliencyScoreBox score={80} baseline={80} status="pass" enabled clusterScores={clusterScores} />);
+    expect(screen.getByText('80.0')).toBeInTheDocument();
+    expect(screen.getByText('avg')).toBeInTheDocument();
+  });
+
+  it('does not show avg label for single cluster', () => {
+    const clusterScores = [
+      { clusterName: 'cluster-a', calculated: 90, baseline: 80, status: 'pass' as const, message: '', nodeContributions: {} },
+    ];
+    render(<ResiliencyScoreBox score={90} baseline={80} status="pass" enabled clusterScores={clusterScores} />);
+    expect(screen.getByText('90.0')).toBeInTheDocument();
+    expect(screen.queryByText('avg')).not.toBeInTheDocument();
+  });
+
+  it('does not show avg label when no clusterScores prop', () => {
+    render(<ResiliencyScoreBox score={90} baseline={80} status="pass" enabled />);
+    expect(screen.getByText('90.0')).toBeInTheDocument();
+    expect(screen.queryByText('avg')).not.toBeInTheDocument();
+  });
+});
+
 describe('ResiliencyScoreNA', () => {
   it('renders N/A text', () => {
     render(<ResiliencyScoreNA />);

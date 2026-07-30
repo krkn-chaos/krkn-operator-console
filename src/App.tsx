@@ -169,7 +169,6 @@ function App() {
               scenarioRuns={state.scenarioRuns}
               expandedRunIds={state.expandedRunIds}
               expandedJobIds={state.expandedClusterJobs}
-              pausedPollingRunIds={state.pausedPollingRunIds}
               onToggleRunAccordion={(scenarioRunName) =>
                 dispatch({ type: 'TOGGLE_RUN_ACCORDION', payload: { scenarioRunName } })
               }
@@ -179,13 +178,9 @@ function App() {
               onDeleteScenarioRun={handleDeleteScenarioRun}
               onDeleteJob={handleDeleteJob}
               onCreateJob={handleCreateJob}
-              onRefreshScenarioRun={(scenarioRunName) =>
-                dispatch({ type: 'REFRESH_SCENARIO_RUN', payload: { scenarioRunName } })
-              }
               onNavigateToStudio={handleNavigateToStudio}
               graphRuns={state.graphRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
-              pausedGraphPollingIds={state.pausedGraphPollingIds}
               onToggleGraphRunAccordion={(graphRunName) =>
                 dispatch({ type: 'TOGGLE_GRAPH_RUN_ACCORDION', payload: { graphRunName } })
               }

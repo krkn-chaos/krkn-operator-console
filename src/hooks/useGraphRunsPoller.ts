@@ -15,9 +15,8 @@ export function useGraphRunsPoller() {
   const { state, dispatch } = useAppContext();
 
   const graphRunsRef = useRef(state.graphRuns);
-  const pausedGraphPollingIdsRef = useRef(state.pausedGraphPollingIds);
+
   graphRunsRef.current = state.graphRuns;
-  pausedGraphPollingIdsRef.current = state.pausedGraphPollingIds;
 
   const initialFetchDoneRef = useRef(false);
 
@@ -39,7 +38,7 @@ export function useGraphRunsPoller() {
         completionTime: run.completionTime,
         resiliencyScoreEnabled: run.resiliencyScoreEnabled,
         resiliencyScoreBaseline: run.resiliencyScoreBaseline,
-        resiliencyScore: run.resiliencyScore,
+        resiliencyScores: run.resiliencyScores,
       }));
 
       dispatch({
@@ -57,8 +56,6 @@ export function useGraphRunsPoller() {
     const data = message.data as GraphRunState;
     const runName = message.id || data.name;
 
-    if (pausedGraphPollingIdsRef.current.has(runName)) return;
-
     if (message.event === 'updated' || message.event === 'created') {
       const existing = graphRunsRef.current.find(r => r.name === runName);
 
@@ -73,8 +70,8 @@ export function useGraphRunsPoller() {
         startTime: data.startTime || existing?.startTime,
         completionTime: data.completionTime || existing?.completionTime,
         resiliencyScoreEnabled: data.resiliencyScoreEnabled ?? existing?.resiliencyScoreEnabled,
-        resiliencyScoreBaseline: data.resiliencyScoreBaseline ?? existing?.resiliencyScoreBaseline,
-        resiliencyScore: data.resiliencyScore ?? existing?.resiliencyScore,
+        resiliencyScoreBaseline: data.resiliencyScoreBaseline ?? existing?.resiliencyScoreBaseline ?? data.resiliencyScores?.[0]?.baseline,
+        resiliencyScores: data.resiliencyScores ?? existing?.resiliencyScores,
       };
 
       if (existing) {

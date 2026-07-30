@@ -291,22 +291,23 @@ export function ResiliencyScoreModal({
           )}
         </FormGroup>
 
-        <FormGroup label="File Selection Mode">
-          <Radio
-            id="file-mode-same"
-            name="file-mode"
-            label="Same file for all nodes"
-            isChecked={fileMode === 'same'}
-            onChange={() => setFileMode('same')}
-          />
-          <Radio
-            id="file-mode-per-node"
-            name="file-mode"
-            label="Per-node file selection"
-            isChecked={fileMode === 'per-node'}
-            onChange={() => setFileMode('per-node')}
-            style={{ marginTop: '0.5rem' }}
-          />
+        <FormGroup label="File Selection Mode" role="radiogroup">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Radio
+              id="file-mode-same"
+              name="file-mode"
+              label="Same file for all nodes"
+              isChecked={fileMode === 'same'}
+              onChange={() => setFileMode('same')}
+            />
+            <Radio
+              id="file-mode-per-node"
+              name="file-mode"
+              label="Per-node file selection"
+              isChecked={fileMode === 'per-node'}
+              onChange={() => setFileMode('per-node')}
+            />
+          </div>
         </FormGroup>
 
         {fileMode === 'same' ? (

@@ -36,6 +36,7 @@ const mockGraphRunUpdate = {
   startTime: '2026-07-02T10:05:00Z',
   resiliencyScoreEnabled: true,
   resiliencyScoreBaseline: 90.0,
+  resiliencyScores: undefined as undefined | object[],
 };
 
 const mockDashboardUpdate = {

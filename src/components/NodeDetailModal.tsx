@@ -226,16 +226,32 @@ export function NodeDetailModal({ nodeStatus, onClose }: NodeDetailModalProps) {
           </DescriptionListGroup>
         )}
 
-        {nodeStatus.resiliencyScore !== undefined && (
+        {nodeStatus.resiliencyScores && nodeStatus.resiliencyScores.length > 0 && (
           <DescriptionListGroup>
-            <DescriptionListTerm>Resiliency Score</DescriptionListTerm>
+            <DescriptionListTerm>Resiliency Score{nodeStatus.resiliencyScores.length > 1 ? 's' : ''}</DescriptionListTerm>
             <DescriptionListDescription>
-              <Label
-                color={nodeStatus.resiliencyScore >= 80 ? (nodeStatus.resiliencyScore >= 95 ? 'green' : 'orange') : 'red'}
-                icon={nodeStatus.resiliencyScore >= 95 ? <CheckCircleIcon /> : <ExclamationCircleIcon />}
-              >
-                {nodeStatus.resiliencyScore.toFixed(1)}
-              </Label>
+              <Flex spaceItems={{ default: 'spaceItemsSm' }} direction={{ default: nodeStatus.resiliencyScores.length > 1 ? 'column' : 'row' }}>
+                {nodeStatus.resiliencyScores.map((cs) => {
+                  const scoreValue = cs.score;
+                  return (
+                    <FlexItem key={cs.clusterName}>
+                      <Label
+                        color={scoreValue >= 80 ? (scoreValue >= 95 ? 'green' : 'orange') : 'red'}
+                        icon={scoreValue >= 95 ? <CheckCircleIcon /> : <ExclamationCircleIcon />}
+                      >
+                        {nodeStatus.resiliencyScores!.length > 1 && `${cs.clusterName}: `}{scoreValue.toFixed(1)}
+                      </Label>
+                    </FlexItem>
+                  );
+                })}
+                {nodeStatus.resiliencyScores.length > 1 && nodeStatus.resiliencyScoreAvg !== undefined && (
+                  <FlexItem>
+                    <Label color="blue">
+                      Average: {nodeStatus.resiliencyScoreAvg.toFixed(1)}
+                    </Label>
+                  </FlexItem>
+                )}
+              </Flex>
             </DescriptionListDescription>
           </DescriptionListGroup>
         )}

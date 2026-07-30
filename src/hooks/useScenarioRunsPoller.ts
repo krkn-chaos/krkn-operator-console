@@ -15,9 +15,7 @@ export function useScenarioRunsPoller() {
   const { state, dispatch } = useAppContext();
 
   const scenarioRunsRef = useRef(state.scenarioRuns);
-  const pausedPollingRunIdsRef = useRef(state.pausedPollingRunIds);
   scenarioRunsRef.current = state.scenarioRuns;
-  pausedPollingRunIdsRef.current = state.pausedPollingRunIds;
 
   const initialFetchDoneRef = useRef(false);
   const fetchedDetailsRef = useRef<Set<string>>(new Set());
@@ -48,6 +46,7 @@ export function useScenarioRunsPoller() {
             registryName: details.registryName || base.registryName,
             graphRunName: details.graphRunName || base.graphRunName,
             graphNodeId: details.graphNodeId || base.graphNodeId,
+            customRunName: details.customRunName || base.customRunName,
           },
         },
       });
@@ -64,6 +63,7 @@ export function useScenarioRunsPoller() {
       const scenarioRuns = await operatorApi.listScenarioRuns();
 
       const scenarioRunStates: ScenarioRunState[] = scenarioRuns.map((run) => {
+        const runAny = run as ScenarioRunStatusResponse & { creationTimestamp?: string };
         const scenarioName = run.scenarioName || run.scenarioRunName.replace(/-[a-f0-9]{8}$/, '');
         return {
           scenarioRunName: run.scenarioRunName,
@@ -74,11 +74,12 @@ export function useScenarioRunsPoller() {
           failedJobs: run.failedJobs,
           runningJobs: run.runningJobs,
           clusterJobs: run.clusterJobs || [],
-          createdAt: run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || new Date().toISOString(),
+          createdAt: runAny.creationTimestamp || run.createdAt || (run.clusterJobs && run.clusterJobs[0]?.startTime) || '',
           ownerUserId: run.ownerUserId,
           registryName: run.registryName,
           graphRunName: run.graphRunName,
           graphNodeId: run.graphNodeId,
+          customRunName: run.customRunName,
         };
       });
 
@@ -101,10 +102,8 @@ export function useScenarioRunsPoller() {
   const handleMessage = useCallback((message: ServerMessage) => {
     if (message.resource !== 'run') return;
 
-    const data = message.data as ScenarioRunStatusResponse;
+    const data = message.data as ScenarioRunStatusResponse & { creationTimestamp?: string };
     const runName = message.id || data.scenarioRunName;
-
-    if (pausedPollingRunIdsRef.current.has(runName)) return;
 
     if (message.event === 'updated' || message.event === 'created') {
       const existing = scenarioRunsRef.current.find(r => r.scenarioRunName === runName);
@@ -120,11 +119,12 @@ export function useScenarioRunsPoller() {
         failedJobs: data.failedJobs,
         runningJobs: data.runningJobs,
         clusterJobs: hasWsJobs ? data.clusterJobs : (existing?.clusterJobs || []),
-        createdAt: existing?.createdAt || data.createdAt || new Date().toISOString(),
+        createdAt: existing?.createdAt || data.creationTimestamp || data.createdAt || '',
         ownerUserId: data.ownerUserId || existing?.ownerUserId,
         registryName: data.registryName || existing?.registryName,
         graphRunName: data.graphRunName || existing?.graphRunName,
         graphNodeId: data.graphNodeId || existing?.graphNodeId,
+        customRunName: data.customRunName || existing?.customRunName,
       };
 
       if (existing) {
@@ -180,51 +180,6 @@ export function useScenarioRunsPoller() {
     return () => clearInterval(intervalId);
   }, [connectionState, state.expandedRunIds, fetchRunDetails]);
 
-  // Handle manual refresh trigger (for paused runs with explicit refresh button)
-  useEffect(() => {
-    if (state.scenarioRunsRefreshTrigger === 0) return;
-
-    const runToRefresh = state.scenarioRunToRefresh;
-    if (!runToRefresh) return;
-
-    const run = state.scenarioRuns.find(r => r.scenarioRunName === runToRefresh);
-    if (!run) return;
-
-    if (!state.pausedPollingRunIds.has(runToRefresh) ||
-      ['Succeeded', 'PartiallyFailed', 'Failed'].includes(run.phase)) {
-      return;
-    }
-
-    (async () => {
-      try {
-        const updated = await operatorApi.getScenarioRunStatus(runToRefresh);
-
-        const updatedState: ScenarioRunState = {
-          scenarioRunName: updated.scenarioRunName,
-          scenarioName: run.scenarioName,
-          phase: updated.phase,
-          totalTargets: updated.totalTargets,
-          successfulJobs: updated.successfulJobs,
-          failedJobs: updated.failedJobs,
-          runningJobs: updated.runningJobs,
-          clusterJobs: updated.clusterJobs || run.clusterJobs || [],
-          createdAt: run.createdAt,
-          ownerUserId: updated.ownerUserId || run.ownerUserId,
-          registryName: updated.registryName || run.registryName,
-          graphRunName: updated.graphRunName || run.graphRunName,
-          graphNodeId: updated.graphNodeId || run.graphNodeId,
-          customRunName: updated.customRunName || run.customRunName,
-        };
-
-        if (hasChanges(run, updatedState)) {
-          dispatch({ type: 'UPDATE_SCENARIO_RUN', payload: { run: updatedState } });
-        }
-      } catch {
-        // Silently handle error
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.scenarioRunsRefreshTrigger, dispatch]);
 }
 
 function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {

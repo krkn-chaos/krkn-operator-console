@@ -1,0 +1,159 @@
+import { describe, it, expect } from 'vitest';
+import {
+  getScoreColor,
+  getScoreLevel,
+  formatScore,
+  allClustersPassed,
+  calculateNodeScoreAverage,
+  isScoreCalculating,
+  SCORE_CALCULATING,
+} from '../resiliency';
+import type { ClusterResiliencyScore, GraphClusterScore } from '../../types/api';
+
+describe('getScoreColor', () => {
+  it('returns dark green for ratio >= 100%', () => {
+    expect(getScoreColor(80, 80)).toBe('#28a745');
+    expect(getScoreColor(90, 80)).toBe('#28a745');
+  });
+
+  it('returns light green for ratio 95-100%', () => {
+    expect(getScoreColor(77, 80)).toBe('#5cb85c');
+    expect(getScoreColor(79.9, 80)).toBe('#5cb85c');
+  });
+
+  it('returns yellow for ratio 90-95%', () => {
+    expect(getScoreColor(73, 80)).toBe('#ffc107');
+    expect(getScoreColor(75.9, 80)).toBe('#ffc107');
+  });
+
+  it('returns orange for ratio 80-90%', () => {
+    expect(getScoreColor(65, 80)).toBe('#fd7e14');
+    expect(getScoreColor(71.9, 80)).toBe('#fd7e14');
+  });
+
+  it('returns red for ratio < 80%', () => {
+    expect(getScoreColor(50, 80)).toBe('#dc3545');
+    expect(getScoreColor(63.9, 80)).toBe('#dc3545');
+  });
+});
+
+describe('getScoreLevel', () => {
+  it('returns Excellent for ratio >= 100%', () => {
+    expect(getScoreLevel(90, 80).label).toBe('Excellent');
+  });
+
+  it('returns Good for ratio 95-100%', () => {
+    expect(getScoreLevel(77, 80).label).toBe('Good');
+  });
+
+  it('returns Warning for ratio 90-95%', () => {
+    expect(getScoreLevel(73, 80).label).toBe('Warning');
+  });
+
+  it('returns Poor for ratio 80-90%', () => {
+    expect(getScoreLevel(68, 80).label).toBe('Poor');
+  });
+
+  it('returns Critical for ratio < 80%', () => {
+    expect(getScoreLevel(50, 80).label).toBe('Critical');
+  });
+
+  it('includes percentage in description', () => {
+    const level = getScoreLevel(90, 80);
+    expect(level.description).toContain('112.5%');
+  });
+});
+
+describe('formatScore', () => {
+  it('formats to 1 decimal place', () => {
+    expect(formatScore(85)).toBe('85.0');
+    expect(formatScore(85.123)).toBe('85.1');
+    expect(formatScore(85.999)).toBe('86.0');
+  });
+});
+
+describe('allClustersPassed', () => {
+  it('returns true when all clusters pass', () => {
+    const scores: GraphClusterScore[] = [
+      { clusterName: 'a', calculated: 90, status: 'pass' },
+      { clusterName: 'b', calculated: 85, status: 'pass' },
+    ];
+    expect(allClustersPassed(scores)).toBe(true);
+  });
+
+  it('returns false when any cluster fails', () => {
+    const scores: GraphClusterScore[] = [
+      { clusterName: 'a', calculated: 90, status: 'pass' },
+      { clusterName: 'b', calculated: 70, status: 'fail' },
+    ];
+    expect(allClustersPassed(scores)).toBe(false);
+  });
+
+  it('returns false with no-baseline status', () => {
+    const scores: GraphClusterScore[] = [
+      { clusterName: 'a', calculated: 90, status: 'no-baseline' },
+    ];
+    expect(allClustersPassed(scores)).toBe(false);
+  });
+
+  it('returns true for empty array', () => {
+    expect(allClustersPassed([])).toBe(true);
+  });
+});
+
+describe('calculateNodeScoreAverage', () => {
+  it('calculates average of scores', () => {
+    const scores: ClusterResiliencyScore[] = [
+      { clusterName: 'a', score: 90 },
+      { clusterName: 'b', score: 70 },
+    ];
+    expect(calculateNodeScoreAverage(scores)).toBe(80);
+  });
+
+  it('returns single score for one cluster', () => {
+    const scores: ClusterResiliencyScore[] = [
+      { clusterName: 'a', score: 85 },
+    ];
+    expect(calculateNodeScoreAverage(scores)).toBe(85);
+  });
+
+  it('returns 0 for empty array', () => {
+    expect(calculateNodeScoreAverage([])).toBe(0);
+  });
+});
+
+describe('SCORE_CALCULATING', () => {
+  it('is -1', () => {
+    expect(SCORE_CALCULATING).toBe(-1);
+  });
+});
+
+describe('isScoreCalculating', () => {
+  it('returns true when any score has calculated === -1', () => {
+    const scores: GraphClusterScore[] = [
+      { clusterName: 'a', calculated: 90, status: 'pass' },
+      { clusterName: 'b', calculated: -1, status: 'pass' },
+    ];
+    expect(isScoreCalculating(scores)).toBe(true);
+  });
+
+  it('returns true when all scores have calculated === -1', () => {
+    const scores: GraphClusterScore[] = [
+      { clusterName: 'a', calculated: -1, status: 'pass' },
+      { clusterName: 'b', calculated: -1, status: 'pass' },
+    ];
+    expect(isScoreCalculating(scores)).toBe(true);
+  });
+
+  it('returns false when all scores are computed', () => {
+    const scores: GraphClusterScore[] = [
+      { clusterName: 'a', calculated: 90, status: 'pass' },
+      { clusterName: 'b', calculated: 85, status: 'pass' },
+    ];
+    expect(isScoreCalculating(scores)).toBe(false);
+  });
+
+  it('returns false for empty array', () => {
+    expect(isScoreCalculating([])).toBe(false);
+  });
+});
