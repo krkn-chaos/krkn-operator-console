@@ -225,6 +225,20 @@ export function NodeDetailModal({ nodeStatus, onClose }: NodeDetailModalProps) {
             <DescriptionListDescription>{nodeStatus.message}</DescriptionListDescription>
           </DescriptionListGroup>
         )}
+
+        {nodeStatus.resiliencyScore !== undefined && (
+          <DescriptionListGroup>
+            <DescriptionListTerm>Resiliency Score</DescriptionListTerm>
+            <DescriptionListDescription>
+              <Label
+                color={nodeStatus.resiliencyScore >= 80 ? (nodeStatus.resiliencyScore >= 95 ? 'green' : 'orange') : 'red'}
+                icon={nodeStatus.resiliencyScore >= 95 ? <CheckCircleIcon /> : <ExclamationCircleIcon />}
+              >
+                {nodeStatus.resiliencyScore.toFixed(1)}
+              </Label>
+            </DescriptionListDescription>
+          </DescriptionListGroup>
+        )}
       </DescriptionList>
 
       <hr style={{ margin: '1.5rem 0', border: 'none', borderTop: '1px solid var(--pf-v5-global--BorderColor--100)' }} />

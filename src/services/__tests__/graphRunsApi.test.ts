@@ -108,6 +108,33 @@ describe('graphRunsApi', () => {
       expect(result).toEqual(mockGraphRuns);
     });
 
+    it('should return resiliency score fields in list items', async () => {
+      const mockGraphRuns: GraphRunListItem[] = [
+        {
+          name: 'graphrun-scored',
+          namespace: 'krkn-operator',
+          creationTimestamp: '2026-05-25T10:00:00Z',
+          phase: 'Completed',
+          ownerUserId: 'user1@example.com',
+          targetRequestId: 'target-123',
+          summary: { totalNodes: 3, completedNodes: 3, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+          completionTime: '2026-05-25T10:15:00Z',
+          resiliencyScoreEnabled: true,
+          resiliencyScoreBaseline: 80.0,
+          resiliencyScore: { calculated: 87.5, baseline: 80.0, status: 'pass', message: 'Meets baseline' },
+        },
+      ];
+
+      mockFetchJson.mockResolvedValue(mockGraphRuns);
+
+      const result = await graphRunsApi.listGraphRuns();
+
+      expect(result[0].resiliencyScoreEnabled).toBe(true);
+      expect(result[0].resiliencyScoreBaseline).toBe(80.0);
+      expect(result[0].resiliencyScore?.calculated).toBe(87.5);
+      expect(result[0].resiliencyScore?.status).toBe('pass');
+    });
+
     it('should throw error on API failure', async () => {
       const errorMessage = 'Failed to list graph runs';
       mockFetchJson.mockRejectedValue(new Error(errorMessage));
@@ -180,6 +207,66 @@ describe('graphRunsApi', () => {
 
       expect(mockFetchJson).toHaveBeenCalledWith('/graphruns/graphrun-abc123');
       expect(result).toEqual(mockGraphRun);
+    });
+
+    it('should return node-level resiliency scores', async () => {
+      const mockGraphRun: GraphRunDetail = {
+        name: 'graphrun-with-scores',
+        namespace: 'krkn-operator',
+        creationTimestamp: '2026-05-25T10:00:00Z',
+        spec: {
+          graph: {
+            'node1': { name: 'pod-kill', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios' },
+            'node2': { name: 'net-chaos', image: 'quay.io/krkn-chaos/krkn-hub:network-chaos', depends_on: 'node1' },
+          },
+          targetRequestId: 'target-123',
+          targetClusters: { 'krkn-operator': ['cluster1'] },
+          ownerUserId: 'user1@example.com',
+          resiliencyScoreEnabled: true,
+          resiliencyMountPath: '/etc/krkn/metrics.yaml',
+          resiliencyScoreBaseline: 80.0,
+        },
+        status: {
+          phase: 'Completed',
+          summary: { totalNodes: 2, completedNodes: 2, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+          nodeStatuses: [
+            {
+              nodeId: 'node1',
+              nodeName: 'pod-kill',
+              phase: 'Completed',
+              scenarioRunRef: 'sr-001',
+              startTime: '2026-05-25T10:01:00Z',
+              completionTime: '2026-05-25T10:05:00Z',
+              resiliencyScore: 95.0,
+            },
+            {
+              nodeId: 'node2',
+              nodeName: 'net-chaos',
+              phase: 'Completed',
+              scenarioRunRef: 'sr-002',
+              startTime: '2026-05-25T10:06:00Z',
+              completionTime: '2026-05-25T10:12:00Z',
+              dependsOn: ['node1'],
+              resiliencyScore: 72.3,
+            },
+          ],
+          resolvedLevels: [['node1'], ['node2']],
+          startTime: '2026-05-25T10:01:00Z',
+          completionTime: '2026-05-25T10:12:00Z',
+          resiliencyScore: { calculated: 83.7, baseline: 80.0, status: 'pass', message: 'Score 83.7 meets baseline 80.0' },
+        },
+      };
+
+      mockFetchJson.mockResolvedValue(mockGraphRun);
+
+      const result = await graphRunsApi.getGraphRun('graphrun-with-scores');
+
+      expect(result.spec.resiliencyScoreEnabled).toBe(true);
+      expect(result.spec.resiliencyScoreBaseline).toBe(80.0);
+      expect(result.status.resiliencyScore?.calculated).toBe(83.7);
+      expect(result.status.resiliencyScore?.status).toBe('pass');
+      expect(result.status.nodeStatuses[0].resiliencyScore).toBe(95.0);
+      expect(result.status.nodeStatuses[1].resiliencyScore).toBe(72.3);
     });
 
     it('should encode special characters in graph run name', async () => {

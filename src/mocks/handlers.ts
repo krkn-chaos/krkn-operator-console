@@ -99,6 +99,9 @@ const mockGraphRuns = [
     summary: { totalNodes: 4, completedNodes: 4, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
     startTime: '2026-07-02T08:00:00Z',
     completionTime: '2026-07-02T08:25:00Z',
+    resiliencyScoreEnabled: true,
+    resiliencyScoreBaseline: 80.0,
+    resiliencyScore: { calculated: 87.5, baseline: 80.0, status: 'pass', message: 'Score 87.5 meets baseline 80.0' },
   },
   {
     name: 'resilience-test-staging',
@@ -109,8 +112,75 @@ const mockGraphRuns = [
     targetRequestId: 'target-002',
     summary: { totalNodes: 3, completedNodes: 1, runningNodes: 1, failedNodes: 0, pendingNodes: 1 },
     startTime: '2026-07-02T10:05:00Z',
+    resiliencyScoreEnabled: true,
+    resiliencyScoreBaseline: 90.0,
   },
 ];
+
+const mockGraphRunDetails: Record<string, object> = {
+  'chaos-workflow-daily': {
+    name: 'chaos-workflow-daily',
+    namespace: 'krkn-operator-system',
+    creationTimestamp: '2026-07-02T08:00:00Z',
+    spec: {
+      graph: {
+        'pod-kill': { name: 'pod-kill', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios' },
+        'net-chaos': { name: 'net-chaos', image: 'quay.io/krkn-chaos/krkn-hub:network-chaos', depends_on: 'pod-kill' },
+        'cpu-hog': { name: 'cpu-hog', image: 'quay.io/krkn-chaos/krkn-hub:cpu-hog', depends_on: 'pod-kill' },
+        'time-skew': { name: 'time-skew', image: 'quay.io/krkn-chaos/krkn-hub:time-skew', depends_on: 'net-chaos' },
+      },
+      targetRequestId: 'target-001',
+      targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
+      ownerUserId: 'admin@preview.local',
+      resiliencyScoreEnabled: true,
+      resiliencyMountPath: '/etc/krkn/metrics.yaml',
+      resiliencyScoreBaseline: 80.0,
+    },
+    status: {
+      phase: 'Completed',
+      summary: { totalNodes: 4, completedNodes: 4, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+      nodeStatuses: [
+        { nodeId: 'pod-kill', nodeName: 'pod-kill', phase: 'Completed', scenarioRunRef: 'sr-pod-kill-001', startTime: '2026-07-02T08:00:00Z', completionTime: '2026-07-02T08:05:00Z', resiliencyScore: 95.0 },
+        { nodeId: 'net-chaos', nodeName: 'net-chaos', phase: 'Completed', scenarioRunRef: 'sr-net-chaos-001', startTime: '2026-07-02T08:05:00Z', completionTime: '2026-07-02T08:12:00Z', dependsOn: ['pod-kill'], resiliencyScore: 72.3 },
+        { nodeId: 'cpu-hog', nodeName: 'cpu-hog', phase: 'Completed', scenarioRunRef: 'sr-cpu-hog-001', startTime: '2026-07-02T08:05:00Z', completionTime: '2026-07-02T08:18:00Z', dependsOn: ['pod-kill'], resiliencyScore: 88.1 },
+        { nodeId: 'time-skew', nodeName: 'time-skew', phase: 'Completed', scenarioRunRef: 'sr-time-skew-001', startTime: '2026-07-02T08:12:00Z', completionTime: '2026-07-02T08:25:00Z', dependsOn: ['net-chaos'], resiliencyScore: 94.5 },
+      ],
+      resolvedLevels: [['pod-kill'], ['net-chaos', 'cpu-hog'], ['time-skew']],
+      startTime: '2026-07-02T08:00:00Z',
+      completionTime: '2026-07-02T08:25:00Z',
+      resiliencyScore: { calculated: 87.5, baseline: 80.0, status: 'pass', message: 'Score 87.5 meets baseline 80.0' },
+    },
+  },
+  'resilience-test-staging': {
+    name: 'resilience-test-staging',
+    namespace: 'krkn-operator-system',
+    creationTimestamp: '2026-07-02T10:05:00Z',
+    spec: {
+      graph: {
+        'node-drain': { name: 'node-drain', image: 'quay.io/krkn-chaos/krkn-hub:node-scenarios' },
+        'pod-delete': { name: 'pod-delete', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios', depends_on: 'node-drain' },
+        'io-stress': { name: 'io-stress', image: 'quay.io/krkn-chaos/krkn-hub:io-hog', depends_on: 'node-drain' },
+      },
+      targetRequestId: 'target-002',
+      targetClusters: { 'krkn-operator': ['staging-eu-west-1'] },
+      ownerUserId: 'admin@preview.local',
+      resiliencyScoreEnabled: true,
+      resiliencyMountPath: '/etc/krkn/metrics.yaml',
+      resiliencyScoreBaseline: 90.0,
+    },
+    status: {
+      phase: 'Running',
+      summary: { totalNodes: 3, completedNodes: 1, runningNodes: 1, failedNodes: 0, pendingNodes: 1 },
+      nodeStatuses: [
+        { nodeId: 'node-drain', nodeName: 'node-drain', phase: 'Completed', scenarioRunRef: 'sr-node-drain-001', startTime: '2026-07-02T10:05:00Z', completionTime: '2026-07-02T10:15:00Z', resiliencyScore: 82.0 },
+        { nodeId: 'pod-delete', nodeName: 'pod-delete', phase: 'Running', scenarioRunRef: 'sr-pod-delete-001', startTime: '2026-07-02T10:15:00Z', dependsOn: ['node-drain'] },
+        { nodeId: 'io-stress', nodeName: 'io-stress', phase: 'Pending', dependsOn: ['node-drain'] },
+      ],
+      resolvedLevels: [['node-drain'], ['pod-delete', 'io-stress']],
+      startTime: '2026-07-02T10:05:00Z',
+    },
+  },
+};
 
 const mockClusters = {
   targetData: {
@@ -260,6 +330,8 @@ export const handlers = [
   // ─── GRAPH RUNS ───
   http.get(`${BASE}/graphruns`, () => HttpResponse.json(mockGraphRuns)),
   http.get(`${BASE}/graphruns/:name`, ({ params }) => {
+    const detail = mockGraphRunDetails[params.name as string];
+    if (detail) return HttpResponse.json(detail);
     const run = mockGraphRuns.find((r) => r.name === params.name);
     return HttpResponse.json(run || mockGraphRuns[0]);
   }),

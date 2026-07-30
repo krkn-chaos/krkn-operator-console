@@ -39,6 +39,7 @@ import {
 import type { GraphRunDetail, NodeStatus } from '../types/api';
 import { graphRunsApi } from '../services';
 import { ScenarioRunDetailModal } from './ScenarioRunDetailModal';
+import { ResiliencyScoreBox } from './ResiliencyScoreBox';
 
 interface GraphRunDetailProps {
   /** Name of the graph run to visualize */
@@ -46,14 +47,37 @@ interface GraphRunDetailProps {
 }
 
 /**
+ * 5-level color gradient for resiliency score based on score/baseline ratio.
+ * Same scale used across the entire application for consistency.
+ */
+function getScoreColor(score: number, baseline: number): string {
+  const ratio = score / baseline;
+  if (ratio >= 1.0) return '#28a745';
+  if (ratio >= 0.95) return '#5cb85c';
+  if (ratio >= 0.9) return '#ffc107';
+  if (ratio >= 0.8) return '#fd7e14';
+  return '#dc3545';
+}
+
+function getScoreLevel(score: number, baseline: number): { label: string; description: string } {
+  const ratio = score / baseline;
+  const pct = (ratio * 100).toFixed(1);
+  if (ratio >= 1.0) return { label: 'Excellent', description: `${pct}% of baseline — meets or exceeds the target` };
+  if (ratio >= 0.95) return { label: 'Good', description: `${pct}% of baseline — within 5% of target` };
+  if (ratio >= 0.9) return { label: 'Warning', description: `${pct}% of baseline — 5-10% below target` };
+  if (ratio >= 0.8) return { label: 'Poor', description: `${pct}% of baseline — 10-20% below target` };
+  return { label: 'Critical', description: `${pct}% of baseline — more than 20% below target` };
+}
+
+/**
  * Custom node component for ReactFlow
- * Displays scenario name, status badge, and connections
+ * Displays scenario name, status badge, resiliency score, and connections
  */
 function ScenarioNode({ data }: NodeProps) {
-  const { nodeStatus, onClick } = data;
+  const { nodeStatus, onClick, resiliencyBaseline, resiliencyEnabled } = data;
   const phase = nodeStatus.phase as string;
+  const nodeScore: number | undefined = nodeStatus.resiliencyScore;
 
-  // Get phase display properties
   const getPhaseDisplay = (phase: string) => {
     switch (phase) {
       case 'Pending':
@@ -73,26 +97,61 @@ function ScenarioNode({ data }: NodeProps) {
 
   const phaseDisplay = getPhaseDisplay(phase);
 
+  const hasScore = resiliencyEnabled && nodeScore !== undefined;
+  const scoreColor = hasScore && resiliencyBaseline
+    ? getScoreColor(nodeScore, resiliencyBaseline)
+    : '#17a2b8';
+  const scoreLevel = hasScore && resiliencyBaseline
+    ? getScoreLevel(nodeScore, resiliencyBaseline)
+    : null;
+
+  const scoreTooltipContent = hasScore ? (
+    <div style={{ maxWidth: '280px' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        marginBottom: '8px', paddingBottom: '6px',
+        borderBottom: `2px solid ${scoreColor}`,
+      }}>
+        <div style={{
+          width: '28px', height: '28px', borderRadius: '6px',
+          backgroundColor: scoreColor, color: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 'bold', fontSize: '11px',
+        }}>
+          {nodeScore.toFixed(1)}
+        </div>
+        <div>
+          <div style={{ fontWeight: 'bold', fontSize: '13px' }}>
+            Resiliency Score
+          </div>
+          <div style={{ fontSize: '11px', color: scoreColor, fontWeight: 600 }}>
+            {scoreLevel?.label}
+          </div>
+        </div>
+      </div>
+      <div style={{ fontSize: '12px', lineHeight: '1.4' }}>
+        <div style={{ marginBottom: '4px' }}>
+          This node scored <strong>{nodeScore.toFixed(1)}</strong> against a
+          workflow baseline of <strong>{resiliencyBaseline?.toFixed(1)}</strong>.
+        </div>
+        <div style={{ color: scoreColor, fontStyle: 'italic', fontSize: '11px' }}>
+          {scoreLevel?.description}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
-      {/* Add keyframe animation for running nodes */}
       {phase === 'Running' && (
         <style>{`
           @keyframes pulse-border {
-            0%, 100% {
-              box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4);
-            }
-            50% {
-              box-shadow: 0 0 0 8px rgba(0, 123, 255, 0);
-            }
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(0, 123, 255, 0); }
           }
           @keyframes glow {
-            0%, 100% {
-              filter: brightness(1);
-            }
-            50% {
-              filter: brightness(1.2);
-            }
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
           }
         `}</style>
       )}
@@ -109,7 +168,7 @@ function ScenarioNode({ data }: NodeProps) {
             'var(--pf-v5-global--warning-color--100)'
           }`,
           backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
-          minWidth: '200px',
+          minWidth: '220px',
           cursor: 'pointer',
           boxShadow: phase === 'Running'
             ? '0 2px 4px rgba(0,0,0,0.1), 0 0 0 0 rgba(0, 123, 255, 0.4)'
@@ -130,28 +189,60 @@ function ScenarioNode({ data }: NodeProps) {
           e.currentTarget.style.transform = 'translateY(0)';
         }}
       >
-      {/* Input handle for dependencies (left side for horizontal flow) */}
       <Handle
         type="target"
         position={Position.Left}
         style={{ background: 'var(--pf-v5-global--BorderColor--300)' }}
       />
 
-      {/* Node content */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {/* Status badge */}
-        <div>
+        {/* Top row: status badge + resiliency score badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <Label color={phaseDisplay.color} icon={phaseDisplay.icon} isCompact>
             {phaseDisplay.label}
           </Label>
+
+          {hasScore && (
+            <Tooltip content={scoreTooltipContent}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                backgroundColor: scoreColor,
+                color: 'white',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'transform 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                {nodeScore.toFixed(1)}
+              </div>
+            </Tooltip>
+          )}
+
+          {resiliencyEnabled && nodeScore === undefined && phase === 'Running' && (
+            <Tooltip content="Resiliency score will be calculated when this node completes">
+              <div style={{
+                backgroundColor: '#6c757d',
+                color: 'white',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+              }}>
+                ···
+              </div>
+            </Tooltip>
+          )}
         </div>
 
-        {/* Scenario name */}
         <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
           {nodeStatus.nodeName}
         </div>
 
-        {/* Node ID (small, grey) */}
         <div
           style={{
             fontSize: '11px',
@@ -163,7 +254,6 @@ function ScenarioNode({ data }: NodeProps) {
         </div>
       </div>
 
-      {/* Output handle for dependents (right side for horizontal flow) */}
       <Handle
         type="source"
         position={Position.Right}
@@ -311,14 +401,19 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
       (nodeStatus: NodeStatus) => nodeStatus.nodeId !== '_comment'
     );
 
+    const resiliencyEnabled = graphRunDetail.spec.resiliencyScoreEnabled ?? false;
+    const resiliencyBaseline = graphRunDetail.spec.resiliencyScoreBaseline;
+
     // Create nodes
     const reactFlowNodes: Node[] = nodeStatuses.map((nodeStatus: NodeStatus) => ({
       id: nodeStatus.nodeId,
       type: 'scenarioNode',
-      position: { x: 0, y: 0 }, // Will be calculated by dagre
+      position: { x: 0, y: 0 },
       data: {
         nodeStatus,
         onClick: handleNodeClick,
+        resiliencyEnabled,
+        resiliencyBaseline,
       },
     }));
 
@@ -407,11 +502,15 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
     pendingNodes: filteredNodes.filter((ns: NodeStatus) => ns.phase === 'Pending').length,
   };
 
+  const overallScore = graphRunDetail.status.resiliencyScore;
+  const specBaseline = graphRunDetail.spec.resiliencyScoreBaseline;
+  const specEnabled = graphRunDetail.spec.resiliencyScoreEnabled;
+
   return (
     <Card isFlat>
       <CardBody>
         {/* Graph summary */}
-        <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <Tooltip content="Total nodes in the graph">
             <Label color="blue" isCompact>
               Total: {summary.totalNodes}
@@ -437,6 +536,23 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
               Pending: {summary.pendingNodes}
             </Label>
           </Tooltip>
+
+          {specEnabled && (
+            <>
+              <div style={{
+                width: '1px', height: '20px',
+                backgroundColor: 'var(--pf-v5-global--BorderColor--100)',
+                margin: '0 4px',
+              }} />
+              <ResiliencyScoreBox
+                score={overallScore?.calculated}
+                baseline={specBaseline}
+                status={overallScore?.status}
+                enabled={specEnabled}
+                calculating={!overallScore && graphRunDetail.status.phase === 'Running'}
+              />
+            </>
+          )}
         </div>
 
         {/* ReactFlow graph */}

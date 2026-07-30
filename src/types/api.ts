@@ -718,6 +718,8 @@ export interface NodeStatus {
   dependsOn?: string[];
   /** Additional information about the node status */
   message?: string;
+  /** Individual resiliency score for this node (only present when resiliency scoring is enabled) */
+  resiliencyScore?: number;
 }
 
 /**

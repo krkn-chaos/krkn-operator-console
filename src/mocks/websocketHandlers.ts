@@ -34,6 +34,8 @@ const mockGraphRunUpdate = {
   targetRequestId: 'target-002',
   summary: { totalNodes: 3, completedNodes: 1, runningNodes: 1, failedNodes: 0, pendingNodes: 1 },
   startTime: '2026-07-02T10:05:00Z',
+  resiliencyScoreEnabled: true,
+  resiliencyScoreBaseline: 90.0,
 };
 
 const mockDashboardUpdate = {
