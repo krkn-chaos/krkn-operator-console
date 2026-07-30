@@ -52,11 +52,22 @@ export function JobStatsSummary({ unifiedRuns }: JobStatsSummaryProps) {
   const stats = useMemo(() => {
     const counts = unifiedRuns.reduce(
       (acc, item) => {
-        const runs = item.type === 'graph' ? item.nodes : [item.run];
-        for (const run of runs) {
-          acc.total += run.totalTargets;
-          acc.succeeded += run.successfulJobs;
-          acc.failed += run.failedJobs;
+        if (item.type === 'graph') {
+          if (item.nodes.length > 0) {
+            for (const run of item.nodes) {
+              acc.total += run.totalTargets || 0;
+              acc.succeeded += run.successfulJobs || 0;
+              acc.failed += run.failedJobs || 0;
+            }
+          } else if (item.summary) {
+            acc.total += item.summary.totalNodes || 0;
+            acc.succeeded += item.summary.completedNodes || 0;
+            acc.failed += item.summary.failedNodes || 0;
+          }
+        } else {
+          acc.total += item.run.totalTargets || 0;
+          acc.succeeded += item.run.successfulJobs || 0;
+          acc.failed += item.run.failedJobs || 0;
         }
         return acc;
       },

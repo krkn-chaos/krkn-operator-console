@@ -358,7 +358,7 @@ export function JobsList({
       } else {
         const aDate = a.type === 'graph' ? a.createdAt : a.run.createdAt;
         const bDate = b.type === 'graph' ? b.createdAt : b.run.createdAt;
-        cmp = aDate.localeCompare(bDate);
+        cmp = (Date.parse(aDate) || 0) - (Date.parse(bDate) || 0);
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });

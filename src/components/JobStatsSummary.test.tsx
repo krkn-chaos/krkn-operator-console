@@ -128,4 +128,37 @@ describe('JobStatsSummary', () => {
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(screen.getByText('66.7%')).toBeInTheDocument();
   });
+
+  it('falls back to graph run summary when nodes are empty', () => {
+    const runs: UnifiedRunItem[] = [{
+      type: 'graph',
+      graphRunName: 'graph-running',
+      nodes: [],
+      phase: 'Running',
+      createdAt: '2026-01-01T00:00:00Z',
+      summary: { totalNodes: 3, completedNodes: 2, runningNodes: 1, failedNodes: 1, pendingNodes: 0 },
+    }];
+    render(<JobStatsSummary unifiedRuns={runs} />);
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('66.7%')).toBeInTheDocument();
+  });
+
+  it('uses node data over summary when nodes are present', () => {
+    const runs: UnifiedRunItem[] = [{
+      type: 'graph',
+      graphRunName: 'graph-with-nodes',
+      nodes: [
+        { phase: 'Succeeded', totalTargets: 4, successfulJobs: 3, failedJobs: 1, runningJobs: 0 } as ScenarioRunState,
+      ],
+      phase: 'Succeeded',
+      createdAt: '2026-01-01T00:00:00Z',
+      summary: { totalNodes: 5, completedNodes: 5, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+    }];
+    render(<JobStatsSummary unifiedRuns={runs} />);
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+  });
 });

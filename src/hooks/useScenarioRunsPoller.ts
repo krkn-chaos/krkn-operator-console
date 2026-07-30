@@ -184,6 +184,7 @@ export function useScenarioRunsPoller() {
 
 function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
   if (prev.phase !== next.phase) return true;
+  if (prev.totalTargets !== next.totalTargets) return true;
   if (prev.runningJobs !== next.runningJobs) return true;
   if (prev.successfulJobs !== next.successfulJobs) return true;
   if (prev.failedJobs !== next.failedJobs) return true;
