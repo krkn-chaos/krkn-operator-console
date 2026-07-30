@@ -5,6 +5,7 @@ import type { ClusterResiliencyScore, GraphClusterScore } from '../types/api';
  * Shared across all resiliency score displays for consistency.
  */
 export function getScoreColor(score: number, baseline: number): string {
+  if (baseline <= 0) return '#17a2b8';
   const ratio = score / baseline;
   if (ratio >= 1.0) return '#28a745';
   if (ratio >= 0.95) return '#5cb85c';
@@ -14,6 +15,7 @@ export function getScoreColor(score: number, baseline: number): string {
 }
 
 export function getScoreLevel(score: number, baseline: number): { label: string; description: string } {
+  if (baseline <= 0) return { label: 'No Baseline', description: 'No baseline configured' };
   const ratio = score / baseline;
   const pct = (ratio * 100).toFixed(1);
   if (ratio >= 1.0) return { label: 'Excellent', description: `${pct}% of baseline — meets or exceeds the target` };

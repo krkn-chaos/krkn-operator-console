@@ -35,6 +35,15 @@ describe('getScoreColor', () => {
     expect(getScoreColor(50, 80)).toBe('#dc3545');
     expect(getScoreColor(63.9, 80)).toBe('#dc3545');
   });
+
+  it('returns info blue when baseline is 0', () => {
+    expect(getScoreColor(50, 0)).toBe('#17a2b8');
+    expect(getScoreColor(100, 0)).toBe('#17a2b8');
+  });
+
+  it('returns info blue when baseline is negative', () => {
+    expect(getScoreColor(50, -10)).toBe('#17a2b8');
+  });
 });
 
 describe('getScoreLevel', () => {
@@ -61,6 +70,18 @@ describe('getScoreLevel', () => {
   it('includes percentage in description', () => {
     const level = getScoreLevel(90, 80);
     expect(level.description).toContain('112.5%');
+  });
+
+  it('returns No Baseline when baseline is 0', () => {
+    const level = getScoreLevel(85, 0);
+    expect(level.label).toBe('No Baseline');
+    expect(level.description).toBe('No baseline configured');
+  });
+
+  it('returns No Baseline when baseline is negative', () => {
+    const level = getScoreLevel(85, -5);
+    expect(level.label).toBe('No Baseline');
+    expect(level.description).toBe('No baseline configured');
   });
 });
 

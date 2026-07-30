@@ -171,25 +171,29 @@ function ClusterScoresSection({ scores }: { scores: GraphClusterScore[] }) {
 
                       {/* Level badge */}
                       {level ? (
-                        <Tooltip content={level.description}>
-                          <Label
-                            color={
-                              level.label === 'Excellent' || level.label === 'Good' ? 'green'
-                                : level.label === 'Warning' || level.label === 'Poor' ? 'orange'
-                                : 'red'
-                            }
-                            icon={
-                              level.label === 'Excellent' || level.label === 'Good'
-                                ? <CheckCircleIcon />
-                                : level.label === 'Critical'
-                                ? <ExclamationCircleIcon />
-                                : undefined
-                            }
-                            isCompact
-                          >
-                            {level.label}
-                          </Label>
-                        </Tooltip>
+                        level.label === 'No Baseline' ? (
+                          <Label color="blue" isCompact>No Baseline</Label>
+                        ) : (
+                          <Tooltip content={level.description}>
+                            <Label
+                              color={
+                                level.label === 'Excellent' || level.label === 'Good' ? 'green'
+                                  : level.label === 'Warning' || level.label === 'Poor' ? 'orange'
+                                  : 'red'
+                              }
+                              icon={
+                                level.label === 'Excellent' || level.label === 'Good'
+                                  ? <CheckCircleIcon />
+                                  : level.label === 'Critical'
+                                  ? <ExclamationCircleIcon />
+                                  : undefined
+                              }
+                              isCompact
+                            >
+                              {level.label}
+                            </Label>
+                          </Tooltip>
+                        )
                       ) : (
                         <Label color="blue" isCompact>No Baseline</Label>
                       )}
