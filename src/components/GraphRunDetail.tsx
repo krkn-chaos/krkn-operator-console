@@ -223,8 +223,12 @@ function ScenarioNode({ data }: NodeProps) {
             </Tooltip>
           )}
 
-          {resiliencyEnabled && nodeScore === undefined && phase === 'Running' && (
-            <Tooltip content="Resiliency score will be calculated when this node completes">
+          {resiliencyEnabled && nodeScore === undefined && (phase === 'Running' || phase === 'Completed') && (
+            <Tooltip content={
+              phase === 'Running'
+                ? "Resiliency score will be calculated when this node completes"
+                : "Resiliency score is being calculated..."
+            }>
               <div style={{
                 backgroundColor: '#6c757d',
                 color: 'white',
@@ -549,7 +553,7 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
                 baseline={specBaseline}
                 status={overallScore?.status}
                 enabled={specEnabled}
-                calculating={!overallScore && graphRunDetail.status.phase === 'Running'}
+                calculating={!overallScore && (graphRunDetail.status.phase === 'Running' || graphRunDetail.status.phase === 'Pending')}
               />
             </>
           )}
