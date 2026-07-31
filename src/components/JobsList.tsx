@@ -21,6 +21,10 @@ import {
   Modal,
   ModalVariant,
   DatePicker,
+  InputGroup,
+  InputGroupItem,
+  isValidDate,
+  yyyyMMddFormat,
   Select,
   SelectOption,
   SelectList,
@@ -113,8 +117,9 @@ export function JobsList({
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
   const [confirmDeleteJob, setConfirmDeleteJob] = useState<{ jobId: string; jobName: string } | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<string>('');
-  const [dateFrom, setDateFrom] = useState<string>('');
-  const [dateTo, setDateTo] = useState<string>('');
+  const [dateTimeFrom, setDateTimeFrom] = useState<Date | undefined>();
+  const [dateTimeTo, setDateTimeTo] = useState<Date | undefined>();
+  const [timeRangeError, setTimeRangeError] = useState('');
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [sortField, setSortField] = useState<'date' | 'runName'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -203,6 +208,98 @@ export function JobsList({
     }
   };
 
+  const toTimeValue = (date: Date | undefined): string => {
+    if (!isValidDate(date)) return '';
+    const d = date!;
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+  };
+
+  const onFromDateChange = (_event: React.FormEvent, inputDate: string, newFromDate?: Date) => {
+    if (!newFromDate) return;
+    if (isValidDate(newFromDate) && inputDate === yyyyMMddFormat(newFromDate)) {
+      newFromDate.setHours(0, 0, 0, 0);
+      setDateTimeFrom(new Date(newFromDate));
+    }
+    setTimeRangeError('');
+  };
+
+  const onFromTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value) return;
+    const [h, m, s] = value.split(':').map(Number);
+    if (isNaN(h)) return;
+    setDateTimeFrom(prev => {
+      if (!isValidDate(prev)) return prev;
+      const updated = new Date(prev!);
+      updated.setHours(h, m ?? 0, s ?? 0, 0);
+      return updated;
+    });
+    if (isValidDate(dateTimeFrom) && isValidDate(dateTimeTo) &&
+        yyyyMMddFormat(dateTimeFrom!) === yyyyMMddFormat(dateTimeTo!)) {
+      const fromWithTime = new Date(dateTimeFrom!);
+      fromWithTime.setHours(h ?? 0, m ?? 0, s ?? 0, 0);
+      setTimeRangeError(fromWithTime >= dateTimeTo! ? 'Start time must be before end time' : '');
+    } else {
+      setTimeRangeError('');
+    }
+  };
+
+  const fromValidator = (date: Date) => {
+    if (!isValidDate(dateTimeTo)) return '';
+    const dayStr = yyyyMMddFormat(date);
+    const toStr = yyyyMMddFormat(dateTimeTo!);
+    if (dayStr > toStr) return 'Start date must be before end date';
+    if (dayStr === toStr && isValidDate(dateTimeFrom)) {
+      const fromWithTime = new Date(date);
+      fromWithTime.setHours(dateTimeFrom!.getHours(), dateTimeFrom!.getMinutes(), dateTimeFrom!.getSeconds(), 0);
+      if (fromWithTime >= dateTimeTo!) return 'Start time must be before end time';
+    }
+    return '';
+  };
+
+  const toValidator = (date: Date) => {
+    if (!isValidDate(dateTimeFrom)) return '';
+    const dayStr = yyyyMMddFormat(date);
+    const fromStr = yyyyMMddFormat(dateTimeFrom!);
+    if (dayStr < fromStr) return 'End date must be after start date';
+    if (dayStr === fromStr && isValidDate(dateTimeTo)) {
+      const toWithTime = new Date(date);
+      toWithTime.setHours(dateTimeTo!.getHours(), dateTimeTo!.getMinutes(), dateTimeTo!.getSeconds(), 0);
+      if (toWithTime <= dateTimeFrom!) return 'End time must be after start time';
+    }
+    return '';
+  };
+
+  const onToDateChange = (_event: React.FormEvent, inputDate: string, newToDate?: Date) => {
+    if (!newToDate) return;
+    if (isValidDate(newToDate) && inputDate === yyyyMMddFormat(newToDate)) {
+      newToDate.setHours(23, 59, 59, 0);
+      setDateTimeTo(new Date(newToDate));
+    }
+    setTimeRangeError('');
+  };
+
+  const onToTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value) return;
+    const [h, m, s] = value.split(':').map(Number);
+    if (isNaN(h)) return;
+    setDateTimeTo(prev => {
+      if (!isValidDate(prev)) return prev;
+      const updated = new Date(prev!);
+      updated.setHours(h, m ?? 0, s ?? 0, 0);
+      return updated;
+    });
+    if (isValidDate(dateTimeFrom) && isValidDate(dateTimeTo) &&
+        yyyyMMddFormat(dateTimeFrom!) === yyyyMMddFormat(dateTimeTo!)) {
+      const toWithTime = new Date(dateTimeTo!);
+      toWithTime.setHours(h ?? 0, m ?? 0, s ?? 0, 0);
+      setTimeRangeError(toWithTime <= dateTimeFrom! ? 'End time must be after start time' : '');
+    } else {
+      setTimeRangeError('');
+    }
+  };
+
   // Get unique owner user IDs for autocomplete
   const uniqueOwners = Array.from(
     new Set(scenarioRuns.map((run) => run.ownerUserId).filter((id): id is string => !!id))
@@ -216,23 +313,14 @@ export function JobsList({
     }
 
     // Date range filter
-    if (dateFrom || dateTo) {
+    if (isValidDate(dateTimeFrom) || isValidDate(dateTimeTo)) {
       const runDate = new Date(run.createdAt);
 
       // Guard: exclude runs with invalid/empty createdAt when a date filter is active
       if (isNaN(runDate.getTime())) return false;
 
-      if (dateFrom) {
-        const fromDate = new Date(dateFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        if (runDate < fromDate) return false;
-      }
-
-      if (dateTo) {
-        const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        if (runDate > toDate) return false;
-      }
+      if (isValidDate(dateTimeFrom) && runDate < dateTimeFrom!) return false;
+      if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return false;
     }
 
     return true;
@@ -263,6 +351,14 @@ export function JobsList({
 
       // Remove from map so we don't add it twice
       graphRunsMap.delete(graphRunState.name);
+
+      // Apply the same date filter to graph runs
+      if (isValidDate(dateTimeFrom) || isValidDate(dateTimeTo)) {
+        const runDate = new Date(graphRunState.creationTimestamp);
+        if (isNaN(runDate.getTime())) return;
+        if (isValidDate(dateTimeFrom) && runDate < dateTimeFrom!) return;
+        if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return;
+      }
 
       // Map GraphRun phase ('Completed') to ScenarioRun phase ('Succeeded')
       let phase: ScenarioRunPhase = 'Pending';
@@ -349,7 +445,7 @@ export function JobsList({
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [filteredScenarioRuns, _graphRuns, sortField, sortDir]);
+  }, [filteredScenarioRuns, _graphRuns, sortField, sortDir, dateTimeFrom, dateTimeTo]);
 
   // Apply run-name filter to the aggregated list so graph items are matched by graphRunName
   // and filtering never strips individual nodes from an otherwise-matching graph.
@@ -571,56 +667,92 @@ export function JobsList({
                   </div>
                 )}
 
-                {/* Date From Filter (Admin Only) */}
-                {isAdmin && scenarioRuns.length > 0 && (
+                {/* Date From Filter */}
+                {scenarioRuns.length > 0 && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
-                      From Date:
+                      From:
                     </div>
-                    <DatePicker
-                      value={dateFrom}
-                      onChange={(_event, value) => setDateFrom(value)}
-                      placeholder="Select start date"
-                      aria-label="From date"
-                      dateParse={(date) => {
-                        const parsed = new Date(date);
-                        return isNaN(parsed.getTime()) ? new Date() : parsed;
-                      }}
-                    />
+                    <InputGroup>
+                      <InputGroupItem>
+                        <DatePicker
+                          value={isValidDate(dateTimeFrom) ? yyyyMMddFormat(dateTimeFrom!) : ''}
+                          onChange={onFromDateChange}
+                          validators={[fromValidator]}
+                          aria-label="Start date"
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </InputGroupItem>
+                      <InputGroupItem>
+                        <input
+                          key={isValidDate(dateTimeFrom) ? yyyyMMddFormat(dateTimeFrom!) : 'no-from-date'}
+                          type="time"
+                          step="1"
+                          aria-label="Start time"
+                          defaultValue={toTimeValue(dateTimeFrom)}
+                          onChange={onFromTimeChange}
+                          disabled={!isValidDate(dateTimeFrom)}
+                          style={{ height: '36px', padding: '0 0.5rem', border: '1px solid var(--pf-v5-global--BorderColor--100)', borderRadius: 'var(--pf-v5-global--BorderRadius--sm)', background: 'var(--pf-v5-global--BackgroundColor--100)', color: 'var(--pf-v5-global--Color--100)' }}
+                        />
+                      </InputGroupItem>
+                    </InputGroup>
                   </div>
                 )}
 
-                {/* Date To Filter (Admin Only) */}
-                {isAdmin && scenarioRuns.length > 0 && (
+                {/* Date To Filter */}
+                {scenarioRuns.length > 0 && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
-                      To Date:
+                      To:
                     </div>
-                    <DatePicker
-                      value={dateTo}
-                      onChange={(_event, value) => setDateTo(value)}
-                      placeholder="Select end date"
-                      aria-label="To date"
-                      dateParse={(date) => {
-                        const parsed = new Date(date);
-                        return isNaN(parsed.getTime()) ? new Date() : parsed;
-                      }}
-                    />
+                    <InputGroup>
+                      <InputGroupItem>
+                        <DatePicker
+                          value={isValidDate(dateTimeTo) ? yyyyMMddFormat(dateTimeTo!) : ''}
+                          onChange={onToDateChange}
+                          isDisabled={!isValidDate(dateTimeFrom)}
+                          rangeStart={dateTimeFrom}
+                          validators={[toValidator]}
+                          aria-label="End date"
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </InputGroupItem>
+                      <InputGroupItem>
+                        <input
+                          key={isValidDate(dateTimeTo) ? yyyyMMddFormat(dateTimeTo!) : 'no-to-date'}
+                          type="time"
+                          step="1"
+                          aria-label="End time"
+                          defaultValue={toTimeValue(dateTimeTo)}
+                          onChange={onToTimeChange}
+                          disabled={!isValidDate(dateTimeTo)}
+                          style={{ height: '36px', padding: '0 0.5rem', border: '1px solid var(--pf-v5-global--BorderColor--100)', borderRadius: 'var(--pf-v5-global--BorderRadius--sm)', background: 'var(--pf-v5-global--BackgroundColor--100)', color: 'var(--pf-v5-global--Color--100)' }}
+                        />
+                      </InputGroupItem>
+                    </InputGroup>
                   </div>
                 )}
               </div>
 
+              {/* Time range validation error */}
+              {timeRangeError && (
+                <div style={{ marginTop: '0.5rem', color: 'var(--pf-v5-global--danger-color--100)', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                  {timeRangeError}
+                </div>
+              )}
+
               {/* Clear filters button */}
-              {(ownerFilter || dateFrom || dateTo || customRunNameFilter) && (
+              {(ownerFilter || isValidDate(dateTimeFrom) || isValidDate(dateTimeTo) || customRunNameFilter) && (
                 <div style={{ marginTop: '1rem' }}>
                   <Button
                     variant="link"
                     isInline
                     onClick={() => {
                       setOwnerFilter('');
-                      setDateFrom('');
-                      setDateTo('');
+                      setDateTimeFrom(undefined);
+                      setDateTimeTo(undefined);
                       setCustomRunNameFilter('');
+                      setTimeRangeError('');
                     }}
                   >
                     Clear all filters

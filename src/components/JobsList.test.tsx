@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { JobsList } from './JobsList';
@@ -20,17 +20,14 @@ const defaultProps = {
   scenarioRuns: [] as ScenarioRunState[],
   expandedRunIds: noopSet,
   expandedJobIds: noopSet,
-  pausedPollingRunIds: noopSet,
   onToggleRunAccordion: noop,
   onToggleJobAccordion: noop,
   onDeleteScenarioRun: noopAsync,
   onDeleteJob: noopAsync,
   onCreateJob: noop,
-  onRefreshScenarioRun: noop,
   onNavigateToStudio: noop,
-  graphRuns: [],
+  graphRuns: [] as GraphRunState[],
   expandedGraphRunIds: noopSet,
-  pausedGraphPollingIds: noopSet,
   onToggleGraphRunAccordion: noop,
   onDeleteGraphRun: noopAsync,
   onRerunScenario: noop,
@@ -56,7 +53,11 @@ function makeScenarioRun(
   } as unknown as ScenarioRunState;
 }
 
-function makeGraphRun(name: string, phase: GraphRunState['phase'] = 'Running'): GraphRunState {
+function makeGraphRun(
+  name: string,
+  phase: GraphRunState['phase'] = 'Running',
+  overrides: Partial<GraphRunState> = {},
+): GraphRunState {
   return {
     name,
     namespace: 'default',
@@ -65,6 +66,7 @@ function makeGraphRun(name: string, phase: GraphRunState['phase'] = 'Running'): 
     ownerUserId: 'user@example.com',
     targetRequestId: 'req-123',
     summary: { totalNodes: 1, completedNodes: 0, runningNodes: 1, failedNodes: 0, pendingNodes: 0 },
+    ...overrides,
   };
 }
 
@@ -195,18 +197,15 @@ describe('JobsList - Re-run button', () => {
   const rerunDefaultProps = {
     expandedRunIds: new Set<string>(['run-001']),
     expandedJobIds: new Set<string>(),
-    pausedPollingRunIds: new Set<string>(),
     onToggleRunAccordion: vi.fn(),
     onToggleJobAccordion: vi.fn(),
     onDeleteScenarioRun: vi.fn(),
     onDeleteJob: vi.fn(),
     onCreateJob: vi.fn(),
-    onRefreshScenarioRun: vi.fn(),
     onNavigateToStudio: vi.fn(),
     onRerunScenario: mockOnRerunScenario,
-    graphRuns: [],
+    graphRuns: [] as GraphRunState[],
     expandedGraphRunIds: new Set<string>(),
-    pausedGraphPollingIds: new Set<string>(),
     onToggleGraphRunAccordion: vi.fn(),
     onDeleteGraphRun: vi.fn(),
   };
@@ -267,6 +266,7 @@ describe('JobsList - Re-run button', () => {
   });
 
   it('should not show Re-run button for graph runs', () => {
+
     const graphRun: GraphRunState = {
       name: 'graphrun-001',
       namespace: 'default',
@@ -303,5 +303,106 @@ describe('JobsList - Re-run button', () => {
     );
 
     expect(screen.queryByLabelText('Re-run scenario')).not.toBeInTheDocument();
+  });
+});
+
+describe('JobsList - Date/Time Filter', () => {
+  it('hides a scenario run whose createdAt is before the "from" date', async () => {
+    const user = userEvent.setup();
+    const oldRun = makeScenarioRun('run-old', 'Succeeded', undefined, { createdAt: '2026-01-14T12:00:00.000Z' });
+    const newRun = makeScenarioRun('run-new', 'Succeeded', undefined, { createdAt: '2026-01-15T12:00:00.000Z' });
+
+    render(<JobsList {...defaultProps} scenarioRuns={[oldRun, newRun]} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Start date' }), '2026-01-15');
+
+    await waitFor(() => {
+      expect(screen.queryByText('run-old')).not.toBeInTheDocument();
+      expect(screen.getByText('run-new')).toBeInTheDocument();
+    });
+  });
+
+  it('hides a scenario run whose createdAt is after the "to" datetime', async () => {
+    const user = userEvent.setup();
+    const insideRun = makeScenarioRun('run-inside', 'Succeeded', undefined, { createdAt: '2026-01-15T12:00:00.000Z' });
+    const outsideRun = makeScenarioRun('run-outside', 'Succeeded', undefined, { createdAt: '2026-01-16T12:00:00.000Z' });
+
+    render(<JobsList {...defaultProps} scenarioRuns={[insideRun, outsideRun]} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Start date' }), '2026-01-15');
+    await user.type(screen.getByRole('textbox', { name: 'End date' }), '2026-01-15');
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '23:59:59' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('run-inside')).toBeInTheDocument();
+      expect(screen.queryByText('run-outside')).not.toBeInTheDocument();
+    });
+  });
+
+  it('hides a graph run whose creationTimestamp is before the "from" date', async () => {
+    const user = userEvent.setup();
+    // Scenario run is needed both for the filter UI to appear and to pass the filter
+    const controlRun = makeScenarioRun('run-control', 'Succeeded', undefined, { createdAt: '2026-01-16T12:00:00.000Z' });
+    const graphRun = makeGraphRun('graphrun-old', 'Completed', { creationTimestamp: '2026-01-14T12:00:00.000Z' });
+
+    render(<JobsList {...defaultProps} scenarioRuns={[controlRun]} graphRuns={[graphRun]} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Start date' }), '2026-01-16');
+
+    await waitFor(() => {
+      expect(screen.queryByText('graphrun-old')).not.toBeInTheDocument();
+      expect(screen.getByText('run-control')).toBeInTheDocument();
+    });
+  });
+
+  it('shows a graph run whose creationTimestamp is within the date range', async () => {
+    const user = userEvent.setup();
+    const controlRun = makeScenarioRun('run-control', 'Succeeded', undefined, { createdAt: '2026-01-15T12:00:00.000Z' });
+    const graphRun = makeGraphRun('graphrun-inside', 'Running', { creationTimestamp: '2026-01-15T12:00:00.000Z' });
+
+    render(<JobsList {...defaultProps} scenarioRuns={[controlRun]} graphRuns={[graphRun]} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Start date' }), '2026-01-15');
+
+    await waitFor(() => {
+      expect(screen.getByText('graphrun-inside')).toBeInTheDocument();
+    });
+  });
+
+  it('shows a time range error when same-day start time is after end time', async () => {
+    const user = userEvent.setup();
+    const run = makeScenarioRun('run-1', 'Succeeded', undefined, { createdAt: '2026-01-15T12:00:00.000Z' });
+
+    render(<JobsList {...defaultProps} scenarioRuns={[run]} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Start date' }), '2026-01-15');
+    await user.type(screen.getByRole('textbox', { name: 'End date' }), '2026-01-15');
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00:00' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '11:00:00' } });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Start time must be before end time').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('clears date filter and restores hidden runs when "Clear all filters" is clicked', async () => {
+    const user = userEvent.setup();
+    const oldRun = makeScenarioRun('run-old', 'Succeeded', undefined, { createdAt: '2026-01-14T12:00:00.000Z' });
+    const newRun = makeScenarioRun('run-new', 'Succeeded', undefined, { createdAt: '2026-01-15T12:00:00.000Z' });
+
+    render(<JobsList {...defaultProps} scenarioRuns={[oldRun, newRun]} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Start date' }), '2026-01-15');
+
+    await waitFor(() => {
+      expect(screen.queryByText('run-old')).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Clear all filters/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('run-old')).toBeInTheDocument();
+      expect(screen.getByText('run-new')).toBeInTheDocument();
+    });
   });
 });
