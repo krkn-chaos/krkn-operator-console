@@ -435,18 +435,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     }
   };
 
+  const hasGroupedScenarioFields = useMemo(
+    () => scenarioDetail?.fields.some(f => f.type === 'group') || false,
+    [scenarioDetail?.fields]
+  );
+
   const optionalFields = useMemo(
     () => scenarioDetail?.fields.filter(field => !field.required) || [],
     [scenarioDetail?.fields]
   );
 
-  const requiredGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => field.required) || [],
-    [scenarioGlobals?.fields]
-  );
-
-  const optionalGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => !field.required) || [],
+  const allGlobalFields = useMemo(
+    () => scenarioGlobals?.fields || [],
     [scenarioGlobals?.fields]
   );
 
@@ -537,12 +537,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
       {!showPreview ? (
         <>
-          {/* Required Fields Section */}
+          {/* Parameters Section */}
           <Card>
-            <CardTitle>Required Parameters</CardTitle>
+            <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
             <CardBody>
               <DynamicFormBuilder
-                fields={scenarioDetail.fields.filter(field => field.required)}
+                fields={hasGroupedScenarioFields ? scenarioDetail.fields : scenarioDetail.fields.filter(field => field.required)}
                 values={scenarioFormValues || {}}
                 onChange={handleFormChange}
               />
@@ -569,8 +569,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             optionalFields={optionalFields}
             formValues={scenarioFormValues || {}}
             onFormChange={handleFormChange}
-            requiredGlobalFields={requiredGlobalFields}
-            optionalGlobalFields={optionalGlobalFields}
+            suppressOptionalSection={hasGroupedScenarioFields}
+            allGlobalFields={allGlobalFields}
             globalFormValues={globalFormValues || {}}
             globalTouchedFields={globalTouchedFields || {}}
             onGlobalFormChange={handleGlobalFormChange}

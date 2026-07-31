@@ -136,6 +136,11 @@ export function ScenarioConfigStep({
 
   // Memoize filtered field arrays to prevent infinite loops
   // MUST be before any conditional returns (hooks order must be consistent)
+  const hasGroupedScenarioFields = useMemo(
+    () => scenarioDetail?.fields.some(f => f.type === 'group') || false,
+    [scenarioDetail?.fields]
+  );
+
   const requiredFields = useMemo(
     () => scenarioDetail?.fields.filter(field => field.required) || [],
     [scenarioDetail?.fields]
@@ -146,13 +151,8 @@ export function ScenarioConfigStep({
     [scenarioDetail?.fields]
   );
 
-  const requiredGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => field.required) || [],
-    [scenarioGlobals?.fields]
-  );
-
-  const optionalGlobalFields = useMemo(
-    () => scenarioGlobals?.fields.filter(field => !field.required) || [],
+  const allGlobalFields = useMemo(
+    () => scenarioGlobals?.fields || [],
     [scenarioGlobals?.fields]
   );
 
@@ -186,12 +186,12 @@ export function ScenarioConfigStep({
         </p>
       </div>
 
-      {/* Required Fields Section */}
+      {/* Parameters Section */}
       <Card>
-        <CardTitle>Required Parameters</CardTitle>
+        <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
         <CardBody>
           <DynamicFormBuilder
-            fields={requiredFields}
+            fields={hasGroupedScenarioFields ? (scenarioDetail?.fields || []) : requiredFields}
             values={formValues}
             onChange={onFormChange}
           />
@@ -202,8 +202,8 @@ export function ScenarioConfigStep({
         optionalFields={optionalFields}
         formValues={formValues}
         onFormChange={onFormChange}
-        requiredGlobalFields={requiredGlobalFields}
-        optionalGlobalFields={optionalGlobalFields}
+        suppressOptionalSection={hasGroupedScenarioFields}
+        allGlobalFields={allGlobalFields}
         globalFormValues={globalFormValues}
         globalTouchedFields={globalTouchedFields}
         onGlobalFormChange={onGlobalFormChange}

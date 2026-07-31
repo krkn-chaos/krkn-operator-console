@@ -1,7 +1,6 @@
 import {
   Spinner,
   Card,
-  CardTitle,
   CardBody,
   ExpandableSection,
 } from '@patternfly/react-core';
@@ -13,8 +12,8 @@ interface ScenarioParameterSectionsProps {
   optionalFields: ScenarioField[];
   formValues: ScenarioFormValues;
   onFormChange: (values: ScenarioFormValues) => void;
-  requiredGlobalFields: ScenarioField[];
-  optionalGlobalFields: ScenarioField[];
+  suppressOptionalSection?: boolean;
+  allGlobalFields: ScenarioField[];
   globalFormValues: ScenarioFormValues;
   globalTouchedFields: TouchedFields;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
@@ -29,8 +28,8 @@ export function ScenarioParameterSections({
   optionalFields,
   formValues,
   onFormChange,
-  requiredGlobalFields,
-  optionalGlobalFields,
+  suppressOptionalSection = false,
+  allGlobalFields,
   globalFormValues,
   globalTouchedFields,
   onGlobalFormChange,
@@ -42,28 +41,30 @@ export function ScenarioParameterSections({
 }: ScenarioParameterSectionsProps) {
   return (
     <>
-      <ExpandableSection
-        style={{ marginTop: '1.5rem' }}
-        toggleText="Optional Parameters"
-        isExpanded={showOptionalFields}
-        onToggle={(_event, isExpanded) => onToggleOptional(isExpanded)}
-      >
-        <Card>
-          <CardBody>
-            {optionalFields.length > 0 ? (
-              <DynamicFormBuilder
-                fields={optionalFields}
-                values={formValues}
-                onChange={onFormChange}
-              />
-            ) : (
-              <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
-                No optional parameters available for this scenario
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </ExpandableSection>
+      {!suppressOptionalSection && (
+        <ExpandableSection
+          style={{ marginTop: '1.5rem' }}
+          toggleText="Optional Parameters"
+          isExpanded={showOptionalFields}
+          onToggle={(_event, isExpanded) => onToggleOptional(isExpanded)}
+        >
+          <Card>
+            <CardBody>
+              {optionalFields.length > 0 ? (
+                <DynamicFormBuilder
+                  fields={optionalFields}
+                  values={formValues}
+                  onChange={onFormChange}
+                />
+              ) : (
+                <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
+                  No optional parameters available for this scenario
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </ExpandableSection>
+      )}
 
       <ExpandableSection
         style={{ marginTop: '1.5rem' }}
@@ -80,35 +81,17 @@ export function ScenarioParameterSections({
               </div>
             </CardBody>
           </Card>
-        ) : (requiredGlobalFields.length > 0 || optionalGlobalFields.length > 0) ? (
-          <>
-            {requiredGlobalFields.length > 0 && (
-              <Card style={{ marginBottom: '1rem' }}>
-                <CardTitle>Required Global Parameters</CardTitle>
-                <CardBody>
-                  <DynamicFormBuilderWithTracking
-                    fields={requiredGlobalFields}
-                    values={globalFormValues}
-                    touchedFields={globalTouchedFields}
-                    onChange={onGlobalFormChange}
-                  />
-                </CardBody>
-              </Card>
-            )}
-            {optionalGlobalFields.length > 0 && (
-              <Card>
-                <CardTitle>Optional Global Parameters</CardTitle>
-                <CardBody>
-                  <DynamicFormBuilderWithTracking
-                    fields={optionalGlobalFields}
-                    values={globalFormValues}
-                    touchedFields={globalTouchedFields}
-                    onChange={onGlobalFormChange}
-                  />
-                </CardBody>
-              </Card>
-            )}
-          </>
+        ) : allGlobalFields.length > 0 ? (
+          <Card>
+            <CardBody>
+              <DynamicFormBuilderWithTracking
+                fields={allGlobalFields}
+                values={globalFormValues}
+                touchedFields={globalTouchedFields}
+                onChange={onGlobalFormChange}
+              />
+            </CardBody>
+          </Card>
         ) : null}
       </ExpandableSection>
     </>

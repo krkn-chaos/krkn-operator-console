@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import {
   Form,
   FormGroup,
@@ -10,6 +11,8 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
+  SearchInput,
+  Title,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField } from '../types/api';
@@ -110,6 +113,18 @@ export function DynamicFormBuilderWithTracking({
       setErrors(prev => ({ ...prev, [variable]: '' }));
     }
   };
+
+  const groupMembers = useMemo(() => {
+    const members = new Map<string, ScenarioField[]>();
+    for (const field of fields) {
+      if (field.type !== 'group' && field.group) {
+        const list = members.get(field.group) || [];
+        list.push(field);
+        members.set(field.group, list);
+      }
+    }
+    return members;
+  }, [fields]);
 
   const renderField = (field: ScenarioField) => {
     const value = values[field.variable] ?? field.default ?? '';
@@ -292,5 +307,96 @@ export function DynamicFormBuilderWithTracking({
     }
   };
 
-  return <Form>{fields.map((field) => renderField(field))}</Form>;
+  return (
+    <Form>
+      {fields.map((field) => {
+        if (field.type === 'group') {
+          const groupKey = (field.variable as string | null) ?? field.name;
+          const members = groupMembers.get(groupKey) || [];
+          return (
+            <ScrollableFieldGroupWithTracking
+              key={groupKey}
+              groupField={field}
+              members={members}
+              renderField={renderField}
+            />
+          );
+        }
+        if (field.group) {
+          return null;
+        }
+        return renderField(field);
+      })}
+    </Form>
+  );
+}
+
+const GROUP_CONTAINER_HEIGHT = 400;
+
+function ScrollableFieldGroupWithTracking({
+  groupField,
+  members,
+  renderField,
+}: {
+  groupField: ScenarioField;
+  members: ScenarioField[];
+  renderField: (field: ScenarioField) => ReactNode;
+}) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search) return members;
+    const lower = search.toLowerCase();
+    return members.filter(
+      (m) =>
+        m.short_description.toLowerCase().includes(lower) ||
+        m.variable.toLowerCase().includes(lower)
+    );
+  }, [members, search]);
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--pf-v5-global--BorderColor--100)',
+        borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+        marginBottom: '1rem',
+      }}
+    >
+      <div
+        style={{
+          borderLeft: '4px solid var(--pf-v5-global--primary-color--100)',
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid var(--pf-v5-global--BorderColor--100)',
+          background: 'var(--pf-v5-global--BackgroundColor--200)',
+        }}
+      >
+        <Title headingLevel="h2" size="xl" id={`group-${groupField.variable}-title`}>
+          {groupField.short_description}
+        </Title>
+        <p style={{ marginTop: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+          {groupField.description}
+        </p>
+      </div>
+      <div style={{ padding: '1rem' }}>
+        <SearchInput
+          placeholder="Filter fields..."
+          value={search}
+          onChange={(_event, value) => setSearch(value)}
+          onClear={() => setSearch('')}
+          style={{ marginBottom: '0.75rem' }}
+        />
+        <div style={{ maxHeight: `${GROUP_CONTAINER_HEIGHT}px`, overflowY: 'auto' }}>
+          {filtered.length > 0 ? (
+            filtered.map((m) => renderField(m))
+          ) : (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>No fields match your search.</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
