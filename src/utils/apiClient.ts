@@ -17,7 +17,12 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = 'ApiError';
+    Object.setPrototypeOf(this, ApiError.prototype);
   }
+}
+
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof Error && 'status' in err && 'statusText' in err;
 }
 
 /**

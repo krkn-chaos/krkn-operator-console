@@ -25,7 +25,7 @@ import { FileTypesTable } from '../FileTypesManagement/FileTypesTable';
 import { FileTypeFormModal } from '../FileTypesManagement/FileTypeFormModal';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
-import { ApiError } from '../../utils/apiClient';
+import { isApiError } from '../../utils/apiClient';
 import type { FileInfo, FileTypeResponse } from '../../types/api';
 
 interface FileManagementModalProps {
@@ -118,7 +118,7 @@ export function FileManagementModal({
       await loadFiles();
       setError(null);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
+      if (isApiError(err) && err.status === 403) {
         setError('You do not have permission to delete this file');
       } else {
         setError(err instanceof Error ? err.message : 'Failed to delete file');

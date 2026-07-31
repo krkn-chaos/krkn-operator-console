@@ -34,7 +34,7 @@ import {
 import { FiPlus, FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
-import { ApiError } from '../../utils/apiClient';
+import { isApiError } from '../../utils/apiClient';
 import type { FileInfo, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
@@ -101,7 +101,7 @@ export function FileForm({
         setAccessType(file.availableToAll ? 'public' : 'group');
         setSelectedGroup(file.groups?.[0] || '');
       } catch (err) {
-        if (err instanceof ApiError) {
+        if (isApiError(err)) {
           if (err.status === 403) {
             setError('You do not have permission to edit this file');
           } else if (err.status === 404) {
@@ -207,9 +207,10 @@ export function FileForm({
 
       onSuccess();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setValidationErrors(prev => ({ ...prev, fileName: 'A file with this name already exists' }));
-      } else if (err instanceof ApiError && err.status === 403) {
+      if (isApiError(err) && err.status === 409) {
+        setValidationErrors(prev => ({ ...prev, fileName: `A file named "${fileName}" already exists. Please choose a different name.` }));
+        setError(`The file name "${fileName}" is already taken.`);
+      } else if (isApiError(err) && err.status === 403) {
         setError('You do not have permission to perform this action');
       } else {
         setError(err instanceof Error ? err.message : `Failed to ${mode} file`);

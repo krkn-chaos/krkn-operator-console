@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ApiError, BaseApiClient } from '../apiClient';
+import { ApiError, isApiError, BaseApiClient } from '../apiClient';
 
 // Mock authService so authenticatedFetch can resolve getToken()
 vi.mock('../../services/authService', () => ({
@@ -82,6 +82,27 @@ describe('ApiError', () => {
     }
 
     expect(caughtStatus).toBe(409);
+  });
+});
+
+describe('isApiError', () => {
+  it('returns true for ApiError instances', () => {
+    expect(isApiError(new ApiError('msg', 409, 'Conflict'))).toBe(true);
+  });
+
+  it('returns false for plain Error', () => {
+    expect(isApiError(new Error('plain'))).toBe(false);
+  });
+
+  it('returns false for non-Error objects', () => {
+    expect(isApiError({ status: 409, statusText: 'Conflict' })).toBe(false);
+    expect(isApiError(null)).toBe(false);
+    expect(isApiError('string')).toBe(false);
+  });
+
+  it('returns true for duck-typed Error with status and statusText', () => {
+    const err = Object.assign(new Error('msg'), { status: 500, statusText: 'ISE' });
+    expect(isApiError(err)).toBe(true);
   });
 });
 
