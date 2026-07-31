@@ -24,6 +24,8 @@ import { FileFormModal } from './FileFormModal';
 import { FileTypesTable } from '../FileTypesManagement/FileTypesTable';
 import { FileTypeFormModal } from '../FileTypesManagement/FileTypeFormModal';
 import { operatorApi } from '../../services/operatorApi';
+import { useRole } from '../../hooks/useRole';
+import { ApiError } from '../../utils/apiClient';
 import type { FileInfo, FileTypeResponse } from '../../types/api';
 
 interface FileManagementModalProps {
@@ -37,6 +39,7 @@ export function FileManagementModal({
   isOpen,
   onClose,
 }: FileManagementModalProps) {
+  const { isAdmin, userGroups } = useRole();
   const [activeTab, setActiveTab] = useState<ActiveTab>('files-list');
 
   // Files state
@@ -115,7 +118,11 @@ export function FileManagementModal({
       await loadFiles();
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete file');
+      if (err instanceof ApiError && err.status === 403) {
+        setError('You do not have permission to delete this file');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to delete file');
+      }
     }
   };
 
@@ -237,6 +244,8 @@ export function FileManagementModal({
                 <FilesTable
                   files={files}
                   fileTypes={fileTypes}
+                  isAdmin={isAdmin}
+                  userGroups={userGroups}
                   onCreateClick={handleCreateFileClick}
                   onEditClick={handleEditFileClick}
                   onDeleteClick={handleDeleteFileClick}

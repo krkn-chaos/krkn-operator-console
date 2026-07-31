@@ -6,6 +6,7 @@
 
 import { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
 import { authService } from '../services/authService';
+import { operatorApi } from '../services/operatorApi';
 import { setUnauthorizedHandler } from '../utils/apiClient';
 import type { User, LoginRequest, RegisterRequest } from '../types/auth';
 
@@ -25,7 +26,8 @@ type AuthAction =
   | { type: 'AUTH_INIT'; payload: { user: User | null } }
   | { type: 'AUTH_LOGIN'; payload: { user: User } }
   | { type: 'AUTH_LOGOUT' }
-  | { type: 'AUTH_ERROR' };
+  | { type: 'AUTH_ERROR' }
+  | { type: 'AUTH_UPDATE_GROUPS'; payload: { groups: string[] } };
 
 /**
  * Authentication context value
@@ -84,6 +86,11 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         loading: false,
       };
 
+    case 'AUTH_UPDATE_GROUPS':
+      return state.user
+        ? { ...state, user: { ...state.user, groups: action.payload.groups } }
+        : state;
+
     default:
       return state;
   }
@@ -132,41 +139,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  /**
-   * Initialize auth state from sessionStorage on mount
-   */
+  const loadAndStoreGroups = useCallback(async () => {
+    try {
+      const response = await operatorApi.getGroups();
+      const groupNames = (response.groups || []).map(g => g.name);
+      dispatch({ type: 'AUTH_UPDATE_GROUPS', payload: { groups: groupNames } });
+      const user = authService.getUser();
+      if (user) {
+        authService.setUser({ ...user, groups: groupNames });
+      }
+    } catch {
+      // Non-critical: groups will be loaded on demand
+    }
+  }, []);
+
   useEffect(() => {
-    // Set up unauthorized handler for API client
     setUnauthorizedHandler(handleUnauthorized);
 
-    // Check if user is authenticated
     const user = authService.getUser();
     const token = authService.getToken();
 
     if (user && token) {
-      // Check if token is expired
       if (authService.isTokenExpired()) {
         authService.logout();
         dispatch({ type: 'AUTH_INIT', payload: { user: null } });
       } else {
-        // Valid session - restore auth state
         dispatch({ type: 'AUTH_INIT', payload: { user } });
+        loadAndStoreGroups();
       }
     } else {
-      // No session - user not authenticated
       dispatch({ type: 'AUTH_INIT', payload: { user: null } });
     }
-  }, [handleUnauthorized]);
+  }, [handleUnauthorized, loadAndStoreGroups]);
 
-  /**
-   * Login user
-   * @param request - Login credentials
-   */
   const login = useCallback(async (request: LoginRequest) => {
     try {
       const response = await authService.login(request);
 
-      // Dispatch login action with user data
       dispatch({
         type: 'AUTH_LOGIN',
         payload: {
@@ -179,11 +188,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
           },
         },
       });
+
+      // Load groups after login (fire and forget)
+      loadAndStoreGroups();
     } catch (error) {
       dispatch({ type: 'AUTH_ERROR' });
-      throw error; // Re-throw for component to handle
+      throw error;
     }
-  }, []);
+  }, [loadAndStoreGroups]);
 
   /**
    * Logout user

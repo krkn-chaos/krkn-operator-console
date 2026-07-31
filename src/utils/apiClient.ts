@@ -9,6 +9,17 @@
 
 import { authService } from '../services/authService';
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly statusText: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 /**
  * Callback function called when 401 Unauthorized is received
  * This should trigger logout and redirect to login page
@@ -98,13 +109,12 @@ export class BaseApiClient {
     const response = await authenticatedFetch(fullUrl, options);
 
     if (!response.ok) {
-      // Try to parse error message from response
+      let message = `HTTP ${response.status}: ${response.statusText}`;
       try {
         const error = await response.json();
-        throw new Error(error.message || `HTTP ${response.status}`);
-      } catch {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+        if (error.message) message = error.message;
+      } catch { /* use default message */ }
+      throw new ApiError(message, response.status, response.statusText);
     }
 
     return response.json();

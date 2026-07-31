@@ -167,12 +167,19 @@ class AuthService {
       return null;
     }
 
+    const groupsJson = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
+    let groups: string[] | undefined;
+    if (groupsJson) {
+      try { groups = JSON.parse(groupsJson); } catch { /* ignore */ }
+    }
+
     return {
       userId,
       name,
       surname,
       role: role as User['role'],
       organization: organization || undefined,
+      groups,
     };
   }
 
@@ -188,6 +195,9 @@ class AuthService {
     if (user.organization) {
       sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION, user.organization);
     }
+    if (user.groups) {
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_GROUPS, JSON.stringify(user.groups));
+    }
   }
 
   /**
@@ -199,6 +209,7 @@ class AuthService {
     sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_SURNAME);
     sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_ROLE);
     sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
+    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_GROUPS);
   }
 
   /**

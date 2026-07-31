@@ -18,6 +18,7 @@ export interface User {
   surname: string;
   role: UserRole;
   organization?: string;
+  groups?: string[];
 }
 
 /**
@@ -87,5 +88,6 @@ export const AUTH_STORAGE_KEYS = {
   USER_EMAIL: 'user_email',
   USER_SURNAME: 'user_surname',
   USER_ORGANIZATION: 'user_organization',
+  USER_GROUPS: 'user_groups',
   TOKEN_EXPIRES_AT: 'token_expires_at',
 } as const;

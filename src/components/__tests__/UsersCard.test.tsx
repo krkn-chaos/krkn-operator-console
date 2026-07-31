@@ -66,6 +66,7 @@ describe('UsersCard', () => {
       isUser: false,
       hasRole: vi.fn(),
       isAuthenticated: true,
+      userGroups: [],
     });
 
     vi.mocked(useAuth).mockReturnValue({
@@ -167,6 +168,7 @@ describe('UsersCard', () => {
       isUser: true,
       hasRole: vi.fn(),
       isAuthenticated: true,
+      userGroups: [],
     });
 
     render(<UsersCard groups={mockGroups} />);

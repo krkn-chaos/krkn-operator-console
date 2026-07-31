@@ -1,7 +1,3 @@
-/**
- * FilesTable - Clean table view of files
- */
-
 import { useState } from 'react';
 import {
   Button,
@@ -19,12 +15,29 @@ import {
   Tooltip,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock } from 'react-icons/fi';
+import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock, FiGitBranch, FiBarChart2 } from 'react-icons/fi';
 import type { FileInfo } from '../../types/api';
+
+const FILE_PURPOSE_CONFIG: Record<string, { icon: typeof FiFile; color: string; label: string }> = {
+  'file': { icon: FiFile, color: 'var(--pf-v5-global--palette--blue-300)', label: 'File' },
+  'workflow-template': { icon: FiGitBranch, color: 'var(--pf-v5-global--palette--purple-400)', label: 'Workflow' },
+  'resiliency-score': { icon: FiBarChart2, color: 'var(--pf-v5-global--palette--green-400)', label: 'Resiliency' },
+};
+
+function canModifyFile(file: FileInfo, userGroups: string[], isAdmin: boolean): boolean {
+  if (isAdmin) return true;
+  if (file.availableToAll) return true;
+  if (file.groups && file.groups.length > 0) {
+    return file.groups.some(g => userGroups.includes(g));
+  }
+  return false;
+}
 
 interface FilesTableProps {
   files: FileInfo[];
   fileTypes: Array<{ name: string; color: string }>;
+  isAdmin: boolean;
+  userGroups: string[];
   onCreateClick: () => void;
   onEditClick: (file: FileInfo) => void;
   onDeleteClick: (fileId: string) => void;
@@ -34,6 +47,8 @@ interface FilesTableProps {
 export function FilesTable({
   files,
   fileTypes,
+  isAdmin,
+  userGroups,
   onCreateClick,
   onEditClick,
   onDeleteClick,
@@ -111,79 +126,94 @@ export function FilesTable({
           </Tr>
         </Thead>
         <Tbody>
-          {filteredFiles.map((file) => (
-            <Tr key={file.fileId}>
-              <Td dataLabel="File Name">
-                <Tooltip content={file.description || 'No description'} position="top">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FiFile style={{ color: 'var(--pf-v5-global--palette--blue-300)', flexShrink: 0 }} />
-                    <code style={{
-                      fontSize: '0.875rem',
-                      padding: '0.125rem 0.25rem',
-                      backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                      borderRadius: '3px',
-                      cursor: 'help',
-                    }}>
-                      {file.fileName}
-                    </code>
+          {filteredFiles.map((file) => {
+            const purposeKey = file.filePurpose || 'file';
+            const purposeCfg = FILE_PURPOSE_CONFIG[purposeKey] || FILE_PURPOSE_CONFIG['file'];
+            const PurposeIcon = purposeCfg.icon;
+            const canModify = canModifyFile(file, userGroups, isAdmin);
+            const disabledTooltip = `You don't have permission (file belongs to ${file.groups?.[0] || 'another group'})`;
+
+            return (
+              <Tr key={file.fileId}>
+                <Td dataLabel="File Name">
+                  <Tooltip content={file.description || 'No description'} position="top">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <PurposeIcon style={{ color: purposeCfg.color, flexShrink: 0 }} />
+                      <code style={{
+                        fontSize: '0.875rem',
+                        padding: '0.125rem 0.25rem',
+                        backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                        borderRadius: '3px',
+                        cursor: 'help',
+                      }}>
+                        {file.fileName}
+                      </code>
+                      {purposeKey !== 'file' && (
+                        <Label isCompact color={purposeKey === 'workflow-template' ? 'purple' : 'green'}>
+                          {purposeCfg.label}
+                        </Label>
+                      )}
+                    </div>
+                  </Tooltip>
+                </Td>
+                <Td dataLabel="Type">
+                  {file.fileType ? (
+                    <Label
+                      isCompact
+                      style={{
+                        backgroundColor: fileTypes.find(t => t.name === file.fileType)?.color || '#6c757d',
+                        color: '#fff',
+                      }}
+                    >
+                      {file.fileType}
+                    </Label>
+                  ) : (
+                    <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>—</span>
+                  )}
+                </Td>
+                <Td dataLabel="Access">
+                  {file.availableToAll ? (
+                    <Tooltip content="Available to all users">
+                      <Label color="green" isCompact icon={<FiGlobe />}>
+                        Public
+                      </Label>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip content={file.groups?.length ? `Only ${file.groups[0]} members` : 'No groups'}>
+                      <Label color="blue" isCompact icon={<FiLock />}>
+                        {file.groups && file.groups.length > 0 ? file.groups[0] : 'Private'}
+                      </Label>
+                    </Tooltip>
+                  )}
+                </Td>
+                <Td isActionCell>
+                  <div style={{ display: 'flex', gap: '0', alignItems: 'center' }}>
+                    <Tooltip content={canModify ? 'Edit file' : disabledTooltip}>
+                      <Button
+                        variant="plain"
+                        onClick={() => onEditClick(file)}
+                        aria-label="Edit file"
+                        icon={<FiEdit />}
+                        style={{ padding: '0.25rem' }}
+                        isDisabled={!canModify}
+                      />
+                    </Tooltip>
+                    <Tooltip content={canModify ? 'Delete file' : disabledTooltip}>
+                      <Button
+                        variant="plain"
+                        onClick={() => onDeleteClick(file.fileId)}
+                        aria-label="Delete file"
+                        isDanger
+                        icon={<FiTrash2 />}
+                        style={{ padding: '0.25rem' }}
+                        isDisabled={!canModify}
+                      />
+                    </Tooltip>
                   </div>
-                </Tooltip>
-              </Td>
-              <Td dataLabel="Type">
-                {file.fileType ? (
-                  <Label
-                    isCompact
-                    style={{
-                      backgroundColor: fileTypes.find(t => t.name === file.fileType)?.color || '#6c757d',
-                      color: '#fff',
-                    }}
-                  >
-                    {file.fileType}
-                  </Label>
-                ) : (
-                  <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>—</span>
-                )}
-              </Td>
-              <Td dataLabel="Access">
-                {file.availableToAll ? (
-                  <Tooltip content="Available to all users">
-                    <Label color="green" isCompact icon={<FiGlobe />}>
-                      Public
-                    </Label>
-                  </Tooltip>
-                ) : (
-                  <Tooltip content={file.groups?.length ? `Only ${file.groups[0]} members` : 'No groups'}>
-                    <Label color="blue" isCompact icon={<FiLock />}>
-                      {file.groups && file.groups.length > 0 ? file.groups[0] : 'Private'}
-                    </Label>
-                  </Tooltip>
-                )}
-              </Td>
-              <Td isActionCell>
-                <div style={{ display: 'flex', gap: '0', alignItems: 'center' }}>
-                  <Tooltip content="Edit file">
-                    <Button
-                      variant="plain"
-                      onClick={() => onEditClick(file)}
-                      aria-label="Edit file"
-                      icon={<FiEdit />}
-                      style={{ padding: '0.25rem' }}
-                    />
-                  </Tooltip>
-                  <Tooltip content="Delete file">
-                    <Button
-                      variant="plain"
-                      onClick={() => onDeleteClick(file.fileId)}
-                      aria-label="Delete file"
-                      isDanger
-                      icon={<FiTrash2 />}
-                      style={{ padding: '0.25rem' }}
-                    />
-                  </Tooltip>
-                </div>
-              </Td>
-            </Tr>
-          ))}
+                </Td>
+              </Tr>
+            );
+          })}
         </Tbody>
       </Table>
 

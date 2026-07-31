@@ -31,6 +31,7 @@ import { workflowsApi } from '../../services/workflowsApi';
 import { useStudioContext, buildGraph } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { useRole } from '../../hooks/useRole';
+import { ApiError } from '../../utils/apiClient';
 import type { GroupResponse } from '../../types/api';
 
 const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
@@ -132,7 +133,11 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
       handleClose();
       onSuccess();
     } catch (err) {
-      showError('Save failed', err instanceof Error ? err.message : 'Failed to save workflow');
+      if (err instanceof ApiError && err.status === 409) {
+        setValidationErrors(prev => ({ ...prev, name: 'A workflow with this name already exists' }));
+      } else {
+        showError('Save failed', err instanceof Error ? err.message : 'Failed to save workflow');
+      }
     } finally {
       setIsSaving(false);
     }

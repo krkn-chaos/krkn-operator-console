@@ -34,6 +34,7 @@ import {
 import { FiPlus, FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
+import { ApiError } from '../../utils/apiClient';
 import type { FileInfo, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
@@ -100,16 +101,16 @@ export function FileForm({
         setAccessType(file.availableToAll ? 'public' : 'group');
         setSelectedGroup(file.groups?.[0] || '');
       } catch (err) {
-        if (err instanceof Error) {
-          if (err.message.includes('403')) {
+        if (err instanceof ApiError) {
+          if (err.status === 403) {
             setError('You do not have permission to edit this file');
-          } else if (err.message.includes('404')) {
+          } else if (err.status === 404) {
             setError('File not found - it may have been deleted');
           } else {
             setError('Failed to load file: ' + err.message);
           }
         } else {
-          setError('Failed to load file');
+          setError(err instanceof Error ? err.message : 'Failed to load file');
         }
         console.error('[FileForm] Error loading file for edit:', err);
       } finally {
@@ -206,7 +207,13 @@ export function FileForm({
 
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${mode} file`);
+      if (err instanceof ApiError && err.status === 409) {
+        setValidationErrors(prev => ({ ...prev, fileName: 'A file with this name already exists' }));
+      } else if (err instanceof ApiError && err.status === 403) {
+        setError('You do not have permission to perform this action');
+      } else {
+        setError(err instanceof Error ? err.message : `Failed to ${mode} file`);
+      }
     } finally {
       setSubmitting(false);
     }

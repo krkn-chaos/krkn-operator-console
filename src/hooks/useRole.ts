@@ -11,29 +11,11 @@ export function useRole() {
   const { state, isAdmin } = useAuth();
 
   return {
-    /**
-     * Current user role
-     */
     role: state.user?.role,
-
-    /**
-     * Check if user is admin
-     */
     isAdmin: isAdmin(),
-
-    /**
-     * Check if user is regular user (non-admin)
-     */
     isUser: state.user?.role === 'user',
-
-    /**
-     * Check if user has specific role
-     */
     hasRole: (role: UserRole) => state.user?.role === role,
-
-    /**
-     * Check if user is authenticated
-     */
     isAuthenticated: state.isAuthenticated,
+    userGroups: state.user?.groups || [],
   };
 }
