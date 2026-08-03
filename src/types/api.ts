@@ -1121,8 +1121,10 @@ export interface UpdateFileResponse {
 export interface FileInfo {
   /** File UUID */
   fileId: string;
-  /** File name */
+  /** File name (ConfigMap data key) */
   fileName: string;
+  /** User-defined workflow name (only for workflow-template files) */
+  workflowName?: string;
   /** File description */
   description?: string;
   /** If true, available to all users */

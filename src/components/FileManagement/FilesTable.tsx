@@ -15,12 +15,14 @@ import {
   Tooltip,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock, FiGitBranch, FiBarChart2 } from 'react-icons/fi';
+import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock, FiBarChart2 } from 'react-icons/fi';
+import { TopologyIcon } from '@patternfly/react-icons';
 import type { FileInfo } from '../../types/api';
+import type { ComponentType } from 'react';
 
-const FILE_PURPOSE_CONFIG: Record<string, { icon: typeof FiFile; color: string; label: string }> = {
+const FILE_PURPOSE_CONFIG: Record<string, { icon: ComponentType<{ style?: React.CSSProperties }>; color: string; label: string }> = {
   'file': { icon: FiFile, color: 'var(--pf-v5-global--palette--blue-300)', label: 'File' },
-  'workflow-template': { icon: FiGitBranch, color: 'var(--pf-v5-global--palette--purple-400)', label: 'Workflow' },
+  'workflow-template': { icon: TopologyIcon, color: 'var(--pf-v5-global--palette--purple-400)', label: 'Workflow' },
   'resiliency-score': { icon: FiBarChart2, color: 'var(--pf-v5-global--palette--green-400)', label: 'Resiliency' },
 };
 
@@ -59,10 +61,15 @@ export function FilesTable({
   const filesList = Array.isArray(files) ? files : [];
 
   const filteredFiles = filesList.filter(
-    (file) =>
-      file.fileId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      file.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    (file) => {
+      const term = searchTerm.toLowerCase();
+      return (
+        file.fileId.toLowerCase().includes(term) ||
+        file.fileName.toLowerCase().includes(term) ||
+        file.workflowName?.toLowerCase().includes(term) ||
+        file.description?.toLowerCase().includes(term)
+      );
+    }
   );
 
   if (filesList.length === 0) {
@@ -130,6 +137,7 @@ export function FilesTable({
             const purposeKey = file.filePurpose || 'file';
             const purposeCfg = FILE_PURPOSE_CONFIG[purposeKey] || FILE_PURPOSE_CONFIG['file'];
             const PurposeIcon = purposeCfg.icon;
+            const displayName = (purposeKey === 'workflow-template' && file.workflowName) ? file.workflowName : file.fileName;
             const canModify = canModifyFile(file, userGroups, isAdmin);
             const disabledTooltip = `You don't have permission (file belongs to ${file.groups?.[0] || 'another group'})`;
 
@@ -146,7 +154,7 @@ export function FilesTable({
                         borderRadius: '3px',
                         cursor: 'help',
                       }}>
-                        {file.fileName}
+                        {displayName}
                       </code>
                       {purposeKey !== 'file' && (
                         <Label isCompact color={purposeKey === 'workflow-template' ? 'purple' : 'green'}>

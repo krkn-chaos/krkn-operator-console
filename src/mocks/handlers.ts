@@ -3,6 +3,8 @@ import { config } from '../config';
 
 const BASE = config.apiBaseUrl;
 
+// ─── SCENARIO RUNS ───
+
 const mockScenarioRuns = [
   {
     scenarioRunName: 'pod-disruption-run-01',
@@ -88,6 +90,8 @@ const mockScenarioRuns = [
   },
 ];
 
+// ─── GRAPH RUNS (list view — GraphRunState) ───
+
 const mockGraphRuns = [
   {
     name: 'chaos-workflow-daily',
@@ -168,6 +172,8 @@ const mockGraphRuns = [
     ],
   },
 ];
+
+// ─── GRAPH RUNS (detail view — GraphRunDetail with spec/status) ───
 
 const mockGraphRunDetails: Record<string, object> = {
   'chaos-workflow-daily': {
@@ -319,6 +325,8 @@ const mockGraphRunDetails: Record<string, object> = {
   },
 };
 
+// ─── CLUSTERS ───
+
 const mockClusters = {
   targetData: {
     'krkn-operator': [
@@ -330,19 +338,27 @@ const mockClusters = {
   status: 'ready',
 };
 
+// ─── USERS ───
+
 const mockUsers = [
   { userId: 'admin@preview.local', name: 'Preview', surname: 'User', role: 'admin', organization: 'Krkn', active: true, created: '2026-06-01T00:00:00Z', lastLogin: '2026-07-08T10:00:00Z' },
   { userId: 'user1@preview.local', name: 'Alice', surname: 'Engineer', role: 'user', organization: 'Krkn', active: true, created: '2026-06-15T00:00:00Z', lastLogin: '2026-07-07T14:00:00Z' },
 ];
+
+// ─── GROUPS ───
 
 const mockGroups = [
   { name: 'chaos-engineers', description: 'Chaos engineering team', createdAt: '2026-06-01T00:00:00Z', memberCount: 2, clusterPermissions: { 'https://api.staging-east.example.com:6443': { actions: ['view', 'run', 'cancel'] } } },
   { name: 'platform-team', description: 'Platform engineering', createdAt: '2026-06-10T00:00:00Z', memberCount: 1, clusterPermissions: {} },
 ];
 
+// ─── REGISTRIES ───
+
 const mockRegistries = [
-  { name: 'default', registryUrl: 'quay.io', scenarioRepository: 'krkn-chaos/krkn-hub', authType: 'anonymous', description: 'Default krkn scenario registry', skipTls: false, insecure: false, groups: [], availableToAll: true, createdAt: '2026-06-01T00:00:00Z' },
+  { name: 'default', registryUrl: 'quay.io', scenarioRepository: 'krkn-chaos/krkn-hub', authType: 'token', description: 'Default krkn scenario registry', skipTls: false, insecure: false, groups: [], availableToAll: true, createdAt: '2026-06-01T00:00:00Z' },
 ];
+
+// ─── PROVIDERS ───
 
 const mockProviders = [
   { name: 'aws', active: true, lastHeartbeat: '2026-07-08T10:00:00Z' },
@@ -350,28 +366,68 @@ const mockProviders = [
   { name: 'azure', active: false, lastHeartbeat: null },
 ];
 
+// ─── TARGETS ───
+
 const mockTargets = [
-  { uuid: 'target-001', clusterName: 'staging-us-east-1', clusterAPIURL: 'https://api.staging-east.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z', operatorSource: 'krkn-operator' },
-  { uuid: 'target-002', clusterName: 'staging-eu-west-1', clusterAPIURL: 'https://api.staging-west.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z', operatorSource: 'krkn-operator' },
-  { uuid: 'target-003', clusterName: 'prod-us-central1', clusterAPIURL: 'https://api.prod.example.com:6443', secretType: 'token', ready: true, createdAt: '2026-06-30T08:00:00Z', operatorSource: 'krkn-operator' },
+  { uuid: 'target-001', clusterName: 'staging-us-east-1', clusterAPIURL: 'https://api.staging-east.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z' },
+  { uuid: 'target-002', clusterName: 'staging-eu-west-1', clusterAPIURL: 'https://api.staging-west.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z' },
+  { uuid: 'target-003', clusterName: 'prod-us-central1', clusterAPIURL: 'https://api.prod.example.com:6443', secretType: 'token', ready: true, createdAt: '2026-06-30T08:00:00Z' },
 ];
+
+// ─── SCENARIOS (ScenarioTag) ───
 
 const mockScenarios = [
-  { name: 'pod-disruption', description: 'Disrupts pods in target namespaces' },
-  { name: 'node-cpu-hog', description: 'Stresses CPU on target nodes' },
-  { name: 'network-chaos', description: 'Introduces network latency and packet loss' },
-  { name: 'container-kill', description: 'Kills containers in target pods' },
-  { name: 'time-skew', description: 'Skews system time on target nodes' },
+  { name: 'pod-disruption' },
+  { name: 'node-cpu-hog' },
+  { name: 'network-chaos' },
+  { name: 'container-kill' },
+  { name: 'time-skew' },
 ];
+
+// ─── FILES (FileInfo for listings) ───
 
 const mockFiles = [
-  { name: 'kubeconfig-staging', fileType: 'kubeconfig', content: 'apiVersion: v1\nclusters: []', createdAt: '2026-06-20T00:00:00Z', groups: ['chaos-engineers'] },
+  { fileId: 'file-001', fileName: 'kubeconfig-staging', availableToAll: false, groups: ['chaos-engineers'], fileType: 'kubeconfig', filePurpose: 'file' },
+  { fileId: 'file-002', fileName: 'metrics.yaml', description: 'Prometheus metrics config', availableToAll: true, fileType: 'yaml', filePurpose: 'file' },
+  { fileId: 'file-003', fileName: 'workflow.json', workflowName: 'chaos-daily-suite', description: 'Daily chaos workflow', availableToAll: true, filePurpose: 'workflow-template' },
+  { fileId: 'file-004', fileName: 'alerts-custom.yaml', description: 'Custom alerting rules', availableToAll: false, groups: ['platform-team'], fileType: 'yaml', filePurpose: 'file' },
 ];
 
+// ─── FILE TYPES (FileTypeResponse) ───
+
 const mockFileTypes = [
-  { name: 'kubeconfig', description: 'Kubernetes configuration file', extension: '.yaml', createdAt: '2026-06-01T00:00:00Z' },
-  { name: 'env', description: 'Environment variables file', extension: '.env', createdAt: '2026-06-01T00:00:00Z' },
+  { name: 'kubeconfig', color: '#0066CC', icon: '', usageCount: 1, createdAt: '2026-06-01T00:00:00Z' },
+  { name: 'yaml', color: '#CB7832', icon: '', usageCount: 2, createdAt: '2026-06-01T00:00:00Z' },
 ];
+
+// ─── WORKFLOWS (WorkflowInfo for listings) ───
+
+const mockWorkflows = [
+  { workflowId: 'wf-001', workflowName: 'chaos-daily-suite', description: 'Daily chaos workflow for staging', nodeCount: 4 },
+  { workflowId: 'wf-002', workflowName: 'resilience-quick-check', description: 'Quick resilience validation', nodeCount: 2 },
+];
+
+const mockWorkflowDetail = {
+  workflowId: 'wf-001',
+  workflowName: 'chaos-daily-suite',
+  description: 'Daily chaos workflow for staging',
+  availableToAll: true,
+  graph: {
+    'node-1': { name: 'pod-disruption', env: { NAMESPACE: 'default' } },
+    'node-2': { name: 'node-cpu-hog', env: {}, depends_on: 'node-1' },
+  },
+  studioLayout: {
+    edges: [{ source: 'node-1', target: 'node-2' }],
+    nextNodeNumber: 3,
+    nodes: [
+      { nodeId: 'node-1', position: { x: 100, y: 200 }, status: 'configured' },
+      { nodeId: 'node-2', position: { x: 400, y: 200 }, status: 'configured' },
+    ],
+  },
+  createdAt: '2026-07-01T00:00:00Z',
+  updatedAt: '2026-07-02T08:00:00Z',
+  createdBy: 'admin@preview.local',
+};
 
 function b64(s: string) { return btoa(s); }
 
@@ -397,49 +453,50 @@ export const handlers = [
 
   // ─── TARGET CREATION & POLLING ───
   http.post(`${BASE}/targets`, () =>
-    HttpResponse.json({ uuid: 'mock-target-001' }),
+    HttpResponse.json({ uuid: 'mock-target-001', message: 'Target created' }),
   ),
   http.get(`${BASE}/targets/:uuid`, () =>
     new HttpResponse(null, { status: 200 }),
   ),
-  http.delete(`${BASE}/targets/:uuid`, () =>
-    new HttpResponse(null, { status: 204 }),
+  http.delete(`${BASE}/targets/:uuid`, ({ params }) =>
+    HttpResponse.json({ uuid: params.uuid as string, message: 'Target deleted' }),
   ),
 
   // ─── CLUSTERS ───
   http.get(`${BASE}/clusters`, () => HttpResponse.json(mockClusters)),
   http.get(`${BASE}/nodes`, () =>
-    HttpResponse.json({ nodes: [
-      { name: 'ip-10-0-1-100.ec2.internal', status: 'Ready', roles: 'worker', version: 'v1.28.4' },
-      { name: 'ip-10-0-1-101.ec2.internal', status: 'Ready', roles: 'master', version: 'v1.28.4' },
-    ]}),
+    HttpResponse.json({ nodes: ['ip-10-0-1-100.ec2.internal', 'ip-10-0-1-101.ec2.internal'] }),
   ),
 
   // ─── SCENARIOS ───
   http.post(`${BASE}/scenarios`, () =>
     HttpResponse.json({ scenarios: mockScenarios }),
   ),
-  http.post(`${BASE}/scenarios/detail/:scenarioName`, ({ params }) =>
-    HttpResponse.json({
-      title: params.scenarioName,
-      name: params.scenarioName,
-      description: `Chaos scenario: ${params.scenarioName}`,
-      digest: 'sha256:mock',
+  http.post(`${BASE}/scenarios/detail/:scenarioName`, ({ params }) => {
+    const name = params.scenarioName as string;
+    return HttpResponse.json({
+      name,
+      title: name,
+      description: `Chaos scenario: ${name}`,
       fields: [
-        { name: 'namespace', type: 'string', required: true, description: 'Target namespace', default: 'default' },
-        { name: 'duration', type: 'integer', required: false, description: 'Duration in seconds', default: 60 },
-        { name: 'label_selector', type: 'string', required: false, description: 'Pod label selector', default: '' },
+        { name: 'namespace', short_description: 'Target namespace', description: 'Kubernetes namespace to target', variable: 'NAMESPACE', type: 'string', required: true, default: 'default' },
+        { name: 'duration', short_description: 'Duration in seconds', description: 'How long the chaos should run', variable: 'DURATION', type: 'number', required: false, default: '60' },
+        { name: 'label_selector', short_description: 'Pod selector', description: 'Label selector for target pods', variable: 'LABEL_SELECTOR', type: 'string', required: false, default: '' },
       ],
-    }),
-  ),
-  http.post(`${BASE}/scenarios/globals/:scenarioName`, () =>
-    HttpResponse.json({
+    });
+  }),
+  http.post(`${BASE}/scenarios/globals/:scenarioName`, ({ params }) => {
+    const name = params.scenarioName as string;
+    return HttpResponse.json({
+      name,
+      title: `${name} globals`,
+      description: `Global configuration for ${name}`,
       fields: [
-        { name: 'iterations', type: 'integer', required: false, description: 'Number of iterations', default: 1 },
-        { name: 'daemon_mode', type: 'boolean', required: false, description: 'Run in daemon mode', default: false },
+        { name: 'iterations', short_description: 'Number of iterations', description: 'Number of iterations to run', variable: 'ITERATIONS', type: 'number', required: false, default: '1' },
+        { name: 'daemon_mode', short_description: 'Daemon mode', description: 'Run in daemon mode', variable: 'DAEMON_MODE', type: 'boolean', required: false, default: 'false' },
       ],
-    }),
-  ),
+    });
+  }),
 
   // ─── SCENARIO RUNS ───
   http.get(`${BASE}/scenarios/run`, () =>
@@ -448,8 +505,7 @@ export const handlers = [
   http.post(`${BASE}/scenarios/run`, () =>
     HttpResponse.json({
       scenarioRunName: 'preview-run-' + Date.now().toString(36),
-      message: 'Scenario run created',
-      targetClusters: ['staging-us-east-1'],
+      targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
       totalTargets: 1,
     }),
   ),
@@ -472,14 +528,26 @@ export const handlers = [
     const run = mockGraphRuns.find((r) => r.name === params.name);
     return HttpResponse.json(run || mockGraphRuns[0]);
   }),
-  http.post(`${BASE}/graphruns`, () =>
-    HttpResponse.json({
-      name: 'preview-graph-' + Date.now().toString(36),
+  http.post(`${BASE}/graphruns`, () => {
+    const name = 'preview-graph-' + Date.now().toString(36);
+    return HttpResponse.json({
+      name,
       namespace: 'krkn-operator-system',
-      phase: 'Pending',
-      summary: { totalNodes: 0, completedNodes: 0, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
-    }),
-  ),
+      creationTimestamp: new Date().toISOString(),
+      spec: {
+        graph: {},
+        targetRequestId: 'target-001',
+        targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
+        ownerUserId: 'admin@preview.local',
+      },
+      status: {
+        phase: 'Pending',
+        summary: { totalNodes: 0, completedNodes: 0, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+        nodeStatuses: [],
+        resolvedLevels: [],
+      },
+    });
+  }),
   http.delete(`${BASE}/graphruns/:name`, () =>
     new HttpResponse(null, { status: 204 }),
   ),
@@ -488,7 +556,6 @@ export const handlers = [
   http.get(`${BASE}/dashboard/active-runs`, () =>
     HttpResponse.json({
       totalActiveRuns: 2,
-      totalActiveClusters: 2,
       totalClusters: 3,
       clusterRuns: {
         'staging-us-east-1': ['network-chaos-run-03'],
@@ -507,13 +574,13 @@ export const handlers = [
     return HttpResponse.json(t || mockTargets[0]);
   }),
   http.post(`${BASE}/operator/targets`, () =>
-    HttpResponse.json({ success: true, message: 'Target created' }),
+    HttpResponse.json({ uuid: 'mock-target-new', message: 'Target created' }),
   ),
-  http.put(`${BASE}/operator/targets/:uuid`, () =>
-    HttpResponse.json({ success: true, message: 'Target updated' }),
+  http.put(`${BASE}/operator/targets/:uuid`, ({ params }) =>
+    HttpResponse.json({ uuid: params.uuid as string, message: 'Target updated' }),
   ),
-  http.delete(`${BASE}/operator/targets/:uuid`, () =>
-    new HttpResponse(null, { status: 204 }),
+  http.delete(`${BASE}/operator/targets/:uuid`, ({ params }) =>
+    HttpResponse.json({ uuid: params.uuid as string, message: 'Target deleted' }),
   ),
 
   // ─── USERS (CRUD) ───
@@ -525,16 +592,16 @@ export const handlers = [
     return HttpResponse.json(u || mockUsers[0]);
   }),
   http.post(`${BASE}/users`, () =>
-    HttpResponse.json({ success: true, message: 'User created' }),
+    HttpResponse.json({ userId: 'new-user@preview.local', message: 'User created' }),
   ),
   http.patch(`${BASE}/users/:userId/password`, () =>
-    HttpResponse.json({ success: true, message: 'Password changed' }),
+    HttpResponse.json({ userId: 'admin@preview.local', message: 'Password changed' }),
   ),
-  http.patch(`${BASE}/users/:userId`, () =>
-    HttpResponse.json({ success: true, message: 'User updated' }),
+  http.patch(`${BASE}/users/:userId`, ({ params }) =>
+    HttpResponse.json({ userId: params.userId as string, message: 'User updated' }),
   ),
-  http.delete(`${BASE}/users/:userId`, () =>
-    HttpResponse.json({ success: true, message: 'User deleted' }),
+  http.delete(`${BASE}/users/:userId`, ({ params }) =>
+    HttpResponse.json({ userId: params.userId as string, message: 'User deleted' }),
   ),
 
   // ─── GROUPS (CRUD) ───
@@ -544,8 +611,8 @@ export const handlers = [
   http.get(`${BASE}/groups/:groupName/members`, () =>
     HttpResponse.json({
       members: [
-        { userId: 'admin@preview.local', name: 'Preview', surname: 'User', role: 'admin', joinedAt: '2026-06-01T00:00:00Z' },
-        { userId: 'user1@preview.local', name: 'Alice', surname: 'Engineer', role: 'user', joinedAt: '2026-06-15T00:00:00Z' },
+        { userId: 'admin@preview.local', name: 'Preview', surname: 'User', role: 'admin' },
+        { userId: 'user1@preview.local', name: 'Alice', surname: 'Engineer', role: 'user' },
       ],
     }),
   ),
@@ -554,19 +621,19 @@ export const handlers = [
     return HttpResponse.json(g || mockGroups[0]);
   }),
   http.post(`${BASE}/groups`, () =>
-    HttpResponse.json({ success: true, message: 'Group created' }),
+    HttpResponse.json({ name: 'new-group', message: 'Group created' }),
   ),
-  http.patch(`${BASE}/groups/:groupName`, () =>
-    HttpResponse.json({ success: true, message: 'Group updated' }),
+  http.patch(`${BASE}/groups/:groupName`, ({ params }) =>
+    HttpResponse.json({ name: params.groupName as string, message: 'Group updated' }),
   ),
-  http.delete(`${BASE}/groups/:groupName`, () =>
-    HttpResponse.json({ success: true, message: 'Group deleted' }),
+  http.delete(`${BASE}/groups/:groupName`, ({ params }) =>
+    HttpResponse.json({ name: params.groupName as string, message: 'Group deleted' }),
   ),
-  http.post(`${BASE}/groups/:groupName/members`, () =>
-    HttpResponse.json({ success: true, message: 'Member added' }),
+  http.post(`${BASE}/groups/:groupName/members`, ({ params }) =>
+    HttpResponse.json({ groupName: params.groupName as string, userId: 'new-member@preview.local', message: 'Member added' }),
   ),
-  http.delete(`${BASE}/groups/:groupName/members/:userId`, () =>
-    HttpResponse.json({ success: true, message: 'Member removed' }),
+  http.delete(`${BASE}/groups/:groupName/members/:userId`, ({ params }) =>
+    HttpResponse.json({ groupName: params.groupName as string, userId: params.userId as string, message: 'Member removed' }),
   ),
 
   // ─── REGISTRIES (CRUD) ───
@@ -585,21 +652,21 @@ export const handlers = [
     return HttpResponse.json(r || mockRegistries[0]);
   }),
   http.post(`${BASE}/registries`, () =>
-    HttpResponse.json({ success: true, message: 'Registry created' }),
+    HttpResponse.json({ name: 'new-registry', message: 'Registry created' }),
   ),
-  http.put(`${BASE}/registries/:name`, () =>
-    HttpResponse.json({ success: true, message: 'Registry updated' }),
+  http.put(`${BASE}/registries/:name`, ({ params }) =>
+    HttpResponse.json({ name: params.name as string, message: 'Registry updated' }),
   ),
-  http.delete(`${BASE}/registries/:name`, () =>
-    HttpResponse.json({ success: true, message: 'Registry deleted' }),
+  http.delete(`${BASE}/registries/:name`, ({ params }) =>
+    HttpResponse.json({ name: params.name as string, message: 'Registry deleted' }),
   ),
 
   // ─── PROVIDERS ───
   http.get(`${BASE}/providers`, () =>
     HttpResponse.json({ providers: mockProviders }),
   ),
-  http.patch(`${BASE}/providers/:name`, () =>
-    HttpResponse.json({ success: true, message: 'Provider updated' }),
+  http.patch(`${BASE}/providers/:name`, ({ params }) =>
+    HttpResponse.json({ message: 'Provider updated', name: params.name as string, active: true }),
   ),
   http.post(`${BASE}/provider-config`, () =>
     HttpResponse.json({ uuid: 'mock-provider-config-001' }),
@@ -613,7 +680,7 @@ export const handlers = [
           'config-schema': JSON.stringify((() => {
             const groups = [
               { name: 'ACM_SECRET_GROUP', short_description: 'ACM/OCM Secret Selection', description: 'Select secrets for direct API connection to managed clusters.', variable: 'ACM_SECRET_GROUP', type: 'group', required: 'false', secret: 'false' },
-              { name: 'ACM_USE_PROXY_GROUP', short_description: 'Cluster Proxy Configuration', description: 'Enable cluster proxy connection for managed clusters. Activating proxy overrides the secret selection.', variable: 'ACM_USE_PROXY_GROUP', type: 'group', required: 'false', secret: 'false' },
+              { name: 'ACM_USE_PROXY_GROUP', short_description: 'Cluster Proxy Configuration', description: 'Enable cluster proxy connection for managed clusters.', variable: 'ACM_USE_PROXY_GROUP', type: 'group', required: 'false', secret: 'false' },
             ];
             const clusterNames = [
               'local-cluster', ...Array.from({ length: 30 }, (_, i) => `managed-cluster-${i + 1}`)
@@ -645,18 +712,19 @@ export const handlers = [
   http.get(`${BASE}/files`, () =>
     HttpResponse.json({ files: mockFiles }),
   ),
-  http.get(`${BASE}/files/:name`, ({ params }) => {
-    const f = mockFiles.find((x) => x.name === params.name);
-    return HttpResponse.json(f || mockFiles[0]);
+  http.get(`${BASE}/files/:fileId`, ({ params }) => {
+    const f = mockFiles.find((x) => x.fileId === params.fileId);
+    const base = f || mockFiles[0];
+    return HttpResponse.json({ ...base, content: '# Mock file content\nkey: value\n' });
   }),
   http.post(`${BASE}/files`, () =>
-    HttpResponse.json({ success: true, name: 'new-file', message: 'File created' }),
+    HttpResponse.json({ message: 'File created', fileId: 'file-new-' + Date.now().toString(36) }),
   ),
-  http.put(`${BASE}/files/:name`, () =>
-    HttpResponse.json({ success: true, message: 'File updated' }),
+  http.put(`${BASE}/files/:fileId`, ({ params }) =>
+    HttpResponse.json({ message: 'File updated', fileId: params.fileId as string }),
   ),
-  http.delete(`${BASE}/files/:name`, () =>
-    new HttpResponse(null, { status: 204 }),
+  http.delete(`${BASE}/files/:fileId`, () =>
+    HttpResponse.json({ message: 'File deleted' }),
   ),
 
   // ─── FILE TYPES (CRUD) ───
@@ -668,13 +736,31 @@ export const handlers = [
     return HttpResponse.json(ft || mockFileTypes[0]);
   }),
   http.post(`${BASE}/file-types`, () =>
-    HttpResponse.json({ success: true, message: 'File type created' }),
+    HttpResponse.json({ message: 'File type created', name: 'new-type' }),
   ),
   http.put(`${BASE}/file-types/:name`, () =>
-    HttpResponse.json({ success: true, message: 'File type updated' }),
+    HttpResponse.json({ message: 'File type updated' }),
   ),
   http.delete(`${BASE}/file-types/:name`, () =>
-    new HttpResponse(null, { status: 204 }),
+    HttpResponse.json({ message: 'File type deleted' }),
+  ),
+
+  // ─── WORKFLOWS (CRUD) ───
+  http.get(`${BASE}/workflows/available`, () =>
+    HttpResponse.json({ workflows: mockWorkflows }),
+  ),
+  http.get(`${BASE}/workflows/:workflowId`, ({ params }) => {
+    if (params.workflowId === 'wf-001') return HttpResponse.json(mockWorkflowDetail);
+    return HttpResponse.json({ ...mockWorkflowDetail, workflowId: params.workflowId, workflowName: 'loaded-workflow' });
+  }),
+  http.post(`${BASE}/workflows`, () =>
+    HttpResponse.json({ message: 'Workflow created', workflowId: 'wf-new-' + Date.now().toString(36) }),
+  ),
+  http.put(`${BASE}/workflows/:workflowId`, ({ params }) =>
+    HttpResponse.json({ message: 'Workflow updated', workflowId: params.workflowId as string }),
+  ),
+  http.delete(`${BASE}/workflows/:workflowId`, () =>
+    HttpResponse.json({ message: 'Workflow deleted' }),
   ),
 
   // ─── TERMINAL ───
@@ -687,8 +773,14 @@ export const handlers = [
   ),
   http.get(`${BASE}/terminal/available-commands`, () =>
     HttpResponse.json({
-      commands: ['oc', 'kubectl', 'curl', 'cat', 'echo', 'grep'],
-      blockedFlags: ['--kubeconfig', '--token', '--exec'],
+      commands: [
+        { name: 'oc', description: 'OpenShift CLI', subcommands: [{ name: 'get', description: 'Get resources' }, { name: 'describe', description: 'Describe resources' }] },
+        { name: 'kubectl', description: 'Kubernetes CLI', subcommands: [{ name: 'get', description: 'Get resources' }, { name: 'logs', description: 'View logs' }] },
+        { name: 'curl', description: 'HTTP client', subcommands: [] },
+        { name: 'cat', description: 'Display file contents', subcommands: [] },
+        { name: 'echo', description: 'Print text', subcommands: [] },
+        { name: 'grep', description: 'Search text', subcommands: [] },
+      ],
     }),
   ),
 

@@ -9,20 +9,20 @@
 
 import { authService } from '../services/authService';
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly statusText: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-    Object.setPrototypeOf(this, ApiError.prototype);
-  }
-}
+export type ApiError = Error & { status: number; statusText: string };
 
 export function isApiError(err: unknown): err is ApiError {
-  return err instanceof Error && 'status' in err && 'statusText' in err;
+  return (
+    err instanceof Error &&
+    typeof (err as unknown as Record<string, unknown>).status === 'number'
+  );
+}
+
+function createApiError(message: string, status: number, statusText: string): ApiError {
+  const err = new Error(message) as ApiError;
+  err.status = status;
+  err.statusText = statusText;
+  return err;
 }
 
 /**
@@ -119,7 +119,7 @@ export class BaseApiClient {
         const error = await response.json();
         if (error.message) message = error.message;
       } catch { /* use default message */ }
-      throw new ApiError(message, response.status, response.statusText);
+      throw createApiError(message, response.status, response.statusText);
     }
 
     return response.json();
