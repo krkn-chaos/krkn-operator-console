@@ -377,11 +377,12 @@ const mockTargets = [
 // ─── SCENARIOS (ScenarioTag) ───
 
 const mockScenarios = [
-  { name: 'pod-disruption' },
-  { name: 'node-cpu-hog' },
-  { name: 'network-chaos' },
-  { name: 'container-kill' },
-  { name: 'time-skew' },
+  { name: 'pod-disruption', description: 'Disrupts pods in target namespaces' },
+  { name: 'node-cpu-hog', description: 'Stresses CPU on target nodes' },
+  { name: 'network-chaos', description: 'Introduces network latency and packet loss' },
+  { name: 'container-kill', description: 'Kills containers in target pods' },
+  { name: 'time-skew', description: 'Skews system time on target nodes' },
+  { name: 'node-scenarios', description: 'Node-level chaos scenarios requiring cloud provider credentials' },
 ];
 
 // ─── FILES (FileInfo for listings) ───

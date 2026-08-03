@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isScenarioBlocked } from '../utils/blockedScenarios';
 import {
   Card,
   CardBody,
@@ -24,6 +25,7 @@ import {
   MenuToggle,
   MenuToggleElement,
   SearchInput,
+  Tooltip,
 } from '@patternfly/react-core';
 import { FileCodeIcon, SortAmountDownIcon, CopyIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
@@ -281,12 +283,29 @@ export function ScenariosList() {
                         </div>
                       </DataListCell>,
                       <DataListCell key="actions" width={1}>
-                        <Button
-                          variant="primary"
-                          onClick={() => handleConfigureScenario(scenario.name)}
-                        >
-                          Configure
-                        </Button>
+                        {isScenarioBlocked(scenario.name) ? (
+                          <Tooltip
+                            content="Not configured yet — cloud provider credentials support is coming in the next release (krkn-operator#43)."
+                          >
+                            <span style={{ display: 'inline-block', cursor: 'not-allowed' }}>
+                              <Button
+                                variant="primary"
+                                isDisabled
+                                aria-disabled="true"
+                                style={{ pointerEvents: 'none' }}
+                              >
+                                Configure
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            onClick={() => handleConfigureScenario(scenario.name)}
+                          >
+                            Configure
+                          </Button>
+                        )}
                       </DataListCell>,
                     ]}
                   />
