@@ -319,7 +319,7 @@ export interface ScenarioRunStatusResponse {
   failedJobs: number;
   runningJobs: number;
   clusterJobs: ClusterJob[];
-  createdAt?: string; // Optional - backend may include it in the future
+  creationTimestamp?: string;
   ownerUserId?: string; // Email of the user who created the run
   registryName?: string; // Name of private registry used (null for public Quay registry)
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
