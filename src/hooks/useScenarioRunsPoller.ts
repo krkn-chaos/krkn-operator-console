@@ -102,7 +102,7 @@ export function useScenarioRunsPoller() {
   const handleMessage = useCallback((message: ServerMessage) => {
     if (message.resource !== 'run') return;
 
-    const data = message.data as ScenarioRunStatusResponse & { creationTimestamp?: string; createdAt?: string };
+    const data = message.data as ScenarioRunStatusResponse & { creationTimestamp?: string };
     const runName = message.id || data.scenarioRunName;
 
     if (message.event === 'updated' || message.event === 'created') {
@@ -119,7 +119,7 @@ export function useScenarioRunsPoller() {
         failedJobs: data.failedJobs,
         runningJobs: data.runningJobs,
         clusterJobs: hasWsJobs ? data.clusterJobs : (existing?.clusterJobs || []),
-        createdAt: existing?.createdAt || data.creationTimestamp || data.createdAt || '',
+        createdAt: existing?.createdAt || data.creationTimestamp || '',
         ownerUserId: data.ownerUserId || existing?.ownerUserId,
         registryName: data.registryName || existing?.registryName,
         graphRunName: data.graphRunName || existing?.graphRunName,
