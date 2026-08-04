@@ -199,6 +199,32 @@ describe('FilesTable permission-based edit/delete buttons', () => {
   });
 
   // --------------------------------------------------------------------------
+  // Non-admin user with empty userGroups (groups not loaded) — backend enforces
+  // --------------------------------------------------------------------------
+  describe('non-admin user with empty userGroups defaults to enabled', () => {
+    const files: FileInfo[] = [
+      makeFile({ fileId: 'priv-1', fileName: 'private.yaml', availableToAll: false, groups: ['team-b'] }),
+    ];
+
+    it('enables edit and delete buttons when userGroups is empty', () => {
+      render(
+        <FilesTable
+          {...defaultProps}
+          files={files}
+          isAdmin={false}
+          userGroups={[]}
+        />,
+      );
+
+      const editBtn = screen.getByLabelText('Edit file');
+      const deleteBtn = screen.getByLabelText('Delete file');
+
+      expect(editBtn).toBeEnabled();
+      expect(deleteBtn).toBeEnabled();
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // Additional edge case: file with no groups property at all (undefined)
   // --------------------------------------------------------------------------
   describe('regular user with file where groups is undefined', () => {

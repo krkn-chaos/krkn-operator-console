@@ -139,8 +139,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  const loadAndStoreGroups = useCallback(async () => {
+  const loadAndStoreGroups = useCallback(async (userRole?: string) => {
     try {
+      if (userRole !== 'admin') return;
       const response = await operatorApi.getGroups();
       const groupNames = (response.groups || []).map(g => g.name);
       dispatch({ type: 'AUTH_UPDATE_GROUPS', payload: { groups: groupNames } });
@@ -165,7 +166,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         dispatch({ type: 'AUTH_INIT', payload: { user: null } });
       } else {
         dispatch({ type: 'AUTH_INIT', payload: { user } });
-        loadAndStoreGroups();
+        loadAndStoreGroups(user.role);
       }
     } else {
       dispatch({ type: 'AUTH_INIT', payload: { user: null } });
@@ -189,8 +190,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         },
       });
 
-      // Load groups after login (fire and forget)
-      loadAndStoreGroups();
+      // Load groups after login (admin only — no endpoint for user's own groups)
+      loadAndStoreGroups(response.role);
     } catch (error) {
       dispatch({ type: 'AUTH_ERROR' });
       throw error;

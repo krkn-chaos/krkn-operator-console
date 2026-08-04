@@ -29,6 +29,7 @@ const FILE_PURPOSE_CONFIG: Record<string, { icon: ComponentType<{ style?: React.
 function canModifyFile(file: FileInfo, userGroups: string[], isAdmin: boolean): boolean {
   if (isAdmin) return true;
   if (file.availableToAll) return true;
+  if (userGroups.length === 0) return true;
   if (file.groups && file.groups.length > 0) {
     return file.groups.some(g => userGroups.includes(g));
   }
