@@ -1110,4 +1110,120 @@ describe('ScenarioDetail', () => {
       expect(screen.getByText('Configuration Preview')).toBeInTheDocument();
     });
   });
+
+  describe('Grouped Scenario Fields', () => {
+    const groupedScenarioDetail: ScenarioDetailType = {
+      name: 'grouped-scenario',
+      title: 'Grouped Scenario',
+      description: 'A scenario with grouped fields',
+      digest: 'sha256:grouped123',
+      fields: [
+        {
+          name: 'namespace',
+          variable: 'NAMESPACE',
+          short_description: 'Target namespace',
+          title: 'Target namespace',
+          description: 'Namespace where pods will be killed',
+          type: 'string',
+          required: true,
+        },
+        {
+          name: 'advanced_group',
+          variable: 'ADVANCED_GROUP',
+          short_description: 'Advanced Settings',
+          title: 'Advanced Settings',
+          description: 'Group header for advanced settings',
+          type: 'group',
+          required: false,
+        },
+        {
+          name: 'timeout',
+          variable: 'TIMEOUT',
+          short_description: 'Timeout seconds',
+          title: 'Timeout',
+          description: 'Max timeout',
+          type: 'number',
+          required: false,
+          default: '60',
+          group: 'ADVANCED_GROUP',
+        },
+      ],
+    };
+
+    it('should not show group headers in Preview table', async () => {
+      const user = userEvent.setup();
+      renderWithContext({
+        scenarioDetail: groupedScenarioDetail,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
+      await user.click(previewButton);
+
+      expect(screen.getByText('NAMESPACE')).toBeInTheDocument();
+      expect(screen.getByText('TIMEOUT')).toBeInTheDocument();
+      expect(screen.queryByText('ADVANCED_GROUP')).not.toBeInTheDocument();
+    });
+
+    it('should not include group headers in run request environment', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce({
+        scenarioRunName: 'test-run',
+        targetClusters: { 'krkn-operator': ['cluster1'] },
+        totalTargets: 1,
+      });
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce({
+        scenarioRunName: 'test-run',
+        phase: 'Running',
+        totalTargets: 1,
+        successfulJobs: 0,
+        failedJobs: 0,
+        runningJobs: 1,
+        clusterJobs: [],
+      });
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce({
+        totalActiveRuns: 0,
+        totalClusters: 0,
+        clusterRuns: {},
+      });
+
+      renderWithContext({
+        scenarioDetail: groupedScenarioDetail,
+        scenarioFormValues: { NAMESPACE: 'test-ns' },
+      });
+
+      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
+      await user.click(previewButton);
+
+      const runButton = screen.getByRole('button', { name: /Run Scenarios/i });
+      await user.click(runButton);
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({
+            environment: expect.not.objectContaining({
+              ADVANCED_GROUP: expect.anything(),
+            }),
+          })
+        );
+      });
+
+      await waitFor(() => {
+        const callArgs = vi.mocked(operatorApi.runScenario).mock.calls[0][0];
+        expect(callArgs.environment).toHaveProperty('NAMESPACE', 'test-ns');
+        expect(callArgs.environment).toHaveProperty('TIMEOUT', '60');
+        expect(callArgs.environment).not.toHaveProperty('ADVANCED_GROUP');
+      });
+    });
+
+    it('should suppress optional parameters section when fields are grouped', () => {
+      renderWithContext({
+        scenarioDetail: groupedScenarioDetail,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      // When hasGroupedScenarioFields is true, optional section is suppressed
+      expect(screen.queryByRole('button', { name: /Optional Parameters/i })).not.toBeInTheDocument();
+    });
+  });
 });

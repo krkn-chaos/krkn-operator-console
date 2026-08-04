@@ -326,6 +326,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       const files: ScenarioFileMount[] = [];
 
       for (const field of scenarioDetail.fields) {
+        if (field.type === 'group') continue;
         const value = scenarioFormValues[field.variable];
 
         if (field.type === 'file') {
@@ -441,7 +442,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   );
 
   const optionalFields = useMemo(
-    () => scenarioDetail?.fields.filter(field => !field.required) || [],
+    () => scenarioDetail?.fields.filter(field => !field.required && field.type !== 'group') || [],
     [scenarioDetail?.fields]
   );
 
@@ -611,7 +612,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {scenarioDetail.fields.map((field) => {
+                  {scenarioDetail.fields.filter(f => f.type !== 'group').map((field) => {
                     const value = scenarioFormValues?.[field.variable];
                     let displayValue: string;
 

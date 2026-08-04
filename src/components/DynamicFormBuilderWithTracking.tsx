@@ -380,6 +380,7 @@ function ScrollableFieldGroupWithTracking({
       <div style={{ padding: '1rem' }}>
         <SearchInput
           placeholder="Filter fields..."
+          aria-label={`Filter fields in ${groupField.short_description}`}
           value={search}
           onChange={(_event, value) => setSearch(value)}
           onClear={() => setSearch('')}
