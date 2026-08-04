@@ -317,7 +317,9 @@ describe('ScenarioDetail', () => {
       const toggle = screen.getByRole('button', { name: /Global Parameters/i });
       await user.click(toggle);
 
-      expect(screen.getByText('Loading global parameters...')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Loading global parameters...')).toBeInTheDocument();
+      });
 
       await waitFor(() => {
         expect(mockDispatch).toHaveBeenCalledWith({
