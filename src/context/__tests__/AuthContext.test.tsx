@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '../AuthContext';
 import { authService } from '../../services/authService';
 import { operatorApi } from '../../services/operatorApi';
 import { setUnauthorizedHandler } from '../../utils/apiClient';
+import type { UserRole } from '../../types/auth';
 
 vi.mock('../../services/authService');
 vi.mock('../../services/operatorApi');
@@ -37,7 +38,7 @@ describe('AuthProvider - loadAndStoreGroups', () => {
       userId: 'u1',
       name: 'Admin',
       surname: 'User',
-      role: 'admin',
+      role: 'admin' as UserRole,
       organization: 'test-org',
     };
 
@@ -82,7 +83,7 @@ describe('AuthProvider - loadAndStoreGroups', () => {
       userId: 'u2',
       name: 'Regular',
       surname: 'User',
-      role: 'user',
+      role: 'user' as UserRole,
       organization: 'test-org',
     };
 
@@ -108,7 +109,7 @@ describe('AuthProvider - loadAndStoreGroups', () => {
       userId: 'u1',
       name: 'Admin',
       surname: 'User',
-      role: 'admin',
+      role: 'admin' as UserRole,
       organization: 'test-org',
     };
 
