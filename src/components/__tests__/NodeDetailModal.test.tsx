@@ -45,7 +45,7 @@ const makeScenarioRun = (overrides?: Partial<ScenarioRunStatusResponse>): Scenar
       containerImage: 'quay.io/krkn-chaos/krkn-hub:latest',
     },
   ],
-  createdAt: '2026-07-02T08:00:00Z',
+  creationTimestamp: '2026-07-02T08:00:00Z',
   ownerUserId: 'admin@test.com',
   ...overrides,
 });
