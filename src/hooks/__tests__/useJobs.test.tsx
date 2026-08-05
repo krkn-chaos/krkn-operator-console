@@ -88,7 +88,10 @@ describe('useJobs', () => {
       event: 'snapshot',
       data: {
         jobs: [
-          { type: 'scenarioRun', name: 'run-002', createdAt: '2026-08-02T10:00:00Z' },
+          {
+            type: 'scenarioRun', name: 'run-002', createdAt: '2026-08-02T10:00:00Z',
+            scenarioRun: { scenarioRunName: 'run-002', phase: 'Running', totalTargets: 1, successfulJobs: 0, failedJobs: 0, runningJobs: 1, clusterJobs: [] },
+          },
         ],
       },
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
@@ -97,6 +100,34 @@ describe('useJobs', () => {
     expect(result.current.jobs).toHaveLength(1);
     expect(result.current.jobs[0].name).toBe('run-002');
     expect(result.current.pagination.total).toBe(1);
+  });
+
+  it('falls back to REST fetch when snapshot has incomplete payloads', async () => {
+    const { result } = renderHook(() => useJobs());
+
+    await waitFor(() => {
+      expect(result.current.jobs).toHaveLength(2);
+    });
+
+    vi.mocked(operatorApi.listUnifiedJobs).mockClear();
+
+    sendWsMessage({
+      resource: 'jobs',
+      id: '',
+      event: 'snapshot',
+      data: {
+        jobs: [
+          { type: 'scenarioRun', name: 'run-incomplete', createdAt: '2026-08-02T10:00:00Z' },
+        ],
+      },
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
+
+    expect(result.current.pagination.total).toBe(1);
+
+    await waitFor(() => {
+      expect(operatorApi.listUnifiedJobs).toHaveBeenCalledWith(1, 20);
+    });
   });
 
   it('re-fetches on WS created event', async () => {

@@ -66,15 +66,21 @@ export function useJobs(): UseJobsReturn {
 
     if (message.event === 'snapshot') {
       const data = message.data as { jobs?: UnifiedJobItem[] };
-      if (data.jobs) {
+      const hasFullPayloads = data.jobs?.every(
+        j => (j.type === 'scenarioRun' && j.scenarioRun) || (j.type === 'graphRun' && j.graphRun)
+      );
+      if (data.jobs && hasFullPayloads) {
         setJobs(data.jobs);
+        if (message.pagination) {
+          setPagination(message.pagination);
+        }
+      } else {
+        if (message.pagination) {
+          setPagination(message.pagination);
+        }
+        fetchJobs(pageRef.current, limitRef.current);
       }
-      if (message.pagination) {
-        setPagination(message.pagination);
-      }
-    } else if (message.event === 'created' || message.event === 'updated') {
-      fetchJobs(pageRef.current, limitRef.current);
-    } else if (message.event === 'deleted') {
+    } else if (message.event === 'created' || message.event === 'updated' || message.event === 'deleted') {
       fetchJobs(pageRef.current, limitRef.current);
     }
   }, [fetchJobs]);
