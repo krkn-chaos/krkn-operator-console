@@ -210,6 +210,42 @@ describe('useScenarioRunsPoller handleMessage integration', () => {
     );
   });
 
+  it('resets terminal guard after delete so re-created run can fetch again', async () => {
+    vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValue({
+      scenarioRunName: 'run-001', phase: 'Succeeded', totalTargets: 2,
+      successfulJobs: 2, failedJobs: 0, runningJobs: 0,
+      clusterJobs: [{ providerName: 'krkn', clusterName: 'c1', jobId: 'j1', podName: 'p1', phase: 'Succeeded', startTime: '' }],
+    });
+
+    mockScenarioRuns = [makeRunState({ phase: 'Running' })];
+    renderHook(() => useScenarioRunsPoller());
+
+    // Terminal transition → triggers REST fetch
+    sendWsMessage({
+      resource: 'run', id: 'run-001', event: 'updated',
+      data: { scenarioRunName: 'run-001', phase: 'Succeeded', totalTargets: 2, successfulJobs: 2, failedJobs: 0, runningJobs: 0, clusterJobs: [] },
+    });
+    await vi.waitFor(() => {
+      expect(operatorApi.getScenarioRunStatus).toHaveBeenCalledTimes(1);
+    });
+
+    // Delete clears the guard
+    sendWsMessage({ resource: 'run', id: 'run-001', event: 'deleted', data: {} });
+
+    // Re-create with same name → terminal transition should fire again
+    mockScenarioRuns = [makeRunState({ phase: 'Running', scenarioRunName: 'run-001' })];
+    vi.mocked(operatorApi.getScenarioRunStatus).mockClear();
+
+    sendWsMessage({
+      resource: 'run', id: 'run-001', event: 'updated',
+      data: { scenarioRunName: 'run-001', phase: 'Failed', totalTargets: 2, successfulJobs: 0, failedJobs: 2, runningJobs: 0, clusterJobs: [] },
+    });
+
+    await vi.waitFor(() => {
+      expect(operatorApi.getScenarioRunStatus).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('ignores messages for other resources', () => {
     renderHook(() => useScenarioRunsPoller());
 

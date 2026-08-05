@@ -176,7 +176,18 @@ export function useScenarioRunsPoller() {
 
 }
 
-/** Shallow diff of the fields that affect UI rendering; true when a dispatch is needed. */
+/**
+ * Shallow diff of the fields that affect UI rendering; true when a dispatch is needed.
+ *
+ * @example
+ * ```ts
+ * const prev: ScenarioRunState = { phase: 'Running', runningJobs: 2, ... };
+ * const next: ScenarioRunState = { phase: 'Succeeded', runningJobs: 0, ... };
+ * if (hasChanges(prev, next)) {
+ *   dispatch({ type: 'UPDATE_SCENARIO_RUN', payload: { run: next } });
+ * }
+ * ```
+ */
 export function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
   if (prev.phase !== next.phase) return true;
   if (prev.totalTargets !== next.totalTargets) return true;
