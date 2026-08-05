@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { BaseApiClient } from '../utils/apiClient';
+import { BaseApiClient, authenticatedFetch } from '../utils/apiClient';
 import type {
   CreateTargetResponse,
   ClustersResponse,
@@ -29,7 +29,8 @@ import type {
   FileTypesListResponse,
   CreateFileTypeRequest,
   UpdateFileTypeRequest,
-  JobConfigResponse
+  JobConfigResponse,
+  UnifiedJobsResponse,
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -593,6 +594,40 @@ class OperatorApiClient extends BaseApiClient {
     await this.fetchJson<void>(`/file-types/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     });
+  }
+
+  /**
+   * GET /api/v2/jobs
+   * List unified jobs (scenario runs + graph runs) with optional pagination.
+   * When page/limit are omitted, all items are returned.
+   */
+  async listUnifiedJobs(page?: number, limit?: number): Promise<UnifiedJobsResponse> {
+    const params = new URLSearchParams();
+    if (page !== undefined) params.set('page', String(page));
+    if (limit !== undefined) params.set('limit', String(limit));
+    const query = params.toString();
+    const url = `${config.apiV2BaseUrl}/jobs${query ? `?${query}` : ''}`;
+
+    try {
+      const response = await authenticatedFetch(url);
+      if (!response.ok) {
+        if (response.status === 404) {
+          return { jobs: [], pagination: { page: 0, limit: 0, total: 0, totalPages: 0 } };
+        }
+        let message = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const error = await response.json();
+          if (error.message) message = error.message;
+        } catch { /* use default message */ }
+        throw new Error(message);
+      }
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('404')) {
+        return { jobs: [], pagination: { page: 0, limit: 0, total: 0, totalPages: 0 } };
+      }
+      throw error;
+    }
   }
 }
 

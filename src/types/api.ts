@@ -954,6 +954,24 @@ export type RunItem =
   | (ScenarioRunState & { runType: 'scenario' })
   | (GraphRunState & { runType: 'graph' });
 
+// Re-export PaginationMeta from websocket types (single source of truth)
+export type { PaginationMeta } from './websocket';
+
+/** Server-side unified job item from GET /api/v2/jobs */
+export interface UnifiedJobItem {
+  type: 'scenarioRun' | 'graphRun';
+  name: string;
+  createdAt: string;
+  scenarioRun?: ScenarioRunStatusResponse;
+  graphRun?: GraphRunListItem;
+}
+
+/** Response from GET /api/v2/jobs */
+export interface UnifiedJobsResponse {
+  jobs: UnifiedJobItem[];
+  pagination: import('./websocket').PaginationMeta;
+}
+
 // Chaos Scenario Studio Types
 
 /**

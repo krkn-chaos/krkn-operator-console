@@ -9,11 +9,21 @@
 // Connection state
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
+// Pagination metadata (shared with REST API responses)
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 // Client → Server messages (subscription pattern only)
 export interface SubscribeMessage {
   action: 'subscribe';
   resource: string;
   ids?: string[];
+  page?: number;
+  limit?: number;
 }
 
 export interface UnsubscribeMessage {
@@ -25,13 +35,14 @@ export interface UnsubscribeMessage {
 export type ClientMessage = SubscribeMessage | UnsubscribeMessage;
 
 // Server → Client messages (subscription pattern)
-export type ServerEventType = 'updated' | 'created' | 'deleted';
+export type ServerEventType = 'updated' | 'created' | 'deleted' | 'snapshot';
 
 export interface ServerMessage<T = unknown> {
   resource: string;
   id: string;
   event: ServerEventType;
   data: T;
+  pagination?: PaginationMeta;
 }
 
 // Event handlers
@@ -43,6 +54,8 @@ export type ConnectionStateHandler = (state: ConnectionState) => void;
 export interface Subscription {
   resource: string;
   ids?: string[];
+  page?: number;
+  limit?: number;
 }
 
 // Connection configuration

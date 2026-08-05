@@ -15,7 +15,7 @@ interface UseWebSocketOptions {
 
 interface UseWebSocketReturn {
   connectionState: ConnectionState;
-  subscribe: (resource: string, ids?: string[]) => void;
+  subscribe: (resource: string, ids?: string[], page?: number, limit?: number) => void;
   unsubscribe: (resource: string, ids?: string[]) => void;
 }
 
@@ -82,7 +82,7 @@ export function useWebSocket(
   }, [connectionId, url, disabled, subscriptionMode]);
 
   const subscribe = useCallback(
-    (resource: string, ids?: string[]) => websocketService.subscribe(connectionId, resource, ids),
+    (resource: string, ids?: string[], page?: number, limit?: number) => websocketService.subscribe(connectionId, resource, ids, page, limit),
     [connectionId],
   );
 

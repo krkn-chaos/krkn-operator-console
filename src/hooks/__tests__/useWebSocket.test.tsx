@@ -125,13 +125,25 @@ describe('useWebSocket', () => {
       result.current.subscribe('run', ['run-1']);
     });
 
-    expect(mockSubscribe).toHaveBeenCalledWith('test-callbacks', 'run', ['run-1']);
+    expect(mockSubscribe).toHaveBeenCalledWith('test-callbacks', 'run', ['run-1'], undefined, undefined);
 
     act(() => {
       result.current.unsubscribe('run', ['run-1']);
     });
 
     expect(mockUnsubscribe).toHaveBeenCalledWith('test-callbacks', 'run', ['run-1']);
+  });
+
+  it('should forward pagination params to subscribe', () => {
+    const { result } = renderHook(() =>
+      useWebSocket('test-pagination', 'ws://localhost/test')
+    );
+
+    act(() => {
+      result.current.subscribe('jobs', undefined, 2, 20);
+    });
+
+    expect(mockSubscribe).toHaveBeenCalledWith('test-pagination', 'jobs', undefined, 2, 20);
   });
 
   it('should clean up handlers on unmount in subscription mode', () => {

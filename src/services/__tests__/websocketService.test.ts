@@ -292,6 +292,69 @@ describe('WebSocketService', () => {
       websocketService.disconnect('test-unsub');
     });
 
+    it('should send subscribe message with pagination params', () => {
+      websocketService.connect('test-sub-page', 'ws://localhost/test');
+      const ws = MockWebSocket.latest!;
+      ws.simulateOpen();
+
+      websocketService.subscribe('test-sub-page', 'jobs', undefined, 1, 20);
+
+      expect(ws.sent).toHaveLength(1);
+      expect(JSON.parse(ws.sent[0])).toEqual({
+        action: 'subscribe',
+        resource: 'jobs',
+        page: 1,
+        limit: 20,
+      });
+
+      websocketService.disconnect('test-sub-page');
+    });
+
+    it('should update existing subscription when page changes', () => {
+      websocketService.connect('test-sub-update', 'ws://localhost/test');
+      const ws = MockWebSocket.latest!;
+      ws.simulateOpen();
+
+      websocketService.subscribe('test-sub-update', 'jobs', undefined, 1, 20);
+      websocketService.subscribe('test-sub-update', 'jobs', undefined, 2, 20);
+
+      expect(ws.sent).toHaveLength(2);
+      expect(JSON.parse(ws.sent[1])).toEqual({
+        action: 'subscribe',
+        resource: 'jobs',
+        page: 2,
+        limit: 20,
+      });
+
+      websocketService.disconnect('test-sub-update');
+    });
+
+    it('should re-subscribe with pagination after reconnect', () => {
+      websocketService.connect('test-resub-page', 'ws://localhost/test', {
+        baseReconnectDelay: 100,
+      });
+      const ws1 = MockWebSocket.latest!;
+      ws1.simulateOpen();
+
+      websocketService.subscribe('test-resub-page', 'jobs', undefined, 3, 10);
+
+      ws1.simulateClose(1006);
+      vi.advanceTimersByTime(100);
+
+      const ws2 = MockWebSocket.latest!;
+      ws2.simulateOpen();
+
+      expect(ws2.sent).toHaveLength(1);
+      expect(JSON.parse(ws2.sent[0])).toEqual({
+        action: 'subscribe',
+        resource: 'jobs',
+        page: 3,
+        limit: 10,
+      });
+
+      websocketService.disconnect('test-resub-page');
+    });
+
     it('should re-subscribe after reconnect', () => {
       websocketService.connect('test-resub', 'ws://localhost/test', {
         baseReconnectDelay: 100,
