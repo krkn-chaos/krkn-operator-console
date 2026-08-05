@@ -30,14 +30,15 @@ function collectJobCounts(items: UnifiedRunItem[]): JobCounts {
 
   for (const item of items) {
     if (item.type === 'scenario') {
-      const jobs = item.run.clusterJobs;
+      const jobs = item.run.clusterJobs ?? [];
       total += jobs.length;
       succeeded += jobs.filter(j => j.phase === 'Succeeded').length;
       failed += jobs.filter(j => j.phase === 'Failed').length;
     } else {
-      total += item.summary.totalNodes;
-      succeeded += item.summary.completedNodes;
-      failed += item.summary.failedNodes;
+      const summary = item.summary ?? { totalNodes: 0, completedNodes: 0, failedNodes: 0 };
+      total += summary.totalNodes;
+      succeeded += summary.completedNodes;
+      failed += summary.failedNodes;
     }
   }
 
