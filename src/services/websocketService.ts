@@ -120,6 +120,24 @@ class WebSocketService {
   /**
    * Send a subscribe message over a subscription-mode connection.
    * Subscriptions are persisted and re-sent on reconnect.
+   *
+   * @param connectionId - The connection to subscribe on
+   * @param resource - The resource type to subscribe to (e.g. 'jobs', 'scenarioRuns')
+   * @param ids - Optional array of specific resource IDs to watch
+   * @param page - Optional page number for paginated snapshots
+   * @param limit - Optional page size for paginated snapshots
+   *
+   * @example
+   * ```ts
+   * // Subscribe to all jobs, paginated
+   * websocketService.subscribe('jobs', 'jobs', undefined, 1, 20);
+   *
+   * // Subscribe to specific scenario runs (no pagination)
+   * websocketService.subscribe('runs', 'scenarioRuns', ['run-abc', 'run-def']);
+   *
+   * // Re-subscribe with new page (replaces existing subscription for same resource)
+   * websocketService.subscribe('jobs', 'jobs', undefined, 2, 20);
+   * ```
    */
   subscribe(connectionId: string, resource: string, ids?: string[], page?: number, limit?: number): void {
     const conn = this.connections.get(connectionId);
