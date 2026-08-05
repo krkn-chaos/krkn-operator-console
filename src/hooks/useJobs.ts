@@ -33,31 +33,22 @@ export function useJobs(): UseJobsReturn {
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
   const [isLoading, setIsLoading] = useState(false);
 
+  const initialFetchDoneRef = useRef(false);
   const pageRef = useRef(page);
   const limitRef = useRef(limit);
   pageRef.current = page;
   limitRef.current = limit;
 
-  const requestIdRef = useRef(0);
-  const lastFetchedRef = useRef<string | null>(null);
-
   const fetchJobs = useCallback(async (p: number, l: number) => {
-    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     try {
       const data: UnifiedJobsResponse = await operatorApi.listUnifiedJobs(p, l);
-      if (requestId !== requestIdRef.current) return;
       setJobs(data.jobs);
-      if (data.pagination.page !== p) setPage(data.pagination.page);
-      if (data.pagination.limit !== l) setLimit(data.pagination.limit);
       setPagination(data.pagination);
-    } catch (err) {
-      if (requestId !== requestIdRef.current) return;
-      console.error('Failed to fetch jobs:', err);
+    } catch {
+      // Keep existing state on error
     } finally {
-      if (requestId === requestIdRef.current) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   }, []);
 
@@ -73,6 +64,7 @@ export function useJobs(): UseJobsReturn {
         setPagination(message.pagination);
       }
     } else if (message.event === 'created' || message.event === 'updated') {
+      // Individual item update — re-fetch current page for consistency
       fetchJobs(pageRef.current, limitRef.current);
     } else if (message.event === 'deleted') {
       fetchJobs(pageRef.current, limitRef.current);
@@ -82,20 +74,27 @@ export function useJobs(): UseJobsReturn {
   const wsUrl = websocketService.buildResourceUrl('runs');
   const { connectionState } = useWebSocket('jobs', wsUrl, handleMessage);
 
-  // Fetch + subscribe on connect and when page/limit changes
+  // Initial fetch + subscribe on connect
   useEffect(() => {
     if (connectionState !== 'connected') {
-      lastFetchedRef.current = null;
+      initialFetchDoneRef.current = false;
       return;
     }
-
-    const key = `${page}:${limit}`;
-    if (lastFetchedRef.current === key) return;
-    lastFetchedRef.current = key;
+    if (initialFetchDoneRef.current) return;
+    initialFetchDoneRef.current = true;
 
     fetchJobs(page, limit);
     websocketService.subscribe('jobs', 'jobs', undefined, page, limit);
   }, [connectionState, page, limit, fetchJobs]);
+
+  // Re-subscribe + re-fetch when page or limit changes
+  useEffect(() => {
+    if (connectionState !== 'connected') return;
+    if (!initialFetchDoneRef.current) return;
+
+    fetchJobs(page, limit);
+    websocketService.subscribe('jobs', 'jobs', undefined, page, limit);
+  }, [page, limit, connectionState, fetchJobs]);
 
   return { jobs, pagination, page, setPage, limit, setLimit, isLoading };
 }
