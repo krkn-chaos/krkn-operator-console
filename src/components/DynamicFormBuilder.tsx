@@ -6,7 +6,6 @@ import {
   TextInput,
   FormSelect,
   FormSelectOption,
-  Checkbox,
   FileUpload,
   FormHelperText,
   HelperText,
@@ -42,6 +41,12 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
           if (currentValue === 'true' || currentValue === true) {
             disabled.add(field.mutually_excludes);
           }
+        }
+      }
+      if (field.mutually_excludes && field.type === 'boolean') {
+        const currentValue = values[field.variable] ?? field.default ?? '';
+        if (currentValue === 'true' || currentValue === true) {
+          disabled.add(field.mutually_excludes);
         }
       }
     }
@@ -254,10 +259,11 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
 
         if (isBooleanEnum) {
           return (
-            <FormGroup key={field.variable} fieldId={field.variable}>
+            <FormGroup key={field.variable} label={field.short_description} fieldId={field.variable}>
               <Switch
                 id={field.variable}
-                label={field.short_description}
+                label="True"
+                labelOff="False"
                 isChecked={value === 'true' || value === true}
                 onChange={(_event, checked) => handleChange(field.variable, checked ? 'true' : 'false')}
                 isDisabled={isFieldDisabled}
@@ -314,15 +320,22 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
 
       case 'boolean':
         return (
-          <FormGroup key={field.variable} fieldId={field.variable}>
-            <Checkbox
+          <FormGroup key={field.variable} label={field.short_description} fieldId={field.variable}>
+            <Switch
               id={field.variable}
-              label={field.short_description}
-              description={field.description}
+              label="True"
+              labelOff="False"
               isChecked={value === true || value === 'true'}
               onChange={(_event, checked) => handleChange(field.variable, checked)}
               isDisabled={isFieldDisabled}
             />
+            {field.description && (
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>{field.description}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            )}
           </FormGroup>
         );
 

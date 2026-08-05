@@ -25,6 +25,18 @@ function makeStringField(variable: string, shortDesc: string): ScenarioField {
   return { name: variable, short_description: shortDesc, description: `Desc for ${variable}`, variable, type: 'string', required: false, secret: false } as ScenarioField;
 }
 
+function makeBooleanField(
+  variable: string,
+  shortDesc: string,
+  opts: { mutually_excludes?: string; default?: string } = {},
+): ScenarioField {
+  return {
+    name: variable, short_description: shortDesc, description: `Desc for ${variable}`,
+    variable, type: 'boolean', required: false, secret: false,
+    mutually_excludes: opts.mutually_excludes, default: opts.default,
+  } as ScenarioField;
+}
+
 describe('DynamicFormBuilder', () => {
   describe('group rendering', () => {
     it('should render group headers with title and description', () => {
@@ -166,7 +178,7 @@ describe('DynamicFormBuilder', () => {
       const values: ScenarioFormValues = { PROXY: 'false', SECRET: 'workmgr' };
       render(<DynamicFormBuilder fields={fields} values={values} onChange={onChange} />);
 
-      const proxyToggle = screen.getByRole('checkbox', { name: /Proxy/i });
+      const proxyToggle = screen.getByRole('checkbox', { name: /False/i });
       await user.click(proxyToggle);
 
       const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0];
@@ -180,7 +192,61 @@ describe('DynamicFormBuilder', () => {
       ];
       render(<DynamicFormBuilder fields={fields} values={{}} onChange={vi.fn()} />);
 
-      expect(screen.getByRole('checkbox', { name: /My Toggle/i })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /False/i })).toBeInTheDocument();
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('boolean type mutually_excludes', () => {
+    it('should disable excluded field when boolean toggle is on', () => {
+      const fields: ScenarioField[] = [
+        makeBooleanField('ENABLE', 'Enable Feature', { mutually_excludes: 'TARGET' }),
+        makeEnumField('TARGET', 'Target Setting'),
+      ];
+      const values: ScenarioFormValues = { ENABLE: true, TARGET: 'a' };
+      render(<DynamicFormBuilder fields={fields} values={values} onChange={vi.fn()} />);
+
+      const targetSelect = screen.getByRole('combobox', { name: /Target Setting/i });
+      expect(targetSelect).toBeDisabled();
+    });
+
+    it('should not disable excluded field when boolean toggle is off', () => {
+      const fields: ScenarioField[] = [
+        makeBooleanField('ENABLE', 'Enable Feature', { mutually_excludes: 'TARGET' }),
+        makeEnumField('TARGET', 'Target Setting'),
+      ];
+      const values: ScenarioFormValues = { ENABLE: false, TARGET: 'a' };
+      render(<DynamicFormBuilder fields={fields} values={values} onChange={vi.fn()} />);
+
+      const targetSelect = screen.getByRole('combobox', { name: /Target Setting/i });
+      expect(targetSelect).not.toBeDisabled();
+    });
+
+    it('should reset excluded field value when boolean toggle is turned on', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const fields: ScenarioField[] = [
+        makeBooleanField('ENABLE', 'Enable Feature', { mutually_excludes: 'TARGET', default: 'false' }),
+        makeEnumField('TARGET', 'Target Setting', { allowed_values: 'a,b', default: 'a' }),
+      ];
+      const values: ScenarioFormValues = { ENABLE: false, TARGET: 'b' };
+      render(<DynamicFormBuilder fields={fields} values={values} onChange={onChange} />);
+
+      const toggle = screen.getByRole('checkbox', { name: /False/i });
+      await user.click(toggle);
+
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0];
+      expect(lastCall.ENABLE).toBe(true);
+      expect(lastCall.TARGET).toBe('a');
+    });
+
+    it('should render boolean field as a Switch toggle', () => {
+      const fields: ScenarioField[] = [
+        makeBooleanField('FLAG', 'My Flag'),
+      ];
+      render(<DynamicFormBuilder fields={fields} values={{}} onChange={vi.fn()} />);
+
+      expect(screen.getByRole('checkbox', { name: /False/i })).toBeInTheDocument();
       expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     });
   });

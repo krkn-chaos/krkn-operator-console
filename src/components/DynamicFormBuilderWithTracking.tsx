@@ -6,8 +6,8 @@ import {
   TextInput,
   FormSelect,
   FormSelectOption,
-  Checkbox,
   FileUpload,
+  Switch,
   FormHelperText,
   HelperText,
   HelperTextItem,
@@ -15,7 +15,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
-import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField } from '../types/api';
+import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField, EnumField } from '../types/api';
 
 interface DynamicFormBuilderWithTrackingProps {
   fields: ScenarioField[];
@@ -30,10 +30,36 @@ export function DynamicFormBuilderWithTracking({
   values,
   touchedFields,
   onChange,
-  disabledFields = [],
+  disabledFields: externalDisabledFields = [],
 }: DynamicFormBuilderWithTrackingProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const validationTimeouts = useRef<{ [key: string]: number }>({});
+
+  const disabledFields = useMemo(() => {
+    const disabled = new Set<string>(externalDisabledFields);
+    for (const field of fields) {
+      if (field.mutually_excludes && field.type === 'enum') {
+        const enumField = field as EnumField;
+        const opts = enumField.allowed_values
+          .split(enumField.separator)
+          .map((o) => o.trim())
+          .sort();
+        if (opts.length === 2 && opts[0] === 'false' && opts[1] === 'true') {
+          const currentValue = values[field.variable] ?? field.default ?? '';
+          if (currentValue === 'true' || currentValue === true) {
+            disabled.add(field.mutually_excludes);
+          }
+        }
+      }
+      if (field.mutually_excludes && field.type === 'boolean') {
+        const currentValue = values[field.variable] ?? field.default ?? '';
+        if (currentValue === 'true' || currentValue === true) {
+          disabled.add(field.mutually_excludes);
+        }
+      }
+    }
+    return disabled;
+  }, [fields, values, externalDisabledFields]);
 
   /**
    * Safe regex test with timeout protection
@@ -84,6 +110,15 @@ export function DynamicFormBuilderWithTracking({
   const handleChange = (variable: string, value: string | number | boolean | File) => {
     const newValues = { ...values, [variable]: value };
     const newTouchedFields = { ...touchedFields, [variable]: true };
+
+    const changedField = fields.find(f => f.variable === variable);
+    if (changedField?.mutually_excludes && (value === 'true' || value === true)) {
+      const excludedField = fields.find(f => f.variable === changedField.mutually_excludes);
+      if (excludedField) {
+        newValues[changedField.mutually_excludes] = excludedField.default ?? '';
+      }
+    }
+
     onChange(newValues, newTouchedFields);
 
     // Clear existing validation timeout for this field
@@ -128,7 +163,7 @@ export function DynamicFormBuilderWithTracking({
     return members;
   }, [fields]);
 
-  const renderField = (field: ScenarioField) => {
+  const renderField = (field: ScenarioField, isFieldDisabled: boolean = false) => {
     const value = values[field.variable] ?? field.default ?? '';
     const error = errors[field.variable];
     const validated = error ? 'error' : 'default';
@@ -136,7 +171,7 @@ export function DynamicFormBuilderWithTracking({
     switch (field.type) {
       case 'string': {
         const stringField = field as StringField;
-        const isDisabled = disabledFields.includes(field.variable);
+        const isDisabled = disabledFields.has(field.variable);
         return (
           <FormGroup
             key={field.variable}
@@ -152,7 +187,7 @@ export function DynamicFormBuilderWithTracking({
               validated={validated}
               placeholder={field.default}
               autoComplete={field.secret ? 'off' : undefined}
-              isDisabled={isDisabled}
+              isDisabled={isFieldDisabled}
             />
             {field.description && (
               <FormHelperText>
@@ -198,6 +233,7 @@ export function DynamicFormBuilderWithTracking({
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
               placeholder={field.default}
+              isDisabled={isFieldDisabled}
             />
             {field.description && (
               <FormHelperText>
@@ -219,7 +255,60 @@ export function DynamicFormBuilderWithTracking({
         );
 
       case 'enum': {
-        const options = (field.allowed_values ?? '').split(field.separator ?? ',').map((opt) => opt.trim()).filter(Boolean);
+        const enumField = field as EnumField;
+
+        if (!enumField.allowed_values || !enumField.separator) {
+          return (
+            <FormGroup
+              key={field.variable}
+              label={field.short_description}
+              isRequired={field.required}
+              fieldId={field.variable}
+            >
+              <TextInput
+                id={field.variable}
+                value={value as string}
+                onChange={(_event, val) => handleChange(field.variable, val)}
+                placeholder="Error: enum configuration missing"
+                isDisabled
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant="error">
+                    Enum field is misconfigured (missing allowed_values or separator)
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+          );
+        }
+
+        const options = enumField.allowed_values.split(enumField.separator).map((opt: string) => opt.trim());
+        const sortedOpts = [...options].sort();
+        const isBooleanEnum = sortedOpts.length === 2 && sortedOpts[0] === 'false' && sortedOpts[1] === 'true';
+
+        if (isBooleanEnum) {
+          return (
+            <FormGroup key={field.variable} label={field.short_description} fieldId={field.variable}>
+              <Switch
+                id={field.variable}
+                label="True"
+                labelOff="False"
+                isChecked={value === 'true' || value === true}
+                onChange={(_event, checked) => handleChange(field.variable, checked ? 'true' : 'false')}
+                isDisabled={isFieldDisabled}
+              />
+              {field.description && (
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>{field.description}</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
+            </FormGroup>
+          );
+        }
+
         return (
           <FormGroup
             key={field.variable}
@@ -232,9 +321,10 @@ export function DynamicFormBuilderWithTracking({
               value={value as string}
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
+              isDisabled={isFieldDisabled}
             >
               {!field.required && <FormSelectOption key="empty" value="" label="Select an option" />}
-              {options.map((option) => (
+              {options.map((option: string) => (
                 <FormSelectOption key={option} value={option} label={option} />
               ))}
             </FormSelect>
@@ -260,14 +350,22 @@ export function DynamicFormBuilderWithTracking({
 
       case 'boolean':
         return (
-          <FormGroup key={field.variable} fieldId={field.variable}>
-            <Checkbox
+          <FormGroup key={field.variable} label={field.short_description} fieldId={field.variable}>
+            <Switch
               id={field.variable}
-              label={field.short_description}
-              description={field.description}
+              label="True"
+              labelOff="False"
               isChecked={value === true || value === 'true'}
               onChange={(_event, checked) => handleChange(field.variable, checked)}
+              isDisabled={isFieldDisabled}
             />
+            {field.description && (
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>{field.description}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            )}
           </FormGroup>
         );
 
@@ -286,6 +384,7 @@ export function DynamicFormBuilderWithTracking({
               filename={(value as File)?.name || ''}
               onFileInputChange={(_event, file: File) => handleChange(field.variable, file)}
               validated={validated}
+              isDisabled={isFieldDisabled}
             />
             {field.description && (
               <FormHelperText>
@@ -322,6 +421,7 @@ export function DynamicFormBuilderWithTracking({
               key={groupKey}
               groupField={field}
               members={members}
+              disabledFields={disabledFields}
               renderField={renderField}
             />
           );
@@ -329,7 +429,7 @@ export function DynamicFormBuilderWithTracking({
         if (field.group) {
           return null;
         }
-        return renderField(field);
+        return renderField(field, disabledFields.has(field.variable));
       })}
     </Form>
   );
@@ -340,11 +440,13 @@ const GROUP_CONTAINER_HEIGHT = 400;
 function ScrollableFieldGroupWithTracking({
   groupField,
   members,
+  disabledFields,
   renderField,
 }: {
   groupField: ScenarioField;
   members: ScenarioField[];
-  renderField: (field: ScenarioField) => ReactNode;
+  disabledFields: Set<string>;
+  renderField: (field: ScenarioField, isDisabled: boolean) => ReactNode;
 }) {
   const [search, setSearch] = useState('');
 
@@ -392,7 +494,7 @@ function ScrollableFieldGroupWithTracking({
         />
         <div style={{ maxHeight: `${GROUP_CONTAINER_HEIGHT}px`, overflowY: 'auto' }}>
           {filtered.length > 0 ? (
-            filtered.map((m) => renderField(m))
+            filtered.map((m) => renderField(m, disabledFields.has(m.variable)))
           ) : (
             <FormHelperText>
               <HelperText>
