@@ -35,6 +35,9 @@ import {
   DropdownList,
   DropdownItem,
   TextInput,
+  Pagination,
+  PaginationVariant,
+  Spinner,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -56,11 +59,11 @@ import { JobStatsSummary } from './JobStatsSummary';
 import { FileManagementModal } from './FileManagement';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
+import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunState, GraphRunSummary, GraphClusterScore } from '../types/api';
+import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
 
-// Unified run item type - can be either a GraphRun or a standalone ScenarioRun
 export type UnifiedRunItem =
   | {
       type: 'graph';
@@ -76,8 +79,52 @@ export type UnifiedRunItem =
     }
   | { type: 'scenario'; run: ScenarioRunState };
 
+function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem | null {
+  if (item.type === 'graphRun' && item.graphRun) {
+    const gr = item.graphRun;
+    let phase: ScenarioRunPhase = 'Pending';
+    if (gr.phase === 'Completed') phase = 'Succeeded';
+    else if (gr.phase === 'Running' || gr.phase === 'Failed' || gr.phase === 'PartiallyFailed' || gr.phase === 'Pending') {
+      phase = gr.phase;
+    }
+    return {
+      type: 'graph',
+      graphRunName: gr.name,
+      nodes: [],
+      phase,
+      createdAt: gr.creationTimestamp,
+      ownerUserId: gr.ownerUserId,
+      summary: gr.summary,
+      resiliencyScoreEnabled: gr.resiliencyScoreEnabled,
+      resiliencyScoreBaseline: gr.resiliencyScoreBaseline,
+      resiliencyScores: gr.resiliencyScores,
+    };
+  }
+  if (item.type === 'scenarioRun' && item.scenarioRun) {
+    const sr = item.scenarioRun;
+    return {
+      type: 'scenario',
+      run: {
+        scenarioRunName: sr.scenarioRunName,
+        scenarioName: sr.scenarioName || '',
+        phase: sr.phase,
+        totalTargets: sr.totalTargets,
+        successfulJobs: sr.successfulJobs,
+        failedJobs: sr.failedJobs,
+        runningJobs: sr.runningJobs,
+        clusterJobs: sr.clusterJobs,
+        createdAt: item.createdAt,
+        ownerUserId: sr.ownerUserId,
+        registryName: sr.registryName,
+        graphRunName: sr.graphRunName,
+        customRunName: sr.customRunName,
+      },
+    };
+  }
+  return null;
+}
+
 interface JobsListProps {
-  scenarioRuns: ScenarioRunState[];
   expandedRunIds: Set<string>;
   expandedJobIds: Set<string>;
   onToggleRunAccordion: (scenarioRunName: string) => void;
@@ -87,15 +134,12 @@ interface JobsListProps {
   onCreateJob: () => void;
   onNavigateToStudio: () => void;
   onRerunScenario: (run: ScenarioRunState, jobId: string) => void;
-  // GraphRuns props
-  graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
 }
 
 export function JobsList({
-  scenarioRuns,
   expandedRunIds,
   expandedJobIds,
   onToggleRunAccordion,
@@ -105,13 +149,13 @@ export function JobsList({
   onCreateJob,
   onNavigateToStudio,
   onRerunScenario,
-  graphRuns: _graphRuns, // Not used - GraphRuns are derived from scenarioRuns
   expandedGraphRunIds,
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
 }: JobsListProps) {
   const { isAdmin } = useRole();
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
+  const { jobs, pagination, page, setPage, limit, setLimit, isLoading } = useJobs();
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -121,9 +165,6 @@ export function JobsList({
   const [dateTimeTo, setDateTimeTo] = useState<Date | undefined>();
   const [timeRangeError, setTimeRangeError] = useState('');
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
-  const [sortField, setSortField] = useState<'date' | 'runName'>('date');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [isSortSelectOpen, setIsSortSelectOpen] = useState(false);
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
   const [isFileManagementOpen, setIsFileManagementOpen] = useState(false);
@@ -300,165 +341,47 @@ export function JobsList({
     }
   };
 
-  // Get unique owner user IDs for autocomplete
-  const uniqueOwners = Array.from(
-    new Set(scenarioRuns.map((run) => run.ownerUserId).filter((id): id is string => !!id))
-  ).sort();
-
-  // Filter scenario runs by owner and date range only (run-name filter is applied after graph aggregation)
-  const filteredScenarioRuns = scenarioRuns.filter((run) => {
-    // Owner filter (exact match)
-    if (ownerFilter && run.ownerUserId !== ownerFilter) {
-      return false;
-    }
-
-    // Date range filter
-    if (isValidDate(dateTimeFrom) || isValidDate(dateTimeTo)) {
-      const runDate = new Date(run.createdAt);
-
-      // Guard: exclude runs with invalid/empty createdAt when a date filter is active
-      if (isNaN(runDate.getTime())) return false;
-
-      if (isValidDate(dateTimeFrom) && runDate < dateTimeFrom!) return false;
-      if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return false;
-    }
-
-    return true;
-  });
-
-  // Group scenario runs into unified items (GraphRuns + standalone ScenarioRuns)
+  // Map API items → internal rendering items (server handles merging/sorting/pagination)
   const unifiedRuns = useMemo((): UnifiedRunItem[] => {
-    const graphRunsMap = new Map<string, ScenarioRunState[]>();
-    const standaloneRuns: ScenarioRunState[] = [];
+    return jobs.map(toUnifiedRunItem).filter((item): item is UnifiedRunItem => item !== null);
+  }, [jobs]);
 
-    // Group by graphRunName
-    filteredScenarioRuns.forEach((run) => {
-      if (run.graphRunName) {
-        const nodes = graphRunsMap.get(run.graphRunName) || [];
-        nodes.push(run);
-        graphRunsMap.set(run.graphRunName, nodes);
-      } else {
-        standaloneRuns.push(run);
-      }
-    });
+  // Get unique owner user IDs from current page for autocomplete
+  const uniqueOwners = useMemo(() => {
+    return Array.from(
+      new Set(
+        unifiedRuns.map((item) =>
+          item.type === 'graph' ? item.ownerUserId : item.run.ownerUserId
+        ).filter((id): id is string => !!id)
+      )
+    ).sort();
+  }, [unifiedRuns]);
 
-    // Build unified items
-    const items: UnifiedRunItem[] = [];
-
-    // Add GraphRuns from state (even if no nodes yet - WebSocket sends GraphRun before nodes)
-    _graphRuns.forEach((graphRunState) => {
-      const nodes = graphRunsMap.get(graphRunState.name) || [];
-
-      // Remove from map so we don't add it twice
-      graphRunsMap.delete(graphRunState.name);
-
-      // Apply the same date filter to graph runs
-      if (isValidDate(dateTimeFrom) || isValidDate(dateTimeTo)) {
-        const runDate = new Date(graphRunState.creationTimestamp);
-        if (isNaN(runDate.getTime())) return;
-        if (isValidDate(dateTimeFrom) && runDate < dateTimeFrom!) return;
-        if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return;
-      }
-
-      // Map GraphRun phase ('Completed') to ScenarioRun phase ('Succeeded')
-      let phase: ScenarioRunPhase = 'Pending';
-      if (graphRunState.phase === 'Completed') {
-        phase = 'Succeeded';
-      } else if (graphRunState.phase === 'Pending' || graphRunState.phase === 'Running' ||
-        graphRunState.phase === 'Failed' || graphRunState.phase === 'PartiallyFailed') {
-        phase = graphRunState.phase;
-      }
-
-      items.push({
-        type: 'graph',
-        graphRunName: graphRunState.name,
-        nodes,
-        phase,
-        createdAt: graphRunState.creationTimestamp,
-        ownerUserId: graphRunState.ownerUserId,
-        summary: graphRunState.summary,
-        resiliencyScoreEnabled: graphRunState.resiliencyScoreEnabled,
-        resiliencyScoreBaseline: graphRunState.resiliencyScoreBaseline,
-        resiliencyScores: graphRunState.resiliencyScores,
-      });
-    });
-
-    // Add orphaned GraphRuns (nodes without GraphRunState - shouldn't happen with WebSocket)
-    graphRunsMap.forEach((nodes, graphRunName) => {
-      const hasFailed = nodes.some((n) => n.phase === 'Failed');
-      const hasPartiallyFailed = nodes.some((n) => n.phase === 'PartiallyFailed');
-      const hasRunning = nodes.some((n) => n.phase === 'Running');
-      const allSucceeded = nodes.every((n) => n.phase === 'Succeeded');
-
-      let phase: ScenarioRunPhase = 'Pending';
-      if (hasFailed || hasPartiallyFailed) {
-        phase = 'Failed';
-      } else if (allSucceeded) {
-        phase = 'Succeeded';
-      } else if (hasRunning) {
-        phase = 'Running';
-      }
-
-      const createdAt = nodes.reduce((earliest, node) =>
-        node.createdAt < earliest ? node.createdAt : earliest
-        , nodes[0].createdAt);
-
-      const summary = {
-        totalNodes: nodes.length,
-        completedNodes: nodes.filter(n => n.phase === 'Succeeded').length,
-        runningNodes: nodes.filter(n => n.phase === 'Running').length,
-        failedNodes: nodes.filter(n => n.phase === 'Failed').length,
-        pendingNodes: nodes.filter(n => n.phase === 'Pending').length,
-      };
-
-      items.push({
-        type: 'graph',
-        graphRunName,
-        nodes,
-        phase,
-        createdAt,
-        ownerUserId: nodes[0].ownerUserId,
-        summary,
-      });
-    });
-
-    // Add standalone ScenarioRuns
-    standaloneRuns.forEach((run) => {
-      items.push({ type: 'scenario', run });
-    });
-
-    // Sort by selected field
-    return items.sort((a, b) => {
-      let cmp = 0;
-      if (sortField === 'runName') {
-        const aName = a.type === 'graph'
-          ? a.graphRunName
-          : (a.run.customRunName || a.run.scenarioRunName);
-        const bName = b.type === 'graph'
-          ? b.graphRunName
-          : (b.run.customRunName || b.run.scenarioRunName);
-        cmp = aName.localeCompare(bName);
-      } else {
-        const aDate = a.type === 'graph' ? a.createdAt : a.run.createdAt;
-        const bDate = b.type === 'graph' ? b.createdAt : b.run.createdAt;
-        cmp = (Date.parse(aDate) || 0) - (Date.parse(bDate) || 0);
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [filteredScenarioRuns, _graphRuns, sortField, sortDir, dateTimeFrom, dateTimeTo]);
-
-  // Apply run-name filter to the aggregated list so graph items are matched by graphRunName
-  // and filtering never strips individual nodes from an otherwise-matching graph.
+  // Client-side filtering on current page
   const filteredUnifiedRuns = useMemo((): UnifiedRunItem[] => {
-    if (!customRunNameFilter) return unifiedRuns;
-    const needle = customRunNameFilter.toLowerCase();
     return unifiedRuns.filter((item) => {
-      const haystacks = item.type === 'graph'
-        ? [item.graphRunName.toLowerCase()]
-        : [item.run.scenarioRunName.toLowerCase(), ...(item.run.customRunName ? [item.run.customRunName.toLowerCase()] : [])];
-      return haystacks.some((h) => h.includes(needle));
+      const owner = item.type === 'graph' ? item.ownerUserId : item.run.ownerUserId;
+      if (ownerFilter && owner !== ownerFilter) return false;
+
+      if (isValidDate(dateTimeFrom) || isValidDate(dateTimeTo)) {
+        const dateStr = item.type === 'graph' ? item.createdAt : item.run.createdAt;
+        const runDate = new Date(dateStr);
+        if (isNaN(runDate.getTime())) return false;
+        if (isValidDate(dateTimeFrom) && runDate < dateTimeFrom!) return false;
+        if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return false;
+      }
+
+      if (customRunNameFilter) {
+        const needle = customRunNameFilter.toLowerCase();
+        const haystacks = item.type === 'graph'
+          ? [item.graphRunName.toLowerCase()]
+          : [item.run.scenarioRunName.toLowerCase(), ...(item.run.customRunName ? [item.run.customRunName.toLowerCase()] : [])];
+        if (!haystacks.some((h) => h.includes(needle))) return false;
+      }
+
+      return true;
     });
-  }, [unifiedRuns, customRunNameFilter]);
+  }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter]);
 
   return (
     <Card>
@@ -542,7 +465,7 @@ export function JobsList({
         />
 
         {/* Filters Box */}
-        {scenarioRuns.length > 0 && (
+        {jobs.length > 0 && (
           <Card
             isCompact
             style={{
@@ -576,47 +499,6 @@ export function JobsList({
                     aria-label="Filter by run name"
                     style={{ width: '222px' }}
                   />
-                </div>
-
-                {/* Sort Controls */}
-                <div>
-                  <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
-                    Sort by:
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <Select
-                      isOpen={isSortSelectOpen}
-                      onOpenChange={(isOpen) => setIsSortSelectOpen(isOpen)}
-                      onSelect={(_event, value) => {
-                        setSortField(value as 'date' | 'runName');
-                        setIsSortSelectOpen(false);
-                      }}
-                      toggle={(toggleRef) => (
-                        <MenuToggle
-                          ref={toggleRef}
-                          onClick={() => setIsSortSelectOpen(!isSortSelectOpen)}
-                          isExpanded={isSortSelectOpen}
-                          style={{ width: '130px' }}
-                          className="custom-select-toggle"
-                        >
-                          {sortField === 'date' ? 'Date' : 'Run Name'}
-                        </MenuToggle>
-                      )}
-                    >
-                      <SelectList>
-                        <SelectOption value="date">Date</SelectOption>
-                        <SelectOption value="runName">Run Name</SelectOption>
-                      </SelectList>
-                    </Select>
-                    <Button
-                      variant="plain"
-                      aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
-                      onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-                      style={{ padding: '0.375rem 0.5rem' }}
-                    >
-                      {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
-                    </Button>
-                  </div>
                 </div>
 
                 {/* Owner Filter - Search with Autocomplete (Admin Only) */}
@@ -668,7 +550,7 @@ export function JobsList({
                 )}
 
                 {/* Date From Filter */}
-                {scenarioRuns.length > 0 && (
+                {jobs.length > 0 && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       From:
@@ -700,7 +582,7 @@ export function JobsList({
                 )}
 
                 {/* Date To Filter */}
-                {scenarioRuns.length > 0 && (
+                {jobs.length > 0 && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       To:
@@ -763,7 +645,15 @@ export function JobsList({
           </Card>
         )}
 
-        {filteredUnifiedRuns.length === 0 && scenarioRuns.length > 0 ? (
+        {isLoading && jobs.length === 0 ? (
+          <EmptyState>
+            <EmptyStateIcon icon={Spinner} />
+            <Title headingLevel="h2" size="lg">
+              Loading Jobs
+            </Title>
+            <EmptyStateBody>Fetching scenario runs...</EmptyStateBody>
+          </EmptyState>
+        ) : filteredUnifiedRuns.length === 0 && jobs.length > 0 ? (
           <EmptyState>
             <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
@@ -773,7 +663,7 @@ export function JobsList({
               No scenario runs match the current filter. Try clearing the filter.
             </EmptyStateBody>
           </EmptyState>
-        ) : scenarioRuns.length === 0 ? (
+        ) : jobs.length === 0 ? (
           <EmptyState>
             <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
@@ -1340,6 +1230,22 @@ export function JobsList({
               );
             })}
           </DataList>
+          {pagination.totalPages > 1 && (
+            <Pagination
+              itemCount={pagination.total}
+              perPage={limit}
+              page={page}
+              onSetPage={(_evt, newPage) => setPage(newPage)}
+              onPerPageSelect={(_evt, newPerPage) => { setLimit(newPerPage); setPage(1); }}
+              variant={PaginationVariant.bottom}
+              perPageOptions={[
+                { title: '10', value: 10 },
+                { title: '20', value: 20 },
+                { title: '50', value: 50 },
+              ]}
+              style={{ marginTop: '1rem' }}
+            />
+          )}
           </>
         )}
       </CardBody>

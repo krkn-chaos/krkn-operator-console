@@ -205,7 +205,6 @@ function App() {
         return (
           <PageSection>
             <JobsList
-              scenarioRuns={state.scenarioRuns}
               expandedRunIds={state.expandedRunIds}
               expandedJobIds={state.expandedClusterJobs}
               onToggleRunAccordion={(scenarioRunName) =>
@@ -219,7 +218,6 @@ function App() {
               onCreateJob={handleCreateJob}
               onNavigateToStudio={handleNavigateToStudio}
               onRerunScenario={handleRerunScenario}
-              graphRuns={state.graphRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
               onToggleGraphRunAccordion={(graphRunName) =>
                 dispatch({ type: 'TOGGLE_GRAPH_RUN_ACCORDION', payload: { graphRunName } })

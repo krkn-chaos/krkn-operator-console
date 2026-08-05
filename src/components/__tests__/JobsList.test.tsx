@@ -1,6 +1,24 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GraphRunState, ScenarioRunState } from '../../types/api';
+import type { GraphRunListItem, PaginationMeta, UnifiedJobItem } from '../../types/api';
+
+const mockSetPage = vi.fn();
+const mockSetLimit = vi.fn();
+let mockJobs: UnifiedJobItem[] = [];
+let mockPagination: PaginationMeta = { page: 1, limit: 20, total: 0, totalPages: 0 };
+let mockIsLoading = false;
+
+vi.mock('../../hooks/useJobs', () => ({
+  useJobs: () => ({
+    jobs: mockJobs,
+    pagination: mockPagination,
+    page: mockPagination.page,
+    setPage: mockSetPage,
+    limit: mockPagination.limit,
+    setLimit: mockSetLimit,
+    isLoading: mockIsLoading,
+  }),
+}));
 
 vi.mock('../../hooks/useRole', () => ({
   useRole: () => ({ isAdmin: false, role: 'user' }),
@@ -34,21 +52,58 @@ vi.mock('react-icons/hi2', () => ({
 
 const { JobsList } = await import('../JobsList');
 
-const dummyScenarioRun: ScenarioRunState = {
-  scenarioRunName: 'dummy-run',
-  scenarioName: 'dummy',
-  phase: 'Succeeded' as const,
-  totalTargets: 1,
-  successfulJobs: 1,
-  failedJobs: 0,
-  runningJobs: 0,
-  clusterJobs: [],
+const makeGraphJobItem = (
+  name: string,
+  phase: GraphRunListItem['phase'] = 'Completed',
+  overrides: Partial<GraphRunListItem> = {},
+): UnifiedJobItem => ({
+  type: 'graphRun',
+  name,
+  createdAt: overrides.creationTimestamp || '2026-07-02T08:00:00Z',
+  graphRun: {
+    name,
+    namespace: 'krkn-operator-system',
+    creationTimestamp: '2026-07-02T08:00:00Z',
+    phase,
+    ownerUserId: 'admin@test.com',
+    targetRequestId: 'target-001',
+    summary: { totalNodes: 3, completedNodes: 3, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+    resiliencyScoreEnabled: true,
+    resiliencyScoreBaseline: 80.0,
+    resiliencyScores: [
+      { clusterName: 'cluster1', calculated: 87.5, baseline: 80.0, status: 'pass' as const, message: 'Meets baseline', nodeContributions: {} },
+    ],
+    ...overrides,
+  },
+});
+
+const makeScenarioJobItem = (
+  name: string,
+  overrides: Partial<UnifiedJobItem> = {},
+): UnifiedJobItem => ({
+  type: 'scenarioRun',
+  name,
   createdAt: '2026-06-01T00:00:00Z',
-  ownerUserId: 'system@test.com',
-};
+  scenarioRun: {
+    scenarioRunName: name,
+    scenarioName: 'dummy',
+    phase: 'Succeeded',
+    totalTargets: 1,
+    successfulJobs: 1,
+    failedJobs: 0,
+    runningJobs: 0,
+    clusterJobs: [],
+    ownerUserId: 'system@test.com',
+  },
+  ...overrides,
+});
+
+function setMockJobs(items: UnifiedJobItem[]) {
+  mockJobs = items;
+  mockPagination = { page: 1, limit: 20, total: items.length, totalPages: 1 };
+}
 
 const defaultProps = () => ({
-  scenarioRuns: [dummyScenarioRun] as ScenarioRunState[],
   expandedRunIds: new Set<string>(),
   expandedJobIds: new Set<string>(),
   onToggleRunAccordion: vi.fn(),
@@ -57,38 +112,23 @@ const defaultProps = () => ({
   onDeleteJob: vi.fn().mockResolvedValue(undefined),
   onCreateJob: vi.fn(),
   onNavigateToStudio: vi.fn(),
-  graphRuns: [] as GraphRunState[],
   expandedGraphRunIds: new Set<string>(),
   onToggleGraphRunAccordion: vi.fn(),
   onDeleteGraphRun: vi.fn().mockResolvedValue(undefined),
   onRerunScenario: vi.fn(),
 });
 
-const makeGraphRunState = (overrides?: Partial<GraphRunState>): GraphRunState => ({
-  name: 'test-graph-run',
-  namespace: 'krkn-operator-system',
-  creationTimestamp: '2026-07-02T08:00:00Z',
-  phase: 'Completed',
-  ownerUserId: 'admin@test.com',
-  targetRequestId: 'target-001',
-  summary: { totalNodes: 3, completedNodes: 3, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
-  resiliencyScoreEnabled: true,
-  resiliencyScoreBaseline: 80.0,
-  resiliencyScores: [
-    { clusterName: 'cluster1', calculated: 87.5, baseline: 80.0, status: 'pass' as const, message: 'Meets baseline', nodeContributions: {} },
-  ],
-  ...overrides,
-});
-
 describe('JobsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockJobs = [];
+    mockPagination = { page: 1, limit: 20, total: 0, totalPages: 0 };
+    mockIsLoading = false;
   });
 
   describe('Empty State', () => {
     it('should show empty state when no runs', () => {
       const props = defaultProps();
-      props.scenarioRuns = [];
       render(<JobsList {...props} />);
       expect(screen.getByText('No Scenario Runs')).toBeInTheDocument();
     });
@@ -96,40 +136,34 @@ describe('JobsList', () => {
 
   describe('GraphRun Rendering', () => {
     it('should render graph run workflow name', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('test-graph-run')).toBeInTheDocument();
     });
 
     it('should show owner', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('admin@test.com')).toBeInTheDocument();
     });
 
     it('should show node count', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('3 / 3')).toBeInTheDocument();
     });
 
     it('should show Succeeded phase label for Completed graph run', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run', 'Completed')]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getAllByText('Succeeded').length).toBeGreaterThanOrEqual(1);
     });
 
     it('should show Running phase for running graph run', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState({
-        phase: 'Running',
+      setMockJobs([makeGraphJobItem('test-graph-run', 'Running', {
         summary: { totalNodes: 3, completedNodes: 1, runningNodes: 1, failedNodes: 0, pendingNodes: 1 },
-      })];
-      render(<JobsList {...props} />);
+      })]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('Running')).toBeInTheDocument();
       expect(screen.getByText('1 / 3')).toBeInTheDocument();
     });
@@ -137,45 +171,40 @@ describe('JobsList', () => {
 
   describe('Resiliency Score Display', () => {
     it('should show score when enabled with single cluster', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('87.5')).toBeInTheDocument();
     });
 
     it('should show avg label for multi-cluster scores', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState({
+      setMockJobs([makeGraphJobItem('test-graph-run', 'Completed', {
         resiliencyScores: [
           { clusterName: 'cluster-a', calculated: 90.0, baseline: 80.0, status: 'pass' as const, message: '', nodeContributions: {} },
           { clusterName: 'cluster-b', calculated: 75.0, baseline: 80.0, status: 'fail' as const, message: '', nodeContributions: {} },
         ],
-      })];
-      render(<JobsList {...props} />);
+      })]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText(/\(avg\)/)).toBeInTheDocument();
     });
 
     it('should show Calculating when scores have sentinel value -1', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState({
-        phase: 'Running',
+      setMockJobs([makeGraphJobItem('test-graph-run', 'Running', {
         resiliencyScores: [
           { clusterName: 'cluster-a', calculated: -1, baseline: 80.0, status: 'pass' as const, message: '' },
         ],
         summary: { totalNodes: 3, completedNodes: 0, runningNodes: 1, failedNodes: 0, pendingNodes: 2 },
-      })];
-      render(<JobsList {...props} />);
+      })]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('Calculating...')).toBeInTheDocument();
     });
 
     it('should show N/A when resiliency not enabled', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState({
+      setMockJobs([makeGraphJobItem('test-graph-run', 'Completed', {
         resiliencyScoreEnabled: false,
         resiliencyScores: undefined,
         resiliencyScoreBaseline: undefined,
-      })];
-      render(<JobsList {...props} />);
+      })]);
+      render(<JobsList {...defaultProps()} />);
       const naElements = screen.getAllByText('N/A');
       expect(naElements.length).toBeGreaterThan(0);
     });
@@ -183,9 +212,8 @@ describe('JobsList', () => {
 
   describe('Delete Confirmation', () => {
     it('should show confirmation modal when delete clicked', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
+      render(<JobsList {...defaultProps()} />);
       const deleteBtn = screen.getByLabelText('Delete graph run');
       fireEvent.click(deleteBtn);
       expect(screen.getByText('Delete Graph Run')).toBeInTheDocument();
@@ -193,8 +221,8 @@ describe('JobsList', () => {
     });
 
     it('should call onDeleteGraphRun on confirm', async () => {
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
       const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
       render(<JobsList {...props} />);
       fireEvent.click(screen.getByLabelText('Delete graph run'));
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
@@ -204,9 +232,8 @@ describe('JobsList', () => {
     });
 
     it('should close modal on cancel', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
+      render(<JobsList {...defaultProps()} />);
       fireEvent.click(screen.getByLabelText('Delete graph run'));
       expect(screen.getByText('Delete Graph Run')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -216,8 +243,8 @@ describe('JobsList', () => {
 
   describe('Expand/Collapse', () => {
     it('should call onToggleGraphRunAccordion when toggle clicked', () => {
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
       const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
       render(<JobsList {...props} />);
       const toggle = document.getElementById('toggle-graph-test-graph-run');
       expect(toggle).toBeTruthy();
@@ -226,38 +253,39 @@ describe('JobsList', () => {
     });
 
     it('should render GraphRunDetail when expanded', () => {
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
       const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
       props.expandedGraphRunIds = new Set(['test-graph-run']);
       render(<JobsList {...props} />);
       expect(screen.getByTestId('graph-detail-test-graph-run')).toBeInTheDocument();
     });
 
     it('should not render GraphRunDetail when collapsed', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      render(<JobsList {...props} />);
+      setMockJobs([makeGraphJobItem('test-graph-run')]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.queryByTestId('graph-detail-test-graph-run')).not.toBeInTheDocument();
     });
   });
 
   describe('Mixed Runs', () => {
     it('should show both graph runs and standalone scenario runs', () => {
-      const props = defaultProps();
-      props.graphRuns = [makeGraphRunState()];
-      props.scenarioRuns = [{
-        scenarioRunName: 'standalone-run',
-        scenarioName: 'cpu-hog',
-        phase: 'Succeeded' as const,
-        totalTargets: 1,
-        successfulJobs: 1,
-        failedJobs: 0,
-        runningJobs: 0,
-        clusterJobs: [],
-        createdAt: '2026-07-01T08:00:00Z',
-        ownerUserId: 'user@test.com',
-      }];
-      render(<JobsList {...props} />);
+      setMockJobs([
+        makeGraphJobItem('test-graph-run'),
+        makeScenarioJobItem('standalone-run', {
+          scenarioRun: {
+            scenarioRunName: 'standalone-run',
+            scenarioName: 'cpu-hog',
+            phase: 'Succeeded',
+            totalTargets: 1,
+            successfulJobs: 1,
+            failedJobs: 0,
+            runningJobs: 0,
+            clusterJobs: [],
+            ownerUserId: 'user@test.com',
+          },
+        }),
+      ]);
+      render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('test-graph-run')).toBeInTheDocument();
       expect(screen.getByText('cpu-hog')).toBeInTheDocument();
     });
