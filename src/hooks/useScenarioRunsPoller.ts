@@ -6,6 +6,8 @@ import { websocketService } from '../services/websocketService';
 import type { ServerMessage } from '../types/websocket';
 import type { ScenarioRunState, ScenarioRunStatusResponse } from '../types/api';
 
+export const TERMINAL_PHASES = ['Succeeded', 'Failed', 'PartiallyFailed'];
+
 /**
  * Hook to receive real-time scenario run updates via WebSocket.
  * Initial list+details fetched once via REST on first connect.
@@ -131,6 +133,14 @@ export function useScenarioRunsPoller() {
         if (hasChanges(existing, updatedState)) {
           dispatch({ type: 'UPDATE_SCENARIO_RUN', payload: { run: updatedState } });
         }
+
+        // On terminal phase transition, force one final detail fetch for clusterJobs
+        const isTerminalTransition =
+          !TERMINAL_PHASES.includes(existing.phase) && TERMINAL_PHASES.includes(data.phase);
+        if (isTerminalTransition) {
+          fetchedDetailsRef.current.delete(runName);
+          fetchRunDetails(runName, updatedState);
+        }
       } else {
         dispatch({ type: 'ADD_SCENARIO_RUN', payload: { run: updatedState } });
       }
@@ -158,31 +168,9 @@ export function useScenarioRunsPoller() {
     }
   }, [connectionState, fetchInitialScenarioRuns]);
 
-  // Periodically re-fetch details for expanded runs that are still active.
-  // Keeps clusterJob phases up-to-date until the per-run detail WebSocket is implemented.
-  useEffect(() => {
-    if (connectionState !== 'connected') return;
-
-    const intervalId = setInterval(() => {
-      const expandedIds = state.expandedRunIds;
-      const runs = scenarioRunsRef.current;
-
-      for (const runName of expandedIds) {
-        const run = runs.find(r => r.scenarioRunName === runName);
-        if (!run) continue;
-        if (['Succeeded', 'Failed', 'PartiallyFailed'].includes(run.phase)) continue;
-
-        fetchedDetailsRef.current.delete(runName);
-        fetchRunDetails(runName, run);
-      }
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [connectionState, state.expandedRunIds, fetchRunDetails]);
-
 }
 
-function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
+export function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
   if (prev.phase !== next.phase) return true;
   if (prev.totalTargets !== next.totalTargets) return true;
   if (prev.runningJobs !== next.runningJobs) return true;
