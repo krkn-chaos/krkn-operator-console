@@ -24,10 +24,15 @@ import {
   MenuToggle,
   MenuToggleElement,
   SearchInput,
+  Label,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '@patternfly/react-core';
 import { FileCodeIcon, SortAmountDownIcon, CopyIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { useNotifications } from '../hooks';
+import { getScenarioCategory, ALL_CATEGORIES } from '../utils/scenarioCategory';
+import type { ScenarioCategoryKey } from '../utils/scenarioCategory';
 import type { ScenarioTag } from '../types/api';
 
 type SortOption = 'name-asc' | 'name-desc' | 'date-asc' | 'date-desc';
@@ -39,6 +44,21 @@ export function ScenariosList() {
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [copiedDigest, setCopiedDigest] = useState<string | null>(null);
+  // Category filter — empty set means "show all". Multi-select so users can
+  // narrow to one or several scenario types.
+  const [selectedCategories, setSelectedCategories] = useState<Set<ScenarioCategoryKey>>(() => new Set());
+
+  const toggleCategory = (key: ScenarioCategoryKey) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   if (!state.scenarios || state.scenarios.length === 0) {
     return (
@@ -115,11 +135,21 @@ export function ScenariosList() {
     }
   };
 
+  // Categories actually present in the current scenario list (so the filter
+  // never shows an empty/irrelevant category), in canonical display order.
+  const presentCategoryKeys = new Set(state.scenarios.map((s) => getScenarioCategory(s.name).key));
+  const availableCategories = ALL_CATEGORIES.filter((c) => presentCategoryKeys.has(c.key));
+
   // Filter and sort scenarios
   const filteredAndSortedScenarios = [...state.scenarios]
     .filter((scenario) => {
-      if (!searchValue) return true;
-      return scenario.name.toLowerCase().includes(searchValue.toLowerCase());
+      if (searchValue && !scenario.name.toLowerCase().includes(searchValue.toLowerCase())) {
+        return false;
+      }
+      if (selectedCategories.size > 0 && !selectedCategories.has(getScenarioCategory(scenario.name).key)) {
+        return false;
+      }
+      return true;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -199,6 +229,34 @@ export function ScenariosList() {
               </Dropdown>
             </ToolbarItem>
           </ToolbarContent>
+
+          {/* Category filter — narrow the list to one or more scenario types */}
+          {availableCategories.length > 1 && (
+            <ToolbarContent>
+              <ToolbarItem alignSelf="center" style={{ marginRight: '0.75rem', fontWeight: 'bold', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                Category:
+              </ToolbarItem>
+              <ToolbarItem>
+                <ToggleGroup aria-label="Filter scenarios by category">
+                  <ToggleGroupItem
+                    text="All"
+                    buttonId="category-all"
+                    isSelected={selectedCategories.size === 0}
+                    onChange={() => setSelectedCategories(new Set())}
+                  />
+                  {availableCategories.map((category) => (
+                    <ToggleGroupItem
+                      key={category.key}
+                      text={category.label}
+                      buttonId={`category-${category.key}`}
+                      isSelected={selectedCategories.has(category.key)}
+                      onChange={() => toggleCategory(category.key)}
+                    />
+                  ))}
+                </ToggleGroup>
+              </ToolbarItem>
+            </ToolbarContent>
+          )}
         </Toolbar>
 
         {filteredAndSortedScenarios.length === 0 ? (
@@ -208,13 +266,19 @@ export function ScenariosList() {
               No Scenarios Found
             </Title>
             <EmptyStateBody>
-              {searchValue
-                ? `No scenarios match "${searchValue}". Try a different search term.`
+              {searchValue || selectedCategories.size > 0
+                ? 'No scenarios match the current filters. Try adjusting the search or category filter.'
                 : 'No chaos scenarios were found in the registry.'}
             </EmptyStateBody>
-            {searchValue && (
-              <Button variant="link" onClick={() => setSearchValue('')}>
-                Clear search
+            {(searchValue || selectedCategories.size > 0) && (
+              <Button
+                variant="link"
+                onClick={() => {
+                  setSearchValue('');
+                  setSelectedCategories(new Set());
+                }}
+              >
+                Clear filters
               </Button>
             )}
           </EmptyState>
@@ -230,9 +294,19 @@ export function ScenariosList() {
                           <div style={{ marginBottom: '0.25rem' }}>
                             <strong>Scenario:</strong>
                           </div>
-                          <code style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
-                            {scenario.name}
-                          </code>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <code style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                              {scenario.name}
+                            </code>
+                            {(() => {
+                              const category = getScenarioCategory(scenario.name);
+                              return (
+                                <Label color={category.color} isCompact>
+                                  {category.label}
+                                </Label>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </DataListCell>,
                       <DataListCell key="digest" width={2}>
