@@ -12,18 +12,36 @@ import {
   TachometerAltIcon,
 } from '@patternfly/react-icons';
 import type { UnifiedRunItem } from './JobsList';
-import type { ClusterJob } from '../types/api';
 
 interface JobStatsSummaryProps {
   unifiedRuns: UnifiedRunItem[];
 }
 
-function collectClusterJobs(items: UnifiedRunItem[]): ClusterJob[] {
-  return items.flatMap(item =>
-    item.type === 'scenario'
-      ? item.run.clusterJobs
-      : item.nodes.flatMap(node => node.clusterJobs)
-  );
+interface JobCounts {
+  total: number;
+  succeeded: number;
+  failed: number;
+}
+
+function collectJobCounts(items: UnifiedRunItem[]): JobCounts {
+  let total = 0;
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const item of items) {
+    if (item.type === 'scenario') {
+      const jobs = item.run.clusterJobs;
+      total += jobs.length;
+      succeeded += jobs.filter(j => j.phase === 'Succeeded').length;
+      failed += jobs.filter(j => j.phase === 'Failed').length;
+    } else {
+      total += item.summary.totalNodes;
+      succeeded += item.summary.completedNodes;
+      failed += item.summary.failedNodes;
+    }
+  }
+
+  return { total, succeeded, failed };
 }
 
 const statCards = [
@@ -59,10 +77,7 @@ const statCards = [
 
 export function JobStatsSummary({ unifiedRuns }: JobStatsSummaryProps) {
   const stats = useMemo(() => {
-    const jobs = collectClusterJobs(unifiedRuns);
-    const total = jobs.length;
-    const succeeded = jobs.filter(j => j.phase === 'Succeeded').length;
-    const failed = jobs.filter(j => j.phase === 'Failed').length;
+    const { total, succeeded, failed } = collectJobCounts(unifiedRuns);
     const passRate = total > 0 ? ((succeeded / total) * 100).toFixed(1) + '%' : 'N/A';
     return { total, succeeded, failed, passRate };
   }, [unifiedRuns]);

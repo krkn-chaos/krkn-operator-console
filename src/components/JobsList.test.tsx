@@ -1,25 +1,10 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import type { ClusterJob, UnifiedJobItem, PaginationMeta, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
+import type { ClusterJob, UnifiedJobItem, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
+import { setMockJobs, setMockIsLoading, setMockPagination, resetJobsMock } from '../hooks/__mocks__/useJobs';
 
-const mockSetPage = vi.fn();
-const mockSetLimit = vi.fn();
-let mockJobs: UnifiedJobItem[] = [];
-let mockPagination: PaginationMeta = { page: 1, limit: 20, total: 0, totalPages: 0 };
-let mockIsLoading = false;
-
-vi.mock('../hooks/useJobs', () => ({
-  useJobs: () => ({
-    jobs: mockJobs,
-    pagination: mockPagination,
-    page: mockPagination.page,
-    setPage: mockSetPage,
-    limit: mockPagination.limit,
-    setLimit: mockSetLimit,
-    isLoading: mockIsLoading,
-  }),
-}));
+vi.mock('../hooks/useJobs');
 
 vi.mock('../hooks/useRole', () => ({
   useRole: () => ({ isAdmin: false, role: 'user' }),
@@ -122,17 +107,10 @@ function makeGraphJobItem(
   };
 }
 
-function setMockJobs(items: UnifiedJobItem[]) {
-  mockJobs = items;
-  mockPagination = { page: 1, limit: 20, total: items.length, totalPages: 1 };
-}
-
 describe('JobsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockJobs = [];
-    mockPagination = { page: 1, limit: 20, total: 0, totalPages: 0 };
-    mockIsLoading = false;
+    resetJobsMock();
   });
 
   it('shows empty state when no jobs', () => {
@@ -142,7 +120,7 @@ describe('JobsList', () => {
   });
 
   it('shows loading state when loading with no jobs', () => {
-    mockIsLoading = true;
+    setMockIsLoading(true);
     render(<JobsList {...defaultProps} />);
     expect(screen.getByText('Loading Jobs')).toBeInTheDocument();
   });
@@ -255,7 +233,7 @@ describe('JobsList - Re-run button', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIsLoading = false;
+    setMockIsLoading(false);
   });
 
   it('should not show Re-run button for a running job', () => {
@@ -323,7 +301,7 @@ describe('JobsList - Re-run button', () => {
 describe('JobsList - Date/Time Filter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIsLoading = false;
+    setMockIsLoading(false);
   });
 
   it('hides a scenario run whose createdAt is before the "from" date', async () => {
@@ -432,7 +410,7 @@ describe('JobsList - Date/Time Filter', () => {
 describe('JobsList - Pagination', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIsLoading = false;
+    setMockIsLoading(false);
   });
 
   it('does not show pagination when totalPages <= 1', () => {
@@ -442,8 +420,8 @@ describe('JobsList - Pagination', () => {
   });
 
   it('shows pagination when totalPages > 1', () => {
-    mockJobs = [makeScenarioJobItem('run-1', 'Succeeded')];
-    mockPagination = { page: 1, limit: 10, total: 25, totalPages: 3 };
+    setMockJobs([makeScenarioJobItem('run-1', 'Succeeded')]);
+    setMockPagination({ page: 1, limit: 10, total: 25, totalPages: 3 });
     render(<JobsList {...defaultProps} />);
     expect(screen.getByLabelText('Go to next page')).toBeInTheDocument();
   });

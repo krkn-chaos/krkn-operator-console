@@ -33,13 +33,20 @@ function makeScenarioItem(clusterJobPhases: ClusterJobPhase[]): UnifiedRunItem {
 }
 
 function makeGraphItem(nodeJobPhases: ClusterJobPhase[][]): UnifiedRunItem {
+  const allPhases = nodeJobPhases.flat();
   return {
     type: 'graph',
     graphRunName: 'graph-1',
     nodes: nodeJobPhases.map(phases => makeScenarioRun(phases)),
     phase: 'Succeeded',
     createdAt: '2026-01-01T00:00:00Z',
-    summary: { totalNodes: nodeJobPhases.length, completedNodes: 0, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+    summary: {
+      totalNodes: allPhases.length,
+      completedNodes: allPhases.filter(p => p === 'Succeeded').length,
+      runningNodes: allPhases.filter(p => p === 'Running').length,
+      failedNodes: allPhases.filter(p => p === 'Failed').length,
+      pendingNodes: allPhases.filter(p => p === 'Pending').length,
+    },
   };
 }
 

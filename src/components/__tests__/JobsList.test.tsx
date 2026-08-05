@@ -1,24 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GraphRunListItem, PaginationMeta, UnifiedJobItem } from '../../types/api';
+import type { GraphRunListItem, UnifiedJobItem } from '../../types/api';
+import { setMockJobs, resetJobsMock } from '../../hooks/__mocks__/useJobs';
 
-const mockSetPage = vi.fn();
-const mockSetLimit = vi.fn();
-let mockJobs: UnifiedJobItem[] = [];
-let mockPagination: PaginationMeta = { page: 1, limit: 20, total: 0, totalPages: 0 };
-let mockIsLoading = false;
-
-vi.mock('../../hooks/useJobs', () => ({
-  useJobs: () => ({
-    jobs: mockJobs,
-    pagination: mockPagination,
-    page: mockPagination.page,
-    setPage: mockSetPage,
-    limit: mockPagination.limit,
-    setLimit: mockSetLimit,
-    isLoading: mockIsLoading,
-  }),
-}));
+vi.mock('../../hooks/useJobs');
 
 vi.mock('../../hooks/useRole', () => ({
   useRole: () => ({ isAdmin: false, role: 'user' }),
@@ -98,11 +83,6 @@ const makeScenarioJobItem = (
   ...overrides,
 });
 
-function setMockJobs(items: UnifiedJobItem[]) {
-  mockJobs = items;
-  mockPagination = { page: 1, limit: 20, total: items.length, totalPages: 1 };
-}
-
 const defaultProps = () => ({
   expandedRunIds: new Set<string>(),
   expandedJobIds: new Set<string>(),
@@ -121,9 +101,7 @@ const defaultProps = () => ({
 describe('JobsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockJobs = [];
-    mockPagination = { page: 1, limit: 20, total: 0, totalPages: 0 };
-    mockIsLoading = false;
+    resetJobsMock();
   });
 
   describe('Empty State', () => {

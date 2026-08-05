@@ -79,29 +79,39 @@ export type UnifiedRunItem =
     }
   | { type: 'scenario'; run: ScenarioRunState };
 
-function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem | null {
-  if (item.type === 'graphRun' && item.graphRun) {
+function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
+  if (item.type === 'graphRun') {
     const gr = item.graphRun;
-    let phase: ScenarioRunPhase = 'Pending';
-    if (gr.phase === 'Completed') phase = 'Succeeded';
-    else if (gr.phase === 'Running' || gr.phase === 'Failed' || gr.phase === 'PartiallyFailed' || gr.phase === 'Pending') {
-      phase = gr.phase;
+    if (gr) {
+      let phase: ScenarioRunPhase = 'Pending';
+      if (gr.phase === 'Completed') phase = 'Succeeded';
+      else if (gr.phase === 'Running' || gr.phase === 'Failed' || gr.phase === 'PartiallyFailed' || gr.phase === 'Pending') {
+        phase = gr.phase;
+      }
+      return {
+        type: 'graph',
+        graphRunName: gr.name,
+        nodes: [],
+        phase,
+        createdAt: gr.creationTimestamp,
+        ownerUserId: gr.ownerUserId,
+        summary: gr.summary,
+        resiliencyScoreEnabled: gr.resiliencyScoreEnabled,
+        resiliencyScoreBaseline: gr.resiliencyScoreBaseline,
+        resiliencyScores: gr.resiliencyScores,
+      };
     }
     return {
       type: 'graph',
-      graphRunName: gr.name,
+      graphRunName: item.name,
       nodes: [],
-      phase,
-      createdAt: gr.creationTimestamp,
-      ownerUserId: gr.ownerUserId,
-      summary: gr.summary,
-      resiliencyScoreEnabled: gr.resiliencyScoreEnabled,
-      resiliencyScoreBaseline: gr.resiliencyScoreBaseline,
-      resiliencyScores: gr.resiliencyScores,
+      phase: 'Pending',
+      createdAt: item.createdAt,
+      summary: { totalNodes: 0, completedNodes: 0, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
     };
   }
-  if (item.type === 'scenarioRun' && item.scenarioRun) {
-    const sr = item.scenarioRun;
+  const sr = item.scenarioRun;
+  if (sr) {
     return {
       type: 'scenario',
       run: {
@@ -121,7 +131,20 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem | null {
       },
     };
   }
-  return null;
+  return {
+    type: 'scenario',
+    run: {
+      scenarioRunName: item.name,
+      scenarioName: '',
+      phase: 'Pending',
+      totalTargets: 0,
+      successfulJobs: 0,
+      failedJobs: 0,
+      runningJobs: 0,
+      clusterJobs: [],
+      createdAt: item.createdAt,
+    },
+  };
 }
 
 interface JobsListProps {
@@ -343,7 +366,7 @@ export function JobsList({
 
   // Map API items → internal rendering items (server handles merging/sorting/pagination)
   const unifiedRuns = useMemo((): UnifiedRunItem[] => {
-    return jobs.map(toUnifiedRunItem).filter((item): item is UnifiedRunItem => item !== null);
+    return jobs.map(toUnifiedRunItem);
   }, [jobs]);
 
   // Get unique owner user IDs from current page for autocomplete
