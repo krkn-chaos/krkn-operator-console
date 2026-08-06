@@ -90,10 +90,10 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
       }
       return {
         type: 'graph',
-        graphRunName: gr.name,
+        graphRunName: item.name,
         nodes: [],
         phase,
-        createdAt: gr.creationTimestamp,
+        createdAt: item.createdAt,
         ownerUserId: gr.ownerUserId,
         summary: gr.summary,
         resiliencyScoreEnabled: gr.resiliencyScoreEnabled,
@@ -585,7 +585,7 @@ export function JobsList({
                           onChange={onFromDateChange}
                           validators={[fromValidator]}
                           aria-label="Start date"
-                          placeholder="YYYY-MM-DD"
+                          placeholder="Start date"
                         />
                       </InputGroupItem>
                       <InputGroupItem>
@@ -619,7 +619,7 @@ export function JobsList({
                           rangeStart={dateTimeFrom}
                           validators={[toValidator]}
                           aria-label="End date"
-                          placeholder="YYYY-MM-DD"
+                          placeholder="End date"
                         />
                       </InputGroupItem>
                       <InputGroupItem>
