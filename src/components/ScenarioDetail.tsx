@@ -7,6 +7,7 @@ import {
   Button,
   Alert,
   Spinner,
+  Switch,
   Modal,
   ModalVariant,
   FormGroup,
@@ -72,6 +73,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
   const [customRunName, setCustomRunName] = useState('');
+  const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -293,6 +295,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         ownerUserId: statusResponse.ownerUserId,
         registryName: statusResponse.registryName,
         customRunName: statusResponse.customRunName || runRequest.customRunName,
+        resiliencyScoreEnabled: statusResponse.resiliencyScoreEnabled ?? enableResiliencyScore,
+        resiliencyScores: statusResponse.resiliencyScores,
       };
 
       // Dispatch creation event
@@ -443,6 +447,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
         customRunName: customRunName.trim() || undefined,
         elasticsearchConfigName: appliedEsConfigName || undefined,
+        resiliencyScoreEnabled: enableResiliencyScore || undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -807,6 +812,24 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               </FormGroup>
             </CardBody>
           </Card>
+
+          {/* Resiliency Score option */}
+          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+            <FormGroup label="Calculate Resiliency Score" fieldId="enable-resiliency-score">
+              <Switch
+                id="enable-resiliency-score"
+                label="Enabled"
+                labelOff="Disabled"
+                isChecked={enableResiliencyScore}
+                onChange={(_event, checked) => setEnableResiliencyScore(checked)}
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>Enable resiliency score calculation for this scenario run</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+          </div>
 
           {/* Run Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>

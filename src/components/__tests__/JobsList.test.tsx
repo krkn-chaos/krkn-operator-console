@@ -187,6 +187,45 @@ describe('JobsList', () => {
       const naElements = screen.getAllByText('N/A');
       expect(naElements.length).toBeGreaterThan(0);
     });
+
+    it('should show Calculating for standalone run with scoring enabled while running', () => {
+      setMockJobs([makeScenarioJobItem('running-with-score', {
+        scenarioRun: {
+          scenarioRunName: 'running-with-score',
+          scenarioName: 'network-chaos',
+          phase: 'Running',
+          totalTargets: 1,
+          successfulJobs: 0,
+          failedJobs: 0,
+          runningJobs: 1,
+          clusterJobs: [],
+          ownerUserId: 'admin@test.com',
+          resiliencyScoreEnabled: true,
+        },
+      })]);
+      render(<JobsList {...defaultProps()} />);
+      expect(screen.getByText('Calculating...')).toBeInTheDocument();
+    });
+
+    it('should show N/A for standalone run without scoring enabled while running', () => {
+      setMockJobs([makeScenarioJobItem('running-no-score', {
+        scenarioRun: {
+          scenarioRunName: 'running-no-score',
+          scenarioName: 'network-chaos',
+          phase: 'Running',
+          totalTargets: 1,
+          successfulJobs: 0,
+          failedJobs: 0,
+          runningJobs: 1,
+          clusterJobs: [],
+          ownerUserId: 'admin@test.com',
+        },
+      })]);
+      render(<JobsList {...defaultProps()} />);
+      const naElements = screen.getAllByText('N/A');
+      expect(naElements.length).toBeGreaterThan(0);
+    });
+
   });
 
   describe('Delete Confirmation', () => {

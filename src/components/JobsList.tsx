@@ -62,6 +62,8 @@ import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
+import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
+import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
 
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
 
@@ -129,6 +131,8 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
         registryName: sr.registryName,
         graphRunName: sr.graphRunName,
         customRunName: sr.customRunName,
+        resiliencyScoreEnabled: sr.resiliencyScoreEnabled,
+        resiliencyScores: sr.resiliencyScores,
       },
     };
   }
@@ -1002,6 +1006,22 @@ export function JobsList({
                                 <span style={{ fontSize: '1.25rem' }}>⟳</span> {run.runningJobs}
                               </span>
                             </div>
+                          </div>
+                        </DataListCell>,
+                        <DataListCell key="resiliency-score" width={2}>
+                          <div>
+                            <div style={{ marginBottom: '0.25rem' }}>
+                              <strong>Resiliency Score:</strong>
+                            </div>
+                            <ResiliencyScoreTooltip
+                              scores={
+                                run.resiliencyScores
+                                  ? toGraphClusterScores(run.resiliencyScores)
+                                  : run.resiliencyScoreEnabled && !TERMINAL_PHASES.includes(run.phase)
+                                    ? [{ clusterName: '', calculated: SCORE_CALCULATING, status: 'no-baseline' as const }]
+                                    : undefined
+                              }
+                            />
                           </div>
                         </DataListCell>,
                         <DataListCell key="created" width={2}>
