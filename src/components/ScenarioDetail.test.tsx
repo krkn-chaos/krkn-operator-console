@@ -907,7 +907,36 @@ describe('ScenarioDetail', () => {
       });
     });
 
-    it('should build correct scenario reference for private registry', async () => {
+
+    it('should include resiliencyScoreEnabled when the resiliency score switch is enabled', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      const resiliencySwitch = screen.getByRole('checkbox');
+      expect(resiliencySwitch).not.toBeChecked();
+      await user.click(resiliencySwitch);
+      expect(resiliencySwitch).toBeChecked();
+
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ resiliencyScoreEnabled: true })
+        );
+      });
+    });
+
+    it('should build correct scenario image for private registry', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
       vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);

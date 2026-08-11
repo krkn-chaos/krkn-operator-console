@@ -30,6 +30,8 @@ function makeRun(overrides: Partial<ScenarioRunStatusResponse> = {}): ScenarioRu
     failedJobs: 0,
     runningJobs: 1,
     clusterJobs: [],
+    resiliencyScoreEnabled: true,
+    resiliencyScores: [{ clusterName: 'cluster-1', score: 87.5 }],
     ...overrides,
   };
 }
@@ -190,6 +192,31 @@ describe('hasChanges', () => {
     const prev = makeRunState({ clusterJobs: [{ ...job, phase: 'Running' }] });
     const next = makeRunState({ clusterJobs: [{ ...job, phase: 'Succeeded' }] });
     expect(hasChanges(prev, next)).toBe(true);
+  });
+
+  it('detects resiliencyScores added', () => {
+    const prev = makeRunState({ resiliencyScores: undefined });
+    const next = makeRunState({ resiliencyScores: [{ clusterName: 'c1', score: 85 }] });
+    expect(hasChanges(prev, next)).toBe(true);
+  });
+
+  it('detects resiliencyScores value change (same length)', () => {
+    const prev = makeRunState({ resiliencyScores: [{ clusterName: 'c1', score: 70 }] });
+    const next = makeRunState({ resiliencyScores: [{ clusterName: 'c1', score: 85 }] });
+    expect(hasChanges(prev, next)).toBe(true);
+  });
+
+  it('returns false for identical resiliencyScores', () => {
+    const scores = [{ clusterName: 'c1', score: 85 }];
+    const prev = makeRunState({ resiliencyScores: scores });
+    const next = makeRunState({ resiliencyScores: [...scores] });
+    expect(hasChanges(prev, next)).toBe(false);
+  });
+
+  it('returns false when both resiliencyScores are undefined', () => {
+    const prev = makeRunState({ resiliencyScores: undefined });
+    const next = makeRunState({ resiliencyScores: undefined });
+    expect(hasChanges(prev, next)).toBe(false);
   });
 
   it('detects missing clusterJob in next state', () => {
