@@ -23,6 +23,10 @@ const mockScenarioRunUpdate = {
   createdAt: '2026-07-02T10:10:00Z',
   ownerUserId: 'admin@preview.local',
   registryName: 'default',
+  resiliencyScoreEnabled: true,
+  resiliencyScores: [
+    { clusterName: 'staging-us-east-1', score: 85.2 },
+  ],
 };
 
 const mockJobsSnapshot = {

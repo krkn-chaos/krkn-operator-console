@@ -39,6 +39,11 @@ const mockScenarioRuns = [
     createdAt: '2026-07-02T10:00:00Z',
     ownerUserId: 'admin@preview.local',
     registryName: 'default',
+    resiliencyScoreEnabled: true,
+    resiliencyScores: [
+      { clusterName: 'staging-us-east-1', score: 92.3 },
+      { clusterName: 'staging-eu-west-1', score: 88.7 },
+    ],
   },
   {
     scenarioRunName: 'node-cpu-hog-run-02',
@@ -64,6 +69,10 @@ const mockScenarioRuns = [
     createdAt: '2026-07-02T09:30:00Z',
     ownerUserId: 'admin@preview.local',
     registryName: 'default',
+    resiliencyScoreEnabled: true,
+    resiliencyScores: [
+      { clusterName: 'prod-us-central1', score: 62.1 },
+    ],
   },
   {
     scenarioRunName: 'network-chaos-run-03',
@@ -87,6 +96,10 @@ const mockScenarioRuns = [
     createdAt: '2026-07-02T10:10:00Z',
     ownerUserId: 'admin@preview.local',
     registryName: 'default',
+    resiliencyScoreEnabled: true,
+    resiliencyScores: [
+      { clusterName: 'staging-us-east-1', score: 85.2 },
+    ],
   },
 ];
 
