@@ -281,7 +281,7 @@ export interface JobStatusResponse {
   message: string;
 }
 
-/** @deprecated Use listScenarioRuns() response (ScenarioRunStatusResponse[]) instead */
+/** @deprecated Use listScenarioRuns() response (ScenarioRunListResponse) instead */
 export interface JobsListResponse {
   jobs: JobStatusResponse[];
 }
@@ -976,6 +976,12 @@ export interface JobStatsSummary {
   totalJobs: number;
   succeededJobs: number;
   failedJobs: number;
+}
+
+/** Response from GET /api/v1/scenarios/run (paginated) */
+export interface ScenarioRunListResponse {
+  scenarioRuns: ScenarioRunStatusResponse[];
+  pagination?: import('./websocket').PaginationMeta;
 }
 
 /** Response from GET /api/v2/jobs */

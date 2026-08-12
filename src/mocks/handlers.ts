@@ -501,7 +501,10 @@ export const handlers = [
 
   // ─── SCENARIO RUNS ───
   http.get(`${BASE}/scenarios/run`, () =>
-    HttpResponse.json({ scenarioRuns: mockScenarioRuns }),
+    HttpResponse.json({
+      scenarioRuns: mockScenarioRuns,
+      pagination: { page: 1, limit: 20, total: mockScenarioRuns.length, totalPages: 1 },
+    }),
   ),
   http.post(`${BASE}/scenarios/run`, () =>
     HttpResponse.json({

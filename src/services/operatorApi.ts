@@ -31,6 +31,7 @@ import type {
   UpdateFileTypeRequest,
   JobConfigResponse,
   UnifiedJobsResponse,
+  ScenarioRunListResponse,
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -283,19 +284,20 @@ class OperatorApiClient extends BaseApiClient {
 
   /**
    * GET /api/v1/scenarios/run
-   * List all scenario runs (NEW API)
-   * @returns Promise with scenario runs array
+   * List all scenario runs (paginated)
+   * @returns Promise with scenario runs array and optional pagination metadata
    */
-  async listScenarioRuns(): Promise<ScenarioRunStatusResponse[]> {
+  async listScenarioRuns(): Promise<ScenarioRunListResponse> {
     try {
-      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[] }>('/scenarios/run');
+      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: import('../types/websocket').PaginationMeta }>('/scenarios/run');
 
-      const runs = data.scenarioRuns || data.runs || [];
-      return runs;
+      return {
+        scenarioRuns: data.scenarioRuns || data.runs || [],
+        pagination: data.pagination,
+      };
     } catch (error) {
-      // Fallback: if backend doesn't support list yet, return empty array
       if (error instanceof Error && error.message.includes('404')) {
-        return [];
+        return { scenarioRuns: [] };
       }
       throw error;
     }
