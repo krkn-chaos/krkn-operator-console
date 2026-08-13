@@ -284,12 +284,18 @@ class OperatorApiClient extends BaseApiClient {
 
   /**
    * GET /api/v1/scenarios/run
-   * List all scenario runs (paginated)
-   * @returns Promise with scenario runs array and optional pagination metadata
+   * List all scenario runs with optional pagination.
+   * When page/limit are omitted, all items are returned.
    */
-  async listScenarioRuns(): Promise<ScenarioRunListResponse> {
+  async listScenarioRuns(page?: number, limit?: number): Promise<ScenarioRunListResponse> {
     try {
-      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: import('../types/websocket').PaginationMeta }>('/scenarios/run');
+      const params = new URLSearchParams();
+      if (page !== undefined) params.set('page', String(page));
+      if (limit !== undefined) params.set('limit', String(limit));
+      const query = params.toString();
+      const path = `/scenarios/run${query ? `?${query}` : ''}`;
+
+      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: import('../types/websocket').PaginationMeta }>(path);
 
       return {
         scenarioRuns: data.scenarioRuns || data.runs || [],

@@ -500,12 +500,27 @@ export const handlers = [
   }),
 
   // ─── SCENARIO RUNS ───
-  http.get(`${BASE}/scenarios/run`, () =>
-    HttpResponse.json({
+  http.get(`${BASE}/scenarios/run`, ({ request }) => {
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '0', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '0', 10);
+
+    if (page > 0 && limit > 0) {
+      const total = mockScenarioRuns.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const offset = (page - 1) * limit;
+      const pageItems = mockScenarioRuns.slice(offset, offset + limit);
+      return HttpResponse.json({
+        scenarioRuns: pageItems,
+        pagination: { page, limit, total, totalPages },
+      });
+    }
+
+    return HttpResponse.json({
       scenarioRuns: mockScenarioRuns,
-      pagination: { page: 1, limit: 20, total: mockScenarioRuns.length, totalPages: 1 },
-    }),
-  ),
+      pagination: { page: 1, limit: mockScenarioRuns.length, total: mockScenarioRuns.length, totalPages: 1 },
+    });
+  }),
   http.post(`${BASE}/scenarios/run`, () =>
     HttpResponse.json({
       scenarioRunName: 'preview-run-' + Date.now().toString(36),
