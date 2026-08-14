@@ -42,6 +42,15 @@ export function StudioNodeConfigModal({ node, onClose }: StudioNodeConfigModalPr
   const dtStyle = { fontWeight: 'bold' } as const;
   const ddStyle = { margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' } as const;
   const sectionStyle = { padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' } as const;
+  const labelStyle = {
+    margin: 0,
+    marginBottom: '0.5rem',
+    fontSize: 'var(--pf-v5-global--FontSize--sm)',
+    fontWeight: 600,
+    color: 'var(--pf-v5-global--Color--200)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+  };
 
   return (
     <Modal
@@ -55,12 +64,10 @@ export function StudioNodeConfigModal({ node, onClose }: StudioNodeConfigModalPr
         </Button>,
       ]}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {/* Scenario Info */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {/* Scenario Settings */}
         <div style={sectionStyle}>
-          <h4 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--pf-v5-global--FontSize--md)', fontWeight: 'bold' }}>
-            Scenario
-          </h4>
+          <p style={labelStyle}>Scenario Settings</p>
           <dl style={dlStyle}>
             <dt style={dtStyle}>Scenario Name:</dt>
             <dd style={ddStyle}>{config.scenarioName}</dd>
@@ -75,12 +82,10 @@ export function StudioNodeConfigModal({ node, onClose }: StudioNodeConfigModalPr
           </dl>
         </div>
 
-        {/* Scenario Parameters */}
+        {/* Scenario Variables */}
         {formEntries.length > 0 && (
           <div style={sectionStyle}>
-            <h4 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--pf-v5-global--FontSize--md)', fontWeight: 'bold' }}>
-              Scenario Parameters
-            </h4>
+            <p style={labelStyle}>Scenario Variables</p>
             <dl style={dlStyle}>
               {formEntries.map(([key, value]) => (
                 <div key={key} style={{ display: 'contents' }}>
@@ -95,9 +100,7 @@ export function StudioNodeConfigModal({ node, onClose }: StudioNodeConfigModalPr
         {/* Global Parameters */}
         {globalEntries.length > 0 && (
           <div style={sectionStyle}>
-            <h4 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--pf-v5-global--FontSize--md)', fontWeight: 'bold' }}>
-              Global Parameters
-            </h4>
+            <p style={labelStyle}>Global Parameters</p>
             <dl style={dlStyle}>
               {globalEntries.map(([key, value]) => (
                 <div key={key} style={{ display: 'contents' }}>
@@ -112,9 +115,7 @@ export function StudioNodeConfigModal({ node, onClose }: StudioNodeConfigModalPr
         {/* Volumes */}
         {volumeEntries.length > 0 && (
           <div style={sectionStyle}>
-            <h4 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--pf-v5-global--FontSize--md)', fontWeight: 'bold' }}>
-              Volumes
-            </h4>
+            <p style={labelStyle}>Volumes</p>
             <dl style={dlStyle}>
               {volumeEntries.map(([key, value]) => (
                 <div key={key} style={{ display: 'contents' }}>
