@@ -26,6 +26,7 @@ import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
+import { hasCloudFields, isCloudEnvVar } from '../utils/cloudProviderUtils';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
 
@@ -182,18 +183,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     (f) => f.variable != null && (f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_'))
   ) ?? false;
 
-  const hasCloudGlobalFields = scenarioGlobals?.fields.some(
-    (f) => f.variable != null && (
-      f.variable === 'CLOUD_TYPE' ||
-      f.variable.startsWith('AWS_') ||
-      f.variable.startsWith('AZURE_') ||
-      f.variable.startsWith('OS_') ||
-      f.variable.startsWith('GOOGLE_') ||
-      f.variable.startsWith('BMC_') ||
-      f.variable.startsWith('VSPHERE_') ||
-      f.variable.startsWith('IBMC_')
-    )
-  ) ?? false;
+  const hasCloudGlobalFields = scenarioGlobals ? hasCloudFields(scenarioGlobals.fields) : false;
 
   const applyCloudCredential = (credName: string) => {
     setSelectedCloudCredName(credName);
@@ -462,9 +452,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       // The controller injects them via SecretKeyRef — plaintext values in the CRD spec
       // would defeat the security model.
       if (appliedCloudCredName) {
-        const cloudVarPrefixes = ['AWS_', 'AZURE_', 'OS_', 'GOOGLE_', 'BMC_', 'VSPHERE_', 'IBMC_'];
         for (const key of Object.keys(environment)) {
-          if (key === 'CLOUD_TYPE' || cloudVarPrefixes.some(p => key.startsWith(p))) {
+          if (isCloudEnvVar(key)) {
             delete environment[key];
           }
         }

@@ -14,6 +14,7 @@ import {
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, ElasticsearchConfig, CloudCredential } from '../types/api';
+import { CLOUD_DISABLED_FIELDS } from '../utils/cloudProviderUtils';
 
 interface ScenarioParameterSectionsProps {
   optionalFields: ScenarioField[];
@@ -66,16 +67,7 @@ export function ScenarioParameterSections({
   onSelectCloudCredential,
   appliedCloudCredName,
 }: ScenarioParameterSectionsProps) {
-  const cloudDisabledFields = appliedCloudCredName ? [
-    'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_DEFAULT_REGION',
-    'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_SUBSCRIPTION_ID',
-    'OS_AUTH_URL', 'OS_USERNAME', 'OS_PASSWORD', 'OS_PROJECT_NAME', 'OS_DOMAIN_NAME',
-    'BMC_USER', 'BMC_PASSWORD', 'BMC_ADDR',
-    'VSPHERE_IP', 'VSPHERE_USERNAME', 'VSPHERE_PASSWORD',
-    'IBMC_URL', 'IBMC_APIKEY',
-    'GOOGLE_APPLICATION_CREDENTIALS',
-    'CLOUD_TYPE',
-  ] : [];
+  const cloudDisabledFields = appliedCloudCredName ? [...CLOUD_DISABLED_FIELDS] : [];
   const esDisabledFields = appliedEsConfigName ? ['ES_PASSWORD'] : [];
   const disabledFields = [...esDisabledFields, ...cloudDisabledFields];
   const requiredGlobalFields = allGlobalFields.filter((f) => f.required);
