@@ -95,45 +95,65 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
   const envEntries = Object.entries(config.environment || {}).sort(([a], [b]) => a.localeCompare(b));
   const clusterEntries = Object.entries(config.targetClusters || {});
 
+  const dlStyle = { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 } as const;
+  const dtStyle = { fontWeight: 'bold' } as const;
+  const ddMono = { margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' } as const;
+  const labelStyle = {
+    margin: 0,
+    marginBottom: '0.5rem',
+    fontSize: 'var(--pf-v5-global--FontSize--sm)',
+    fontWeight: 600,
+    color: 'var(--pf-v5-global--Color--200)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+  };
+
   return (
-    <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
-      <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 }}>
-        <dt style={{ fontWeight: 'bold' }}>Scenario Image:</dt>
-        <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)', wordBreak: 'break-all' }}>
-          {config.scenarioImage}
-        </dd>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {/* Scenario Settings */}
+      <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+        <p style={labelStyle}>Scenario Settings</p>
+        <dl style={dlStyle}>
+          <dt style={dtStyle}>Scenario Image:</dt>
+          <dd style={{ ...ddMono, wordBreak: 'break-all' }}>
+            {config.scenarioImage}
+          </dd>
 
-        {clusterEntries.length > 0 && (
-          <>
-            <dt style={{ fontWeight: 'bold' }}>Target Clusters:</dt>
-            <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
-              {clusterEntries.map(([provider, clusters]) => (
-                <div key={provider}>
-                  {provider}: {(clusters as string[]).join(', ')}
-                </div>
-              ))}
-            </dd>
-          </>
+          {clusterEntries.length > 0 && (
+            <>
+              <dt style={dtStyle}>Target Clusters:</dt>
+              <dd style={ddMono}>
+                {clusterEntries.map(([provider, clusters]) => (
+                  <div key={provider}>
+                    {provider}: {(clusters as string[]).join(', ')}
+                  </div>
+                ))}
+              </dd>
+            </>
+          )}
+        </dl>
+      </div>
+
+      {/* Scenario Variables */}
+      <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+        <p style={labelStyle}>Scenario Variables</p>
+        {envEntries.length > 0 ? (
+          <dl style={dlStyle}>
+            {envEntries.map(([key, value]) => (
+              <div key={key} style={{ display: 'contents' }}>
+                <dt style={dtStyle}>{key}:</dt>
+                <dd style={ddMono}>
+                  {SENSITIVE_PATTERNS.test(key) ? '********' : value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--pf-v5-global--Color--200)', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+            No configuration parameters set
+          </p>
         )}
-
-        {envEntries.length > 0 && envEntries.map(([key, value]) => (
-          <div key={key} style={{ display: 'contents' }}>
-            <dt style={{ fontWeight: 'bold' }}>{key}:</dt>
-            <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
-              {SENSITIVE_PATTERNS.test(key) ? '********' : value}
-            </dd>
-          </div>
-        ))}
-
-        {envEntries.length === 0 && (
-          <>
-            <dt style={{ fontWeight: 'bold' }}>Environment:</dt>
-            <dd style={{ margin: 0, fontStyle: 'italic', color: 'var(--pf-v5-global--Color--200)' }}>
-              No configuration parameters set
-            </dd>
-          </>
-        )}
-      </dl>
+      </div>
     </div>
   );
 }
