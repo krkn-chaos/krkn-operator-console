@@ -13,7 +13,7 @@ import {
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
-import type { ScenarioField, ScenarioFormValues, TouchedFields, ElasticsearchConfig } from '../types/api';
+import type { ScenarioField, ScenarioFormValues, TouchedFields, ElasticsearchConfig, CloudCredential } from '../types/api';
 
 interface ScenarioParameterSectionsProps {
   optionalFields: ScenarioField[];
@@ -34,6 +34,11 @@ interface ScenarioParameterSectionsProps {
   selectedEsConfigName: string;
   onSelectEsConfig: (name: string) => void;
   appliedEsConfigName: string;
+  hasCloudGlobalFields: boolean;
+  cloudCredentials: CloudCredential[];
+  selectedCloudCredName: string;
+  onSelectCloudCredential: (name: string) => void;
+  appliedCloudCredName: string;
 }
 
 export function ScenarioParameterSections({
@@ -55,8 +60,24 @@ export function ScenarioParameterSections({
   selectedEsConfigName,
   onSelectEsConfig,
   appliedEsConfigName,
+  hasCloudGlobalFields,
+  cloudCredentials,
+  selectedCloudCredName,
+  onSelectCloudCredential,
+  appliedCloudCredName,
 }: ScenarioParameterSectionsProps) {
-  const disabledFields = appliedEsConfigName ? ['ES_PASSWORD'] : [];
+  const cloudDisabledFields = appliedCloudCredName ? [
+    'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_DEFAULT_REGION',
+    'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_SUBSCRIPTION_ID',
+    'OS_AUTH_URL', 'OS_USERNAME', 'OS_PASSWORD', 'OS_PROJECT_NAME', 'OS_DOMAIN_NAME',
+    'BMC_USER', 'BMC_PASSWORD', 'BMC_ADDR',
+    'VSPHERE_IP', 'VSPHERE_USERNAME', 'VSPHERE_PASSWORD',
+    'IBMC_URL', 'IBMC_APIKEY',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'CLOUD_TYPE',
+  ] : [];
+  const esDisabledFields = appliedEsConfigName ? ['ES_PASSWORD'] : [];
+  const disabledFields = [...esDisabledFields, ...cloudDisabledFields];
   const requiredGlobalFields = allGlobalFields.filter((f) => f.required);
   const optionalGlobalFields = allGlobalFields.filter((f) => !f.required);
 
@@ -129,6 +150,39 @@ export function ScenarioParameterSections({
                         <HelperText>
                           <HelperTextItem variant="success">
                             ES_PASSWORD will be injected automatically from &quot;{appliedEsConfigName}&quot;
+                          </HelperTextItem>
+                        </HelperText>
+                      </FormHelperText>
+                    )}
+                  </FormGroup>
+                </CardBody>
+              </Card>
+            )}
+            {hasCloudGlobalFields && cloudCredentials.length > 0 && (
+              <Card style={{ marginBottom: '1rem' }}>
+                <CardTitle>Load Cloud Credential</CardTitle>
+                <CardBody>
+                  <FormGroup label="Load from saved credential" fieldId="cloud-cred-picker">
+                    <FormSelect
+                      id="cloud-cred-picker"
+                      value={selectedCloudCredName}
+                      onChange={(_e, v) => onSelectCloudCredential(v)}
+                      style={{ maxWidth: '500px' }}
+                    >
+                      <FormSelectOption value="" label="Select a saved cloud credential…" />
+                      {cloudCredentials.map((c) => (
+                        <FormSelectOption
+                          key={c.name}
+                          value={c.name}
+                          label={`${c.name} — ${c.provider.toUpperCase()}`}
+                        />
+                      ))}
+                    </FormSelect>
+                    {appliedCloudCredName && (
+                      <FormHelperText>
+                        <HelperText>
+                          <HelperTextItem variant="success">
+                            Cloud credentials will be injected automatically from &quot;{appliedCloudCredName}&quot;
                           </HelperTextItem>
                         </HelperText>
                       </FormHelperText>

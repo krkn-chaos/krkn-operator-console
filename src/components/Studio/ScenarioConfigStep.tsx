@@ -17,7 +17,8 @@ import { DynamicFormBuilder } from '../DynamicFormBuilder';
 import { ScenarioParameterSections } from '../ScenarioParameterSections';
 import { operatorApi } from '../../services/operatorApi';
 import { elasticsearchApi } from '../../services/elasticsearchApi';
-import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig } from '../../types/api';
+import { cloudCredentialsApi } from '../../services/cloudCredentialsApi';
+import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig, CloudCredential } from '../../types/api';
 
 interface ScenarioConfigStepProps {
   scenarioName: string;
@@ -50,6 +51,10 @@ export function ScenarioConfigStep({
   const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
   const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
+
+  const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
+  const [selectedCloudCredName, setSelectedCloudCredName] = useState('');
+  const [appliedCloudCredName, setAppliedCloudCredName] = useState('');
 
   // Fetch scenario detail when scenario changes
   useEffect(() => {
@@ -142,11 +147,34 @@ export function ScenarioConfigStep({
   useEffect(() => {
     if (!showGlobalParameters) return;
     elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
+    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
   }, [showGlobalParameters]);
 
   const hasEsGlobalFields = scenarioGlobals?.fields.some(
     (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
   ) ?? false;
+
+  const hasCloudGlobalFields = scenarioGlobals?.fields.some(
+    (f) => f.variable != null && (
+      f.variable === 'CLOUD_TYPE' ||
+      f.variable.startsWith('AWS_') ||
+      f.variable.startsWith('AZURE_') ||
+      f.variable.startsWith('OS_') ||
+      f.variable.startsWith('GOOGLE_') ||
+      f.variable.startsWith('BMC_') ||
+      f.variable.startsWith('VSPHERE_') ||
+      f.variable.startsWith('IBMC_')
+    )
+  ) ?? false;
+
+  const applyCloudCredential = (credName: string) => {
+    setSelectedCloudCredName(credName);
+    if (!credName) {
+      setAppliedCloudCredName('');
+      return;
+    }
+    setAppliedCloudCredName(credName);
+  };
 
   const applyEsConfig = (configName: string) => {
     setSelectedEsConfigName(configName);
@@ -259,6 +287,11 @@ export function ScenarioConfigStep({
         selectedEsConfigName={selectedEsConfigName}
         onSelectEsConfig={applyEsConfig}
         appliedEsConfigName={appliedEsConfigName}
+        hasCloudGlobalFields={hasCloudGlobalFields}
+        cloudCredentials={cloudCredentials}
+        selectedCloudCredName={selectedCloudCredName}
+        onSelectCloudCredential={applyCloudCredential}
+        appliedCloudCredName={appliedCloudCredName}
       />
     </div>
   );
