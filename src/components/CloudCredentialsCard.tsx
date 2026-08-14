@@ -68,9 +68,11 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
 
   useEffect(() => {
+    let mounted = true;
     operatorApi.getGroups()
-      .then(response => setAvailableGroups(response.groups || []))
-      .catch(() => setAvailableGroups([]));
+      .then(response => { if (mounted) setAvailableGroups(response.groups || []); })
+      .catch(() => { if (mounted) setAvailableGroups([]); });
+    return () => { mounted = false; };
   }, []);
 
   // AWS
@@ -125,6 +127,10 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
   const handleSubmit = async () => {
     if (!isEdit && !name.trim()) {
       setError('Name is required');
+      return;
+    }
+    if (!isEdit && !/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name.trim())) {
+      setError('Name must be lowercase alphanumeric with hyphens, starting and ending with alphanumeric');
       return;
     }
 
@@ -235,9 +241,14 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         };
       case 'gcp':
         if (!gcpServiceAccountJson.trim()) return {};
-        return {
-          gcpServiceAccountJson: btoa(gcpServiceAccountJson.trim()),
-        };
+        {
+          const encoder = new TextEncoder();
+          const bytes = encoder.encode(gcpServiceAccountJson.trim());
+          const binary = Array.from(bytes, b => String.fromCharCode(b)).join('');
+          return {
+            gcpServiceAccountJson: btoa(binary),
+          };
+        }
       case 'azure':
         return {
           azureTenantId: azureTenantId || undefined,
@@ -483,21 +494,26 @@ export function CloudCredentialsCard() {
   useEffect(() => { fetchCredentials(); }, [fetchCredentials]);
 
   const handleCreate = async (data: CreateCloudCredentialRequest | UpdateCloudCredentialRequest) => {
-    await cloudCredentialsApi.createCredential(data as CreateCloudCredentialRequest);
-    showSuccess('Credential created', `Cloud credential "${(data as CreateCloudCredentialRequest).name}" was created`);
+    if (!('name' in data) || !('provider' in data)) return;
+    const createData = data as CreateCloudCredentialRequest;
+    await cloudCredentialsApi.createCredential(createData);
+    showSuccess('Credential created', `Cloud credential "${createData.name}" was created`);
     setShowCreateModal(false);
     fetchCredentials();
   };
 
   const handleUpdate = async (data: CreateCloudCredentialRequest | UpdateCloudCredentialRequest) => {
     if (!editingCred) return;
-    await cloudCredentialsApi.updateCredential(editingCred.name, data as UpdateCloudCredentialRequest);
+    await cloudCredentialsApi.updateCredential(editingCred.name, data);
     showSuccess('Credential updated', `Cloud credential "${editingCred.name}" was updated`);
     setEditingCred(null);
     fetchCredentials();
   };
 
+  const [deletingInProgress, setDeletingInProgress] = useState(false);
+
   const handleDelete = async (name: string) => {
+    setDeletingInProgress(true);
     try {
       await cloudCredentialsApi.deleteCredential(name);
       showSuccess('Credential deleted', `Cloud credential "${name}" was deleted`);
@@ -505,6 +521,8 @@ export function CloudCredentialsCard() {
       fetchCredentials();
     } catch (err) {
       showError('Failed to delete credential', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setDeletingInProgress(false);
     }
   };
 
@@ -624,7 +642,7 @@ export function CloudCredentialsCard() {
           isOpen={!!deletingName}
           onClose={() => setDeletingName(null)}
           actions={[
-            <Button key="delete" variant="danger" onClick={() => handleDelete(deletingName)}>Delete</Button>,
+            <Button key="delete" variant="danger" onClick={() => handleDelete(deletingName)} isDisabled={deletingInProgress}>{deletingInProgress ? <Spinner size="sm" /> : 'Delete'}</Button>,
             <Button key="cancel" variant="link" onClick={() => setDeletingName(null)}>Cancel</Button>,
           ]}
         >
