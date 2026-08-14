@@ -18,6 +18,7 @@ import { ScenarioParameterSections } from '../ScenarioParameterSections';
 import { operatorApi } from '../../services/operatorApi';
 import { elasticsearchApi } from '../../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../../services/cloudCredentialsApi';
+import { hasCloudFields } from '../../utils/cloudProviderUtils';
 import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig, CloudCredential } from '../../types/api';
 
 interface ScenarioConfigStepProps {
@@ -154,18 +155,7 @@ export function ScenarioConfigStep({
     (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
   ) ?? false;
 
-  const hasCloudGlobalFields = scenarioGlobals?.fields.some(
-    (f) => f.variable != null && (
-      f.variable === 'CLOUD_TYPE' ||
-      f.variable.startsWith('AWS_') ||
-      f.variable.startsWith('AZURE_') ||
-      f.variable.startsWith('OS_') ||
-      f.variable.startsWith('GOOGLE_') ||
-      f.variable.startsWith('BMC_') ||
-      f.variable.startsWith('VSPHERE_') ||
-      f.variable.startsWith('IBMC_')
-    )
-  ) ?? false;
+  const hasCloudGlobalFields = scenarioGlobals ? hasCloudFields(scenarioGlobals.fields) : false;
 
   const applyCloudCredential = (credName: string) => {
     setSelectedCloudCredName(credName);
