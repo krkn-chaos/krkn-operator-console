@@ -231,6 +231,16 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
+   * GET /api/v1/scenarios/run/{scenarioRunName}/config
+   * Get the configuration used to create a scenario run
+   * @param scenarioRunName - Scenario run name
+   * @returns Promise with the scenario run's environment configuration
+   */
+  async getScenarioRunConfig(scenarioRunName: string): Promise<JobConfigResponse> {
+    return this.fetchJson<JobConfigResponse>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/config`);
+  }
+
+  /**
    * DELETE /api/v1/scenarios/run/{scenarioRunName}
    * Delete an entire scenario run and all its jobs
    * @param scenarioRunName - Scenario run name to delete

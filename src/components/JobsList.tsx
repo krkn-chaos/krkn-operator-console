@@ -61,6 +61,7 @@ import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
+import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
 
@@ -1048,6 +1049,10 @@ export function JobsList({
                   >
                     {isRunExpanded && (
                       <>
+                        <div style={{ paddingLeft: '2rem', marginBottom: '1rem' }}>
+                          <ScenarioConfigDisplay scenarioRunName={run.scenarioRunName} />
+                        </div>
+
                         {run.clusterJobs && run.clusterJobs.length > 0 ? (
                           <div style={{ paddingLeft: '2rem' }}>
                             <DataList aria-label="Cluster jobs list" isCompact>

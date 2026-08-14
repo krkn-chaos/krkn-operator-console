@@ -803,6 +803,45 @@ export const handlers = [
     }),
   ),
 
+  // ─── SCENARIO RUN CONFIG ───
+  http.get(`${BASE}/scenarios/run/:scenarioRunName/config`, ({ params }) => {
+    const run = mockScenarioRuns.find((r) => r.scenarioRunName === params.scenarioRunName);
+    const scenarioName = run?.scenarioName || (params.scenarioRunName as string).replace(/-run-\d+$/, '');
+    return HttpResponse.json({
+      targetRequestId: 'target-001',
+      targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
+      scenarioImage: 'quay.io/krkn-chaos/krkn-hub:' + scenarioName,
+      scenarioName,
+      kubeconfigPath: '/root/.kube/config',
+      environment: {
+        NAMESPACE: 'default',
+        DURATION: '60',
+        LABEL_SELECTOR: 'app=test',
+        ITERATIONS: '1',
+        DAEMON_MODE: 'false',
+      },
+    });
+  }),
+
+  // ─── GRAPH RUN CONFIG ───
+  http.get(`${BASE}/graphruns/:graphRunName/config`, ({ params }) => {
+    const detail = mockGraphRunDetails[params.graphRunName as string] as { spec?: { targetClusters?: Record<string, string[]> } } | undefined;
+    return HttpResponse.json({
+      targetRequestId: 'target-001',
+      targetClusters: detail?.spec?.targetClusters || { 'krkn-operator': ['staging-us-east-1'] },
+      scenarioImage: 'quay.io/krkn-chaos/krkn-hub:workflow',
+      scenarioName: params.graphRunName as string,
+      kubeconfigPath: '/root/.kube/config',
+      environment: {
+        NAMESPACE: 'default',
+        DURATION: '120',
+        LABEL_SELECTOR: 'app=chaos-target',
+        ITERATIONS: '3',
+        DAEMON_MODE: 'false',
+      },
+    });
+  }),
+
   // ─── CATCH-ALL ───
   http.all(`${BASE}/*`, ({ request }) => {
     if (request.method === 'GET') return HttpResponse.json({});

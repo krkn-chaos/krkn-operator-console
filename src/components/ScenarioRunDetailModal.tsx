@@ -37,6 +37,7 @@ import {
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
+import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioRunStatusResponse, ClusterJobPhase } from '../types/api';
 
@@ -236,6 +237,11 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
                 </dd>
               </dl>
             </div>
+          </FlexItem>
+
+          {/* Scenario Configuration */}
+          <FlexItem>
+            <ScenarioConfigDisplay scenarioRunName={scenarioRunName!} />
           </FlexItem>
 
           {/* Cluster Jobs */}
