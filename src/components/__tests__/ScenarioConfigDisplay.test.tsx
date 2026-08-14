@@ -16,7 +16,8 @@ vi.mock('../../services/graphRunsApi', () => ({
   },
 }));
 
-const { ScenarioConfigDisplay, configCache } = await import('../ScenarioConfigDisplay');
+const { ScenarioConfigDisplay } = await import('../ScenarioConfigDisplay');
+const { configCache } = await import('../scenarioConfigCache');
 
 const makeConfig = (envOverrides?: Record<string, string>) => ({
   targetRequestId: 'target-001',

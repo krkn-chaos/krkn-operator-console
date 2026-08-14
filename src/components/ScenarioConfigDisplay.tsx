@@ -10,11 +10,10 @@ import { useState, useEffect } from 'react';
 import { Spinner, Alert } from '@patternfly/react-core';
 import { operatorApi } from '../services/operatorApi';
 import { graphRunsApi } from '../services/graphRunsApi';
+import { configCache } from './scenarioConfigCache';
 import type { JobConfigResponse } from '../types/api';
 
 const SENSITIVE_PATTERNS = /PASSWORD|SECRET|TOKEN|KEY|CREDENTIALS/i;
-
-export const configCache = new Map<string, JobConfigResponse>();
 
 interface ScenarioConfigDisplayProps {
   scenarioRunName?: string;
