@@ -22,16 +22,19 @@ import {
   FormSelect,
   FormSelectOption,
   Label,
+  Radio,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { PlusCircleIcon, KeyIcon } from '@patternfly/react-icons';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
+import { operatorApi } from '../services/operatorApi';
 import { useNotifications } from '../hooks';
 import type {
   CloudCredential,
   CloudCredentialProvider,
   CreateCloudCredentialRequest,
   UpdateCloudCredentialRequest,
+  GroupResponse,
 } from '../types/api';
 
 const PROVIDER_LABELS: Record<CloudCredentialProvider, string> = {
@@ -58,6 +61,17 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
   const [name, setName] = useState(initial?.name ?? '');
   const [provider, setProvider] = useState<CloudCredentialProvider>(existingProvider ?? initial?.provider ?? 'aws');
   const [description, setDescription] = useState(initial?.description ?? '');
+  const [accessType, setAccessType] = useState<'public' | 'group'>(
+    initial?.availableToAll || (!initial?.groups?.length) ? 'public' : 'group'
+  );
+  const [selectedGroup, setSelectedGroup] = useState(initial?.groups?.[0] ?? '');
+  const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
+
+  useEffect(() => {
+    operatorApi.getGroups()
+      .then(response => setAvailableGroups(response.groups || []))
+      .catch(() => setAvailableGroups([]));
+  }, []);
 
   // AWS
   const [awsAccessKeyId, setAwsAccessKeyId] = useState('');
@@ -181,10 +195,14 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
 
     try {
       const providerFields = buildProviderFields();
+      const groupsArray = accessType === 'group' && selectedGroup ? [selectedGroup] : [];
+      const availableToAll = accessType === 'public';
 
       if (isEdit) {
         const req: UpdateCloudCredentialRequest = {
           description: description.trim() || undefined,
+          groups: groupsArray.length > 0 ? groupsArray : undefined,
+          availableToAll,
           ...providerFields,
         };
         await onSubmit(req);
@@ -193,6 +211,8 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
           name: name.trim(),
           provider,
           description: description.trim() || undefined,
+          groups: groupsArray.length > 0 ? groupsArray : undefined,
+          availableToAll,
           ...providerFields,
         };
         await onSubmit(req);
@@ -295,6 +315,38 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
           placeholder="Optional description"
         />
       </FormGroup>
+
+      <FormGroup label="Access Control" fieldId="cc-access">
+        <Radio
+          id="cc-access-public"
+          name="cc-access-type"
+          label="Available to all users"
+          isChecked={accessType === 'public'}
+          onChange={() => setAccessType('public')}
+        />
+        <Radio
+          id="cc-access-group"
+          name="cc-access-type"
+          label="Assign to group"
+          isChecked={accessType === 'group'}
+          onChange={() => setAccessType('group')}
+        />
+      </FormGroup>
+
+      {accessType === 'group' && (
+        <FormGroup label="Group" isRequired fieldId="cc-group">
+          <FormSelect
+            id="cc-group"
+            value={selectedGroup}
+            onChange={(_e, v) => setSelectedGroup(v)}
+          >
+            <FormSelectOption value="" label="Select a group…" />
+            {availableGroups.map((g) => (
+              <FormSelectOption key={g.name} value={g.name} label={g.name} />
+            ))}
+          </FormSelect>
+        </FormGroup>
+      )}
 
       {activeProvider === 'aws' && (
         <>
@@ -497,6 +549,7 @@ export function CloudCredentialsCard() {
                   <Th>Name</Th>
                   <Th>Provider</Th>
                   <Th>Description</Th>
+                  <Th>Access</Th>
                   <Th>Created</Th>
                   <Th>Actions</Th>
                 </Tr>
@@ -509,6 +562,13 @@ export function CloudCredentialsCard() {
                       <Label color="blue">{PROVIDER_LABELS[cred.provider] ?? cred.provider}</Label>
                     </Td>
                     <Td dataLabel="Description">{cred.description || '—'}</Td>
+                    <Td dataLabel="Access">
+                      {cred.availableToAll
+                        ? 'All Users'
+                        : cred.groups && cred.groups.length > 0
+                          ? cred.groups.join(', ')
+                          : 'No groups'}
+                    </Td>
                     <Td dataLabel="Created">
                       {cred.createdAt ? new Date(cred.createdAt).toLocaleDateString() : '—'}
                     </Td>
