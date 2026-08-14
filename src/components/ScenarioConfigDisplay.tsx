@@ -98,9 +98,6 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
 
   return (
     <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
-      <h4 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--pf-v5-global--FontSize--md)', fontWeight: 'bold' }}>
-        Configuration
-      </h4>
       <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 }}>
         <dt style={{ fontWeight: 'bold' }}>Scenario Image:</dt>
         <dd style={{ margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)', wordBreak: 'break-all' }}>
