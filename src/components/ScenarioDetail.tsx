@@ -458,6 +458,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         delete environment['ES_PASSWORD'];
       }
 
+      // When a cloud credential is selected, strip all cloud-related vars from environment.
+      // The controller injects them via SecretKeyRef — plaintext values in the CRD spec
+      // would defeat the security model.
+      if (appliedCloudCredName) {
+        const cloudVarPrefixes = ['AWS_', 'AZURE_', 'OS_', 'GOOGLE_', 'BMC_', 'VSPHERE_', 'IBMC_'];
+        for (const key of Object.keys(environment)) {
+          if (key === 'CLOUD_TYPE' || cloudVarPrefixes.some(p => key.startsWith(p))) {
+            delete environment[key];
+          }
+        }
+      }
+
       // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid,
