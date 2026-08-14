@@ -17,7 +17,7 @@ vi.mock('../../services/graphRunsApi', () => ({
 }));
 
 const { ScenarioConfigDisplay } = await import('../ScenarioConfigDisplay');
-const { configCache } = await import('../scenarioConfigCache');
+const { configCache, cacheSet } = await import('../scenarioConfigCache');
 
 const makeConfig = (envOverrides?: Record<string, string>) => ({
   targetRequestId: 'target-001',
@@ -175,5 +175,54 @@ describe('ScenarioConfigDisplay', () => {
     });
 
     expect(mockGetScenarioRunConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('namespaces cache keys to avoid collision between scenario and graph runs', async () => {
+    const scenarioConfig = makeConfig({ SOURCE: 'scenario' });
+    const graphConfig = makeConfig({ SOURCE: 'graph' });
+    mockGetScenarioRunConfig.mockResolvedValue(scenarioConfig);
+    mockGetGraphRunConfig.mockResolvedValue(graphConfig);
+
+    const { unmount: unmount1 } = render(<ScenarioConfigDisplay scenarioRunName="same-name" />);
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+    });
+    expect(screen.getByText('scenario')).toBeInTheDocument();
+    unmount1();
+
+    render(<ScenarioConfigDisplay graphRunName="same-name" />);
+    await waitFor(() => {
+      expect(mockGetGraphRunConfig).toHaveBeenCalledWith('same-name');
+    });
+    expect(screen.getByText('graph')).toBeInTheDocument();
+  });
+
+  it('clears stale error when cache hit occurs', async () => {
+    cacheSet('scenario:cached-run', makeConfig());
+
+    mockGetScenarioRunConfig.mockRejectedValue(new Error('Network error'));
+    const { unmount } = render(<ScenarioConfigDisplay scenarioRunName="error-first-run" />);
+    await waitFor(() => {
+      expect(screen.getByText('Configuration not available')).toBeInTheDocument();
+    });
+    unmount();
+
+    render(<ScenarioConfigDisplay scenarioRunName="cached-run" />);
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Configuration not available')).not.toBeInTheDocument();
+  });
+
+  it('evicts oldest entry when cache exceeds max size', () => {
+    for (let i = 0; i < 100; i++) {
+      cacheSet(`key-${i}`, makeConfig());
+    }
+    expect(configCache.size).toBe(100);
+
+    cacheSet('key-new', makeConfig());
+    expect(configCache.size).toBe(100);
+    expect(configCache.has('key-0')).toBe(false);
+    expect(configCache.has('key-new')).toBe(true);
   });
 });

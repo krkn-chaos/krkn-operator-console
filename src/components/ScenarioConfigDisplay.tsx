@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { Spinner, Alert } from '@patternfly/react-core';
 import { operatorApi } from '../services/operatorApi';
 import { graphRunsApi } from '../services/graphRunsApi';
-import { configCache } from './scenarioConfigCache';
+import { configCache, cacheSet } from './scenarioConfigCache';
 import type { JobConfigResponse } from '../types/api';
 
 const SENSITIVE_PATTERNS = /PASSWORD|SECRET|TOKEN|KEY|CREDENTIALS/i;
@@ -21,7 +21,7 @@ interface ScenarioConfigDisplayProps {
 }
 
 export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: ScenarioConfigDisplayProps) {
-  const cacheKey = scenarioRunName || graphRunName || '';
+  const cacheKey = scenarioRunName ? `scenario:${scenarioRunName}` : graphRunName ? `graph:${graphRunName}` : '';
   const [config, setConfig] = useState<JobConfigResponse | null>(null);
   const [loading, setLoading] = useState(!!cacheKey);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
     const cached = configCache.get(cacheKey);
     if (cached) {
       setConfig(cached);
+      setError(null);
       setLoading(false);
       return;
     }
@@ -53,7 +54,7 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
         }
 
         if (mounted) {
-          configCache.set(cacheKey, result);
+          cacheSet(cacheKey, result);
           setConfig(result);
         }
       } catch (err) {
