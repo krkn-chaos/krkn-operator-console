@@ -44,17 +44,9 @@ export function StudioNodeContextMenu({
       }
     };
 
-    const handleContextMenuOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('contextmenu', handleContextMenuOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('contextmenu', handleContextMenuOutside);
     };
   }, [onClose]);
 
