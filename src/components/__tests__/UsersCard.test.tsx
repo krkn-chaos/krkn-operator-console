@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UsersCard } from '../UsersCard';
 import { usersApi } from '../../services/usersApi';
@@ -203,6 +204,81 @@ describe('UsersCard', () => {
     await waitFor(() => {
       const activeLabels = screen.getAllByText('Active');
       expect(activeLabels.length).toBe(2);
+    });
+  });
+
+  it('should not show pagination when users are less than or equal to default perPage (10)', async () => {
+    render(<UsersCard groups={mockGroups} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    });
+
+    // Pagination should not be visible
+    expect(screen.queryByLabelText(/pagination/i)).not.toBeInTheDocument();
+  });
+
+  it('should show pagination and paginate users when more than 10 users exist', async () => {
+    // Create 12 mock users to trigger pagination
+    const manyUsers: UserDetails[] = Array.from({ length: 12 }, (_, i) => ({
+      userId: `user${i + 1}@example.com`,
+      name: `User`,
+      surname: `${String(i + 1).padStart(2, '0')}`,
+      organization: 'Test Org',
+      role: 'user' as const,
+      active: true,
+      lastLogin: '2024-01-01T00:00:00Z',
+    }));
+
+    vi.mocked(usersApi.listUsers).mockResolvedValue(manyUsers);
+
+    render(<UsersCard groups={mockGroups} />);
+
+    // Wait for initial load - should show first 10 users
+    await waitFor(() => {
+      expect(screen.getByText('User 01')).toBeInTheDocument();
+      expect(screen.getByText('User 10')).toBeInTheDocument();
+    });
+
+    // Users beyond page 1 should not be visible
+    expect(screen.queryByText('User 11')).not.toBeInTheDocument();
+
+    // Pagination should be visible
+    const pagination = screen.getAllByRole('navigation');
+    expect(pagination.length).toBeGreaterThan(0);
+  });
+
+  it('should reset to page 1 when search filter changes', async () => {
+    // Create mock users with varied organizations
+    const manyUsers: UserDetails[] = Array.from({ length: 12 }, (_, i) => ({
+      userId: `user${i + 1}@example.com`,
+      name: `User`,
+      surname: `${String(i + 1).padStart(2, '0')}`,
+      organization: i < 5 ? 'Test Org A' : 'Test Org B',
+      role: 'user' as const,
+      active: true,
+      lastLogin: '2024-01-01T00:00:00Z',
+    }));
+
+    vi.mocked(usersApi.listUsers).mockResolvedValue(manyUsers);
+
+    const user = userEvent.setup();
+    render(<UsersCard groups={mockGroups} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('User 01')).toBeInTheDocument();
+    });
+
+    // Apply search filter
+    const searchInput = screen.getByPlaceholderText(/filter by name, email, or organization/i);
+    await user.type(searchInput, 'Test Org A');
+
+    // Should show filtered results
+    await waitFor(() => {
+      expect(screen.getByText('User 01')).toBeInTheDocument();
+      // Users with "Test Org B" should not be visible
+      expect(screen.queryByText('User 06')).not.toBeInTheDocument();
     });
   });
 });

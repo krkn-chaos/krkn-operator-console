@@ -341,15 +341,26 @@ const mockClusters = {
 // ─── USERS ───
 
 const mockUsers = [
-  { userId: 'admin@preview.local', name: 'Preview', surname: 'User', role: 'admin', organization: 'Krkn', active: true, created: '2026-06-01T00:00:00Z', lastLogin: '2026-07-08T10:00:00Z' },
-  { userId: 'user1@preview.local', name: 'Alice', surname: 'Engineer', role: 'user', organization: 'Krkn', active: true, created: '2026-06-15T00:00:00Z', lastLogin: '2026-07-07T14:00:00Z' },
+  { userId: 'admin@preview.local', name: 'Preview', surname: 'User', role: 'admin', organization: 'Krkn', active: true, created: '2026-06-01T00:00:00Z', lastLogin: '2026-08-18T10:00:00Z' },
+  { userId: 'alice.engineer@preview.local', name: 'Alice', surname: 'Engineer', role: 'user', organization: 'Platform Team', active: true, created: '2026-06-15T00:00:00Z', lastLogin: '2026-08-17T14:00:00Z' },
+  { userId: 'bob.chaos@preview.local', name: 'Bob', surname: 'Chaos', role: 'admin', organization: 'Chaos Engineering', active: true, created: '2026-06-10T00:00:00Z', lastLogin: '2026-08-18T09:30:00Z' },
+  { userId: 'carol.devops@preview.local', name: 'Carol', surname: 'DevOps', role: 'user', organization: 'Platform Team', active: true, created: '2026-06-20T00:00:00Z', lastLogin: '2026-08-16T16:45:00Z' },
+  { userId: 'david.sre@preview.local', name: 'David', surname: 'SRE', role: 'user', organization: 'Site Reliability', active: true, created: '2026-06-25T00:00:00Z', lastLogin: '2026-08-18T08:15:00Z' },
+  { userId: 'emma.platform@preview.local', name: 'Emma', surname: 'Platform', role: 'user', organization: 'Platform Team', active: false, created: '2026-07-01T00:00:00Z', lastLogin: '2026-07-30T11:00:00Z' },
+  { userId: 'frank.ops@preview.local', name: 'Frank', surname: 'Ops', role: 'user', organization: 'Operations', active: true, created: '2026-07-05T00:00:00Z', lastLogin: '2026-08-15T13:20:00Z' },
+  { userId: 'grace.qa@preview.local', name: 'Grace', surname: 'QA', role: 'user', organization: 'Quality Assurance', active: true, created: '2026-07-10T00:00:00Z', lastLogin: '2026-08-17T10:00:00Z' },
+  { userId: 'henry.security@preview.local', name: 'Henry', surname: 'Security', role: 'admin', organization: 'Security Team', active: true, created: '2026-07-15T00:00:00Z', lastLogin: '2026-08-18T07:00:00Z' },
+  { userId: 'iris.cloud@preview.local', name: 'Iris', surname: 'Cloud', role: 'user', organization: 'Cloud Infrastructure', active: true, created: '2026-07-20T00:00:00Z', lastLogin: '2026-08-14T15:30:00Z' },
+  { userId: 'jack.network@preview.local', name: 'Jack', surname: 'Network', role: 'user', organization: 'Network Team', active: false, created: '2026-07-25T00:00:00Z', lastLogin: '2026-08-01T09:00:00Z' },
+  { userId: 'karen.monitoring@preview.local', name: 'Karen', surname: 'Monitoring', role: 'user', organization: 'Observability', active: true, created: '2026-08-01T00:00:00Z', lastLogin: '2026-08-17T12:45:00Z' },
 ];
 
 // ─── GROUPS ───
 
 const mockGroups = [
-  { name: 'chaos-engineers', description: 'Chaos engineering team', createdAt: '2026-06-01T00:00:00Z', memberCount: 2, clusterPermissions: { 'https://api.staging-east.example.com:6443': { actions: ['view', 'run', 'cancel'] } } },
-  { name: 'platform-team', description: 'Platform engineering', createdAt: '2026-06-10T00:00:00Z', memberCount: 1, clusterPermissions: {} },
+  { name: 'chaos-engineers', description: 'Chaos engineering team', createdAt: '2026-06-01T00:00:00Z', memberCount: 5, clusterPermissions: { 'https://api.staging-east.example.com:6443': { actions: ['view', 'run', 'cancel'] } } },
+  { name: 'platform-team', description: 'Platform engineering', createdAt: '2026-06-10T00:00:00Z', memberCount: 3, clusterPermissions: {} },
+  { name: 'sre-team', description: 'Site reliability engineers', createdAt: '2026-06-15T00:00:00Z', memberCount: 4, clusterPermissions: { 'https://api.staging-east.example.com:6443': { actions: ['view', 'run'] }, 'https://api.prod.example.com:6443': { actions: ['view'] } } },
 ];
 
 // ─── REGISTRIES ───

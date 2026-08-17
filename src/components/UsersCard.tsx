@@ -31,11 +31,14 @@ import {
   Select,
   SelectOption,
   SelectList,
+  Pagination,
+  PaginationVariant,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, EyeIcon, EllipsisVIcon, KeyIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { usersApi } from '../services/usersApi';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications, useRole } from '../hooks';
+import { usePagination } from '../hooks/usePagination';
 import { useAuth } from '../context/AuthContext';
 import { UserForm } from './UserForm';
 import { UserDetails as UserDetailsComponent } from './UserDetails';
@@ -116,6 +119,17 @@ export function UsersCard({ groups }: UsersCardProps) {
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const { state } = useAuth();
+
+  // Pagination hook
+  const {
+    paginatedData: paginatedUsers,
+    page,
+    perPage,
+    totalItems,
+    totalPages,
+    handleSetPage,
+    handlePerPageSelect,
+  } = usePagination(filteredUsers, { initialPerPage: 10 });
 
   useEffect(() => {
     loadUsers();
@@ -422,8 +436,9 @@ export function UsersCard({ groups }: UsersCardProps) {
                 </EmptyStateBody>
               </EmptyState>
             ) : (
+              <>
               <DataList aria-label="Users list" isCompact>
-                {filteredUsers.map((user) => (
+                {paginatedUsers.map((user) => (
                   <DataListItem key={user.userId}>
                     <DataListItemRow>
                       <DataListItemCells
@@ -548,6 +563,23 @@ export function UsersCard({ groups }: UsersCardProps) {
                   </DataListItem>
                 ))}
               </DataList>
+              {totalPages > 1 && (
+                <Pagination
+                  itemCount={totalItems}
+                  perPage={perPage}
+                  page={page}
+                  onSetPage={handleSetPage}
+                  onPerPageSelect={handlePerPageSelect}
+                  variant={PaginationVariant.bottom}
+                  perPageOptions={[
+                    { title: '10', value: 10 },
+                    { title: '20', value: 20 },
+                    { title: '50', value: 50 },
+                  ]}
+                  style={{ marginTop: '1rem' }}
+                />
+              )}
+              </>
             )}
           </>
         )}

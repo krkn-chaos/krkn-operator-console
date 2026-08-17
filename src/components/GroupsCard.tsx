@@ -26,10 +26,13 @@ import {
   DataListItemRow,
   DataListItemCells,
   DataListCell,
+  Pagination,
+  PaginationVariant,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications } from '../hooks';
+import { usePagination } from '../hooks/usePagination';
 import { CreateGroupModal } from './CreateGroupModal';
 import { EditGroupModal } from './EditGroupModal';
 import { ViewGroupMembersModal } from './ViewGroupMembersModal';
@@ -96,6 +99,17 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [viewMembersGroupName, setViewMembersGroupName] = useState<string | null>(null);
   const { showSuccess, showError } = useNotifications();
+
+  // Pagination hook
+  const {
+    paginatedData: paginatedGroups,
+    page,
+    perPage,
+    totalItems,
+    totalPages,
+    handleSetPage,
+    handlePerPageSelect,
+  } = usePagination(filteredGroups, { initialPerPage: 10 });
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -242,8 +256,9 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
                 </EmptyStateBody>
               </EmptyState>
             ) : (
+              <>
               <DataList aria-label="Groups list" isCompact>
-                {filteredGroups.map((group) => {
+                {paginatedGroups.map((group) => {
                   const clusterCount = Object.keys(group.clusterPermissions || {}).length;
                   return (
                     <DataListItem key={group.name}>
@@ -347,6 +362,23 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
                   );
                 })}
               </DataList>
+              {totalPages > 1 && (
+                <Pagination
+                  itemCount={totalItems}
+                  perPage={perPage}
+                  page={page}
+                  onSetPage={handleSetPage}
+                  onPerPageSelect={handlePerPageSelect}
+                  variant={PaginationVariant.bottom}
+                  perPageOptions={[
+                    { title: '10', value: 10 },
+                    { title: '20', value: 20 },
+                    { title: '50', value: 50 },
+                  ]}
+                  style={{ marginTop: '1rem' }}
+                />
+              )}
+              </>
             )}
           </>
         )}

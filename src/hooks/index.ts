@@ -8,3 +8,4 @@ export { useScenariosFetch } from './useScenariosFetch';
 export { useStudioTargetFetch } from './useStudioTargetFetch';
 export { useWebSocket } from './useWebSocket';
 export { useScenarioRunDetail } from './useScenarioRunDetail';
+export { usePagination } from './usePagination';
