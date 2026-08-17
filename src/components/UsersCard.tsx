@@ -31,6 +31,8 @@ import {
   Select,
   SelectOption,
   SelectList,
+  Pagination,
+  PaginationVariant,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, EyeIcon, EllipsisVIcon, KeyIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { usersApi } from '../services/usersApi';
@@ -113,6 +115,8 @@ export function UsersCard({ groups }: UsersCardProps) {
   const [sortColumn, setSortColumn] = useState<'name' | 'organization' | 'lastLogin'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isSortColumnSelectOpen, setIsSortColumnSelectOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const { state } = useAuth();
@@ -160,7 +164,16 @@ export function UsersCard({ groups }: UsersCardProps) {
     });
 
     setFilteredUsers(result);
+    // Reset to page 1 when filters change
+    setPage(1);
   }, [users, searchValue, sortColumn, sortDirection]);
+
+  // Calculate paginated users
+  const totalItems = filteredUsers.length;
+  const totalPages = Math.ceil(totalItems / perPage);
+  const startIndex = (page - 1) * perPage;
+  const endIndex = startIndex + perPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -422,8 +435,9 @@ export function UsersCard({ groups }: UsersCardProps) {
                 </EmptyStateBody>
               </EmptyState>
             ) : (
+              <>
               <DataList aria-label="Users list" isCompact>
-                {filteredUsers.map((user) => (
+                {paginatedUsers.map((user) => (
                   <DataListItem key={user.userId}>
                     <DataListItemRow>
                       <DataListItemCells
@@ -548,6 +562,23 @@ export function UsersCard({ groups }: UsersCardProps) {
                   </DataListItem>
                 ))}
               </DataList>
+              {totalPages > 1 && (
+                <Pagination
+                  itemCount={totalItems}
+                  perPage={perPage}
+                  page={page}
+                  onSetPage={(_evt, newPage) => setPage(newPage)}
+                  onPerPageSelect={(_evt, newPerPage) => { setPerPage(newPerPage); setPage(1); }}
+                  variant={PaginationVariant.bottom}
+                  perPageOptions={[
+                    { title: '10', value: 10 },
+                    { title: '20', value: 20 },
+                    { title: '50', value: 50 },
+                  ]}
+                  style={{ marginTop: '1rem' }}
+                />
+              )}
+              </>
             )}
           </>
         )}

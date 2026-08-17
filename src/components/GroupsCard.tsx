@@ -26,6 +26,8 @@ import {
   DataListItemRow,
   DataListItemCells,
   DataListCell,
+  Pagination,
+  PaginationVariant,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
@@ -95,6 +97,8 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [deletingGroupName, setDeletingGroupName] = useState<string | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [viewMembersGroupName, setViewMembersGroupName] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const { showSuccess, showError } = useNotifications();
 
   const loadGroups = useCallback(async () => {
@@ -134,7 +138,16 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
     });
 
     setFilteredGroups(result);
+    // Reset to page 1 when filters change
+    setPage(1);
   }, [groups, searchValue, sortDirection]);
+
+  // Calculate paginated groups
+  const totalItems = filteredGroups.length;
+  const totalPages = Math.ceil(totalItems / perPage);
+  const startIndex = (page - 1) * perPage;
+  const endIndex = startIndex + perPage;
+  const paginatedGroups = filteredGroups.slice(startIndex, endIndex);
 
   const handleCreate = () => {
     setIsCreateModalOpen(true);
@@ -242,8 +255,9 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
                 </EmptyStateBody>
               </EmptyState>
             ) : (
+              <>
               <DataList aria-label="Groups list" isCompact>
-                {filteredGroups.map((group) => {
+                {paginatedGroups.map((group) => {
                   const clusterCount = Object.keys(group.clusterPermissions || {}).length;
                   return (
                     <DataListItem key={group.name}>
@@ -347,6 +361,23 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
                   );
                 })}
               </DataList>
+              {totalPages > 1 && (
+                <Pagination
+                  itemCount={totalItems}
+                  perPage={perPage}
+                  page={page}
+                  onSetPage={(_evt, newPage) => setPage(newPage)}
+                  onPerPageSelect={(_evt, newPerPage) => { setPerPage(newPerPage); setPage(1); }}
+                  variant={PaginationVariant.bottom}
+                  perPageOptions={[
+                    { title: '10', value: 10 },
+                    { title: '20', value: 20 },
+                    { title: '50', value: 50 },
+                  ]}
+                  style={{ marginTop: '1rem' }}
+                />
+              )}
+              </>
             )}
           </>
         )}
