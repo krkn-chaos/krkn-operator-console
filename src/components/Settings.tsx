@@ -35,6 +35,7 @@ import { ProviderConfigTab } from './ProviderConfigTab';
 import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
+import { VisualizeInstallCard } from './VisualizeInstallCard';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -219,6 +220,15 @@ export function Settings() {
               <Tab eventKey={4} title={<TabTitleText>Elasticsearch</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <ElasticsearchConfigsCard />
+                </div>
+              </Tab>
+            )}
+
+            {/* krkn-visualize Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={5} title={<TabTitleText>krkn-visualize</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <VisualizeInstallCard />
                 </div>
               </Tab>
             )}

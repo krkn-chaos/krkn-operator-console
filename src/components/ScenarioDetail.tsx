@@ -53,7 +53,8 @@ interface ScenarioDetailProps {
 
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenarioImage, rerunKubeconfigPath } = state;
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenarioImage, rerunKubeconfigPath, scenarios } = state;
+  const { showSuccess } = useNotifications();
   const [showPreview, setShowPreview] = useState(startInPreview);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
@@ -70,6 +71,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
   const [customRunName, setCustomRunName] = useState('');
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -218,6 +220,19 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleBack = () => {
     dispatch({ type: 'GO_BACK' });
+  };
+
+  const handleCancelClick = () => {
+    setShowCancelConfirmation(true);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowCancelConfirmation(false);
+    dispatch({ type: 'CANCEL_WORKFLOW' });
+  };
+
+  const handleCancelDismiss = () => {
+    setShowCancelConfirmation(false);
   };
 
   const validateForm = (): boolean => {
@@ -520,10 +535,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-      {/* Back Button */}
-      <div style={{ marginBottom: '1rem' }}>
+      {/* Navigation Buttons */}
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Button variant="link" onClick={handleBack}>
-          ← Back to Scenarios List
+          ← {scenarios ? 'Back to Scenarios List' : 'Back to Job List'}
+        </Button>
+        <Button variant="secondary" onClick={handleCancelClick}>
+          Cancel
         </Button>
       </div>
 
@@ -818,6 +836,26 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           onContinue={handleConflictContinue}
         />
       )}
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Cancel scenario configuration?"
+        isOpen={showCancelConfirmation}
+        onClose={handleCancelDismiss}
+        actions={[
+          <Button key="confirm" variant="danger" onClick={handleCancelConfirm}>
+            Yes, cancel
+          </Button>,
+          <Button key="dismiss" variant="link" onClick={handleCancelDismiss}>
+            No, continue editing
+          </Button>,
+        ]}
+      >
+        <p>
+          Are you sure you want to cancel? All unsaved changes will be lost and you will return to the scenario runs list.
+        </p>
+      </Modal>
     </div>
   );
 }
