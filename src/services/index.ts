@@ -6,3 +6,4 @@ export { websocketService } from './websocketService';
 export { elasticsearchApi } from './elasticsearchApi';
 export { cloudCredentialsApi } from './cloudCredentialsApi';
 export { signatureVerificationApi } from './signatureVerificationApi';
+export { visualizeApi } from './visualizeApi';
