@@ -22,7 +22,11 @@ vi.mock('../../services/websocketService', () => ({
 import { websocketService } from '../../services/websocketService';
 import { useJobs } from '../useJobs';
 
-function sendWsSnapshot(jobs: unknown[], pagination = { page: 1, limit: 20, total: jobs.length, totalPages: 1 }) {
+function sendWsSnapshot(
+  jobs: unknown[],
+  pagination = { page: 1, limit: 20, total: jobs.length, totalPages: 1 },
+  stats?: { totalJobs: number; succeededJobs: number; failedJobs: number },
+) {
   act(() => {
     capturedHandler?.({
       resource: 'jobs',
@@ -30,6 +34,7 @@ function sendWsSnapshot(jobs: unknown[], pagination = { page: 1, limit: 20, tota
       event: 'snapshot',
       data: { jobs },
       pagination,
+      stats,
     });
   });
 }
@@ -138,5 +143,35 @@ describe('useJobs', () => {
 
     act(() => { result.current.setPage(2); });
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it('populates stats from WS snapshot', () => {
+    const { result } = renderHook(() => useJobs());
+
+    const stats = { totalJobs: 5, succeededJobs: 3, failedJobs: 1 };
+    sendWsSnapshot([scenarioJob], undefined, stats);
+
+    expect(result.current.stats).toEqual(stats);
+    expect(result.current.hasReceivedStats).toBe(true);
+  });
+
+  it('starts with hasReceivedStats false', () => {
+    const { result } = renderHook(() => useJobs());
+
+    expect(result.current.hasReceivedStats).toBe(false);
+    expect(result.current.stats).toEqual({ totalJobs: 0, succeededJobs: 0, failedJobs: 0 });
+  });
+
+  it('keeps previous stats when snapshot arrives without stats', () => {
+    const { result } = renderHook(() => useJobs());
+
+    const stats = { totalJobs: 10, succeededJobs: 8, failedJobs: 2 };
+    sendWsSnapshot([scenarioJob, graphJob], undefined, stats);
+    expect(result.current.stats).toEqual(stats);
+    expect(result.current.hasReceivedStats).toBe(true);
+
+    sendWsSnapshot([scenarioJob]);
+    expect(result.current.stats).toEqual(stats);
+    expect(result.current.hasReceivedStats).toBe(true);
   });
 });

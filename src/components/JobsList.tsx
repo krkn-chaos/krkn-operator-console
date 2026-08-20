@@ -61,6 +61,7 @@ import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
+import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 
 import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
 
@@ -180,7 +181,7 @@ export function JobsList({
 }: JobsListProps) {
   const { isAdmin } = useRole();
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
-  const { jobs, pagination, page, setPage, limit, setLimit, isLoading } = useJobs();
+  const { jobs, pagination, stats, hasReceivedStats, page, setPage, limit, setLimit, isLoading } = useJobs();
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -698,7 +699,7 @@ export function JobsList({
           </EmptyState>
         ) : (
           <>
-          <JobStatsSummary unifiedRuns={unifiedRuns} />
+          {hasReceivedStats && <JobStatsSummary stats={stats} />}
           <DataList aria-label="Scenario runs list" isCompact>
             {filteredUnifiedRuns.map((item) => {
               // Handle GraphRun
@@ -1048,6 +1049,10 @@ export function JobsList({
                   >
                     {isRunExpanded && (
                       <>
+                        <div style={{ paddingLeft: '2rem', marginBottom: '1rem' }}>
+                          <ScenarioConfigDisplay scenarioRunName={run.scenarioRunName} />
+                        </div>
+
                         {run.clusterJobs && run.clusterJobs.length > 0 ? (
                           <div style={{ paddingLeft: '2rem' }}>
                             <DataList aria-label="Cluster jobs list" isCompact>

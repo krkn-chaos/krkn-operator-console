@@ -31,6 +31,7 @@ import { TimesIcon } from '@patternfly/react-icons';
 import { useStudioContext } from './StudioContext';
 import { StudioNode } from './StudioNode';
 import { StudioNodeContextMenu } from './StudioNodeContextMenu';
+import { StudioNodeConfigModal } from './StudioNodeConfigModal';
 import { StudioNodeModals } from './StudioNodeModals';
 import type { StudioNode as StudioNodeType } from '../../types/api';
 
@@ -114,6 +115,7 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const [cloneModal, setCloneModal] = useState<{ nodeId: string } | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ nodeId: string } | null>(null);
+  const [configModalNode, setConfigModalNode] = useState<StudioNodeType | null>(null);
 
   // Convert Studio workflow to ReactFlow nodes and edges
   useEffect(() => {
@@ -322,6 +324,8 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
         onConnectStart={handleConnectStart}
         onConnectEnd={handleConnectEnd}
         onNodeContextMenu={handleNodeContextMenu}
+        onPaneClick={handleCloseContextMenu}
+        onMoveStart={handleCloseContextMenu}
         isValidConnection={isValidConnection}
         connectionLineStyle={getConnectionLineStyle()}
         nodeTypes={nodeTypes}
@@ -349,6 +353,7 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
           onClose={handleCloseContextMenu}
           onOpenClone={(nodeId) => setCloneModal({ nodeId })}
           onOpenDelete={(nodeId) => setDeleteModal({ nodeId })}
+          onShowConfig={(node) => setConfigModalNode(node)}
         />
       )}
 
@@ -358,6 +363,12 @@ export function StudioCanvas({ onNodeClick }: StudioCanvasProps) {
         deleteNode={deleteNodeData || null}
         onCloseClone={() => setCloneModal(null)}
         onCloseDelete={() => setDeleteModal(null)}
+      />
+
+      {/* Config View Modal */}
+      <StudioNodeConfigModal
+        node={configModalNode}
+        onClose={() => setConfigModalNode(null)}
       />
     </div>
   );

@@ -2,7 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import type { ClusterJob, UnifiedJobItem, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
-import { setMockJobs, setMockIsLoading, setMockPagination, resetJobsMock } from '../hooks/__mocks__/useJobs';
+import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJobsMock } from '../hooks/__mocks__/useJobs';
 
 vi.mock('../hooks/useJobs');
 
@@ -142,6 +142,7 @@ describe('JobsList', () => {
         clusterJobs: [makeJob('Failed'), makeJob('Failed')],
       }),
     ]);
+    setMockStats({ totalJobs: 5, succeededJobs: 3, failedJobs: 2 });
     render(<JobsList {...defaultProps} />);
     expect(screen.getByText('Total Jobs')).toBeInTheDocument();
     expect(screen.getByText('Pass Rate')).toBeInTheDocument();

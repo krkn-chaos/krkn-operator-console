@@ -76,7 +76,7 @@ export function useScenarioRunsPoller() {
     initialFetchDoneRef.current = true;
 
     try {
-      const scenarioRuns = await operatorApi.listScenarioRuns();
+      const { scenarioRuns } = await operatorApi.listScenarioRuns();
 
       const scenarioRunStates: ScenarioRunState[] = scenarioRuns.map((run) => {
         const runAny = run as ScenarioRunStatusResponse & { creationTimestamp?: string };

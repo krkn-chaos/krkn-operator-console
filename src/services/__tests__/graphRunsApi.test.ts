@@ -526,6 +526,40 @@ describe('graphRunsApi', () => {
     });
   });
 
+  describe('getGraphRunConfig', () => {
+    it('should fetch config by graph run name', async () => {
+      const mockConfig = {
+        targetRequestId: 'target-001',
+        targetClusters: { 'krkn-operator': ['staging'] },
+        scenarioImage: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
+        scenarioName: 'pod-scenarios',
+        kubeconfigPath: '/root/.kube/config',
+        environment: { NAMESPACE: 'default' },
+      };
+
+      mockFetchJson.mockResolvedValue(mockConfig);
+
+      const result = await graphRunsApi.getGraphRunConfig('graphrun-abc123');
+
+      expect(mockFetchJson).toHaveBeenCalledWith('/graphruns/graphrun-abc123/config');
+      expect(result).toEqual(mockConfig);
+    });
+
+    it('should encode special characters in graph run name', async () => {
+      mockFetchJson.mockResolvedValue({});
+
+      await graphRunsApi.getGraphRunConfig('graphrun/special name');
+
+      expect(mockFetchJson).toHaveBeenCalledWith('/graphruns/graphrun%2Fspecial%20name/config');
+    });
+
+    it('should propagate errors', async () => {
+      mockFetchJson.mockRejectedValue(new Error('HTTP 404'));
+
+      await expect(graphRunsApi.getGraphRunConfig('nonexistent')).rejects.toThrow('HTTP 404');
+    });
+  });
+
   describe('validateGraph', () => {
     it('should return no errors for valid graph', () => {
       const validGraph: { [key: string]: GraphScenarioNode } = {

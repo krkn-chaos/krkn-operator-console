@@ -11,38 +11,10 @@ import {
   ExclamationCircleIcon,
   TachometerAltIcon,
 } from '@patternfly/react-icons';
-import type { UnifiedRunItem } from './JobsList';
+import type { JobStatsSummary as JobStatsSummaryType } from '../types/api';
 
 interface JobStatsSummaryProps {
-  unifiedRuns: UnifiedRunItem[];
-}
-
-interface JobCounts {
-  total: number;
-  succeeded: number;
-  failed: number;
-}
-
-function collectJobCounts(items: UnifiedRunItem[]): JobCounts {
-  let total = 0;
-  let succeeded = 0;
-  let failed = 0;
-
-  for (const item of items) {
-    if (item.type === 'scenario') {
-      const jobs = item.run.clusterJobs ?? [];
-      total += jobs.length;
-      succeeded += jobs.filter(j => j.phase === 'Succeeded').length;
-      failed += jobs.filter(j => j.phase === 'Failed').length;
-    } else {
-      const summary = item.summary ?? { totalNodes: 0, completedNodes: 0, failedNodes: 0 };
-      total += summary.totalNodes;
-      succeeded += summary.completedNodes;
-      failed += summary.failedNodes;
-    }
-  }
-
-  return { total, succeeded, failed };
+  stats: JobStatsSummaryType;
 }
 
 const statCards = [
@@ -76,12 +48,12 @@ const statCards = [
   },
 ] as const;
 
-export function JobStatsSummary({ unifiedRuns }: JobStatsSummaryProps) {
+export function JobStatsSummary({ stats: serverStats }: JobStatsSummaryProps) {
   const stats = useMemo(() => {
-    const { total, succeeded, failed } = collectJobCounts(unifiedRuns);
+    const { totalJobs: total, succeededJobs: succeeded, failedJobs: failed } = serverStats;
     const passRate = total > 0 ? ((succeeded / total) * 100).toFixed(1) + '%' : 'N/A';
     return { total, succeeded, failed, passRate };
-  }, [unifiedRuns]);
+  }, [serverStats]);
 
   return (
     <div style={{ marginBottom: '1.5rem' }}>
@@ -95,7 +67,7 @@ export function JobStatsSummary({ unifiedRuns }: JobStatsSummaryProps) {
                  <Icon style={{ fontSize: '1.5rem', color: card.color, marginRight: '0.5rem' }} />
                 {card.label}</CardTitle>
               <CardBody>
-               
+
                 <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{value}</div>
               </CardBody>
               <CardFooter>{card.subText}</CardFooter>

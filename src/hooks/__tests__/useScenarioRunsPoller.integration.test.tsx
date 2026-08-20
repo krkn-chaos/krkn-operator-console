@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ServerMessage } from '../../types/websocket';
-import type { ScenarioRunState, ScenarioRunStatusResponse } from '../../types/api';
+import type { ScenarioRunState, ScenarioRunStatusResponse, ScenarioRunListResponse } from '../../types/api';
 
 const mockDispatch = vi.fn();
 let mockScenarioRuns: ScenarioRunState[] = [];
@@ -52,6 +52,67 @@ function makeRunState(overrides: Partial<ScenarioRunState> = {}): ScenarioRunSta
 function sendWsMessage(msg: ServerMessage) {
   act(() => { capturedHandler?.(msg); });
 }
+
+describe('useScenarioRunsPoller initial fetch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedHandler = null;
+    mockScenarioRuns = [];
+    mockConnectionState.value = 'connected';
+  });
+
+  it('fetches and maps ScenarioRunListResponse on connect', async () => {
+    const listResponse: ScenarioRunListResponse = {
+      scenarioRuns: [
+        {
+          scenarioRunName: 'sr-init-001',
+          phase: 'Running',
+          totalTargets: 2,
+          successfulJobs: 1,
+          failedJobs: 0,
+          runningJobs: 1,
+          clusterJobs: [],
+          creationTimestamp: '2025-07-01T12:00:00Z',
+        },
+      ],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    };
+    vi.mocked(operatorApi.listScenarioRuns).mockResolvedValue(listResponse);
+
+    renderHook(() => useScenarioRunsPoller());
+
+    await vi.waitFor(() => {
+      expect(operatorApi.listScenarioRuns).toHaveBeenCalledTimes(1);
+    });
+
+    const dispatchCall = mockDispatch.mock.calls.find(
+      ([a]) => a.type === 'LOAD_SCENARIO_RUNS_SUCCESS',
+    );
+    expect(dispatchCall).toBeDefined();
+    const runs = dispatchCall![0].payload.runs as ScenarioRunState[];
+    expect(runs).toHaveLength(1);
+    expect(runs[0].scenarioRunName).toBe('sr-init-001');
+    expect(runs[0].createdAt).toBe('2025-07-01T12:00:00Z');
+  });
+
+  it('handles empty ScenarioRunListResponse gracefully', async () => {
+    vi.mocked(operatorApi.listScenarioRuns).mockResolvedValue({
+      scenarioRuns: [],
+    });
+
+    renderHook(() => useScenarioRunsPoller());
+
+    await vi.waitFor(() => {
+      expect(operatorApi.listScenarioRuns).toHaveBeenCalledTimes(1);
+    });
+
+    const dispatchCall = mockDispatch.mock.calls.find(
+      ([a]) => a.type === 'LOAD_SCENARIO_RUNS_SUCCESS',
+    );
+    expect(dispatchCall).toBeDefined();
+    expect(dispatchCall![0].payload.runs).toHaveLength(0);
+  });
+});
 
 describe('useScenarioRunsPoller handleMessage integration', () => {
   beforeEach(() => {

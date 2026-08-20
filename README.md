@@ -4,60 +4,64 @@
 ![pr-checks](https://github.com/krkn-chaos/krkn-operator-console/actions/workflows/pr-checks.yml/badge.svg)
 ![coverage](https://krkn-chaos.github.io/krkn-lib-docs/coverage_badge_krkn-operator-console.svg)
 
-Web console for krkn-operator. React-based user interface using PatternFly design system to manage chaos engineering scenarios, select target clusters, and monitor chaos orchestration workflows.
 
-## Documentation
+**Web console and Chaos Studio for [Krkn Operator](https://github.com/krkn-chaos/krkn-operator).**
 
-📖 **[Official Documentation](https://krkn-chaos.dev/docs/krkn-operator)**
+Krkn Operator Console is the web interface for the Krkn Operator platform, providing a graphical experience to manage chaos engineering across Kubernetes and OpenShift environments.
 
-## Running Locally
+It enables users to compose and execute chaos workflows, manage target clusters, and monitor experiment execution from a centralized interface.
+
+📖 **[Official Documentation](https://krkn-chaos.gateway.scarf.sh/krkn-operator/docs?source=github-console)**
+
+## Development
 
 ### Prerequisites
 
-- Node.js 18+
-- npm
-- krkn-operator running at `http://localhost:8080` (see [krkn-operator README](https://github.com/krkn-chaos/krkn-operator#running-locally))
+* Node.js 18+
+* npm
+* [krkn-operator](https://github.com/krkn-chaos/krkn-operator) running at `http://localhost:8080`
 
 ### Setup
 
 ```bash
 cd krkn-operator-console
 
-# Install dependencies (first time or after package.json changes)
+# Install dependencies
 npm install
 
-# Start the dev server
+# Start the development server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Vite proxies all `/api` requests to `http://localhost:8080`, so the console talks directly to your locally running operator with no extra configuration.
+Open `http://localhost:3000`.
 
-### Environment variables
+Vite proxies `/api` requests to `http://localhost:8080`, allowing the console to communicate directly with the locally running operator.
 
-Copy `.env.example` to `.env.local` to override defaults:
+### Environment Variables
+
+Copy `.env.example` to `.env.local` to override the defaults:
 
 ```bash
 cp .env.example .env.local
 ```
 
-| Variable | Default | Description |
-|---|---|---|
-| `VITE_API_URL` | `/api/v1` | API base path |
-| `VITE_POLL_INTERVAL` | `3000` | Status poll interval (ms) |
-| `VITE_POLL_TIMEOUT` | `60000` | Poll timeout (ms) |
-| `VITE_DEBUG_MODE` | `false` | Enable debug logging |
+| Variable             | Default   | Description               |
+| -------------------- | --------- | ------------------------- |
+| `VITE_API_URL`       | `/api/v1` | API base path             |
+| `VITE_POLL_INTERVAL` | `3000`    | Status poll interval (ms) |
+| `VITE_POLL_TIMEOUT`  | `60000`   | Poll timeout (ms)         |
+| `VITE_DEBUG_MODE`    | `false`   | Enable debug logging      |
 
-### Other commands
+### Other Commands
 
 ```bash
-npm run test          # Run tests in watch mode
-npm run test:run      # Run tests once (CI mode)
-npm run lint          # Lint
-npm run build         # Production build
+npm run test       # Run tests in watch mode
+npm run test:run   # Run tests once (CI mode)
+npm run lint       # Lint
+npm run build      # Production build
 ```
 
 ## License
 
-Copyright 2025 krkn-chaos
+Licensed under the [Apache License 2.0](LICENSE).
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

@@ -43,6 +43,7 @@ export interface ServerMessage<T = unknown> {
   event: ServerEventType;
   data: T;
   pagination?: PaginationMeta;
+  stats?: import('./api').JobStatsSummary;
 }
 
 // Event handlers

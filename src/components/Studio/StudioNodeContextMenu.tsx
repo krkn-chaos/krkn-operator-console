@@ -1,7 +1,7 @@
 /**
  * StudioNodeContextMenu - Context menu for node actions
  *
- * Provides Edit, Delete, and Clone actions for scenario nodes.
+ * Provides Edit, Show Configuration, Delete, and Clone actions for scenario nodes.
  * Triggered by right-click on node.
  */
 
@@ -11,6 +11,7 @@ import {
   MenuContent,
   MenuList,
   MenuItem,
+  Divider,
 } from '@patternfly/react-core';
 import type { StudioNode } from '../../types/api';
 
@@ -19,15 +20,9 @@ interface StudioNodeContextMenuProps {
   onEdit: (node: StudioNode) => void;
   position: { x: number; y: number };
   onClose: () => void;
-}
-
-interface StudioNodeContextMenuProps {
-  node: StudioNode;
-  onEdit: (node: StudioNode) => void;
-  position: { x: number; y: number };
-  onClose: () => void;
   onOpenClone: (nodeId: string) => void;
   onOpenDelete: (nodeId: string) => void;
+  onShowConfig: (node: StudioNode) => void;
 }
 
 export function StudioNodeContextMenu({
@@ -37,11 +32,11 @@ export function StudioNodeContextMenu({
   onClose,
   onOpenClone,
   onOpenDelete,
+  onShowConfig,
 }: StudioNodeContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const isConfigured = node.status === 'configured';
 
-  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -50,7 +45,9 @@ export function StudioNodeContextMenu({
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [onClose]);
 
   const handleEdit = () => {
@@ -68,40 +65,48 @@ export function StudioNodeContextMenu({
     onOpenClone(node.nodeId);
   };
 
+  const handleShowConfig = () => {
+    onClose();
+    onShowConfig(node);
+  };
+
   return (
-    <>
-      {/* Context Menu */}
-      <div
-        ref={menuRef}
-        style={{
-          position: 'fixed',
-          left: position.x,
-          top: position.y,
-          zIndex: 9999,
-          backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-          borderRadius: '4px',
-          border: '1px solid var(--pf-v5-global--BorderColor--100)',
-        }}
-      >
-        <Menu>
-          <MenuContent>
-            <MenuList>
-              <MenuItem onClick={handleEdit}>
-                {isConfigured ? 'Edit Configuration' : 'Configure'}
+    <div
+      ref={menuRef}
+      style={{
+        position: 'fixed',
+        left: position.x,
+        top: position.y,
+        zIndex: 9999,
+        backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        borderRadius: '4px',
+        border: '1px solid var(--pf-v5-global--BorderColor--100)',
+      }}
+    >
+      <Menu>
+        <MenuContent>
+          <MenuList>
+            <MenuItem onClick={handleEdit}>
+              {isConfigured ? 'Edit Configuration' : 'Configure'}
+            </MenuItem>
+            {isConfigured && (
+              <MenuItem onClick={handleShowConfig}>
+                Show Configuration
               </MenuItem>
-              {isConfigured && (
-                <MenuItem onClick={handleCloneClick}>
-                  Clone Node
-                </MenuItem>
-              )}
-              <MenuItem onClick={handleDeleteClick}>
-                Delete Node
+            )}
+            <Divider component="li" />
+            {isConfigured && (
+              <MenuItem onClick={handleCloneClick}>
+                Clone Node
               </MenuItem>
-            </MenuList>
-          </MenuContent>
-        </Menu>
-      </div>
-    </>
+            )}
+            <MenuItem onClick={handleDeleteClick}>
+              Delete Node
+            </MenuItem>
+          </MenuList>
+        </MenuContent>
+      </Menu>
+    </div>
   );
 }

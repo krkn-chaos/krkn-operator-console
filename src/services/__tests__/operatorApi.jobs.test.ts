@@ -38,6 +38,7 @@ describe('OperatorApi - listUnifiedJobs', () => {
       },
     ],
     pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
+    stats: { totalJobs: 2, succeededJobs: 0, failedJobs: 0 },
   };
 
   it('should fetch jobs with pagination params', async () => {
@@ -94,5 +95,62 @@ describe('OperatorApi - listUnifiedJobs', () => {
     });
 
     await expect(operatorApi.listUnifiedJobs(1, 20)).rejects.toThrow('Database error');
+  });
+});
+
+describe('OperatorApi - getScenarioRunConfig', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetAllMocks();
+  });
+
+  it('should fetch config by scenario run name', async () => {
+    const mockConfig = {
+      targetRequestId: 'target-001',
+      targetClusters: { 'krkn-operator': ['staging'] },
+      scenarioImage: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
+      scenarioName: 'pod-scenarios',
+      kubeconfigPath: '/root/.kube/config',
+      environment: { NAMESPACE: 'default' },
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockConfig,
+    });
+
+    const result = await operatorApi.getScenarioRunConfig('run-001');
+
+    const fetchCall = mockFetch.mock.calls[0];
+    expect(fetchCall[0]).toContain('/scenarios/run/run-001/config');
+    expect(result).toEqual(mockConfig);
+  });
+
+  it('should encode special characters in scenario run name', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    await operatorApi.getScenarioRunConfig('run/special name');
+
+    const fetchCall = mockFetch.mock.calls[0][0];
+    expect(fetchCall).toContain(encodeURIComponent('run/special name'));
+  });
+
+  it('should propagate errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      json: async () => ({ message: 'Scenario run not found' }),
+    });
+
+    await expect(operatorApi.getScenarioRunConfig('nonexistent')).rejects.toThrow();
   });
 });

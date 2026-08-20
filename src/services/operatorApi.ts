@@ -31,6 +31,7 @@ import type {
   UpdateFileTypeRequest,
   JobConfigResponse,
   UnifiedJobsResponse,
+  ScenarioRunListResponse,
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -230,6 +231,16 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
+   * GET /api/v1/scenarios/run/{scenarioRunName}/config
+   * Get the configuration used to create a scenario run
+   * @param scenarioRunName - Scenario run name
+   * @returns Promise with the scenario run's environment configuration
+   */
+  async getScenarioRunConfig(scenarioRunName: string): Promise<JobConfigResponse> {
+    return this.fetchJson<JobConfigResponse>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/config`);
+  }
+
+  /**
    * DELETE /api/v1/scenarios/run/{scenarioRunName}
    * Delete an entire scenario run and all its jobs
    * @param scenarioRunName - Scenario run name to delete
@@ -283,19 +294,26 @@ class OperatorApiClient extends BaseApiClient {
 
   /**
    * GET /api/v1/scenarios/run
-   * List all scenario runs (NEW API)
-   * @returns Promise with scenario runs array
+   * List all scenario runs with optional pagination.
+   * When page/limit are omitted, all items are returned.
    */
-  async listScenarioRuns(): Promise<ScenarioRunStatusResponse[]> {
+  async listScenarioRuns(page?: number, limit?: number): Promise<ScenarioRunListResponse> {
     try {
-      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[] }>('/scenarios/run');
+      const params = new URLSearchParams();
+      if (page !== undefined) params.set('page', String(page));
+      if (limit !== undefined) params.set('limit', String(limit));
+      const query = params.toString();
+      const path = `/scenarios/run${query ? `?${query}` : ''}`;
 
-      const runs = data.scenarioRuns || data.runs || [];
-      return runs;
+      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: import('../types/websocket').PaginationMeta }>(path);
+
+      return {
+        scenarioRuns: data.scenarioRuns || data.runs || [],
+        pagination: data.pagination,
+      };
     } catch (error) {
-      // Fallback: if backend doesn't support list yet, return empty array
       if (error instanceof Error && error.message.includes('404')) {
-        return [];
+        return { scenarioRuns: [] };
       }
       throw error;
     }
@@ -612,7 +630,7 @@ class OperatorApiClient extends BaseApiClient {
       const response = await authenticatedFetch(url);
       if (!response.ok) {
         if (response.status === 404) {
-          return { jobs: [], pagination: { page: 0, limit: 0, total: 0, totalPages: 0 } };
+          return { jobs: [], pagination: { page: 0, limit: 0, total: 0, totalPages: 0 }, stats: { totalJobs: 0, succeededJobs: 0, failedJobs: 0 } };
         }
         let message = `HTTP ${response.status}: ${response.statusText}`;
         try {
@@ -624,7 +642,7 @@ class OperatorApiClient extends BaseApiClient {
       return response.json();
     } catch (error) {
       if (error instanceof Error && error.message.includes('404')) {
-        return { jobs: [], pagination: { page: 0, limit: 0, total: 0, totalPages: 0 } };
+        return { jobs: [], pagination: { page: 0, limit: 0, total: 0, totalPages: 0 }, stats: { totalJobs: 0, succeededJobs: 0, failedJobs: 0 } };
       }
       throw error;
     }
