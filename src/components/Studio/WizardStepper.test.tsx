@@ -329,3 +329,84 @@ describe('WizardStepper Enter handling', () => {
     expect(screen.queryByText('Second step')).not.toBeInTheDocument();
   });
 });
+
+describe('WizardStepper cancellation', () => {
+  it('asks for confirmation before cancelling', async () => {
+    const user = userEvent.setup();
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={makeSteps()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+
+    expect(screen.getByText(/cancel configuration/i)).toBeInTheDocument();
+    expect(screen.getByText(/are you sure you want to cancel/i)).toBeInTheDocument();
+  });
+
+  it('calls onCancel instead of onClose when cancellation is confirmed', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={makeSteps()}
+        onCancel={onCancel}
+        onClose={onClose}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+    await user.click(screen.getByRole('button', { name: /yes, cancel/i }));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('uses onClose when cancellation is confirmed and onCancel is absent', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={makeSteps()}
+        onClose={onClose}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+    await user.click(screen.getByRole('button', { name: /yes, cancel/i }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the confirmation when the user continues editing', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={makeSteps()}
+        onClose={onClose}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+    await user.click(screen.getByRole('button', { name: /no, continue editing/i }));
+
+    expect(screen.queryByText(/cancel configuration/i)).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
