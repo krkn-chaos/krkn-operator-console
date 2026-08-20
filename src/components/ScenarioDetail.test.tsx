@@ -228,10 +228,80 @@ describe('ScenarioDetail', () => {
       expect(screen.getByText(/sha256:abc123def456/i)).toBeInTheDocument();
     });
 
-    it('should render back button', () => {
-      renderWithContext();
+    it('should render back button with "Back to Scenarios List" when in normal flow', () => {
+      renderWithContext({ scenarios: [{ name: 'test-scenario' }] });
 
       expect(screen.getByRole('button', { name: /Back to Scenarios List/i })).toBeInTheDocument();
+    });
+
+    it('should render back button with "Back to Job List" when in replay flow', () => {
+      renderWithContext({ scenarios: null });
+
+      expect(screen.getByRole('button', { name: /Back to Job List/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Cancel Button', () => {
+    it('should render cancel button', () => {
+      renderWithContext();
+
+      expect(screen.getByRole('button', { name: /^Cancel$/i })).toBeInTheDocument();
+    });
+
+    it('should show confirmation dialog when cancel button is clicked', async () => {
+      renderWithContext();
+      const user = userEvent.setup();
+
+      const cancelButton = screen.getByRole('button', { name: /^Cancel$/i });
+      await user.click(cancelButton);
+
+      expect(screen.getByText(/cancel scenario configuration/i)).toBeInTheDocument();
+      expect(screen.getByText(/are you sure you want to cancel/i)).toBeInTheDocument();
+    });
+
+    it('should dispatch CANCEL_WORKFLOW when cancel is confirmed', async () => {
+      renderWithContext();
+      const user = userEvent.setup();
+
+      // Click cancel button
+      const cancelButton = screen.getByRole('button', { name: /^Cancel$/i });
+      await user.click(cancelButton);
+
+      // Confirm cancellation
+      const confirmButton = screen.getByRole('button', { name: /yes, cancel/i });
+      await user.click(confirmButton);
+
+      // Should dispatch CANCEL_WORKFLOW action to return to jobs list
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'CANCEL_WORKFLOW' });
+    });
+
+    it('should dismiss confirmation and stay on page when user chooses to continue', async () => {
+      renderWithContext();
+      const user = userEvent.setup();
+
+      // Click cancel button
+      const cancelButton = screen.getByRole('button', { name: /^Cancel$/i });
+      await user.click(cancelButton);
+
+      // Click "No, continue editing"
+      const continueButton = screen.getByRole('button', { name: /no, continue editing/i });
+      await user.click(continueButton);
+
+      // Confirmation dialog should be dismissed
+      expect(screen.queryByText(/cancel scenario configuration/i)).not.toBeInTheDocument();
+
+      // Should NOT dispatch CANCEL_WORKFLOW
+      expect(mockDispatch).not.toHaveBeenCalledWith({ type: 'CANCEL_WORKFLOW' });
+    });
+
+    it('should show message about returning to scenario runs list', async () => {
+      renderWithContext({ scenarios: [{ name: 'test-scenario' }] });
+      const user = userEvent.setup();
+
+      const cancelButton = screen.getByRole('button', { name: /^Cancel$/i });
+      await user.click(cancelButton);
+
+      expect(screen.getByText(/will return to the scenario runs list/i)).toBeInTheDocument();
     });
   });
 
@@ -847,11 +917,21 @@ describe('ScenarioDetail', () => {
   });
 
   describe('Back Navigation', () => {
-    it('should dispatch go back action when back button clicked', async () => {
+    it('should dispatch go back action when back button clicked in normal flow', async () => {
       const user = userEvent.setup();
-      renderWithContext();
+      renderWithContext({ scenarios: [{ name: 'test-scenario' }] });
 
       const backButton = screen.getByRole('button', { name: /Back to Scenarios List/i });
+      await user.click(backButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    });
+
+    it('should dispatch go back action when back button clicked in replay flow', async () => {
+      const user = userEvent.setup();
+      renderWithContext({ scenarios: null });
+
+      const backButton = screen.getByRole('button', { name: /Back to Job List/i });
       await user.click(backButton);
 
       expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
