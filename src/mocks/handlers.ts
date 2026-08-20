@@ -3,6 +3,7 @@ import { config } from '../config';
 import type { AvailableRegistry, CategoryResponse, CreateGraphRunRequest, RegistryDetails } from '../types/api';
 import { krknAiHandlers } from './krknAiHandlers';
 import { krknAiDownloadHandlers } from './krknAiDownloadHandlers';
+import { visualizeHandlers } from './visualizeHandlers';
 import { listPreviewAiChildren } from './krknAiState';
 
 const BASE = config.apiBaseUrl;
@@ -549,6 +550,7 @@ function b64(s: string) { return btoa(s); }
 export const handlers = [
   ...krknAiHandlers,
   ...krknAiDownloadHandlers,
+  ...visualizeHandlers,
   // ─── AUTH ───
   http.get(`${BASE}/auth/is-registered`, () =>
     HttpResponse.json({ registered: true }),

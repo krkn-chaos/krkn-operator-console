@@ -26,8 +26,15 @@ vi.mock('./CloudCredentialsCard', () => ({ CloudCredentialsCard: () => <div>Cred
 vi.mock('./ProviderConfigTab', () => ({ ProviderConfigTab: () => <div>Provider content</div> }));
 vi.mock('./WorkspacesCard', () => ({ WorkspacesCard: () => <div>Workspaces content</div> }));
 vi.mock('./BackupRestoreCard', () => ({ BackupRestoreCard: () => <div>Backup content</div> }));
+vi.mock('./VisualizeInstallCard', () => ({ VisualizeInstallCard: () => <div>Visualize content</div> }));
 
 describe('Settings tabs', () => {
+  it('renders the krkn-visualize tab for admins', () => {
+    render(<Settings />);
+
+    expect(screen.getByRole('tab', { name: 'krkn-visualize' })).toBeInTheDocument();
+  });
+
   it('selects Workspaces and Backup & Restore independently', async () => {
     const user = userEvent.setup();
     render(<Settings />);
