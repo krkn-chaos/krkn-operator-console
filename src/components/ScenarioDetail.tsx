@@ -64,7 +64,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     error: signatureVerificationError,
     isLoading: signatureVerificationLoading,
   } = useSignatureVerification();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath } = state;
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath, scenarios } = state;
   const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
   const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
@@ -122,6 +122,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       mounted = false;
     };
   }, [registryConfig, rerunScenario, state.scenarios]);
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -336,6 +337,19 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleBack = () => {
     dispatch({ type: 'GO_BACK' });
+  };
+
+  const handleCancelClick = () => {
+    setShowCancelConfirmation(true);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowCancelConfirmation(false);
+    dispatch({ type: 'CANCEL_WORKFLOW' });
+  };
+
+  const handleCancelDismiss = () => {
+    setShowCancelConfirmation(false);
   };
 
   const validateForm = (): boolean => {
@@ -734,10 +748,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         }
       }}
     >
-      {/* Back Button */}
-      <div style={{ marginBottom: '1rem' }}>
+      {/* Navigation Buttons */}
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Button variant="link" onClick={handleBack}>
-          ← Back to Scenarios List
+          ← {scenarios ? 'Back to Scenarios List' : 'Back to Job List'}
+        </Button>
+        <Button variant="secondary" onClick={handleCancelClick}>
+          Cancel
         </Button>
       </div>
 
@@ -1038,6 +1055,26 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           onContinue={handleConflictContinue}
         />
       )}
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Cancel scenario configuration?"
+        isOpen={showCancelConfirmation}
+        onClose={handleCancelDismiss}
+        actions={[
+          <Button key="confirm" variant="danger" onClick={handleCancelConfirm}>
+            Yes, cancel
+          </Button>,
+          <Button key="dismiss" variant="link" onClick={handleCancelDismiss}>
+            No, continue editing
+          </Button>,
+        ]}
+      >
+        <p>
+          Are you sure you want to cancel? All unsaved changes will be lost and you will return to the scenario runs list.
+        </p>
+      </Modal>
     </div>
   );
 }
