@@ -68,7 +68,7 @@ export function Login() {
       }
     }
     checkRegistration();
-  }, []);
+  }, [startCooldown]);
 
   // Redirect if already authenticated
   useEffect(() => {
