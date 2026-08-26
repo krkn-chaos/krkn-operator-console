@@ -9,7 +9,7 @@
  * - Error handling with inline validation
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   LoginPage as PFLoginPage,
@@ -21,6 +21,7 @@ import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { RateLimitError } from '../types/auth';
+import { useCooldown } from '../hooks/useCooldown';
 
 export function Login() {
   const { state, login } = useAuth();
@@ -33,29 +34,7 @@ export function Login() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showSessionExpired, setShowSessionExpired] = useState(false);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startCooldown = useCallback((seconds: number) => {
-    setCooldownSeconds(seconds);
-    if (cooldownRef.current) clearInterval(cooldownRef.current);
-    cooldownRef.current = setInterval(() => {
-      setCooldownSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(cooldownRef.current!);
-          cooldownRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-    };
-  }, []);
+  const [cooldownSeconds, startCooldown] = useCooldown();
 
   // Apply theme from localStorage
   useEffect(() => {
@@ -81,7 +60,10 @@ export function Login() {
         const registered = await authService.isRegistered();
         setIsRegistered(registered);
       } catch (error) {
-        // Assume registered on error to show login form
+        if (error instanceof RateLimitError) {
+          setErrorMessage(error.message);
+          startCooldown(5);
+        }
         setIsRegistered(true);
       }
     }

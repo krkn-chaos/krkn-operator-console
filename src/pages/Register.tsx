@@ -5,7 +5,7 @@
  * Creates the first admin account.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LoginPage as PFLoginPage,
@@ -22,6 +22,7 @@ import {
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
 import { RateLimitError } from '../types/auth';
+import { useCooldown } from '../hooks/useCooldown';
 
 export function Register() {
   const { register } = useAuth();
@@ -37,29 +38,7 @@ export function Register() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startCooldown = useCallback((seconds: number) => {
-    setCooldownSeconds(seconds);
-    if (cooldownRef.current) clearInterval(cooldownRef.current);
-    cooldownRef.current = setInterval(() => {
-      setCooldownSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(cooldownRef.current!);
-          cooldownRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-    };
-  }, []);
+  const [cooldownSeconds, startCooldown] = useCooldown();
 
   // Form validation errors
   const [errors, setErrors] = useState({
