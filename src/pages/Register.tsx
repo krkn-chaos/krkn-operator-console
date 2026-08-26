@@ -5,7 +5,7 @@
  * Creates the first admin account.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LoginPage as PFLoginPage,
@@ -21,6 +21,7 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
+import { RateLimitError } from '../types/auth';
 
 export function Register() {
   const { register } = useAuth();
@@ -35,6 +36,30 @@ export function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCooldown = useCallback((seconds: number) => {
+    setCooldownSeconds(seconds);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setCooldownSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, []);
 
   // Form validation errors
   const [errors, setErrors] = useState({
@@ -143,7 +168,12 @@ export function Register() {
         navigate('/login');
       }, 2000);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Registration failed');
+      if (error instanceof RateLimitError) {
+        setErrorMessage(error.message);
+        startCooldown(5);
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : 'Registration failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -315,9 +345,9 @@ export function Register() {
             variant="primary"
             type="submit"
             isBlock
-            isDisabled={isLoading || !!successMessage}
+            isDisabled={isLoading || !!successMessage || cooldownSeconds > 0}
           >
-            {isLoading ? 'Creating Account...' : 'Create Admin Account'}
+            {cooldownSeconds > 0 ? `Please wait (${cooldownSeconds}s)` : isLoading ? 'Creating Account...' : 'Create Admin Account'}
           </Button>
         </ActionGroup>
       </Form>

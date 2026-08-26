@@ -14,7 +14,7 @@ import type {
   AuthError,
   User,
 } from '../types/auth';
-import { AUTH_STORAGE_KEYS } from '../types/auth';
+import { AUTH_STORAGE_KEYS, RateLimitError } from '../types/auth';
 
 import { config } from '../config';
 
@@ -31,6 +31,10 @@ class AuthService {
   async isRegistered(): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE}/is-registered`);
+
+      if (response.status === 429) {
+        throw new RateLimitError();
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -55,6 +59,10 @@ class AuthService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
       });
+
+      if (response.status === 429) {
+        throw new RateLimitError();
+      }
 
       const contentType = response.headers.get('content-type');
       if (!contentType?.includes('application/json')) {
@@ -85,6 +93,10 @@ class AuthService {
         body: JSON.stringify(request),
       });
 
+      if (response.status === 429) {
+        throw new RateLimitError();
+      }
+
       const contentType = response.headers.get('content-type');
       if (!contentType?.includes('application/json')) {
         throw new Error('Login endpoint not available');
@@ -92,7 +104,6 @@ class AuthService {
 
       if (!response.ok) {
         const error: AuthError = await response.json();
-        // Map error codes to user-friendly messages
         if (error.error === 'invalid_credentials') {
           throw new Error('Invalid email or password');
         } else if (error.error === 'account_disabled') {

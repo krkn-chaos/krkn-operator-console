@@ -17,6 +17,7 @@ import {
 } from '@patternfly/react-core';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { RateLimitError } from '../types/auth';
 
 export function RegistrationCheck() {
   const navigate = useNavigate();
@@ -48,7 +49,11 @@ export function RegistrationCheck() {
           navigate('/register', { replace: true });
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to connect to server');
+        if (err instanceof RateLimitError) {
+          setError('Too many requests. Please wait a moment and refresh the page.');
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to connect to server');
+        }
       }
     }
 
