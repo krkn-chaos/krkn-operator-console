@@ -36,6 +36,7 @@ import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
 import { CloudCredentialsCard } from './CloudCredentialsCard';
+import { BackupRestoreCard } from './BackupRestoreCard';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -330,6 +331,15 @@ export function Settings() {
                   </>
                 )}
               </div>
+              </Tab>
+            )}
+
+            {/* Backup & Restore Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={6} title={<TabTitleText>Backup & Restore</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <BackupRestoreCard />
+                </div>
               </Tab>
             )}
           </Tabs>
