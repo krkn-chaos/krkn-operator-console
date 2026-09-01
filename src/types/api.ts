@@ -1390,3 +1390,86 @@ export interface ElasticsearchConfigOperationResponse {
   message: string;
   name?: string;
 }
+
+// krkn-visualize Installation Types
+
+/**
+ * VisualizeConfig - Configuration for a krkn-visualize (Grafana) installation
+ */
+export interface VisualizeConfig {
+  /** Unique name for this visualize instance */
+  name: string;
+  /** Target cluster name where krkn-visualize will be deployed */
+  targetCluster: string;
+  /** Kubernetes namespace for deployment (default: krkn-visualize) */
+  namespace: string;
+  /** Name of the Elasticsearch config to use (optional) */
+  elasticsearchConfigName?: string;
+  /** Grafana admin password */
+  grafanaPassword: string;
+  /** Prometheus URL (auto-detected for OpenShift if not provided) */
+  prometheusUrl?: string;
+  /** Prometheus bearer token (auto-generated for OpenShift if not provided) */
+  prometheusBearerToken?: string;
+  /** Current deployment status */
+  status?: 'Pending' | 'Installing' | 'Ready' | 'Failed';
+  /** Grafana dashboard URL (available after deployment) */
+  grafanaUrl?: string;
+  /** Error message if deployment failed */
+  errorMessage?: string;
+  /** When this instance was created */
+  createdAt?: string;
+  /** Who created this instance */
+  createdBy?: string;
+  /** Last update timestamp */
+  updatedAt?: string;
+}
+
+/**
+ * CreateVisualizeRequest - Request to create/install krkn-visualize
+ */
+export interface CreateVisualizeRequest {
+  /** Unique name for this visualize instance */
+  name: string;
+  /** Target cluster name(s) - can be single or multiple */
+  targetClusters: string[];
+  /** Kubernetes namespace (defaults to krkn-visualize) */
+  namespace?: string;
+  /** Name of existing Elasticsearch config to use */
+  elasticsearchConfigName?: string;
+  /** Grafana admin password */
+  grafanaPassword: string;
+  /** Auto-detect Prometheus config for OpenShift (default: true) */
+  autoDetectPrometheus?: boolean;
+  /** Manual Prometheus URL (if autoDetect is false) */
+  prometheusUrl?: string;
+  /** Manual Prometheus bearer token (if autoDetect is false) */
+  prometheusBearerToken?: string;
+}
+
+/**
+ * ListVisualizeResponse - Response containing list of visualize instances
+ */
+export interface ListVisualizeResponse {
+  instances: VisualizeConfig[];
+  total: number;
+}
+
+/**
+ * VisualizeOperationResponse - Response after create/update/delete operations
+ */
+export interface VisualizeOperationResponse {
+  message: string;
+  name?: string;
+  grafanaUrl?: string;
+}
+
+/**
+ * VisualizeLogsResponse - Response containing installation logs for a visualize instance
+ */
+export interface VisualizeLogsResponse {
+  logs: string;
+  status: string;
+  podName?: string;
+  jobName?: string;
+}
