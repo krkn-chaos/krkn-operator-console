@@ -248,6 +248,8 @@ export interface ScenarioRunRequest {
   customRunName?: string;
   /** Name of a saved Elasticsearch config — backend injects its credentials server-side so the password is never sent by the client */
   elasticsearchConfigName?: string;
+  /** Name of a saved cloud credential — backend injects via SecretKeyRef at controller level */
+  cloudCredentialRef?: string;
 }
 
 export interface TargetJobResult {
@@ -1387,6 +1389,102 @@ export interface ListElasticsearchConfigsResponse {
 }
 
 export interface ElasticsearchConfigOperationResponse {
+  message: string;
+  name?: string;
+}
+
+// Cloud Credential Types
+
+export type CloudCredentialProvider = 'aws' | 'gcp' | 'azure' | 'openstack' | 'baremetal' | 'vmware' | 'ibmcloud';
+
+export interface CloudCredential {
+  name: string;
+  provider: CloudCredentialProvider;
+  description?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface CreateCloudCredentialRequest {
+  name: string;
+  provider: string;
+  description?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+  // AWS
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsDefaultRegion?: string;
+  // GCP (base64-encoded service account JSON)
+  gcpServiceAccountJson?: string;
+  // Azure
+  azureTenantId?: string;
+  azureClientId?: string;
+  azureClientSecret?: string;
+  azureSubscriptionId?: string;
+  // OpenStack
+  osAuthUrl?: string;
+  osUsername?: string;
+  osPassword?: string;
+  osProjectName?: string;
+  osDomainName?: string;
+  // Baremetal (IPMI/BMC)
+  bmcUser?: string;
+  bmcPassword?: string;
+  bmcAddr?: string;
+  // VMware vSphere
+  vsphereIp?: string;
+  vsphereUsername?: string;
+  vspherePassword?: string;
+  // IBM Cloud
+  ibmcUrl?: string;
+  ibmcApikey?: string;
+}
+
+export interface UpdateCloudCredentialRequest {
+  description?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+  // AWS
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsDefaultRegion?: string;
+  // GCP
+  gcpServiceAccountJson?: string;
+  // Azure
+  azureTenantId?: string;
+  azureClientId?: string;
+  azureClientSecret?: string;
+  azureSubscriptionId?: string;
+  // OpenStack
+  osAuthUrl?: string;
+  osUsername?: string;
+  osPassword?: string;
+  osProjectName?: string;
+  osDomainName?: string;
+  // Baremetal
+  bmcUser?: string;
+  bmcPassword?: string;
+  bmcAddr?: string;
+  // VMware
+  vsphereIp?: string;
+  vsphereUsername?: string;
+  vspherePassword?: string;
+  // IBM Cloud
+  ibmcUrl?: string;
+  ibmcApikey?: string;
+}
+
+export interface ListCloudCredentialsResponse {
+  credentials: CloudCredential[];
+  total: number;
+}
+
+export interface CloudCredentialOperationResponse {
   message: string;
   name?: string;
 }

@@ -25,8 +25,10 @@ import { FileSelector } from './FileSelector';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
+import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
+import { hasCloudFields, isCloudEnvVar } from '../utils/cloudProviderUtils';
 
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -90,6 +92,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
   const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
+
+  const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
+  const [selectedCloudCredName, setSelectedCloudCredName] = useState('');
+  const [appliedCloudCredName, setAppliedCloudCredName] = useState('');
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -167,6 +173,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   useEffect(() => {
     if (!showGlobalParameters) return;
     elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
+    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
   }, [showGlobalParameters]);
 
   // Ensures fields whose variable name contains "PASSWORD" are always rendered as secret inputs,
@@ -175,6 +182,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const hasEsGlobalFields = scenarioGlobals?.fields.some(
     (f) => f.variable != null && (f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_'))
   ) ?? false;
+
+  const hasCloudGlobalFields = scenarioGlobals ? hasCloudFields(scenarioGlobals.fields) : false;
+
+  const applyCloudCredential = (credName: string) => {
+    setSelectedCloudCredName(credName);
+    if (!credName) {
+      setAppliedCloudCredName('');
+      return;
+    }
+    setAppliedCloudCredName(credName);
+  };
 
   const applyEsConfig = (configName: string) => {
     setSelectedEsConfigName(configName);
@@ -430,6 +448,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         delete environment['ES_PASSWORD'];
       }
 
+      // When a cloud credential is selected, strip all cloud-related vars from environment.
+      // The controller injects them via SecretKeyRef — plaintext values in the CRD spec
+      // would defeat the security model.
+      if (appliedCloudCredName) {
+        for (const key of Object.keys(environment)) {
+          if (isCloudEnvVar(key)) {
+            delete environment[key];
+          }
+        }
+      }
+
       // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid,
@@ -443,6 +472,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
         customRunName: customRunName.trim() || undefined,
         elasticsearchConfigName: appliedEsConfigName || undefined,
+        cloudCredentialRef: appliedCloudCredName || undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -652,6 +682,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             selectedEsConfigName={selectedEsConfigName}
             onSelectEsConfig={applyEsConfig}
             appliedEsConfigName={appliedEsConfigName}
+            hasCloudGlobalFields={hasCloudGlobalFields}
+            cloudCredentials={cloudCredentials}
+            selectedCloudCredName={selectedCloudCredName}
+            onSelectCloudCredential={applyCloudCredential}
+            appliedCloudCredName={appliedCloudCredName}
           />
 
           {/* Preview Button */}
