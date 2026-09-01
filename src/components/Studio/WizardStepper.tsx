@@ -32,6 +32,7 @@ interface WizardStepperProps {
   validationWarnings?: string[];
   onClose: () => void;
   onSave: () => void;
+  onCancel?: () => void;
 }
 
 export function WizardStepper({
@@ -42,8 +43,10 @@ export function WizardStepper({
   validationWarnings = [],
   onClose,
   onSave,
+  onCancel,
 }: WizardStepperProps) {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
 
   const currentStep = steps[activeStepIndex];
   const isFirstStep = activeStepIndex === 0;
@@ -77,9 +80,27 @@ export function WizardStepper({
     setActiveStepIndex(stepIndex);
   };
 
-  const handleModalClose = () => {
+  const handleCancelClick = () => {
+    setShowCancelConfirmation(true);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowCancelConfirmation(false);
     setActiveStepIndex(0);
-    onClose();
+    if (onCancel) {
+      onCancel();
+    } else {
+      onClose();
+    }
+  };
+
+  const handleCancelDismiss = () => {
+    setShowCancelConfirmation(false);
+  };
+
+  const handleModalClose = () => {
+    // Clicking X on modal shows confirmation
+    setShowCancelConfirmation(true);
   };
 
   const getStepVariant = (stepIndex: number) => {
@@ -89,12 +110,13 @@ export function WizardStepper({
   };
 
   return (
-    <Modal
-      variant={ModalVariant.large}
-      isOpen={isOpen}
-      onClose={handleModalClose}
-      aria-label={title}
-    >
+    <>
+      <Modal
+        variant={ModalVariant.large}
+        isOpen={isOpen}
+        onClose={handleModalClose}
+        aria-label={title}
+      >
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -165,7 +187,7 @@ export function WizardStepper({
           gap: '1rem',
           justifyContent: 'flex-end'
         }}>
-          <Button variant="link" onClick={handleModalClose}>
+          <Button variant="tertiary" onClick={handleCancelClick}>
             Cancel
           </Button>
           {!isFirstStep && (
@@ -182,6 +204,27 @@ export function WizardStepper({
           </Button>
         </div>
       </div>
-    </Modal>
+      </Modal>
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Cancel configuration?"
+        isOpen={showCancelConfirmation}
+        onClose={handleCancelDismiss}
+        actions={[
+          <Button key="confirm" variant="danger" onClick={handleCancelConfirm}>
+            Yes, cancel
+          </Button>,
+          <Button key="dismiss" variant="link" onClick={handleCancelDismiss}>
+            No, continue editing
+          </Button>,
+        ]}
+      >
+        <p>
+          Are you sure you want to cancel? All unsaved changes will be lost and you will return to the scenario runs list.
+        </p>
+      </Modal>
+    </>
   );
 }
