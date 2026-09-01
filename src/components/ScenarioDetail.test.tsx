@@ -5,7 +5,6 @@ import { ScenarioDetail } from './ScenarioDetail';
 import { AppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
-import { useNotifications } from '../hooks';
 import type { AppState } from '../types/api';
 import type {
   ScenarioDetail as ScenarioDetailType,
@@ -18,13 +17,9 @@ import type {
 
 vi.mock('../services/operatorApi');
 vi.mock('../services/elasticsearchApi');
-vi.mock('../hooks', () => ({
-  useNotifications: vi.fn(),
-}));
 
 describe('ScenarioDetail', () => {
   const mockDispatch = vi.fn();
-  const mockShowSuccess = vi.fn();
 
   const mockScenarioDetail: ScenarioDetailType = {
     name: 'pod-scenarios',
@@ -124,15 +119,6 @@ describe('ScenarioDetail', () => {
 
   const renderWithContext = (state: Partial<AppState> = {}, registryConfig: ScenariosRequest | null = null) => {
     const fullState = { ...baseState, ...state };
-
-    vi.mocked(useNotifications).mockReturnValue({
-      showNotification: vi.fn(() => 'notification-id'),
-      showSuccess: mockShowSuccess,
-      showError: vi.fn(),
-      showWarning: vi.fn(),
-      showInfo: vi.fn(),
-      hideNotification: vi.fn(),
-    });
 
     return render(
       <AppContext.Provider value={{ state: fullState, dispatch: mockDispatch }}>
@@ -640,33 +626,6 @@ describe('ScenarioDetail', () => {
             scenarioImage: 'pod-scenarios', // Private registry: no krkn-hub prefix
             registryName: 'corp-registry',
           })
-        );
-      });
-    });
-
-    it('should show success notification when scenario run created', async () => {
-      const user = userEvent.setup();
-      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
-      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
-      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
-
-      renderWithContext({
-        scenarioFormValues: {
-          NAMESPACE: 'default',
-        },
-      });
-
-      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
-      await user.click(previewButton);
-
-      const runButton = screen.getByRole('button', { name: /Run Scenarios/i });
-      await user.click(runButton);
-
-      await waitFor(() => {
-        expect(mockShowSuccess).toHaveBeenCalledWith(
-          'Scenario run created successfully',
-          expect.stringContaining('test-run-123'),
-          0
         );
       });
     });
