@@ -33,6 +33,7 @@ type AppSidebarProps = Omit<SidebarNavProps, 'expanded'> & {
  * @param onNavigateStudio - Called when Chaos Studio menu item is clicked
  * @param onOpenFiles - Called when Files menu item is clicked
  * @param onNavigateTerminal - Called when Terminal menu item is clicked
+ * @param onNavigateElasticsearchData - Called when Elasticsearch Data menu item is clicked
  * @param onNavigateSettings - Called when Settings menu item is clicked
  * @param onEditProfile - Called when Edit Profile menu item is clicked
  * @param onChangePassword - Called when Change Password menu item is clicked
@@ -53,6 +54,7 @@ type AppSidebarProps = Omit<SidebarNavProps, 'expanded'> & {
  *   onNavigateStudio={() => dispatch({ type: 'NAVIGATE_TO_STUDIO' })}
  *   onOpenFiles={() => setIsFileManagementOpen(true)}
  *   onNavigateTerminal={() => dispatch({ type: 'NAVIGATE_TO_TERMINAL' })}
+ *   onNavigateElasticsearchData={() => dispatch({ type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' })}
  *   onNavigateSettings={() => dispatch({ type: 'NAVIGATE_TO_SETTINGS' })}
  *   onEditProfile={() => setIsEditProfileOpen(true)}
  *   onChangePassword={() => setIsChangePasswordOpen(true)}

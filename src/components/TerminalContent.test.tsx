@@ -207,6 +207,22 @@ describe('TerminalContent', () => {
     });
   });
 
+  it('should cleanup target request on unmount while open', async () => {
+    const { unmount } = render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+
+    // Wait for discovery to complete (clusters rendered => discoveryUuid active).
+    await waitFor(() => {
+      expect(screen.getByText('cluster-a')).toBeInTheDocument();
+    });
+
+    // Unmount directly (e.g. navigation) without an isOpen -> false transition.
+    unmount();
+
+    await waitFor(() => {
+      expect(operatorApi.deleteTargetRequest).toHaveBeenCalledWith('test-uuid');
+    });
+  });
+
   it('should handle available commands fetch failure gracefully', async () => {
     vi.mocked(operatorApi.getAvailableTerminalCommands).mockRejectedValue(
       new Error('Failed to fetch')

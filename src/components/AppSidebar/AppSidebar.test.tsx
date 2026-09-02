@@ -20,6 +20,7 @@ const makeHandlers = (): Handlers => ({
   onNavigateStudio: vi.fn(),
   onOpenFiles: vi.fn(),
   onNavigateTerminal: vi.fn(),
+  onNavigateElasticsearchData: vi.fn(),
   onNavigateSettings: vi.fn(),
   onEditProfile: vi.fn(),
   onChangePassword: vi.fn(),

@@ -36,7 +36,7 @@ interface ElasticsearchConfigFormProps {
   isEdit?: boolean;
 }
 
-function ElasticsearchConfigForm({ initial, onSubmit, onCancel, isEdit = false }: ElasticsearchConfigFormProps) {
+export function ElasticsearchConfigForm({ initial, onSubmit, onCancel, isEdit = false }: ElasticsearchConfigFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [host, setHost] = useState(initial?.host ?? '');
   const [port, setPort] = useState(String(initial?.port ?? 9200));

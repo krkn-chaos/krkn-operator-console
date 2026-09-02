@@ -1,5 +1,5 @@
 import { Nav, NavItem, NavList, NavExpandable } from '@patternfly/react-core';
-import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon } from '@patternfly/react-icons';
+import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon } from '@patternfly/react-icons';
 import { MdWork } from 'react-icons/md';
 import type { ReactNode } from 'react';
 import type { SidebarNavProps } from './types';
@@ -26,6 +26,7 @@ import './SidebarPFNav.css';
  * @param onNavigateStudio - Called when Chaos Studio menu item is clicked
  * @param onOpenFiles - Called when Files menu item is clicked
  * @param onNavigateTerminal - Called when Terminal menu item is clicked
+ * @param onNavigateElasticsearchData - Called when Elasticsearch Data menu item is clicked
  * @param onNavigateSettings - Called when Settings menu item is clicked
  * @param onEditProfile - Called when Edit Profile menu item is clicked
  * @param onChangePassword - Called when Change Password menu item is clicked
@@ -45,6 +46,7 @@ import './SidebarPFNav.css';
  *   onNavigateStudio={() => console.log('studio')}
  *   onOpenFiles={() => console.log('files')}
  *   onNavigateTerminal={() => console.log('terminal')}
+ *   onNavigateElasticsearchData={() => console.log('elasticsearch data')}
  *   onNavigateSettings={() => console.log('settings')}
  *   onEditProfile={() => console.log('edit')}
  *   onChangePassword={() => console.log('password')}
@@ -63,6 +65,7 @@ export function SidebarPFNav({
   onNavigateStudio,
   onOpenFiles,
   onNavigateTerminal,
+  onNavigateElasticsearchData,
   onNavigateSettings,
   onEditProfile,
   onChangePassword,
@@ -90,6 +93,9 @@ export function SidebarPFNav({
           <NavItem onClick={onOpenFiles} aria-label="Files">{item(<FolderIcon />, 'Files')}</NavItem>
           <NavItem isActive={activePhase === 'terminal'} onClick={onNavigateTerminal} aria-label="Terminal">
             {item(<TerminalIcon />, 'Terminal')}
+          </NavItem>
+          <NavItem isActive={activePhase === 'elasticsearch_data'} onClick={onNavigateElasticsearchData} aria-label="Elasticsearch Data">
+            {item(<DatabaseIcon />, 'ES Data')}
           </NavItem>
           {isAdmin && (
             <NavItem isActive={activePhase === 'settings'} onClick={onNavigateSettings} aria-label="Settings">

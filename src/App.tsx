@@ -7,7 +7,7 @@ import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio, ElasticsearchDataView } from './components';
 import { FileManagementModal } from './components/FileManagement';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
 import { useRole } from './hooks/useRole';
@@ -136,25 +136,30 @@ function App() {
     }
   };
 
-  const handleCreateJob = async () => {
-    // Create initial target for fetching clusters
-    dispatch({ type: 'INIT_START' });
+  const handleCreateJob = () => {
+    const proceed = async () => {
+      // Create initial target for fetching clusters
+      dispatch({ type: 'INIT_START' });
 
-    try {
-      const response = await operatorApi.createTargetRequest();
-      dispatch({
-        type: 'INIT_SUCCESS',
-        payload: { uuid: response.uuid },
-      });
-    } catch (error) {
-      dispatch({
-        type: 'INIT_ERROR',
-        payload: {
-          type: 'network',
-          message: error instanceof Error ? error.message : 'Failed to create target',
-        },
-      });
-    }
+      try {
+        const response = await operatorApi.createTargetRequest();
+        dispatch({
+          type: 'INIT_SUCCESS',
+          payload: { uuid: response.uuid },
+        });
+      } catch (error) {
+        dispatch({
+          type: 'INIT_ERROR',
+          payload: {
+            type: 'network',
+            message: error instanceof Error ? error.message : 'Failed to create target',
+          },
+        });
+      }
+    };
+
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
   };
 
   const handleRerunScenario = async (run: ScenarioRunState, jobId: string) => {
@@ -239,6 +244,13 @@ function App() {
 
       case 'settings':
         return <Settings />;
+
+      case 'elasticsearch_data':
+        return (
+          <PageSection>
+            <ElasticsearchDataView />
+          </PageSection>
+        );
 
       case 'terminal':
         return (
@@ -351,6 +363,12 @@ function App() {
     proceed();
   };
 
+  const handleNavigateToElasticsearchData = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
   const handleNavigateToHome = () => {
     const proceed = () => dispatch({ type: 'JOBS_LIST_READY' });
     if (!checkStudioGuard(proceed)) return;
@@ -412,6 +430,7 @@ function App() {
       onNavigateStudio={handleNavigateToStudio}
       onOpenFiles={handleNavigateToFiles}
       onNavigateTerminal={handleNavigateToTerminal}
+      onNavigateElasticsearchData={handleNavigateToElasticsearchData}
       onNavigateSettings={handleNavigateToSettings}
       onEditProfile={handleEditProfile}
       onChangePassword={handleChangePassword}
