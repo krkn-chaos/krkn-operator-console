@@ -22,6 +22,26 @@ import { useNotifications } from './hooks';
 import { isApiError } from './utils/apiClient';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
 
+/**
+ * Resolves the notification title/message for a failed delete operation.
+ * A 403 ApiError is reported as a permission error; anything else falls
+ * back to the backend message (or a generic one for non-Error rejections).
+ */
+function getDeleteErrorNotification(
+  error: unknown,
+  resourceLabel: string
+): { title: string; message: string } {
+  if (isApiError(error) && error.status === 403) {
+    return {
+      title: 'Permission denied',
+      message: `You do not have permission to delete this ${resourceLabel}`,
+    };
+  }
+
+  const errorMessage = error instanceof Error ? error.message : `Failed to delete ${resourceLabel}`;
+  return { title: `Failed to delete ${resourceLabel}`, message: errorMessage };
+}
+
 function App() {
   const { state, dispatch } = useAppContext();
   const { state: authState, logout } = useAuth();
@@ -87,14 +107,8 @@ function App() {
       });
       showSuccess('Scenario run deleted', `Successfully deleted ${scenarioRunName}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete scenario run';
-
-      // Check if it's a 403 Forbidden error
-      if (isApiError(error) && error.status === 403) {
-        showError('Permission denied', 'You do not have permission to delete this scenario run');
-      } else {
-        showError('Failed to delete scenario run', errorMessage);
-      }
+      const { title, message } = getDeleteErrorNotification(error, 'scenario run');
+      showError(title, message);
     }
   };
 
@@ -105,14 +119,8 @@ function App() {
       // which will reflect the job deletion
       showSuccess('Job deleted', `Successfully deleted job ${jobId}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete job';
-
-      // Check if it's a 403 Forbidden error
-      if (isApiError(error) && error.status === 403) {
-        showError('Permission denied', 'You do not have permission to delete this job');
-      } else {
-        showError('Failed to delete job', errorMessage);
-      }
+      const { title, message } = getDeleteErrorNotification(error, 'job');
+      showError(title, message);
     }
   };
 
@@ -126,14 +134,8 @@ function App() {
       });
       showSuccess('Graph run deleted', `Successfully deleted ${graphRunName}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete graph run';
-
-      // Check if it's a 403 Forbidden error
-      if (isApiError(error) && error.status === 403) {
-        showError('Permission denied', 'You do not have permission to delete this graph run');
-      } else {
-        showError('Failed to delete graph run', errorMessage);
-      }
+      const { title, message } = getDeleteErrorNotification(error, 'graph run');
+      showError(title, message);
     }
   };
 

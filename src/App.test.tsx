@@ -7,6 +7,7 @@ import { AppContext } from './context/AppContext';
 import { operatorApi } from './services/operatorApi';
 import { graphRunsApi } from './services';
 import { useNotifications } from './hooks';
+import { createNotificationsMock } from './test/notificationsMock';
 import type { AppState } from './types/api';
 
 // App.tsx pulls in auth, pollers, role checks, and several large child
@@ -94,6 +95,12 @@ vi.mock('./components', () => ({
 /**
  * Creates an ApiError compatible with isApiError() checks.
  * isApiError expects: err instanceof Error && typeof err.status === 'number'
+ *
+ * operatorApi.deleteScenarioRun/deleteJob and graphRunsApi.deleteGraphRun are
+ * mocked wholesale below, so this shape is asserted here as a given rather
+ * than proven - the guarantee that those service methods actually throw a
+ * status-bearing error like this one is covered separately, against the real
+ * fetch/response path, in operatorApi.deleteRuns.test.ts and graphRunsApi.test.ts.
  */
 function createApiError(message: string, status: number, statusText: string): Error & { status: number; statusText: string } {
   return Object.assign(new Error(message), { status, statusText });
@@ -152,14 +159,9 @@ describe('App delete handlers - status-based permission detection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useNotifications).mockReturnValue({
-      showNotification: vi.fn(),
-      showSuccess: mockShowSuccess,
-      showError: mockShowError,
-      showInfo: vi.fn(),
-      showWarning: vi.fn(),
-      hideNotification: vi.fn(),
-    });
+    vi.mocked(useNotifications).mockReturnValue(
+      createNotificationsMock({ showSuccess: mockShowSuccess, showError: mockShowError }),
+    );
   });
 
   it('shows the permission-denied message when deleteScenarioRun rejects with a 403 ApiError', async () => {

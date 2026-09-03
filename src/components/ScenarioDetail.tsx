@@ -52,6 +52,25 @@ interface ScenarioDetailProps {
   registryConfig: ScenariosRequest | null;
 }
 
+/**
+ * ScenarioDetail — configure and run a chaos scenario against selected clusters.
+ *
+ * Renders the scenario's parameter form (required/optional/global fields), a
+ * configuration preview, cluster-conflict detection, and run submission.
+ * Must be rendered inside an AppContext.Provider — it reads workflow state
+ * such as selectedClusters, scenarioDetail, and scenarioFormValues, and
+ * dispatches the resulting scenario run back into that state on success.
+ *
+ * @param scenarioName - Name of the scenario to load and configure
+ * @param registryConfig - Private registry to pull the scenario image from, or null for the public registry
+ *
+ * @example
+ * // As used in App.tsx once a scenario has been selected:
+ * <ScenarioDetail
+ *   scenarioName={state.selectedScenario}
+ *   registryConfig={state.registryConfig}
+ * />
+ */
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
   const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenarioImage, rerunKubeconfigPath } = state;
@@ -456,7 +475,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       dispatch({
         type: 'SCENARIOS_RUN_BATCH_ERROR',
         payload: {
-          message: error instanceof Error ? error.message : 'Failed to run scenario',
+          message: isApiError(error) && error.status === 500
+            ? 'Internal error, please try again'
+            : (error instanceof Error ? error.message : 'Failed to run scenario'),
           type: 'api_error',
         },
       });

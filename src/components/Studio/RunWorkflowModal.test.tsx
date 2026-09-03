@@ -5,6 +5,7 @@ import { RunWorkflowModal } from './RunWorkflowModal';
 import { graphRunsApi } from '../../services';
 import { useNotifications } from '../../hooks';
 import { useStudioContext } from './StudioContext';
+import { createNotificationsMock } from '../../test/notificationsMock';
 import type { Cluster } from '../../types/api';
 
 vi.mock('../../services');
@@ -40,14 +41,9 @@ describe('RunWorkflowModal error handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    vi.mocked(useNotifications).mockReturnValue({
-      showNotification: vi.fn(),
-      showSuccess: mockShowSuccess,
-      showError: mockShowError,
-      showInfo: vi.fn(),
-      showWarning: vi.fn(),
-      hideNotification: vi.fn(),
-    });
+    vi.mocked(useNotifications).mockReturnValue(
+      createNotificationsMock({ showSuccess: mockShowSuccess, showError: mockShowError }),
+    );
 
     vi.mocked(useStudioContext).mockReturnValue({
       workflow: { nodes: [], edges: [], nextNodeNumber: 1 },

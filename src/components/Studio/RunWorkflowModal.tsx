@@ -3,6 +3,28 @@
  *
  * Uses ClusterMultiSelector to let users choose target clusters,
  * then submits the workflow as a GraphRun.
+ *
+ * `targetFetchState` drives an internal loading/polling/ready/error sequence
+ * (see `useStudioTargetFetch`); once it reaches `'ready'` with `clusters`
+ * populated, the user can pick clusters and submit. On success, `onSuccess`
+ * is called after the GraphRun is created; on failure, an inline
+ * notification is shown ("Internal error, please try again" for HTTP 500,
+ * otherwise the backend's message) and the modal stays open.
+ *
+ * @example
+ * // As used in Studio.tsx to run the current canvas as a GraphRun:
+ * <RunWorkflowModal
+ *   isOpen={isRunWorkflowOpen}
+ *   onClose={() => {
+ *     setIsRunWorkflowOpen(false);
+ *     targetFetch.reset();
+ *   }}
+ *   onSuccess={() => {
+ *     setIsRunWorkflowOpen(false);
+ *     targetFetch.reset();
+ *   }}
+ *   targetFetchState={targetFetch.state}
+ * />
  */
 
 import { useState, useEffect } from 'react';
