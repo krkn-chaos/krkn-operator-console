@@ -24,6 +24,7 @@ import { FileSelector } from './FileSelector';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
+import { isApiError } from '../utils/apiClient';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig } from '../types/api';
 
@@ -329,6 +330,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         type: 'SCENARIOS_RUN_BATCH_SUCCESS',
       });
     } catch (error) {
+      if (isApiError(error) && error.status === 500) {
+        setValidationErrors(['Internal error, please try again']);
+        return;
+      }
       const msg = error instanceof Error ? error.message : 'Failed to run scenario';
       const isConflict = msg.includes('409') || msg.toLowerCase().includes('conflict');
       if (isConflict && customRunName.trim()) {

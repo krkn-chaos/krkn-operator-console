@@ -19,6 +19,7 @@ import { operatorApi } from './services/operatorApi';
 import { graphRunsApi } from './services';
 import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
+import { isApiError } from './utils/apiClient';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
 
 function App() {
@@ -89,7 +90,7 @@ function App() {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete scenario run';
 
       // Check if it's a 403 Forbidden error
-      if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
+      if (isApiError(error) && error.status === 403) {
         showError('Permission denied', 'You do not have permission to delete this scenario run');
       } else {
         showError('Failed to delete scenario run', errorMessage);
@@ -107,7 +108,7 @@ function App() {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete job';
 
       // Check if it's a 403 Forbidden error
-      if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
+      if (isApiError(error) && error.status === 403) {
         showError('Permission denied', 'You do not have permission to delete this job');
       } else {
         showError('Failed to delete job', errorMessage);
@@ -128,7 +129,7 @@ function App() {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete graph run';
 
       // Check if it's a 403 Forbidden error
-      if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
+      if (isApiError(error) && error.status === 403) {
         showError('Permission denied', 'You do not have permission to delete this graph run');
       } else {
         showError('Failed to delete graph run', errorMessage);

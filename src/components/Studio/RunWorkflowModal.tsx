@@ -18,6 +18,7 @@ import { ClusterMultiSelector } from '../ClusterMultiSelector';
 import { ResiliencyScoreModal } from '../ResiliencyScoreModal';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
+import { isApiError } from '../../utils/apiClient';
 import type { SelectedCluster, CreateGraphRunRequest, Cluster, ResiliencyScoreConfig } from '../../types/api';
 import { useStudioContext } from './StudioContext';
 import { clearAutosave } from './studioAutosave';
@@ -173,7 +174,9 @@ export function RunWorkflowModal({
       clearAutosave();
       onSuccess();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create GraphRun';
+      const errorMessage = isApiError(error) && error.status === 500
+        ? 'Internal error, please try again'
+        : (error instanceof Error ? error.message : 'Failed to create GraphRun');
       showError('Failed to run workflow', errorMessage);
     } finally {
       setIsSubmitting(false);
