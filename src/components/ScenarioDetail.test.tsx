@@ -656,6 +656,109 @@ describe('ScenarioDetail', () => {
         );
       });
     });
+
+    /**
+     * Creates an ApiError compatible with isApiError() checks.
+     * isApiError expects: err instanceof Error && typeof err.status === 'number'
+     */
+    function createApiError(message: string, status: number, statusText: string): Error & { status: number; statusText: string } {
+      return Object.assign(new Error(message), { status, statusText });
+    }
+
+    it('shows a generic message and hides the raw backend message when runScenario returns a 500 ApiError', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+      vi.mocked(operatorApi.runScenario).mockRejectedValueOnce(
+        createApiError('internal error validating cluster access', 500, 'Internal Server Error'),
+      );
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
+      await user.click(previewButton);
+
+      const runButton = screen.getByRole('button', { name: /Run Scenarios/i });
+      await user.click(runButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Internal error, please try again')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/internal error validating cluster access/i)).not.toBeInTheDocument();
+    });
+
+    it('preserves the existing conflict message when runScenario rejects with a non-ApiError 409 message', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+      vi.mocked(operatorApi.runScenario).mockRejectedValueOnce(
+        new Error('409 Conflict: run name already in use'),
+      );
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+        rerunIntent: null,
+      });
+
+      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
+      await user.click(previewButton);
+
+      const runNameInput = screen.getByPlaceholderText('e.g. nightly-pod-disruption-test');
+      await user.type(runNameInput, 'my-run');
+
+      const runButton = screen.getByRole('button', { name: /Run Scenarios/i });
+      await user.click(runButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('A run named "my-run" already exists. Please choose a different name.'),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('shows a generic message and hides the raw backend message when the pre-flight getActiveRuns check returns a 500 ApiError', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getActiveRuns).mockRejectedValueOnce(
+        createApiError('internal error validating cluster access', 500, 'Internal Server Error'),
+      );
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
+      await user.click(previewButton);
+
+      const runButton = screen.getByRole('button', { name: /Run Scenarios/i });
+      await user.click(runButton);
+
+      // runScenario must never be reached - getActiveRuns failed first.
+      await waitFor(() => {
+        expect(mockDispatch).toHaveBeenCalledWith({
+          type: 'SCENARIOS_RUN_BATCH_ERROR',
+          payload: {
+            message: 'Internal error, please try again',
+            type: 'api_error',
+          },
+        });
+      });
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      expect(mockDispatch).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            message: expect.stringContaining('internal error validating cluster access'),
+          }),
+        }),
+      );
+    });
   });
 
   describe('Cluster Conflict Warning', () => {

@@ -3,6 +3,28 @@
  *
  * Uses ClusterMultiSelector to let users choose target clusters,
  * then submits the workflow as a GraphRun.
+ *
+ * `targetFetchState` drives an internal loading/polling/ready/error sequence
+ * (see `useStudioTargetFetch`); once it reaches `'ready'` with `clusters`
+ * populated, the user can pick clusters and submit. On success, `onSuccess`
+ * is called after the GraphRun is created; on failure, an inline
+ * notification is shown ("Internal error, please try again" for HTTP 500,
+ * otherwise the backend's message) and the modal stays open.
+ *
+ * @example
+ * // As used in Studio.tsx to run the current canvas as a GraphRun:
+ * <RunWorkflowModal
+ *   isOpen={isRunWorkflowOpen}
+ *   onClose={() => {
+ *     setIsRunWorkflowOpen(false);
+ *     targetFetch.reset();
+ *   }}
+ *   onSuccess={() => {
+ *     setIsRunWorkflowOpen(false);
+ *     targetFetch.reset();
+ *   }}
+ *   targetFetchState={targetFetch.state}
+ * />
  */
 
 import { useState, useEffect } from 'react';
@@ -18,6 +40,7 @@ import { ClusterMultiSelector } from '../ClusterMultiSelector';
 import { ResiliencyScoreModal } from '../ResiliencyScoreModal';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
+import { isApiError } from '../../utils/apiClient';
 import type { SelectedCluster, CreateGraphRunRequest, Cluster, ResiliencyScoreConfig } from '../../types/api';
 import { useStudioContext } from './StudioContext';
 import { clearAutosave } from './studioAutosave';
@@ -173,7 +196,9 @@ export function RunWorkflowModal({
       clearAutosave();
       onSuccess();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create GraphRun';
+      const errorMessage = isApiError(error) && error.status === 500
+        ? 'Internal error, please try again'
+        : (error instanceof Error ? error.message : 'Failed to create GraphRun');
       showError('Failed to run workflow', errorMessage);
     } finally {
       setIsSubmitting(false);
