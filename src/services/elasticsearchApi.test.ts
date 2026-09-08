@@ -26,6 +26,7 @@ const mockResponse: QueryTelemetryResponse = {
     },
   ],
   total: 1,
+  stats: { pass: 1, fail: 0, pass_percent: 100 },
 };
 
 /** Builds a minimal Response-like object for the fetch mock. */

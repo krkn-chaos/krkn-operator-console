@@ -1419,7 +1419,16 @@ export interface TelemetryDocument {
   status: boolean;
 }
 
+// Pass/fail aggregates across the whole matched window (not just the returned
+// page). pass + fail can therefore exceed QueryTelemetryResponse.total.
+export interface TelemetryStats {
+  pass: number;
+  fail: number;
+  pass_percent: number; // 0-100
+}
+
 export interface QueryTelemetryResponse {
   documents: TelemetryDocument[];
   total: number;
+  stats: TelemetryStats;
 }

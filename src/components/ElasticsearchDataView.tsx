@@ -29,9 +29,11 @@ import { DatabaseIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications } from '../hooks';
 import { ElasticsearchConfigForm } from './ElasticsearchConfigsCard';
+import { JobStatsSummary } from './JobStatsSummary';
 import type {
   ElasticsearchConfig,
   TelemetryDocument,
+  TelemetryStats,
   CreateElasticsearchConfigRequest,
   UpdateElasticsearchConfigRequest,
 } from '../types/api';
@@ -117,6 +119,7 @@ export function ElasticsearchDataView() {
   const [startDate, setStartDate] = useState(isoDate(10));
   const [endDate, setEndDate] = useState(isoDate(0));
   const [documents, setDocuments] = useState<TelemetryDocument[]>([]);
+  const [stats, setStats] = useState<TelemetryStats | null>(null);
   const [loadingConfigs, setLoadingConfigs] = useState(true);
   const [querying, setQuerying] = useState(false);
   const [hasQueried, setHasQueried] = useState(false);
@@ -133,6 +136,7 @@ export function ElasticsearchDataView() {
   const invalidateResults = useCallback(() => {
     latestRequestId.current += 1;
     setDocuments([]);
+    setStats(null);
     setHasQueried(false);
     setQuerying(false);
   }, []);
@@ -195,6 +199,7 @@ export function ElasticsearchDataView() {
       // Ignore responses superseded by a newer run or by a criteria change.
       if (latestRequestId.current !== requestId) return;
       setDocuments(result.documents || []);
+      setStats(result.stats ?? null);
       setHasQueried(true);
     } catch (err) {
       if (latestRequestId.current !== requestId) return;
@@ -330,6 +335,26 @@ export function ElasticsearchDataView() {
                   </Button>
                 </FlexItem>
               </Flex>
+
+              {hasQueried && !querying && stats && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <JobStatsSummary
+                    stats={{
+                      // Whole matched window: response.total counts only the returned page.
+                      totalJobs: stats.pass + stats.fail,
+                      succeededJobs: stats.pass,
+                      failedJobs: stats.fail,
+                    }}
+                    labels={{ total: 'Total Runs', succeeded: 'Passed', failed: 'Failed', passRate: 'Pass Rate' }}
+                    subTexts={{
+                      total: 'Runs across matched window',
+                      succeeded: 'status = true',
+                      failed: 'status = false',
+                      passRate: 'Percentage of runs that passed',
+                    }}
+                  />
+                </div>
+              )}
 
               <div style={{ marginTop: '1.5rem' }}>
                 {querying ? (
