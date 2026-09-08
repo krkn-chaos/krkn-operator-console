@@ -106,12 +106,10 @@ function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, target
   // TODO: Remove this comment after debugging - showing all targets for now
   const availableTargets = targets; // targets.filter((t) => t.ready);
 
-  console.log('VisualizeInstallForm render:', {
-    targets,
-    availableTargets,
-    targetsLength: targets.length,
-    availableTargetsLength: availableTargets.length,
-  });
+  // Debug logging without exposing sensitive data
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('VisualizeInstallForm ready: %d targets available', availableTargets.length);
+  }
 
   return (
     <Form>
@@ -302,11 +300,12 @@ export function VisualizeInstallCard() {
         targetsApi.listTargets(),
       ]);
 
-      console.log('Fetched data:', {
-        instances: instancesData,
-        esConfigs: esConfigsData,
-        targetsResponse: targetsData,
-      });
+      // Don't log sensitive data (passwords, credentials)
+      console.debug('Data loaded: instances=%d, esConfigs=%d, targets=%d',
+        instancesData?.length || 0,
+        esConfigsData?.length || 0,
+        targetsData?.length || 0
+      );
 
       setInstances(instancesData);
       setEsConfigs(esConfigsData);
