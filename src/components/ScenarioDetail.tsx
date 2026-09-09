@@ -28,8 +28,9 @@ import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider, resolveEffectiveCloudType, filterScenarioFieldsByCloudType, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
 import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 import { runOnEnterFromFormControl } from '../utils/keyboard';
+import { useSignatureVerification } from '../hooks/useSignatureVerification';
 
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential } from '../types/api';
 import { createScenarioReference } from '../utils/scenarioReference';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
@@ -58,7 +59,10 @@ interface ScenarioDetailProps {
 
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
+  const { enabled: signatureVerificationEnabled } = useSignatureVerification();
   const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath } = state;
+  const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
+  const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
@@ -697,6 +701,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           )}
         </CardBody>
       </Card>
+
+      {showSignatureOverrideWarning && (
+        <Alert
+          variant="warning"
+          isInline
+          title="Image signature verification override is active"
+          style={{ marginBottom: '1.5rem' }}
+        >
+          {scenarioName}: this image is not signed and may be executed because signature verification is disabled.
+        </Alert>
+      )}
 
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
