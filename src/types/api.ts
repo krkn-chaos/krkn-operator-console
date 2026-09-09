@@ -100,6 +100,14 @@ export interface ScenariosRequest {
   registryName?: string;
 }
 
+export interface SignatureVerificationSettingsResponse {
+  enabled: boolean;
+}
+
+export interface SignatureVerificationSettingsRequest {
+  enabled: boolean;
+}
+
 /** Registry-independent scenario reference sent to the operator. */
 export interface ScenarioReference {
   name: string;
@@ -126,9 +134,12 @@ export interface JobConfigResponse {
   environment: { [key: string]: string };
 }
 
+export type SignatureStatus = 'signed' | 'unsigned' | 'untrusted' | 'unknown';
+
 export interface ScenarioTag {
   name: string;
   digest?: string;
+  signature_status?: SignatureStatus;
   size?: number;
   lastModified?: string;
 }
@@ -657,7 +668,7 @@ export interface RegistryDetails {
   description?: string;
   skipTls: boolean;
   insecure: boolean;
-  groups: string[];
+  groups?: string[];
   availableToAll: boolean;
   createdAt?: string;
   createdBy?: string;
@@ -1025,6 +1036,8 @@ export interface StudioNode {
     scenarioName: string;
     /** Full scenario image URL */
     scenarioImage: string;
+    /** Signature status observed when the scenario was selected. */
+    signature_status?: SignatureStatus;
     /** Scenario form values (environment variables) */
     scenarioFormValues: ScenarioFormValues;
     /** Global form values (optional) */

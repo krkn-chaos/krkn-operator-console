@@ -388,12 +388,12 @@ const mockTargets = [
 // ─── SCENARIOS (ScenarioTag) ───
 
 const mockScenarios = [
-  { name: 'pod-disruption', description: 'Disrupts pods in target namespaces' },
-  { name: 'node-cpu-hog', description: 'Stresses CPU on target nodes' },
-  { name: 'network-chaos', description: 'Introduces network latency and packet loss' },
-  { name: 'container-kill', description: 'Kills containers in target pods' },
-  { name: 'time-skew', description: 'Skews system time on target nodes' },
-  { name: 'node-scenarios', description: 'Node-level chaos scenarios requiring cloud provider credentials' },
+  { name: 'pod-disruption', description: 'Disrupts pods in target namespaces', signature_status: 'signed' },
+  { name: 'node-cpu-hog', description: 'Stresses CPU on target nodes', signature_status: 'unsigned' },
+  { name: 'network-chaos', description: 'Introduces network latency and packet loss', signature_status: 'untrusted' },
+  { name: 'container-kill', description: 'Kills containers in target pods', signature_status: 'unknown' },
+  { name: 'time-skew', description: 'Skews system time on target nodes', signature_status: 'signed' },
+  { name: 'node-scenarios', description: 'Node-level chaos scenarios requiring cloud provider credentials', signature_status: 'unknown' },
 ];
 
 // ─── FILES (FileInfo for listings) ───
@@ -698,6 +698,13 @@ export const handlers = [
   http.patch(`${BASE}/providers/:name`, ({ params }) =>
     HttpResponse.json({ message: 'Provider updated', name: params.name as string, active: true }),
   ),
+  http.get(`${BASE}/operator/signature-verification`, () =>
+    HttpResponse.json({ enabled: false }),
+  ),
+  http.patch(`${BASE}/operator/signature-verification`, async ({ request }) => {
+    const body = await request.json() as { enabled?: boolean };
+    return HttpResponse.json({ enabled: body.enabled === true });
+  }),
   http.post(`${BASE}/provider-config`, () =>
     HttpResponse.json({ uuid: 'mock-provider-config-001' }),
   ),
