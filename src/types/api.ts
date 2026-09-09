@@ -41,6 +41,10 @@ export interface AvailableCommandsResponse {
 export interface Cluster {
   'cluster-name': string;
   'cluster-api-url': string;
+  /** Whether the operator's latest liveness check found the cluster reachable. */
+  online?: boolean;
+  /** Timestamp of the operator's latest liveness check. */
+  'checked-at'?: string;
 }
 
 export interface ClustersResponse {
@@ -79,6 +83,8 @@ export interface TargetResponse {
   ready: boolean;
   createdAt?: string;
   operatorSource?: string; // Source operator (krkn-operator, krkn-operator-acm, etc.) - only for discovered clusters
+  online?: boolean;
+  checkedAt?: string;
 }
 
 export interface ListTargetsResponse {

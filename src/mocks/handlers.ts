@@ -330,9 +330,9 @@ const mockGraphRunDetails: Record<string, object> = {
 const mockClusters = {
   targetData: {
     'krkn-operator': [
-      { 'cluster-name': 'staging-us-east-1', 'cluster-api-url': 'https://api.staging-east.example.com:6443' },
-      { 'cluster-name': 'staging-eu-west-1', 'cluster-api-url': 'https://api.staging-west.example.com:6443' },
-      { 'cluster-name': 'prod-us-central1', 'cluster-api-url': 'https://api.prod.example.com:6443' },
+      { 'cluster-name': 'staging-us-east-1', 'cluster-api-url': 'https://api.staging-east.example.com:6443', online: true, 'checked-at': '2026-09-09T08:00:00Z' },
+      { 'cluster-name': 'staging-eu-west-1', 'cluster-api-url': 'https://api.staging-west.example.com:6443', online: true, 'checked-at': '2026-09-09T08:00:00Z' },
+      { 'cluster-name': 'prod-us-central1', 'cluster-api-url': 'https://api.prod.example.com:6443', online: true, 'checked-at': '2026-09-09T08:00:00Z' },
     ],
   },
   status: 'ready',
