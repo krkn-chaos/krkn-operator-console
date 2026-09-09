@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FileForm } from '../FileForm';
 import type { FileTypeResponse } from '../../../types/api';
@@ -113,5 +113,26 @@ describe('FileForm error handling', () => {
         screen.getByText('Internal Server Error'),
       ).toBeInTheDocument();
     });
+  });
+
+  it('blocks submission with a 10MB message when content is too large', async () => {
+    const user = userEvent.setup();
+
+    render(<FileForm {...defaultProps} />);
+
+    await user.type(screen.getByRole('textbox', { name: /file name/i }), 'big-file.yaml');
+
+    // Set oversized content directly (typing 11MB char-by-char is impractical).
+    const oversized = 'a'.repeat(11 * 1024 * 1024);
+    fireEvent.change(document.querySelector('#content-input') as HTMLTextAreaElement, {
+      target: { value: oversized },
+    });
+
+    await user.click(screen.getByRole('button', { name: /create file/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/maximum allowed size is 10MB/i)).toBeInTheDocument();
+    });
+    expect(operatorApi.createFile).not.toHaveBeenCalled();
   });
 });

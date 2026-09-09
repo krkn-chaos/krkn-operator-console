@@ -123,7 +123,7 @@ export function StudioNodeModals({
             </p>
             {deleteNodeData.status === 'configured' && (
               <p style={{ marginTop: '1rem', color: 'var(--pf-v5-global--warning-color--100)' }}>
-                This node is configured with scenario <strong>{deleteNodeData.config?.scenarioName}</strong>.
+                This node is configured with scenario <strong>{deleteNodeData.config?.scenario?.name ?? deleteNodeData.config?.scenarioName}</strong>.
                 All connections will also be removed.
               </p>
             )}

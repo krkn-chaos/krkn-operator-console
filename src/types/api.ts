@@ -100,20 +100,28 @@ export interface ScenariosRequest {
   registryName?: string;
 }
 
-export interface RerunIntent {
-  scenarioName: string;
+/** Registry-independent scenario reference sent to the operator. */
+export interface ScenarioReference {
+  name: string;
+  private: boolean;
   registryName?: string;
+}
+
+export interface RerunIntent {
+  scenario: ScenarioReference;
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
-  scenarioImage: string;
   kubeconfigPath: string;
 }
 
 export interface JobConfigResponse {
   targetRequestId: string;
   targetClusters: { [operatorName: string]: string[] };
-  scenarioImage: string;
-  scenarioName: string;
+  scenario?: ScenarioReference;
+  /** @deprecated Backend response compatibility only; never sent by the console. */
+  scenarioImage?: string;
+  /** @deprecated Backend response compatibility only. */
+  scenarioName?: string;
   kubeconfigPath: string;
   environment: { [key: string]: string };
 }
@@ -235,15 +243,12 @@ export interface FileReference {
 export interface ScenarioRunRequest {
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
-  scenarioImage: string;
-  scenarioName: string;
+  scenario: ScenarioReference;
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
   /** References to centrally-managed files (optional) */
   fileReferences?: FileReference[];
-  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
-  registryName?: string;
   /** Optional custom label for the run, displayed in the runs list */
   customRunName?: string;
   /** Name of a saved Elasticsearch config — backend injects its credentials server-side so the password is never sent by the client */
@@ -468,7 +473,9 @@ export interface AppState {
   // Re-run workflow
   rerunIntent: RerunIntent | null;
   startInPreview: boolean;
-  rerunScenarioImage: string | null;
+  rerunScenario?: ScenarioReference | null;
+  /** @deprecated Legacy test fixture compatibility. */
+  rerunScenarioImage?: string | null;
   rerunKubeconfigPath: string | null;
 
   // Error handling
@@ -712,9 +719,11 @@ export interface AvailableRegistriesResponse {
 export interface GraphScenarioNode {
   /** Optional comment describing the scenario */
   _comment?: string;
-  /** Container image for the scenario */
+  /** Registry-independent scenario reference. */
+  scenario?: ScenarioReference;
+  /** @deprecated Legacy graph fixture compatibility; never produced by the console. */
   image?: string;
-  /** Name of the scenario */
+  /** @deprecated Legacy graph fixture compatibility; never produced by the console. */
   name?: string;
   /** Environment variables for the scenario */
   env?: { [key: string]: string };
@@ -1008,14 +1017,16 @@ export interface StudioNode {
   status: StudioNodeStatus;
   /** Node configuration (only present when status === 'configured') */
   config?: {
-    /** Registry type (public or private) */
-    registryType: 'public' | 'private';
-    /** Registry configuration (contains registryName for private registries) */
-    registryConfig: ScenariosRequest;
-    /** Selected scenario name */
-    scenarioName: string;
-    /** Full scenario image URL */
-    scenarioImage: string;
+    /** Registry-independent scenario reference. */
+    scenario?: ScenarioReference;
+    /** @deprecated Legacy persisted fixture compatibility. */
+    registryType?: 'public' | 'private';
+    /** @deprecated Legacy persisted fixture compatibility. */
+    registryConfig?: ScenariosRequest;
+    /** @deprecated Legacy persisted fixture compatibility. */
+    scenarioName?: string;
+    /** @deprecated Legacy persisted fixture compatibility. */
+    scenarioImage?: string;
     /** Scenario form values (environment variables) */
     scenarioFormValues: ScenarioFormValues;
     /** Global form values (optional) */

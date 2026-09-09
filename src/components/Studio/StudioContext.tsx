@@ -49,8 +49,13 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
       }
 
       graph[node.nodeId] = {
-        name: node.config.scenarioName,
-        image: node.config.scenarioImage,
+        scenario: node.config.scenario ?? {
+          name: node.config.scenarioName ?? node.nodeId,
+          private: node.config.registryType === 'private',
+          ...(node.config.registryType === 'private' && node.config.registryConfig?.registryName
+            ? { registryName: node.config.registryConfig.registryName }
+            : {}),
+        },
         env,
         volumes: node.config.volumes,
         depends_on: incomingEdge?.source,
@@ -283,7 +288,7 @@ export function StudioProvider({ children, initialWorkflow }: StudioProviderProp
           .map(e => e.source);
 
         graph[node.nodeId] = {
-          name: node.config?.scenarioName || node.nodeId,
+          scenario: node.config?.scenario ?? { name: node.nodeId, private: false },
           depends_on: dependencies.length === 1 ? dependencies[0] : undefined,
         };
       }

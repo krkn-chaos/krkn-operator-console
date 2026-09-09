@@ -164,6 +164,37 @@ describe('BaseApiClient.fetchJson', () => {
     );
   });
 
+  it('uses a friendly size message on 413 when the body has no message field', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      fakeResponse(413, { error: 'request_entity_too_large' }, { statusText: 'Request Entity Too Large' }),
+    );
+
+    try {
+      await client.callFetchJson('/files', { method: 'POST' });
+      expect.fail('Expected error');
+    } catch (err) {
+      expect(isApiError(err)).toBe(true);
+      const apiErr = err as ApiError;
+      expect(apiErr.status).toBe(413);
+      expect(apiErr.message).toContain('10MB');
+      expect(apiErr.message).not.toContain('HTTP 413');
+    }
+  });
+
+  it('preserves a server-provided message on 413', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      fakeResponse(413, { message: 'Body exceeds 10MB limit' }, { statusText: 'Request Entity Too Large' }),
+    );
+
+    try {
+      await client.callFetchJson('/files', { method: 'POST' });
+      expect.fail('Expected error');
+    } catch (err) {
+      expect((err as ApiError).message).toBe('Body exceeds 10MB limit');
+      expect((err as ApiError).status).toBe(413);
+    }
+  });
+
   it('handles 409 Conflict correctly for duplicate workflow detection', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       fakeResponse(409, { message: 'A workflow with this name already exists' }, { statusText: 'Conflict' }),

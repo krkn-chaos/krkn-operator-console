@@ -182,10 +182,10 @@ const mockGraphRunDetails: Record<string, object> = {
     creationTimestamp: '2026-07-02T08:00:00Z',
     spec: {
       graph: {
-        'pod-kill': { name: 'pod-kill', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios' },
-        'net-chaos': { name: 'net-chaos', image: 'quay.io/krkn-chaos/krkn-hub:network-chaos', depends_on: 'pod-kill' },
-        'cpu-hog': { name: 'cpu-hog', image: 'quay.io/krkn-chaos/krkn-hub:cpu-hog', depends_on: 'pod-kill' },
-        'time-skew': { name: 'time-skew', image: 'quay.io/krkn-chaos/krkn-hub:time-skew', depends_on: 'net-chaos' },
+        'pod-kill': { scenario: { name: 'pod-kill', private: false } },
+        'net-chaos': { scenario: { name: 'net-chaos', private: false }, depends_on: 'pod-kill' },
+        'cpu-hog': { scenario: { name: 'cpu-hog', private: false }, depends_on: 'pod-kill' },
+        'time-skew': { scenario: { name: 'time-skew', private: false }, depends_on: 'net-chaos' },
       },
       targetRequestId: 'target-001',
       targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
@@ -215,9 +215,9 @@ const mockGraphRunDetails: Record<string, object> = {
     creationTimestamp: '2026-07-02T10:05:00Z',
     spec: {
       graph: {
-        'node-drain': { name: 'node-drain', image: 'quay.io/krkn-chaos/krkn-hub:node-scenarios' },
-        'pod-delete': { name: 'pod-delete', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios', depends_on: 'node-drain' },
-        'io-stress': { name: 'io-stress', image: 'quay.io/krkn-chaos/krkn-hub:io-hog', depends_on: 'node-drain' },
+        'node-drain': { scenario: { name: 'node-drain', private: false } },
+        'pod-delete': { scenario: { name: 'pod-delete', private: false }, depends_on: 'node-drain' },
+        'io-stress': { scenario: { name: 'io-stress', private: false }, depends_on: 'node-drain' },
       },
       targetRequestId: 'target-002',
       targetClusters: { 'krkn-operator': ['staging-eu-west-1'] },
@@ -247,9 +247,9 @@ const mockGraphRunDetails: Record<string, object> = {
     creationTimestamp: '2026-07-02T12:00:00Z',
     spec: {
       graph: {
-        'pod-kill-lg': { name: 'pod-kill', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios' },
-        'net-chaos-lg': { name: 'net-chaos', image: 'quay.io/krkn-chaos/krkn-hub:network-chaos', depends_on: 'pod-kill-lg' },
-        'cpu-hog-lg': { name: 'cpu-hog', image: 'quay.io/krkn-chaos/krkn-hub:cpu-hog', depends_on: 'pod-kill-lg' },
+        'pod-kill-lg': { scenario: { name: 'pod-kill', private: false } },
+        'net-chaos-lg': { scenario: { name: 'net-chaos', private: false }, depends_on: 'pod-kill-lg' },
+        'cpu-hog-lg': { scenario: { name: 'cpu-hog', private: false }, depends_on: 'pod-kill-lg' },
       },
       targetRequestId: 'target-003',
       targetClusters: { 'krkn-operator': ['prod-us-east-1', 'prod-us-west-2', 'prod-eu-central-1', 'prod-eu-west-1', 'prod-ap-southeast-1', 'prod-ap-northeast-1', 'staging-us-east-1', 'staging-eu-west-1'] },
@@ -287,8 +287,8 @@ const mockGraphRunDetails: Record<string, object> = {
     creationTimestamp: '2026-07-02T11:00:00Z',
     spec: {
       graph: {
-        'pod-kill-mc': { name: 'pod-kill', image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios' },
-        'net-chaos-mc': { name: 'net-chaos', image: 'quay.io/krkn-chaos/krkn-hub:network-chaos', depends_on: 'pod-kill-mc' },
+        'pod-kill-mc': { scenario: { name: 'pod-kill', private: false } },
+        'net-chaos-mc': { scenario: { name: 'net-chaos', private: false }, depends_on: 'pod-kill-mc' },
       },
       targetRequestId: 'target-003',
       targetClusters: { 'krkn-operator': ['staging-us-east-1', 'staging-eu-west-1'] },
@@ -821,8 +821,7 @@ export const handlers = [
     return HttpResponse.json({
       targetRequestId: 'target-001',
       targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
-      scenarioImage: 'quay.io/krkn-chaos/krkn-hub:' + scenarioName,
-      scenarioName,
+      scenario: { name: scenarioName, private: false },
       kubeconfigPath: '/root/.kube/config',
       environment: {
         NAMESPACE: 'default',
@@ -840,8 +839,7 @@ export const handlers = [
     return HttpResponse.json({
       targetRequestId: 'target-001',
       targetClusters: detail?.spec?.targetClusters || { 'krkn-operator': ['staging-us-east-1'] },
-      scenarioImage: 'quay.io/krkn-chaos/krkn-hub:workflow',
-      scenarioName: params.graphRunName as string,
+      scenario: { name: params.graphRunName as string, private: false },
       kubeconfigPath: '/root/.kube/config',
       environment: {
         NAMESPACE: 'default',

@@ -70,14 +70,14 @@ export function StudioNodeConfigModal({ node, onClose }: StudioNodeConfigModalPr
           <p style={labelStyle}>Scenario Settings</p>
           <dl style={dlStyle}>
             <dt style={dtStyle}>Scenario Name:</dt>
-            <dd style={ddStyle}>{config.scenarioName}</dd>
+            <dd style={ddStyle}>{config.scenario?.name ?? config.scenarioName}</dd>
 
-            <dt style={dtStyle}>Scenario Image:</dt>
-            <dd style={{ ...ddStyle, wordBreak: 'break-all' }}>{config.scenarioImage}</dd>
+            <dt style={dtStyle}>{config.scenario ? 'Scenario reference:' : 'Scenario Image:'}</dt>
+            <dd style={ddStyle}>{config.scenario ? `${config.scenario.name} (${config.scenario.private ? `private: ${config.scenario.registryName}` : 'public'})` : config.scenarioImage}</dd>
 
             <dt style={dtStyle}>Registry:</dt>
             <dd style={ddStyle}>
-              {config.registryType === 'private' ? config.registryConfig.registryName || 'private' : 'public'}
+              {config.scenario?.private ? config.scenario.registryName || 'private' : 'public'}
             </dd>
           </dl>
         </div>

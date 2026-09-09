@@ -40,7 +40,7 @@ const initialState: AppState = {
   // Re-run workflow
   rerunIntent: null,
   startInPreview: false,
-  rerunScenarioImage: null,
+  rerunScenario: null,
   rerunKubeconfigPath: null,
 
   // Error handling
@@ -101,11 +101,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
             clusterName: c.clusterName,
             clusterApiUrl: '',
           })),
-          registryType: state.rerunIntent.registryName ? 'private' : 'public',
-          registryConfig: state.rerunIntent.registryName
-            ? { registryName: state.rerunIntent.registryName }
+          registryType: state.rerunIntent.scenario.private ? 'private' : 'public',
+          registryConfig: state.rerunIntent.scenario.registryName
+            ? { registryName: state.rerunIntent.scenario.registryName }
             : {},
-          selectedScenario: state.rerunIntent.scenarioName,
+          selectedScenario: state.rerunIntent.scenario.name,
           startInPreview: true,
           error: null,
         };
@@ -365,7 +365,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalTouchedFields: null,
         rerunIntent: null,
         startInPreview: false,
-        rerunScenarioImage: null,
+        rerunScenario: null,
         rerunKubeconfigPath: null,
         error: null,
       };
@@ -483,7 +483,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         phase: 'configuring_scenario',
         scenarioDetail: detail,
         scenarioFormValues: formValues,
-        rerunScenarioImage: state.rerunIntent?.scenarioImage ?? null,
+        rerunScenario: state.rerunIntent?.scenario ?? null,
         rerunKubeconfigPath: state.rerunIntent?.kubeconfigPath ?? null,
         rerunIntent: null,
         error: null,
@@ -546,7 +546,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalTouchedFields: null,
         rerunIntent: null,
         startInPreview: false,
-        rerunScenarioImage: null,
+        rerunScenario: null,
         rerunKubeconfigPath: null,
         error: null,
       };
@@ -621,7 +621,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
               globalTouchedFields: null,
               rerunIntent: null,
               startInPreview: false,
-              rerunScenarioImage: null,
+              rerunScenario: null,
               rerunKubeconfigPath: null,
             };
           }
@@ -636,7 +636,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
             globalFormValues: null,
             globalTouchedFields: null,
             startInPreview: false,
-            rerunScenarioImage: null,
+            rerunScenario: null,
             rerunKubeconfigPath: null,
           };
 

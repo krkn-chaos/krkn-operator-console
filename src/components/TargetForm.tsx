@@ -13,6 +13,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import type { CreateTargetRequest, SecretType, TargetResponse } from '../types/api';
+import { exceedsRequestBodyLimit, MAX_REQUEST_BODY_LABEL } from '../utils/requestSize';
 
 interface TargetFormProps {
   initialData?: TargetResponse;
@@ -128,6 +129,15 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
           }
         }
         break;
+    }
+
+    // Guard against the API's 10MB request body limit before sending.
+    // Base64-encoded kubeconfigs/CA bundles inflate the body by ~33%, so
+    // check the actual serialized payload rather than the raw input length.
+    if (exceedsRequestBodyLimit(data)) {
+      setApiError(`The provided credentials are too large — the maximum allowed size is ${MAX_REQUEST_BODY_LABEL}.`);
+      setSubmitting(false);
+      return;
     }
 
     try {
