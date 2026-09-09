@@ -100,20 +100,28 @@ export interface ScenariosRequest {
   registryName?: string;
 }
 
-export interface RerunIntent {
-  scenarioName: string;
+/** Registry-independent scenario reference sent to the operator. */
+export interface ScenarioReference {
+  name: string;
+  private: boolean;
   registryName?: string;
+}
+
+export interface RerunIntent {
+  scenario: ScenarioReference;
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
-  scenarioImage: string;
   kubeconfigPath: string;
 }
 
 export interface JobConfigResponse {
   targetRequestId: string;
   targetClusters: { [operatorName: string]: string[] };
-  scenarioImage: string;
-  scenarioName: string;
+  scenario?: ScenarioReference;
+  /** Backend response compatibility only; never sent by the console. */
+  scenarioImage?: string;
+  /** Backend response compatibility only. */
+  scenarioName?: string;
   kubeconfigPath: string;
   environment: { [key: string]: string };
 }
@@ -235,15 +243,12 @@ export interface FileReference {
 export interface ScenarioRunRequest {
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
-  scenarioImage: string;
-  scenarioName: string;
+  scenario: ScenarioReference;
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
   /** References to centrally-managed files (optional) */
   fileReferences?: FileReference[];
-  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
-  registryName?: string;
   /** Optional custom label for the run, displayed in the runs list */
   customRunName?: string;
   /** Name of a saved Elasticsearch config — backend injects its credentials server-side so the password is never sent by the client */
@@ -470,7 +475,7 @@ export interface AppState {
   // Re-run workflow
   rerunIntent: RerunIntent | null;
   startInPreview: boolean;
-  rerunScenarioImage: string | null;
+  rerunScenario: ScenarioReference | null;
   rerunKubeconfigPath: string | null;
 
   // Error handling
