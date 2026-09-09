@@ -585,7 +585,7 @@ describe('graphRunsApi', () => {
       expect(errors).toContain('Graph cannot be empty');
     });
 
-    it('should return error for node without name or image', () => {
+    it('should return error for node without a scenario reference', () => {
       const invalidGraph: { [key: string]: GraphScenarioNode } = {
         'node1': {
           env: { FOO: 'bar' },
@@ -594,7 +594,7 @@ describe('graphRunsApi', () => {
 
       const errors = graphRunsApi.validateGraph(invalidGraph);
 
-      expect(errors).toContain("Node 'node1' must have either name or image");
+      expect(errors).toContain("Node 'node1' must have a scenario reference");
     });
 
     it('should return error for invalid depends_on reference', () => {

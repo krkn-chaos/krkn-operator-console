@@ -732,9 +732,11 @@ export interface AvailableRegistriesResponse {
 export interface GraphScenarioNode {
   /** Optional comment describing the scenario */
   _comment?: string;
-  /** Container image for the scenario */
+  /** Registry-independent scenario identity sent to the operator. */
+  scenario?: ScenarioReference;
+  /** @deprecated Legacy fields are accepted only for stored workflow compatibility. */
   image?: string;
-  /** Name of the scenario */
+  /** @deprecated Use scenario.name. */
   name?: string;
   /** Environment variables for the scenario */
   env?: { [key: string]: string };

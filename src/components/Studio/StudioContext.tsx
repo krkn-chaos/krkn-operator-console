@@ -49,8 +49,13 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
       }
 
       graph[node.nodeId] = {
-        name: node.config.scenarioName,
-        image: node.config.scenarioImage,
+        scenario: {
+          name: node.config.scenarioName,
+          private: node.config.registryType === 'private',
+          ...(node.config.registryType === 'private' && node.config.registryConfig.registryName
+            ? { registryName: node.config.registryConfig.registryName }
+            : {}),
+        },
         env,
         volumes: node.config.volumes,
         depends_on: incomingEdge?.source,

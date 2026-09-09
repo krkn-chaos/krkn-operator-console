@@ -104,13 +104,11 @@ class GraphRunsApiClient extends BaseApiClient {
    * const graphRun = await graphRunsApi.createGraphRun({
    *   graph: {
    *     'node1': {
-   *       name: 'pod-scenarios',
-   *       image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
+   *       scenario: { name: 'pod-scenarios', private: false },
    *       env: { SCENARIO_TYPE: 'pod_delete' }
    *     },
    *     'node2': {
-   *       name: 'network-chaos',
-   *       image: 'quay.io/krkn-chaos/krkn-hub:network-chaos',
+   *       scenario: { name: 'network-chaos', private: false },
    *       depends_on: 'node1' // Runs after node1 completes
    *     }
    *   },
@@ -213,9 +211,10 @@ class GraphRunsApiClient extends BaseApiClient {
         errors.push('Node IDs cannot be empty');
       }
 
-      // Node must have either name or image
-      if (!node.name && !node.image) {
-        errors.push(`Node '${nodeId}' must have either name or image`);
+      // New requests must identify a scenario; legacy workflow data is still
+      // validated so it can be migrated by the editor before submission.
+      if (!node.scenario?.name && !node.name && !node.image) {
+        errors.push(`Node '${nodeId}' must have a scenario reference`);
       }
 
       // Validate depends_on references
