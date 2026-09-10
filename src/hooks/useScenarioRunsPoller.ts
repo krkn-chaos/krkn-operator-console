@@ -46,7 +46,7 @@ export function useScenarioRunsPoller() {
         type: 'UPDATE_SCENARIO_RUN',
         payload: {
           run: preserveTerminal
-            ? { ...base, clusterJobs: details.clusterJobs }
+            ? { ...base, clusterJobs: details.clusterJobs, resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled, resiliencyScores: details.resiliencyScores }
             : {
                 ...base,
                 phase: details.phase,
@@ -60,6 +60,8 @@ export function useScenarioRunsPoller() {
                 graphRunName: details.graphRunName || base.graphRunName,
                 graphNodeId: details.graphNodeId || base.graphNodeId,
                 customRunName: details.customRunName || base.customRunName,
+                resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled,
+                resiliencyScores: details.resiliencyScores,
               },
         },
       });
@@ -96,6 +98,8 @@ export function useScenarioRunsPoller() {
           graphRunName: run.graphRunName,
           graphNodeId: run.graphNodeId,
           customRunName: run.customRunName,
+          resiliencyScoreEnabled: run.resiliencyScoreEnabled,
+          resiliencyScores: run.resiliencyScores,
         };
       });
 
@@ -134,6 +138,8 @@ export function useScenarioRunsPoller() {
         graphRunName: data.graphRunName || existing?.graphRunName,
         graphNodeId: data.graphNodeId || existing?.graphNodeId,
         customRunName: data.customRunName || existing?.customRunName,
+        resiliencyScoreEnabled: data.resiliencyScoreEnabled ?? existing?.resiliencyScoreEnabled,
+        resiliencyScores: data.resiliencyScores || existing?.resiliencyScores,
       };
 
       if (existing) {
@@ -222,6 +228,14 @@ export function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): bool
   if (prev.successfulJobs !== next.successfulJobs) return true;
   if (prev.failedJobs !== next.failedJobs) return true;
   if (prev.customRunName !== next.customRunName) return true;
+  const prevScores = prev.resiliencyScores;
+  const nextScores = next.resiliencyScores;
+  if ((prevScores?.length ?? 0) !== (nextScores?.length ?? 0)) return true;
+  if (prevScores && nextScores) {
+    for (let i = 0; i < prevScores.length; i++) {
+      if (prevScores[i].score !== nextScores[i].score) return true;
+    }
+  }
 
   if (prev.clusterJobs.length !== next.clusterJobs.length) return true;
 
