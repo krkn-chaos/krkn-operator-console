@@ -70,8 +70,8 @@ export async function authenticatedFetch(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // Ensure Content-Type is set for JSON requests
-  if (!headers.has('Content-Type') && options.body) {
+  // Ensure Content-Type is set for JSON requests (skip for FormData — browser sets boundary)
+  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
