@@ -1,6 +1,6 @@
 import type { ScenarioField } from '../types/api';
 
-const SECRET_VARIABLE_RE = /password|secret/i;
+const SECRET_VARIABLE_RE = /password|secret|apikey|access_key/i;
 
 /**
  * Returns true when a field's value must be masked in both form inputs and
