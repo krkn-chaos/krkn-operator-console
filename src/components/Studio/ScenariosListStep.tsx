@@ -109,7 +109,9 @@ export function ScenariosListStep({
           selectedDataListItemId={selectedScenario || undefined}
           onSelectDataListItem={(_event, id) => {
             const scenario = scenarios.find((item) => item.name === id);
-            if (!isScenarioBlocked(id) && signatureVerificationEnabled !== true && !signatureVerificationError) {
+            const isSigned = scenario?.signature_status === 'signed';
+            if (!isScenarioBlocked(id) && !signatureVerificationError &&
+              (signatureVerificationEnabled !== true || isSigned)) {
               onSelectScenario(id, scenario?.signature_status);
             }
           }}

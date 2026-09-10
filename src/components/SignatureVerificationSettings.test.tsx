@@ -50,6 +50,7 @@ describe('SignatureVerificationSettings', () => {
     render(<SignatureVerificationSettings />);
 
     await user.click(await screen.findByRole('checkbox', { name: 'Require valid image signatures' }));
+    mockGetSettings.mockResolvedValue({ enabled: false });
     await user.click(screen.getByRole('button', { name: 'Disable verification' }));
 
     await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalledWith(false));
