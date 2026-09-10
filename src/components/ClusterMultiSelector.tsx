@@ -21,7 +21,7 @@ import {
   Spinner,
   Tooltip,
 } from '@patternfly/react-core';
-import { ExclamationCircleIcon, TopologyIcon } from '@patternfly/react-icons';
+import { DisconnectedIcon, TopologyIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
 
 interface ClusterMultiSelectorProps {
@@ -200,7 +200,7 @@ export function ClusterMultiSelector({
                                               aria-label={offlineMessage}
                                               style={{ marginLeft: '0.5rem', color: 'var(--pf-v5-global--danger-color--100)' }}
                                             >
-                                              <ExclamationCircleIcon />
+                                              <DisconnectedIcon />
                                             </span>
                                           </Tooltip>
                                         )}
