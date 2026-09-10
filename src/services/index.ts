@@ -4,3 +4,4 @@ export { graphRunsApi } from './graphRunsApi';
 export { workflowsApi } from './workflowsApi';
 export { websocketService } from './websocketService';
 export { elasticsearchApi } from './elasticsearchApi';
+export { visualizeApi } from './visualizeApi';
