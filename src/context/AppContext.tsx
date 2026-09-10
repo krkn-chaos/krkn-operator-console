@@ -687,6 +687,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         phase: 'files',
       };
 
+    case 'NAVIGATE_TO_ELASTICSEARCH_DATA':
+      return {
+        ...state,
+        phase: 'elasticsearch_data',
+      };
+
     // Notifications
     case 'SHOW_NOTIFICATION':
       return {
