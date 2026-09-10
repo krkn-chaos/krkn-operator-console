@@ -138,6 +138,7 @@ export function ClusterPermissionsTable({
     const updated = { ...clusterPermissions };
 
     targets.forEach((target) => {
+      if (action === 'run' && target.online === false) return;
       const url = target.clusterAPIURL;
       const current = updated[url] || { actions: [] };
       if (!current.actions.includes(action)) {
@@ -170,7 +171,8 @@ export function ClusterPermissionsTable({
 
   // Check if all targets have a specific action
   const allHaveAction = (action: Action): boolean => {
-    return targets.every((target) => hasAction(target.clusterAPIURL, action));
+    const eligibleTargets = action === 'run' ? targets.filter((target) => target.online !== false) : targets;
+    return eligibleTargets.length > 0 && eligibleTargets.every((target) => hasAction(target.clusterAPIURL, action));
   };
 
   if (targets.length === 0 && orphanedUrls.length === 0) {
@@ -311,6 +313,7 @@ export function ClusterPermissionsTable({
                             id={`${target.uuid}-run`}
                             isChecked={hasAction(target.clusterAPIURL, 'run')}
                             onChange={() => toggleAction(target.clusterAPIURL, 'run')}
+                            isDisabled={target.online === false}
                             aria-label={`Run permission for ${target.clusterName}`}
                           />
                         </div>
@@ -379,6 +382,7 @@ export function ClusterPermissionsTable({
                           id={`${target.uuid}-run`}
                           isChecked={hasAction(target.clusterAPIURL, 'run')}
                           onChange={() => toggleAction(target.clusterAPIURL, 'run')}
+                          isDisabled={target.online === false}
                           aria-label={`Run permission for ${target.clusterName}`}
                         />
                       </div>

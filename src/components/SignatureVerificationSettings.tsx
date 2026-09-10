@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   Bullseye,
@@ -12,48 +12,17 @@ import {
   Switch,
   Title,
 } from '@patternfly/react-core';
-import { signatureVerificationApi } from '../services/signatureVerificationApi';
+import { useSignatureVerification } from '../hooks/useSignatureVerification';
 
 export function SignatureVerificationSettings() {
-  const [enabled, setEnabled] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [pendingEnable, setPendingEnable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadSettings = async () => {
-      setLoading(true);
-      try {
-        const settings = await signatureVerificationApi.getSettings();
-        if (mounted) setEnabled(settings.enabled);
-      } catch (error) {
-        if (mounted) {
-          setError(error instanceof Error ? error.message : 'Failed to load image signature verification setting.');
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    loadSettings();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { enabled, error, isLoading, updateSettings } = useSignatureVerification();
 
   const updateSetting = async (nextEnabled: boolean) => {
-    setError(null);
-    setSaving(true);
     try {
-      const settings = await signatureVerificationApi.updateSettings(nextEnabled);
-      setEnabled(settings.enabled);
+      await updateSettings(nextEnabled);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to update image signature verification setting.');
-    } finally {
-      setSaving(false);
+      // The shared hook stores the error for rendering; keep the handler promise-safe.
     }
   };
 
@@ -93,7 +62,7 @@ export function SignatureVerificationSettings() {
           </Alert>
         )}
 
-        {loading ? (
+        {isLoading && enabled === null ? (
           <Bullseye style={{ minHeight: '4rem' }}>
             <Spinner aria-label="Loading image signature verification setting" />
           </Bullseye>
@@ -103,7 +72,7 @@ export function SignatureVerificationSettings() {
             label="Require valid image signatures"
             labelOff="Allow unverified scenario images"
             isChecked={enabled === true}
-            isDisabled={saving || enabled === null}
+            isDisabled={isLoading || enabled === null}
             onChange={handleChange}
             aria-label="Require valid image signatures"
           />
@@ -122,11 +91,11 @@ export function SignatureVerificationSettings() {
                 setPendingEnable(false);
                 updateSetting(false);
               }}
-              isDisabled={saving}
+              isDisabled={isLoading}
             >
               Disable verification
             </Button>,
-            <Button key="cancel" variant="link" onClick={() => setPendingEnable(false)} isDisabled={saving}>
+            <Button key="cancel" variant="link" onClick={() => setPendingEnable(false)} isDisabled={isLoading}>
               Cancel
             </Button>,
           ]}
