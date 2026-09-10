@@ -402,6 +402,7 @@ export type AppPhase =
   | 'studio' // Chaos Scenario Studio page
   | 'terminal' // Full-screen cluster terminal page
   | 'files' // File management page
+  | 'elasticsearch_data' // Elasticsearch telemetry data table page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -557,6 +558,7 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_STUDIO' }
   | { type: 'NAVIGATE_TO_TERMINAL' }
   | { type: 'NAVIGATE_TO_FILES' }
+  | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
@@ -1393,4 +1395,31 @@ export interface ListElasticsearchConfigsResponse {
 export interface ElasticsearchConfigOperationResponse {
   message: string;
   name?: string;
+}
+
+// Elasticsearch telemetry query types
+
+export interface QueryTelemetryRequest {
+  configName: string;
+  size?: number;
+  // "yyyy-MM-dd" date bounds on the document timestamp. Omitted values fall back
+  // to a default trailing window on the backend.
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface TelemetryDocument {
+  run_uuid: string;
+  scenario_type: string;
+  // Epoch seconds; 0 when the scenario did not report a timestamp.
+  start_timestamp: number;
+  end_timestamp: number;
+  namespace: string;
+  // true = passed, false = failed.
+  status: boolean;
+}
+
+export interface QueryTelemetryResponse {
+  documents: TelemetryDocument[];
+  total: number;
 }
