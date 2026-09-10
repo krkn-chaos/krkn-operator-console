@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Card,
   CardBody,
@@ -78,6 +78,23 @@ export function ClusterMultiSelector({
     });
     return flatList;
   }, [clusters]);
+
+  const selectedOfflineClusters = useMemo(() => {
+    if (!clusters) return [];
+    const offline = new Set(
+      Object.entries(clusters)
+        .flatMap(([operatorName, clusterList]) =>
+          clusterList
+            .filter((cluster) => cluster.online === false)
+            .map((cluster) => `${operatorName}\u0000${cluster['cluster-name']}`)
+        )
+    );
+    return selectedClusters.filter((cluster) => offline.has(`${cluster.operatorName}\u0000${cluster.clusterName}`));
+  }, [clusters, selectedClusters]);
+
+  useEffect(() => {
+    selectedOfflineClusters.forEach((cluster) => onToggle(cluster));
+  }, [onToggle, selectedOfflineClusters]);
 
   const handleSelectAll = () => {
     allClusters.forEach((cluster) => {

@@ -55,7 +55,11 @@ interface ScenarioDetailProps {
 
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
-  const { enabled: signatureVerificationEnabled } = useSignatureVerification();
+  const {
+    enabled: signatureVerificationEnabled,
+    error: signatureVerificationError,
+    isLoading: signatureVerificationLoading,
+  } = useSignatureVerification();
   const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath } = state;
   const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
   const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
@@ -357,6 +361,19 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     }
     if (!scenarioFormValues || !scenarioDetail) {
       setValidationErrors(['Scenario configuration is not ready — please reload the page.']);
+      return;
+    }
+
+    if (rerunScenario && signatureVerificationLoading) {
+      setValidationErrors(['Image signature verification is still loading — please try again.']);
+      return;
+    }
+    if (rerunScenario && (signatureVerificationError || signatureVerificationEnabled === null)) {
+      setValidationErrors([signatureVerificationError || 'Image signature verification status is unavailable.']);
+      return;
+    }
+    if (rerunScenario && signatureVerificationEnabled && selectedScenario?.signature_status !== 'signed') {
+      setValidationErrors(['This scenario cannot run because its image signature is not verified.']);
       return;
     }
 

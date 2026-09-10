@@ -17,6 +17,12 @@ import type {
 
 vi.mock('../services/operatorApi');
 vi.mock('../services/elasticsearchApi');
+vi.mock('../services/signatureVerificationApi', () => ({
+  signatureVerificationApi: {
+    getSettings: vi.fn().mockResolvedValue({ enabled: true }),
+    updateSettings: vi.fn(),
+  },
+}));
 
 describe('ScenarioDetail', () => {
   const mockDispatch = vi.fn();
@@ -636,6 +642,7 @@ describe('ScenarioDetail', () => {
 
       renderWithContext({
         rerunScenario: { name: 'pod-scenarios', private: true, registryName: 'rerun-registry' },
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
         scenarioFormValues: { NAMESPACE: 'default' },
       });
 
