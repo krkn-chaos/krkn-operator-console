@@ -1,5 +1,5 @@
 import { Nav, NavItem, NavList, NavExpandable } from '@patternfly/react-core';
-import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, DisconnectedIcon, UserIcon, TopologyIcon } from '@patternfly/react-icons';
+import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon } from '@patternfly/react-icons';
 import { MdWork } from 'react-icons/md';
 import type { ReactNode } from 'react';
 import type { SidebarNavProps } from './types';
@@ -109,7 +109,7 @@ export function SidebarPFNav({
             <NavItem onClick={onToggleTheme} aria-label={isDarkTheme ? 'Light Theme' : 'Dark Theme'}>
               {item(isDarkTheme ? <SunIcon /> : <MoonIcon />, isDarkTheme ? 'Light Theme' : 'Dark Theme')}
             </NavItem>
-            <NavItem onClick={onLogout} aria-label="Logout">{item(<DisconnectedIcon />, 'Logout')}</NavItem>
+            <NavItem onClick={onLogout} aria-label="Logout">{item(<PowerOffIcon />, 'Logout')}</NavItem>
           </NavExpandable>
         </NavList>
       </Nav>
