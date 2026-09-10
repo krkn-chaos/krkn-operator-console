@@ -22,8 +22,7 @@ const { configCache, cacheSet } = await import('../scenarioConfigCache');
 const makeConfig = (envOverrides?: Record<string, string>) => ({
   targetRequestId: 'target-001',
   targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
-  scenarioImage: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
-  scenarioName: 'pod-scenarios',
+  scenario: { name: 'pod-scenarios', private: false },
   kubeconfigPath: '/root/.kube/config',
   environment: {
     NAMESPACE: 'default',
@@ -51,10 +50,10 @@ describe('ScenarioConfigDisplay', () => {
     render(<ScenarioConfigDisplay scenarioRunName="fetch-run" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('quay.io/krkn-chaos/krkn-hub:pod-scenarios')).toBeInTheDocument();
+    expect(screen.getByText('pod-scenarios')).toBeInTheDocument();
     expect(screen.getByText('NAMESPACE:')).toBeInTheDocument();
     expect(screen.getByText('default')).toBeInTheDocument();
     expect(screen.getByText('DURATION:')).toBeInTheDocument();
@@ -66,7 +65,7 @@ describe('ScenarioConfigDisplay', () => {
     render(<ScenarioConfigDisplay graphRunName="my-graph-run" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
 
     expect(mockGetGraphRunConfig).toHaveBeenCalledWith('my-graph-run');
@@ -83,12 +82,12 @@ describe('ScenarioConfigDisplay', () => {
     render(<ScenarioConfigDisplay scenarioRunName="sort-run" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
 
     const dtElements = screen.getAllByText(/^[A-Z_]+:$/);
     const labels = dtElements.map(el => el.textContent);
-    const envLabels = labels.filter(l => l && !['Scenario Image:', 'Target Clusters:'].includes(l));
+    const envLabels = labels.filter(l => l && !['Scenario:', 'Target Clusters:'].includes(l));
     const sorted = [...envLabels].sort();
     expect(envLabels).toEqual(sorted);
   });
@@ -104,7 +103,7 @@ describe('ScenarioConfigDisplay', () => {
     render(<ScenarioConfigDisplay scenarioRunName="mask-run" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
 
     expect(screen.queryByText('supersecret')).not.toBeInTheDocument();
@@ -136,7 +135,7 @@ describe('ScenarioConfigDisplay', () => {
     render(<ScenarioConfigDisplay scenarioRunName="empty-env-run" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
 
     expect(screen.getByText('No configuration parameters set')).toBeInTheDocument();
@@ -162,7 +161,7 @@ describe('ScenarioConfigDisplay', () => {
     const { unmount } = render(<ScenarioConfigDisplay scenarioRunName="cache-run" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
 
     expect(mockGetScenarioRunConfig).toHaveBeenCalledTimes(1);
@@ -171,7 +170,7 @@ describe('ScenarioConfigDisplay', () => {
     render(<ScenarioConfigDisplay scenarioRunName="cache-run" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
 
     expect(mockGetScenarioRunConfig).toHaveBeenCalledTimes(1);
@@ -185,7 +184,7 @@ describe('ScenarioConfigDisplay', () => {
 
     const { unmount: unmount1 } = render(<ScenarioConfigDisplay scenarioRunName="same-name" />);
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
     expect(screen.getByText('scenario')).toBeInTheDocument();
     unmount1();
@@ -209,7 +208,7 @@ describe('ScenarioConfigDisplay', () => {
 
     render(<ScenarioConfigDisplay scenarioRunName="cached-run" />);
     await waitFor(() => {
-      expect(screen.getByText('Scenario Image:')).toBeInTheDocument();
+      expect(screen.getByText('Scenario:')).toBeInTheDocument();
     });
     expect(screen.queryByText('Configuration not available')).not.toBeInTheDocument();
   });

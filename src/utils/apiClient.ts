@@ -8,6 +8,7 @@
  */
 
 import { authService } from '../services/authService';
+import { MAX_REQUEST_BODY_LABEL } from './requestSize';
 
 export type ApiError = Error & { status: number; statusText: string };
 
@@ -114,11 +115,18 @@ export class BaseApiClient {
     const response = await authenticatedFetch(fullUrl, options);
 
     if (!response.ok) {
-      let message = `HTTP ${response.status}: ${response.statusText}`;
+      let message = '';
       try {
         const error = await response.json();
         if (error.message) message = error.message;
-      } catch { /* use default message */ }
+      } catch { /* no parsable body */ }
+      if (!message) {
+        // Prefer a friendly, actionable message for the 10MB body limit
+        // instead of the generic "HTTP 413" fallback.
+        message = response.status === 413
+          ? `Request is too large — the maximum allowed size is ${MAX_REQUEST_BODY_LABEL}.`
+          : `HTTP ${response.status}: ${response.statusText}`;
+      }
       throw createApiError(message, response.status, response.statusText);
     }
 

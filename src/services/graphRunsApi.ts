@@ -104,13 +104,11 @@ class GraphRunsApiClient extends BaseApiClient {
    * const graphRun = await graphRunsApi.createGraphRun({
    *   graph: {
    *     'node1': {
-   *       name: 'pod-scenarios',
-   *       image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
+   *       scenario: { name: 'pod-scenarios', private: false },
    *       env: { SCENARIO_TYPE: 'pod_delete' }
    *     },
    *     'node2': {
-   *       name: 'network-chaos',
-   *       image: 'quay.io/krkn-chaos/krkn-hub:network-chaos',
+   *       scenario: { name: 'network-chaos', private: false },
    *       depends_on: 'node1' // Runs after node1 completes
    *     }
    *   },
@@ -213,9 +211,12 @@ class GraphRunsApiClient extends BaseApiClient {
         errors.push('Node IDs cannot be empty');
       }
 
-      // Node must have either name or image
-      if (!node.name && !node.image) {
+      if (!node.scenario?.name && !node.name && !node.image) {
         errors.push(`Node '${nodeId}' must have either name or image`);
+      } else if (node.scenario?.private && !node.scenario.registryName) {
+        errors.push(`Node '${nodeId}' private scenario requires a registry name`);
+      } else if (node.scenario && !node.scenario.private && node.scenario.registryName) {
+        errors.push(`Node '${nodeId}' public scenario cannot specify a registry`);
       }
 
       // Validate depends_on references
