@@ -6,7 +6,7 @@
  */
 
 import { config } from '../config';
-import { BaseApiClient } from '../utils/apiClient';
+import { BaseApiClient, createApiErrorFromResponse } from '../utils/apiClient';
 import type {
   GraphRunListItem,
   GraphRunDetail,
@@ -156,16 +156,7 @@ class GraphRunsApiClient extends BaseApiClient {
     });
 
     if (!response.ok) {
-      // Try to parse error message from response
-      let errorMessage: string | null = null;
-      try {
-        const error = await response.json();
-        errorMessage = error.message;
-      } catch {
-        // JSON parsing failed, use status text
-      }
-
-      throw new Error(errorMessage || `HTTP ${response.status}: ${response.statusText}`);
+      throw await createApiErrorFromResponse(response);
     }
   }
 
