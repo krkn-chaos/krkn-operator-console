@@ -463,6 +463,14 @@ export const handlers = [
     HttpResponse.json({ message: 'User registered successfully', userId: 'admin@preview.local', role: 'admin' }),
   ),
 
+  // ─── GROUPS ───
+  http.get(`${BASE}/groups`, () =>
+    HttpResponse.json({ groups: [
+      { name: 'krkn-admins', role: 'admin' },
+      { name: 'krkn-users', role: 'user' },
+    ] }),
+  ),
+
   // ─── TARGET CREATION & POLLING ───
   http.post(`${BASE}/targets`, () =>
     HttpResponse.json({ uuid: 'mock-target-001', message: 'Target created' }),

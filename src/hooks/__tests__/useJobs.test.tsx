@@ -14,7 +14,7 @@ vi.mock('../useWebSocket', () => ({
 
 vi.mock('../../services/websocketService', () => ({
   websocketService: {
-    buildResourceUrl: vi.fn(() => 'ws://localhost/api/v2/ws/runs'),
+    buildResourceUrl: vi.fn((resource: string) => `ws://localhost/api/v2/ws/${resource}`),
     subscribe: vi.fn(),
   },
 }));
@@ -54,6 +54,16 @@ describe('useJobs', () => {
     vi.clearAllMocks();
     capturedHandler = null;
     mockConnectionState.value = 'connected';
+  });
+
+  it('connects to /api/v2/ws/jobs endpoint', () => {
+    const buildResourceUrl = vi.mocked(websocketService.buildResourceUrl);
+
+    renderHook(() => useJobs());
+
+    expect(buildResourceUrl).toHaveBeenCalledWith('jobs');
+    // Verify the URL built matches the jobs endpoint
+    expect(buildResourceUrl.mock.results[0]?.value).toBe('ws://localhost/api/v2/ws/jobs');
   });
 
   it('subscribes to WS with page and limit on connect', () => {

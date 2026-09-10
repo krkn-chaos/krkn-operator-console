@@ -129,13 +129,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const handleUnauthorized = useCallback(() => {
     const currentPath = window.location.pathname;
+    const basename = import.meta.env.BASE_URL.replace(/\/+$/, '');
 
     authService.logout();
     dispatch({ type: 'AUTH_LOGOUT' });
 
-    // Redirect to login with expired flag
-    if (currentPath !== '/login') {
-      window.location.href = `/login?expired=true&returnUrl=${encodeURIComponent(currentPath)}`;
+    // Redirect to login with expired flag, accounting for basename
+    const loginPath = basename ? `${basename}/login` : '/login';
+    if (!currentPath.endsWith('/login')) {
+      window.location.href = `${loginPath}?expired=true&returnUrl=${encodeURIComponent(currentPath)}`;
     }
   }, []);
 

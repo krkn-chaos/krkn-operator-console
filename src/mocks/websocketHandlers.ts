@@ -1,30 +1,6 @@
 import { ws } from 'msw';
 
 // Mock data for WebSocket updates (matches REST mock data shapes)
-const mockScenarioRunUpdate = {
-  scenarioRunName: 'network-chaos-run-03',
-  scenarioName: 'network-chaos',
-  phase: 'Running',
-  totalTargets: 1,
-  successfulJobs: 0,
-  failedJobs: 0,
-  runningJobs: 1,
-  clusterJobs: [
-    {
-      providerName: 'aws',
-      clusterName: 'staging-us-east-1',
-      jobId: 'job-ghi-001',
-      podName: 'krkn-network-chaos-jkl',
-      phase: 'Running',
-      startTime: '2026-07-02T10:10:00Z',
-      containerImage: 'quay.io/krkn-chaos/krkn-hub:latest',
-    },
-  ],
-  createdAt: '2026-07-02T10:10:00Z',
-  ownerUserId: 'admin@preview.local',
-  registryName: 'default',
-};
-
 const mockGraphRunUpdate = {
   name: 'resilience-test-staging',
   namespace: 'krkn-operator-system',
@@ -37,6 +13,41 @@ const mockGraphRunUpdate = {
   resiliencyScoreEnabled: true,
   resiliencyScoreBaseline: 90.0,
   resiliencyScores: undefined as undefined | object[],
+};
+
+const mockJobsSnapshot = {
+  jobs: [
+    {
+      type: 'scenarioRun',
+      name: 'network-chaos-run-03',
+      createdAt: '2026-07-02T10:10:00Z',
+      scenarioRun: {
+        scenarioRunName: 'network-chaos-run-03',
+        scenarioName: 'network-chaos',
+        phase: 'Running',
+        totalTargets: 1,
+        successfulJobs: 0,
+        failedJobs: 0,
+        runningJobs: 1,
+        clusterJobs: [
+          {
+            providerName: 'aws',
+            clusterName: 'staging-us-east-1',
+            jobId: 'job-ghi-001',
+            podName: 'krkn-network-chaos-jkl',
+            phase: 'Running',
+            startTime: '2026-07-02T10:10:00Z',
+            containerImage: 'quay.io/krkn-chaos/krkn-hub:latest',
+          },
+        ],
+        createdAt: '2026-07-02T10:10:00Z',
+        ownerUserId: 'admin@preview.local',
+        registryName: 'default',
+      },
+    },
+  ],
+  pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  stats: { totalJobs: 1, succeededJobs: 0, failedJobs: 0 },
 };
 
 const mockDashboardUpdate = {
@@ -52,44 +63,40 @@ const mockDashboardUpdate = {
 
 // ws.link() handlers — each intercepts WebSocket connections to the matching URL pattern
 
-const runsWs = ws.link('*/api/v2/ws/runs');
+const jobsWs = ws.link('*/api/v2/ws/jobs');
 const graphrunsWs = ws.link('*/api/v2/ws/graphruns');
 const dashboardWs = ws.link('*/api/v2/ws/dashboard/active-runs');
 const logsWs = ws.link('*/api/v2/ws/scenarios/run/*/jobs/*/logs*');
 
-const runsHandler = runsWs.addEventListener('connection', ({ client }) => {
+const jobsHandler = jobsWs.addEventListener('connection', ({ client }) => {
   client.addEventListener('message', (event) => {
     try {
       const msg = JSON.parse(event.data as string);
       if (msg.action === 'subscribe') {
-        // Send an initial update after a short delay
         setTimeout(() => {
           client.send(JSON.stringify({
-            resource: 'run',
-            id: mockScenarioRunUpdate.scenarioRunName,
-            event: 'updated',
-            data: mockScenarioRunUpdate,
+            resource: 'jobs',
+            event: 'snapshot',
+            data: mockJobsSnapshot,
+            pagination: mockJobsSnapshot.pagination,
+            stats: mockJobsSnapshot.stats,
           }));
         }, 500);
 
-        // Send periodic updates every 5 seconds
         const interval = setInterval(() => {
           client.send(JSON.stringify({
-            resource: 'run',
-            id: mockScenarioRunUpdate.scenarioRunName,
-            event: 'updated',
-            data: {
-              ...mockScenarioRunUpdate,
-              runningJobs: Math.random() > 0.5 ? 1 : 0,
-              successfulJobs: Math.random() > 0.5 ? 1 : 0,
-            },
+            resource: 'jobs',
+            event: 'snapshot',
+            data: mockJobsSnapshot,
+            pagination: mockJobsSnapshot.pagination,
+            stats: mockJobsSnapshot.stats,
           }));
         }, 5000);
 
         client.addEventListener('close', () => clearInterval(interval));
       }
     } catch {
-      // ignore non-JSON messages
+      // ignore
     }
   });
 });
@@ -191,4 +198,4 @@ const logsHandler = logsWs.addEventListener('connection', ({ client }) => {
   client.addEventListener('close', () => clearInterval(interval));
 });
 
-export const websocketHandlers = [runsHandler, graphrunsHandler, dashboardHandler, logsHandler];
+export const websocketHandlers = [jobsHandler, graphrunsHandler, dashboardHandler, logsHandler];
