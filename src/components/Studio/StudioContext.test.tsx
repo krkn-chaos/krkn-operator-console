@@ -236,7 +236,7 @@ describe('StudioContext', () => {
       expect(payload.groups).toEqual(['team-a']);
       expect(payload.graph).toBeDefined();
       expect(payload.graph['node-a']).toBeDefined();
-      expect(payload.graph['node-a'].name).toBe('scenario-node-a');
+      expect(payload.graph['node-a'].scenario?.name).toBe('scenario-node-a');
       expect(payload.studioLayout).toBeDefined();
       expect(payload.studioLayout!.nodes).toHaveLength(1);
     });
@@ -1015,7 +1015,7 @@ describe('StudioContext', () => {
         expect(Object.keys(exported.graph)).toHaveLength(2);
         expect(exported.graph['export-a'].depends_on).toBeUndefined();
         expect(exported.graph['export-b'].depends_on).toBe('export-a');
-        expect(exported.graph['export-a'].name).toBe('scenario-export-a');
+        expect(exported.graph['export-a'].scenario?.name).toBe('scenario-export-a');
         expect(exported.graph['export-a'].env).toEqual({ KEY: 'val' });
         expect(exported.metadata.nodeCount).toBe(2);
       }

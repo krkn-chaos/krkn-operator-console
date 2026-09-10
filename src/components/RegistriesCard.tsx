@@ -239,10 +239,11 @@ export function RegistriesCard() {
             ) : (
               <DataList aria-label="Registries list" isCompact>
                 {filteredRegistries.map((registry) => {
+                  const groups = registry.groups ?? [];
                   const groupsDisplay = registry.availableToAll
                     ? 'All Users'
-                    : registry.groups.length > 0
-                      ? registry.groups.join(', ')
+                    : groups.length > 0
+                      ? groups.join(', ')
                       : 'No groups';
 
                   return (

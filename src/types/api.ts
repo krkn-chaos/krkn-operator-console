@@ -100,27 +100,46 @@ export interface ScenariosRequest {
   registryName?: string;
 }
 
-export interface RerunIntent {
-  scenarioName: string;
+export interface SignatureVerificationSettingsResponse {
+  enabled: boolean;
+}
+
+export interface SignatureVerificationSettingsRequest {
+  enabled: boolean;
+}
+
+/** Registry-independent scenario reference sent to the operator. */
+export interface ScenarioReference {
+  name: string;
+  private: boolean;
   registryName?: string;
+}
+
+export interface RerunIntent {
+  scenario: ScenarioReference;
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
-  scenarioImage: string;
   kubeconfigPath: string;
 }
 
 export interface JobConfigResponse {
   targetRequestId: string;
   targetClusters: { [operatorName: string]: string[] };
-  scenarioImage: string;
-  scenarioName: string;
+  scenario?: ScenarioReference;
+  /** Backend response compatibility only; never sent by the console. */
+  scenarioImage?: string;
+  /** Backend response compatibility only. */
+  scenarioName?: string;
   kubeconfigPath: string;
   environment: { [key: string]: string };
 }
 
+export type SignatureStatus = 'signed' | 'unsigned' | 'untrusted' | 'unknown';
+
 export interface ScenarioTag {
   name: string;
   digest?: string;
+  signature_status?: SignatureStatus;
   size?: number;
   lastModified?: string;
 }
@@ -235,15 +254,12 @@ export interface FileReference {
 export interface ScenarioRunRequest {
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
-  scenarioImage: string;
-  scenarioName: string;
+  scenario: ScenarioReference;
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
   /** References to centrally-managed files (optional) */
   fileReferences?: FileReference[];
-  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
-  registryName?: string;
   /** Optional custom label for the run, displayed in the runs list */
   customRunName?: string;
   /** Name of a saved Elasticsearch config — backend injects its credentials server-side so the password is never sent by the client */
@@ -470,7 +486,7 @@ export interface AppState {
   // Re-run workflow
   rerunIntent: RerunIntent | null;
   startInPreview: boolean;
-  rerunScenarioImage: string | null;
+  rerunScenario: ScenarioReference | null;
   rerunKubeconfigPath: string | null;
 
   // Error handling
@@ -652,7 +668,7 @@ export interface RegistryDetails {
   description?: string;
   skipTls: boolean;
   insecure: boolean;
-  groups: string[];
+  groups?: string[];
   availableToAll: boolean;
   createdAt?: string;
   createdBy?: string;
@@ -716,9 +732,11 @@ export interface AvailableRegistriesResponse {
 export interface GraphScenarioNode {
   /** Optional comment describing the scenario */
   _comment?: string;
-  /** Container image for the scenario */
+  /** Registry-independent scenario identity sent to the operator. */
+  scenario?: ScenarioReference;
+  /** @deprecated Legacy fields are accepted only for stored workflow compatibility. */
   image?: string;
-  /** Name of the scenario */
+  /** @deprecated Use scenario.name. */
   name?: string;
   /** Environment variables for the scenario */
   env?: { [key: string]: string };
@@ -1020,6 +1038,8 @@ export interface StudioNode {
     scenarioName: string;
     /** Full scenario image URL */
     scenarioImage: string;
+    /** Signature status observed when the scenario was selected. */
+    signature_status?: SignatureStatus;
     /** Scenario form values (environment variables) */
     scenarioFormValues: ScenarioFormValues;
     /** Global form values (optional) */
