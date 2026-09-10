@@ -45,7 +45,7 @@ describe('RegistrySelector', () => {
     providerConfigData: null,
     rerunIntent: null,
     startInPreview: false,
-    rerunScenarioImage: null,
+    rerunScenario: null,
     rerunKubeconfigPath: null,
     notifications: [],
   };

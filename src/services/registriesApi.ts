@@ -90,7 +90,10 @@ class RegistriesApi extends BaseApiClient {
    */
   async listRegistries(): Promise<RegistryDetails[]> {
     const data = await this.fetchJson<ListRegistriesResponse>('/registries');
-    return data.registries || [];
+    return (data.registries || []).map((registry) => ({
+      ...registry,
+      groups: registry.groups ?? [],
+    }));
   }
 
   /**
