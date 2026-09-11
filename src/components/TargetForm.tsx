@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
   Form,
@@ -20,7 +20,19 @@ interface TargetFormProps {
   onCancel: () => void;
 }
 
+function encodeBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
 export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps) {
+  const kubeconfigFileInputRef = useRef<HTMLInputElement>(null);
   const [clusterName, setClusterName] = useState(initialData?.clusterName || '');
   const [secretType, setSecretType] = useState<SecretType>('kubeconfig');
   const [clusterAPIURL, setClusterAPIURL] = useState(initialData?.clusterAPIURL || '');
@@ -32,6 +44,27 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
+
+  const handleKubeconfigFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      setKubeconfig(await file.text());
+      setErrors((currentErrors) => {
+        const nextErrors = { ...currentErrors };
+        delete nextErrors.kubeconfig;
+        return nextErrors;
+      });
+      setApiError(null);
+    } catch {
+      setApiError('Unable to read the selected kubeconfig file');
+    }
+  };
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -82,55 +115,53 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
 
     setSubmitting(true);
 
-    const data: CreateTargetRequest = {
-      clusterName: clusterName.trim(),
-      secretType,
-    };
+    try {
+      const data: CreateTargetRequest = {
+        clusterName: clusterName.trim(),
+        secretType,
+      };
 
-    switch (secretType) {
-      case 'kubeconfig': {
-        // Convert to base64 if not already
-        const kubeconfigContent = kubeconfig.trim();
-        try {
-          // Check if it's already base64
-          atob(kubeconfigContent);
-          data.kubeconfig = kubeconfigContent;
-        } catch {
-          // Not base64, encode it
-          data.kubeconfig = btoa(kubeconfigContent);
+      switch (secretType) {
+        case 'kubeconfig': {
+          // Preserve already-encoded values while encoding text as UTF-8 base64.
+          const kubeconfigContent = kubeconfig.trim();
+          try {
+            atob(kubeconfigContent);
+            data.kubeconfig = kubeconfigContent;
+          } catch {
+            data.kubeconfig = encodeBase64(kubeconfigContent);
+          }
+          break;
         }
-        break;
+
+        case 'token':
+          data.token = token.trim();
+          data.clusterAPIURL = clusterAPIURL.trim();
+          if (caBundle.trim()) {
+            try {
+              atob(caBundle.trim());
+              data.caBundle = caBundle.trim();
+            } catch {
+              data.caBundle = encodeBase64(caBundle.trim());
+            }
+          }
+          break;
+
+        case 'credentials':
+          data.username = username.trim();
+          data.password = password.trim();
+          data.clusterAPIURL = clusterAPIURL.trim();
+          if (caBundle.trim()) {
+            try {
+              atob(caBundle.trim());
+              data.caBundle = caBundle.trim();
+            } catch {
+              data.caBundle = encodeBase64(caBundle.trim());
+            }
+          }
+          break;
       }
 
-      case 'token':
-        data.token = token.trim();
-        data.clusterAPIURL = clusterAPIURL.trim();
-        if (caBundle.trim()) {
-          try {
-            atob(caBundle.trim());
-            data.caBundle = caBundle.trim();
-          } catch {
-            data.caBundle = btoa(caBundle.trim());
-          }
-        }
-        break;
-
-      case 'credentials':
-        data.username = username.trim();
-        data.password = password.trim();
-        data.clusterAPIURL = clusterAPIURL.trim();
-        if (caBundle.trim()) {
-          try {
-            atob(caBundle.trim());
-            data.caBundle = caBundle.trim();
-          } catch {
-            data.caBundle = btoa(caBundle.trim());
-          }
-        }
-        break;
-    }
-
-    try {
       await onSubmit(data);
     } catch (error) {
       setApiError(error instanceof Error ? error.message : 'An unexpected error occurred');
@@ -187,6 +218,21 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
 
       {secretType === 'kubeconfig' && (
         <FormGroup label="Kubeconfig" isRequired fieldId="kubeconfig">
+          <input
+            ref={kubeconfigFileInputRef}
+            id="kubeconfig-file"
+            type="file"
+            aria-label="Select kubeconfig file"
+            hidden
+            onChange={handleKubeconfigFileChange}
+          />
+          <Button
+            variant="secondary"
+            onClick={() => kubeconfigFileInputRef.current?.click()}
+            style={{ marginBottom: '0.75rem' }}
+          >
+            Select kubeconfig file
+          </Button>
           <TextArea
             id="kubeconfig"
             value={kubeconfig}
@@ -198,7 +244,7 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
           <FormHelperText>
             <HelperText>
               <HelperTextItem>
-                Paste your kubeconfig file content here. It will be automatically base64-encoded.
+                Select a kubeconfig file or paste its content here. It will be automatically base64-encoded.
               </HelperTextItem>
             </HelperText>
           </FormHelperText>
