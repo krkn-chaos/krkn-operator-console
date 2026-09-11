@@ -21,7 +21,7 @@ export { AddMembersModal } from './AddMembersModal';
 export { TerminalDrawer } from './TerminalDrawer';
 export { TerminalContent } from './TerminalContent';
 export { Studio } from './Studio';
-export { FileManagementModal } from './FileManagement';
+export { FileManagementPage } from './FileManagement';
 export { FileTypesManagementModal } from './FileTypesManagement';
 export { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 export { ElasticsearchDataView } from './ElasticsearchDataView';
