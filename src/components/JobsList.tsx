@@ -30,11 +30,7 @@ import {
   SelectOption,
   SelectList,
   MenuToggle,
-  MenuToggleAction,
   Tooltip,
-  Dropdown,
-  DropdownList,
-  DropdownItem,
   TextInput,
   Pagination,
   PaginationVariant,
@@ -49,14 +45,12 @@ import {
   RedoIcon,
   LockIcon,
   TopologyIcon,
-  FileIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
 import { JobStatsSummary } from './JobStatsSummary';
-import { FileManagementModal } from './FileManagement';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
@@ -155,8 +149,6 @@ interface JobsListProps {
   onToggleJobAccordion: (jobId: string) => void;
   onDeleteScenarioRun: (scenarioRunName: string) => Promise<void>;
   onDeleteJob: (jobId: string) => Promise<void>;
-  onCreateJob: () => void;
-  onNavigateToStudio: () => void;
   onRerunScenario: (run: ScenarioRunState, jobId: string) => void;
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
@@ -171,8 +163,6 @@ export function JobsList({
   onToggleJobAccordion,
   onDeleteScenarioRun,
   onDeleteJob,
-  onCreateJob,
-  onNavigateToStudio,
   onRerunScenario,
   expandedGraphRunIds,
   onToggleGraphRunAccordion,
@@ -192,8 +182,6 @@ export function JobsList({
   const [timeRangeError, setTimeRangeError] = useState('');
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
-  const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
-  const [isFileManagementOpen, setIsFileManagementOpen] = useState(false);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -418,68 +406,6 @@ export function JobsList({
               Scenario Runs
             </Title>
           </FlexItem>
-          <FlexItem>
-            {/* Split button dropdown - GitHub style */}
-            <Dropdown
-              isOpen={isRunDropdownOpen}
-              onOpenChange={(isOpen) => setIsRunDropdownOpen(isOpen)}
-              popperProps={{ position: 'right' }}
-              toggle={(toggleRef) => (
-                <MenuToggle
-                  ref={toggleRef}
-                  splitButtonOptions={{
-                    variant: 'action',
-                    items: [
-                      <MenuToggleAction
-                        key="default-action"
-                        onClick={onCreateJob}
-                        aria-label="Run single scenario"
-                      >
-                        Run Scenarios
-                      </MenuToggleAction>,
-                    ],
-                  }}
-                  variant="primary"
-                  onClick={() => setIsRunDropdownOpen(!isRunDropdownOpen)}
-                  isExpanded={isRunDropdownOpen}
-                  aria-label="Run scenarios options"
-                />
-              )}
-            >
-              <DropdownList>
-                <DropdownItem
-                  onClick={() => {
-                    setIsRunDropdownOpen(false);
-                    onCreateJob();
-                  }}
-                  description="Run a single chaos scenario on selected clusters"
-                  icon={<HiOutlineRocketLaunch />}
-                >
-                  Single Scenario Run
-                </DropdownItem>
-                <DropdownItem
-                  onClick={() => {
-                    setIsRunDropdownOpen(false);
-                    onNavigateToStudio();
-                  }}
-                  description="Design and run complex chaos scenario workflows"
-                  icon={<TopologyIcon />}
-                >
-                  Chaos Studio
-                </DropdownItem>
-                <DropdownItem
-                  onClick={() => {
-                    setIsRunDropdownOpen(false);
-                    setIsFileManagementOpen(true);
-                  }}
-                  description="Manage ConfigMap-based files for scenarios"
-                  icon={<FileIcon />}
-                >
-                  Manage Files
-                </DropdownItem>
-              </DropdownList>
-            </Dropdown>
-          </FlexItem>
         </Flex>
       </CardTitle>
       <CardBody>
@@ -695,7 +621,7 @@ export function JobsList({
             <Title headingLevel="h2" size="lg">
               No Scenario Runs
             </Title>
-            <EmptyStateBody>Click "Run Scenarios" to start a new execution.</EmptyStateBody>
+            <EmptyStateBody>Use "Run Scenario" in the sidebar to start a new execution.</EmptyStateBody>
           </EmptyState>
         ) : (
           <>
@@ -1349,11 +1275,6 @@ export function JobsList({
         Are you sure you want to delete job <strong>{confirmDeleteJob?.jobName}</strong>?
       </Modal>
 
-      {/* File Management Modal */}
-      <FileManagementModal
-        isOpen={isFileManagementOpen}
-        onClose={() => setIsFileManagementOpen(false)}
-      />
     </Card>
   );
 }

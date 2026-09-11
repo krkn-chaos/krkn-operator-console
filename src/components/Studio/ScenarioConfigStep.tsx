@@ -192,8 +192,8 @@ export function ScenarioConfigStep({
   );
 
   const allGlobalFields = useMemo(
-    () => (scenarioGlobals?.fields.filter(field => field.required) || []).map((f) =>
-      f.variable.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
+    () => (scenarioGlobals?.fields || []).map((f) =>
+      f.variable?.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
     ),
     [scenarioGlobals?.fields]
   );

@@ -191,4 +191,32 @@ describe('AppContext reducer', () => {
       expect(capturedState.graphRuns[0].resiliencyScore?.status).toBe('pass');
     });
   });
+
+  describe('NAVIGATE_TO_TERMINAL', () => {
+    it('transitions to terminal phase', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'NAVIGATE_TO_TERMINAL' });
+      });
+
+      expect(capturedState.phase).toBe('terminal');
+    });
+  });
+
+  describe('GO_BACK from terminal', () => {
+    it('navigates from terminal back to jobs_list', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'NAVIGATE_TO_TERMINAL' });
+      });
+
+      act(() => {
+        capturedDispatch({ type: 'GO_BACK' });
+      });
+
+      expect(capturedState.phase).toBe('jobs_list');
+    });
+  });
 });

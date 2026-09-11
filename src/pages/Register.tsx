@@ -21,6 +21,8 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
+import { RateLimitError } from '../types/auth';
+import { useCooldown } from '../hooks/useCooldown';
 
 export function Register() {
   const { register } = useAuth();
@@ -35,6 +37,8 @@ export function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [cooldownSeconds, startCooldown] = useCooldown();
 
   // Form validation errors
   const [errors, setErrors] = useState({
@@ -143,7 +147,12 @@ export function Register() {
         navigate('/login');
       }, 2000);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Registration failed');
+      if (error instanceof RateLimitError) {
+        setErrorMessage(error.message);
+        startCooldown(5);
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : 'Registration failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -315,9 +324,9 @@ export function Register() {
             variant="primary"
             type="submit"
             isBlock
-            isDisabled={isLoading || !!successMessage}
+            isDisabled={isLoading || !!successMessage || cooldownSeconds > 0}
           >
-            {isLoading ? 'Creating Account...' : 'Create Admin Account'}
+            {cooldownSeconds > 0 ? `Please wait (${cooldownSeconds}s)` : isLoading ? 'Creating Account...' : 'Create Admin Account'}
           </Button>
         </ActionGroup>
       </Form>

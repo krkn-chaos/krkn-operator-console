@@ -1,6 +1,5 @@
-import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadContent, Toolbar, ToolbarContent, ToolbarItem, Alert, AlertActionCloseButton, AlertGroup, Dropdown, DropdownItem, DropdownList, MenuToggle, Modal, ModalVariant } from '@patternfly/react-core';
-import { CogIcon, EditIcon, KeyIcon, MoonIcon, SunIcon } from '@patternfly/react-icons';
-import { HiOutlineUserCircle } from 'react-icons/hi2';
+import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant } from '@patternfly/react-core';
+import { BarsIcon } from '@patternfly/react-icons';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
@@ -8,7 +7,10 @@ import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, AdminOnly, QuakeTerminal, Studio } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio } from './components';
+import { FileManagementModal } from './components/FileManagement';
+import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
+import { useRole } from './hooks/useRole';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import { UserForm } from './components/UserForm';
@@ -24,9 +26,10 @@ function App() {
   const { state: authState, logout } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotifications();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState(false);
+  const { isAdmin } = useRole();
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved === 'dark';
@@ -222,8 +225,6 @@ function App() {
               }
               onDeleteScenarioRun={handleDeleteScenarioRun}
               onDeleteJob={handleDeleteJob}
-              onCreateJob={handleCreateJob}
-              onNavigateToStudio={handleNavigateToStudio}
               onRerunScenario={handleRerunScenario}
               expandedGraphRunIds={state.expandedGraphRunIds}
               onToggleGraphRunAccordion={(graphRunName) =>
@@ -238,6 +239,27 @@ function App() {
 
       case 'settings':
         return <Settings />;
+
+      case 'terminal':
+        return (
+          <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: '100%' }}>
+            <div className="terminal-page">
+              <TerminalContent isOpen={true} onClose={handleNavigateToHome} />
+            </div>
+          </PageSection>
+        );
+
+      case 'files':
+        return (
+          <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: '100%' }}>
+            <div style={{ padding: '1rem' }}>
+              <FileManagementModal
+                isOpen={true}
+                onClose={handleNavigateToHome}
+              />
+            </div>
+          </PageSection>
+        );
 
       case 'studio':
         return (
@@ -317,6 +339,18 @@ function App() {
     dispatch({ type: 'NAVIGATE_TO_STUDIO' });
   };
 
+  const handleNavigateToTerminal = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_TERMINAL' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
+  const handleNavigateToFiles = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_FILES' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
   const handleNavigateToHome = () => {
     const proceed = () => dispatch({ type: 'JOBS_LIST_READY' });
     if (!checkStudioGuard(proceed)) return;
@@ -330,12 +364,12 @@ function App() {
 
   const handleEditProfile = () => {
     setIsEditProfileOpen(true);
-    setIsUserMenuOpen(false);
+    
   };
 
   const handleChangePassword = () => {
     setIsChangePasswordOpen(true);
-    setIsUserMenuOpen(false);
+   
   };
 
   const handleProfileSubmit = async (data: UpdateUserRequest) => {
@@ -364,41 +398,40 @@ function App() {
     }
   };
 
-  const userMenuItems = (
-    <DropdownList style={{ minWidth: '170px' }}>
-      <AdminOnly>
-        <DropdownItem
-          key="settings"
-          icon={<CogIcon />}
-          onClick={() => {
-            handleNavigateToSettings();
-            setIsUserMenuOpen(false);
-          }}
-        >
-          Admin Settings
-        </DropdownItem>
-      </AdminOnly>
-      <DropdownItem key="editProfile" icon={<EditIcon />} onClick={handleEditProfile}>
-        Edit Profile
-      </DropdownItem>
-      <DropdownItem key="changePassword" icon={<KeyIcon />} onClick={handleChangePassword}>
-        Change Password
-      </DropdownItem>
-      <DropdownItem
-        key="theme"
-        icon={isDarkTheme ? <SunIcon /> : <MoonIcon />}
-        onClick={() => setIsDarkTheme(!isDarkTheme)}
-      >
-        {isDarkTheme ? 'Light Theme' : 'Dark Theme'}
-      </DropdownItem>
-      <DropdownItem key="logout" onClick={handleLogout}>
-        Logout
-      </DropdownItem>
-    </DropdownList>
+  
+
+  const appSidebar = (
+    <AppSidebar
+      pinned={isSidebarPinned}
+      activePhase={state.phase}
+      isAdmin={isAdmin}
+      userName={`${authState.user?.name ?? ''} ${authState.user?.surname ?? ''}`.trim()}
+      isDarkTheme={isDarkTheme}
+      onNavigateJobs={handleNavigateToHome}
+      onRunScenario={handleCreateJob}
+      onNavigateStudio={handleNavigateToStudio}
+      onOpenFiles={handleNavigateToFiles}
+      onNavigateTerminal={handleNavigateToTerminal}
+      onNavigateSettings={handleNavigateToSettings}
+      onEditProfile={handleEditProfile}
+      onChangePassword={handleChangePassword}
+      onToggleTheme={() => setIsDarkTheme(!isDarkTheme)}
+      onLogout={handleLogout}
+    />
   );
 
   const header = (
     <Masthead>
+      <MastheadToggle>
+        <Button
+          variant="plain"
+          onClick={() => setIsSidebarPinned(prev => !prev)}
+          aria-label="Pin or unpin sidebar"
+          style={{ color: 'white' }}
+        >
+          <BarsIcon />
+        </Button>
+      </MastheadToggle>
       <MastheadMain>
         <MastheadBrand>
           <div
@@ -416,48 +449,13 @@ function App() {
           </div>
         </MastheadBrand>
       </MastheadMain>
-      <MastheadContent>
-        <Toolbar isFullHeight isStatic>
-          <ToolbarContent>
-            <ToolbarItem align={{ default: 'alignRight' }} style={{ marginRight: '4rem' }}>
-              <Dropdown
-                isOpen={isUserMenuOpen}
-                onOpenChange={(isOpen) => setIsUserMenuOpen(isOpen)}
-                popperProps={{
-                  minWidth: '170px',
-                  enableFlip: true,
-                  appendTo: () => document.body
-                }}
-                toggle={(toggleRef) => (
-                  <MenuToggle
-                    ref={toggleRef}
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    variant="plain"
-                    style={{ color: 'white' }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <HiOutlineUserCircle style={{ fontSize: '1.5rem' }} />
-                      <span>{authState.user?.name} {authState.user?.surname}</span>
-                    </div>
-                  </MenuToggle>
-                )}
-              >
-                {userMenuItems}
-              </Dropdown>
-            </ToolbarItem>
-          </ToolbarContent>
-        </Toolbar>
-      </MastheadContent>
     </Masthead>
   );
 
   return (
-    <>
-      {/* Quake-style dropdown terminal - rendered OUTSIDE Page to avoid layout conflicts */}
-      <QuakeTerminal heightPercent={40} />
-
-      <Page header={header}>
-        {/* Global notifications - appears right below header */}
+    <Page header={header}>
+      {appSidebar}
+      <div className="app-content--with-sidebar" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingLeft: SIDEBAR_RAIL_WIDTH }}>
         {state.notifications.length > 0 && (
           <div style={{ padding: '1rem 1rem 0 1rem' }}>
             <AlertGroup>
@@ -478,8 +476,8 @@ function App() {
           </div>
         )}
         <PageSection isFilled>{renderContent()}</PageSection>
+      </div>
 
-      {/* Edit Profile Modal */}
       <Modal
         variant={ModalVariant.medium}
         title="Edit Profile"
@@ -490,7 +488,7 @@ function App() {
           <UserForm
             initialData={{
               ...authState.user,
-              active: true, // Active status not stored in session, assume active
+              active: true,
               created: undefined,
               lastLogin: undefined,
             }}
@@ -501,7 +499,6 @@ function App() {
         )}
       </Modal>
 
-      {/* Change Password Modal */}
       <Modal
         variant={ModalVariant.small}
         title="Change Password"
@@ -514,8 +511,7 @@ function App() {
           onCancel={() => setIsChangePasswordOpen(false)}
         />
       </Modal>
-      </Page>
-    </>
+    </Page>
   );
 }
 

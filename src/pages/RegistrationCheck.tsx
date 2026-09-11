@@ -17,11 +17,13 @@ import {
 } from '@patternfly/react-core';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { RateLimitError } from '../types/auth';
 
 export function RegistrationCheck() {
   const navigate = useNavigate();
   const { state } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   useEffect(() => {
     async function checkRegistration() {
@@ -48,7 +50,12 @@ export function RegistrationCheck() {
           navigate('/register', { replace: true });
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to connect to server');
+        if (err instanceof RateLimitError) {
+          setIsRateLimited(true);
+          setError('Too many requests. Please wait a moment and refresh the page.');
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to connect to server');
+        }
       }
     }
 
@@ -60,10 +67,10 @@ export function RegistrationCheck() {
       <Bullseye>
         <EmptyState>
           <Title headingLevel="h2" size="lg">
-            Connection Error
+            {isRateLimited ? 'Too Many Requests' : 'Connection Error'}
           </Title>
           <p>{error}</p>
-          <p>Please check that the backend server is running.</p>
+          {!isRateLimited && <p>Please check that the backend server is running.</p>}
         </EmptyState>
       </Bullseye>
     );

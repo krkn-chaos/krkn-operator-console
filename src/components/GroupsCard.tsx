@@ -32,6 +32,7 @@ import {
 import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications } from '../hooks';
+import { usePagination } from '../hooks/usePagination';
 import { CreateGroupModal } from './CreateGroupModal';
 import { EditGroupModal } from './EditGroupModal';
 import { ViewGroupMembersModal } from './ViewGroupMembersModal';
@@ -97,9 +98,18 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [deletingGroupName, setDeletingGroupName] = useState<string | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [viewMembersGroupName, setViewMembersGroupName] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
   const { showSuccess, showError } = useNotifications();
+
+  // Pagination hook
+  const {
+    paginatedData: paginatedGroups,
+    page,
+    perPage,
+    totalItems,
+    totalPages,
+    handleSetPage,
+    handlePerPageSelect,
+  } = usePagination(filteredGroups, { initialPerPage: 10 });
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -138,16 +148,7 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
     });
 
     setFilteredGroups(result);
-    // Reset to page 1 when filters change
-    setPage(1);
   }, [groups, searchValue, sortDirection]);
-
-  // Calculate paginated groups
-  const totalItems = filteredGroups.length;
-  const totalPages = Math.ceil(totalItems / perPage);
-  const startIndex = (page - 1) * perPage;
-  const endIndex = startIndex + perPage;
-  const paginatedGroups = filteredGroups.slice(startIndex, endIndex);
 
   const handleCreate = () => {
     setIsCreateModalOpen(true);
@@ -256,127 +257,127 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
               </EmptyState>
             ) : (
               <>
-              <DataList aria-label="Groups list" isCompact>
-                {paginatedGroups.map((group) => {
-                  const clusterCount = Object.keys(group.clusterPermissions || {}).length;
-                  return (
-                    <DataListItem key={group.name}>
-                      <DataListItemRow>
-                        <DataListItemCells
-                          dataListCells={[
-                            <DataListCell key="name" width={2}>
-                              <div>
-                                <div style={{ marginBottom: '0.25rem' }}>
-                                  <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
-                                    {group.name}
-                                  </strong>
+                <DataList aria-label="Groups list" isCompact>
+                  {paginatedGroups.map((group) => {
+                    const clusterCount = Object.keys(group.clusterPermissions || {}).length;
+                    return (
+                      <DataListItem key={group.name}>
+                        <DataListItemRow>
+                          <DataListItemCells
+                            dataListCells={[
+                              <DataListCell key="name" width={2}>
+                                <div>
+                                  <div style={{ marginBottom: '0.25rem' }}>
+                                    <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                                      {group.name}
+                                    </strong>
+                                  </div>
+                                  <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                                    {group.description || 'No description'}
+                                  </div>
                                 </div>
-                                <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
-                                  {group.description || 'No description'}
+                              </DataListCell>,
+                              <DataListCell key="members" width={1}>
+                                <div>
+                                  <div style={{ marginBottom: '0.25rem' }}>
+                                    <strong>Members:</strong>
+                                  </div>
+                                  <Button
+                                    variant="link"
+                                    isInline
+                                    onClick={() => handleViewMembers(group.name)}
+                                    style={{ padding: 0, fontSize: 'var(--pf-v5-global--FontSize--sm)' }}
+                                  >
+                                    {group.memberCount || 0}
+                                  </Button>
                                 </div>
-                              </div>
-                            </DataListCell>,
-                            <DataListCell key="members" width={1}>
-                              <div>
-                                <div style={{ marginBottom: '0.25rem' }}>
-                                  <strong>Members:</strong>
+                              </DataListCell>,
+                              <DataListCell key="clusters" width={1}>
+                                <div>
+                                  <div style={{ marginBottom: '0.25rem' }}>
+                                    <strong>Clusters:</strong>
+                                  </div>
+                                  <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                                    {clusterCount}
+                                  </div>
                                 </div>
-                                <Button
-                                  variant="link"
-                                  isInline
-                                  onClick={() => handleViewMembers(group.name)}
-                                  style={{ padding: 0, fontSize: 'var(--pf-v5-global--FontSize--sm)' }}
+                              </DataListCell>,
+                              <DataListCell key="actions" width={1}>
+                                <Dropdown
+                                  isOpen={openDropdownId === group.name}
+                                  onOpenChange={(isOpen) => setOpenDropdownId(isOpen ? group.name : null)}
+                                  toggle={(toggleRef) => (
+                                    <MenuToggle
+                                      ref={toggleRef}
+                                      onClick={() =>
+                                        setOpenDropdownId(openDropdownId === group.name ? null : group.name)
+                                      }
+                                      variant="plain"
+                                      aria-label="Group actions"
+                                      isDisabled={deletingGroupName === group.name}
+                                    >
+                                      <EllipsisVIcon />
+                                    </MenuToggle>
+                                  )}
                                 >
-                                  {group.memberCount || 0}
-                                </Button>
-                              </div>
-                            </DataListCell>,
-                            <DataListCell key="clusters" width={1}>
-                              <div>
-                                <div style={{ marginBottom: '0.25rem' }}>
-                                  <strong>Clusters:</strong>
-                                </div>
-                                <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
-                                  {clusterCount}
-                                </div>
-                              </div>
-                            </DataListCell>,
-                            <DataListCell key="actions" width={1}>
-                              <Dropdown
-                                isOpen={openDropdownId === group.name}
-                                onOpenChange={(isOpen) => setOpenDropdownId(isOpen ? group.name : null)}
-                                toggle={(toggleRef) => (
-                                  <MenuToggle
-                                    ref={toggleRef}
-                                    onClick={() =>
-                                      setOpenDropdownId(openDropdownId === group.name ? null : group.name)
-                                    }
-                                    variant="plain"
-                                    aria-label="Group actions"
-                                    isDisabled={deletingGroupName === group.name}
-                                  >
-                                    <EllipsisVIcon />
-                                  </MenuToggle>
-                                )}
-                              >
-                                <DropdownList>
-                                  <DropdownItem
-                                    key="members"
-                                    icon={<UsersIcon />}
-                                    onClick={() => {
-                                      handleViewMembers(group.name);
-                                      setOpenDropdownId(null);
-                                    }}
-                                  >
-                                    Members
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    key="edit"
-                                    icon={<EditIcon />}
-                                    onClick={() => {
-                                      handleEdit(group);
-                                      setOpenDropdownId(null);
-                                    }}
-                                  >
-                                    Edit
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    key="delete"
-                                    icon={<TrashIcon />}
-                                    onClick={() => {
-                                      handleDelete(group.name);
-                                      setOpenDropdownId(null);
-                                    }}
-                                    style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
-                                  >
-                                    Delete
-                                  </DropdownItem>
-                                </DropdownList>
-                              </Dropdown>
-                            </DataListCell>,
-                          ]}
-                        />
-                      </DataListItemRow>
-                    </DataListItem>
-                  );
-                })}
-              </DataList>
-              {totalPages > 1 && (
-                <Pagination
-                  itemCount={totalItems}
-                  perPage={perPage}
-                  page={page}
-                  onSetPage={(_evt, newPage) => setPage(newPage)}
-                  onPerPageSelect={(_evt, newPerPage) => { setPerPage(newPerPage); setPage(1); }}
-                  variant={PaginationVariant.bottom}
-                  perPageOptions={[
-                    { title: '10', value: 10 },
-                    { title: '20', value: 20 },
-                    { title: '50', value: 50 },
-                  ]}
-                  style={{ marginTop: '1rem' }}
-                />
-              )}
+                                  <DropdownList>
+                                    <DropdownItem
+                                      key="members"
+                                      icon={<UsersIcon />}
+                                      onClick={() => {
+                                        handleViewMembers(group.name);
+                                        setOpenDropdownId(null);
+                                      }}
+                                    >
+                                      Members
+                                    </DropdownItem>
+                                    <DropdownItem
+                                      key="edit"
+                                      icon={<EditIcon />}
+                                      onClick={() => {
+                                        handleEdit(group);
+                                        setOpenDropdownId(null);
+                                      }}
+                                    >
+                                      Edit
+                                    </DropdownItem>
+                                    <DropdownItem
+                                      key="delete"
+                                      icon={<TrashIcon />}
+                                      onClick={() => {
+                                        handleDelete(group.name);
+                                        setOpenDropdownId(null);
+                                      }}
+                                      style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                                    >
+                                      Delete
+                                    </DropdownItem>
+                                  </DropdownList>
+                                </Dropdown>
+                              </DataListCell>,
+                            ]}
+                          />
+                        </DataListItemRow>
+                      </DataListItem>
+                    );
+                  })}
+                </DataList>
+                {totalPages > 1 && (
+                  <Pagination
+                    itemCount={totalItems}
+                    perPage={perPage}
+                    page={page}
+                    onSetPage={handleSetPage}
+                    onPerPageSelect={handlePerPageSelect}
+                    variant={PaginationVariant.bottom}
+                    perPageOptions={[
+                      { title: '10', value: 10 },
+                      { title: '20', value: 20 },
+                      { title: '50', value: 50 },
+                    ]}
+                    style={{ marginTop: '1rem' }}
+                  />
+                )}
               </>
             )}
           </>

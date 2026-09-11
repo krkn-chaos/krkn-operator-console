@@ -575,6 +575,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
             phase: 'jobs_list',
           };
 
+        case 'terminal':
+          // From terminal → back to jobs list
+          return {
+            ...state,
+            phase: 'jobs_list',
+          };
+
+        case 'files':
+          // From files → back to jobs list
+          return {
+            ...state,
+            phase: 'jobs_list',
+          };
+
         case 'selecting_clusters':
           // From cluster selection → cancel workflow, back to jobs list
           return {
@@ -659,6 +673,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'studio',
+      };
+
+    case 'NAVIGATE_TO_TERMINAL':
+      return {
+        ...state,
+        phase: 'terminal',
+      };
+
+    case 'NAVIGATE_TO_FILES':
+      return {
+        ...state,
+        phase: 'files',
       };
 
     // Notifications

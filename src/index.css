@@ -17,3 +17,13 @@ body {
 .pf-v5-c-page {
   min-height: 100vh;
 }
+
+/* Fix the page header (masthead) so it never scrolls behind content */
+.pf-v5-c-page__header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  background-color: inherit;
+}

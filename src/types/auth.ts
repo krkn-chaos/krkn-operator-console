@@ -74,8 +74,18 @@ export interface IsRegisteredResponse {
  * Authentication error from API
  */
 export interface AuthError {
-  error: string; // Error code: 'invalid_credentials', 'account_disabled', 'validation_error', 'user_exists'
+  error: string; // Error code: 'invalid_credentials', 'account_disabled', 'validation_error', 'user_exists', 'rate_limited'
   message: string; // User-friendly error message
+}
+
+/**
+ * Error thrown when the API returns HTTP 429 (rate limited)
+ */
+export class RateLimitError extends Error {
+  constructor(message = 'Too many attempts. Please wait and try again.') {
+    super(message);
+    this.name = 'RateLimitError';
+  }
 }
 
 /**

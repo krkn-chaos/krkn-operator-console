@@ -20,6 +20,8 @@ import {
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { RateLimitError } from '../types/auth';
+import { useCooldown } from '../hooks/useCooldown';
 
 export function Login() {
   const { state, login } = useAuth();
@@ -32,6 +34,7 @@ export function Login() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showSessionExpired, setShowSessionExpired] = useState(false);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
+  const [cooldownSeconds, startCooldown] = useCooldown();
 
   // Apply theme from localStorage
   useEffect(() => {
@@ -57,12 +60,15 @@ export function Login() {
         const registered = await authService.isRegistered();
         setIsRegistered(registered);
       } catch (error) {
-        // Assume registered on error to show login form
+        if (error instanceof RateLimitError) {
+          setErrorMessage(error.message);
+          startCooldown(5);
+        }
         setIsRegistered(true);
       }
     }
     checkRegistration();
-  }, []);
+  }, [startCooldown]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -99,9 +105,13 @@ export function Login() {
 
     try {
       await login({ userId: userId.trim(), password });
-      // Success - AuthContext will update state and useEffect will handle redirect
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Login failed');
+      if (error instanceof RateLimitError) {
+        setErrorMessage(error.message);
+        startCooldown(5);
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : 'Login failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -148,8 +158,8 @@ export function Login() {
         onChangePassword={(_, value) => setPassword(value)}
         isValidPassword={!errorMessage}
         isShowPasswordEnabled
-        isLoginButtonDisabled={isLoading}
-        loginButtonLabel={isLoading ? 'Logging in...' : 'Log in'}
+        isLoginButtonDisabled={isLoading || cooldownSeconds > 0}
+        loginButtonLabel={cooldownSeconds > 0 ? `Please wait (${cooldownSeconds}s)` : isLoading ? 'Logging in...' : 'Log in'}
         onLoginButtonClick={handleSubmit}
       />
 

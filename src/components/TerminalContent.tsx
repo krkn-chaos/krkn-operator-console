@@ -213,6 +213,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const previousIsOpenRef = useRef(isOpen);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const CLUSTERS_PER_PAGE = 50;
   const COLUMNS = 5;
@@ -388,11 +389,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
 
   // Keep scroll at top during loading
   useEffect(() => {
-    if (isLoading) {
-      const terminalBody = document.getElementById('terminal-body');
-      if (terminalBody) {
-        terminalBody.scrollTop = 0;
-      }
+    if (isLoading && containerRef.current) {
+      containerRef.current.scrollTop = 0;
     }
   }, [isLoading]);
 
@@ -416,7 +414,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     }
   }, [outputLines, clusters]);
 
-  // Cleanup when terminal closes
+  // Cleanup when terminal closes (isOpen transitions from true to false)
   useEffect(() => {
     const wasOpen = previousIsOpenRef.current;
     previousIsOpenRef.current = isOpen;
@@ -445,6 +443,19 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       setAvailableCommands(null);
     }
   }, [isOpen, discoveryUuid, reset]);
+
+  // Unmount safety cleanup: if component unmounts while open, ensure cleanup runs.
+  // This handles cases where navigation happens before isOpen can transition to false.
+  useEffect(() => {
+    return () => {
+      if (previousIsOpenRef.current && discoveryUuid) {
+        // Attempt cleanup on unmount (best effort, no error handling since component is unmounting)
+        operatorApi.deleteTargetRequest(discoveryUuid).catch(() => {
+          // Silently ignore cleanup failures on unmount
+        });
+      }
+    };
+  }, [discoveryUuid]);
 
   // Handle retry on 'r' key press when in error state
   useEffect(() => {
@@ -662,7 +673,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   // Loading state - static (no animation to prevent layout shift)
   if (isLoading) {
     return (
-      <div className="terminal-content" style={{ minHeight: '100px' }}>
+      <div className="terminal-content" ref={containerRef} style={{ minHeight: '100px' }}>
         <div className="terminal-line" style={{ padding: '1rem 0' }}>
           Loading clusters...
         </div>
@@ -673,7 +684,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   // Error state
   if (error) {
     return (
-      <div className="terminal-content">
+      <div className="terminal-content" ref={containerRef}>
         <div className="terminal-line terminal-error">Error: {error}</div>
         <div className="terminal-line">
           Press <span className="terminal-key">r</span> to retry
@@ -685,7 +696,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   // No clusters found
   if (clusters && clusters.length === 0) {
     return (
-      <div className="terminal-content">
+      <div className="terminal-content" ref={containerRef}>
         <div className="terminal-line">No clusters found.</div>
       </div>
     );
@@ -694,7 +705,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   // Initial state (should not happen due to useEffect)
   if (!clusters) {
     return (
-      <div className="terminal-content">
+      <div className="terminal-content" ref={containerRef}>
         <div className="terminal-line">Ready...</div>
       </div>
     );
@@ -709,7 +720,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const hasNextPage = currentPage < totalPages - 1;
 
   return (
-    <div className="terminal-content" onClick={handleTerminalClick}>
+    <div className="terminal-content" ref={containerRef} onClick={handleTerminalClick}>
       {/* Show cluster selection header and grid only if no cluster is selected */}
       {!selectedCluster && (
         <>

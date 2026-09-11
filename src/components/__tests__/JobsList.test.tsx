@@ -90,8 +90,6 @@ const defaultProps = () => ({
   onToggleJobAccordion: vi.fn(),
   onDeleteScenarioRun: vi.fn().mockResolvedValue(undefined),
   onDeleteJob: vi.fn().mockResolvedValue(undefined),
-  onCreateJob: vi.fn(),
-  onNavigateToStudio: vi.fn(),
   expandedGraphRunIds: new Set<string>(),
   onToggleGraphRunAccordion: vi.fn(),
   onDeleteGraphRun: vi.fn().mockResolvedValue(undefined),

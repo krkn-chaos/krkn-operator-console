@@ -18,7 +18,6 @@ import {
 import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
-import { useNotifications } from '../hooks';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { FileSelector } from './FileSelector';
@@ -55,7 +54,6 @@ interface ScenarioDetailProps {
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
   const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenarioImage, rerunKubeconfigPath } = state;
-  const { showSuccess } = useNotifications();
   const [showPreview, setShowPreview] = useState(startInPreview);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
@@ -330,13 +328,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       dispatch({
         type: 'SCENARIOS_RUN_BATCH_SUCCESS',
       });
-
-      // Show success notification with scenario run name (persistent - no auto-dismiss)
-      showSuccess(
-        'Scenario run created successfully',
-        `Run ID: ${createResponse.scenarioRunName}. Please wait for the job to appear in the list.`,
-        0 // Don't auto-dismiss - user must close manually
-      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to run scenario';
       const isConflict = msg.includes('409') || msg.toLowerCase().includes('conflict');

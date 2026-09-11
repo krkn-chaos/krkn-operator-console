@@ -1,0 +1,63 @@
+/*
+ * AppSidebar — fixed-position overlay sidebar (IBM Cloud style).
+ *
+ * Collapsed by default to a slim icon rail; expanding (hover or pin) floats the
+ * full menu OVER the page content instead of compressing it. The main content
+ * keeps a constant left padding equal to the rail width, so nothing shifts when
+ * the sidebar expands.
+ */
+
+:root {
+  --app-sidebar-rail-width: 64px;
+  --app-sidebar-expanded-width: 200px;
+  /* Sit flush under the masthead at 64px (PatternFly v5 standard height) */
+  --app-sidebar-top: 64px;
+}
+
+.app-sidebar {
+  position: fixed;
+  top: var(--app-sidebar-top);
+  left: 0;
+  bottom: 0;
+  z-index: 400;
+  width: var(--app-sidebar-rail-width);
+  transition: width 0.15s ease-in-out;
+  overflow: visible;
+  /* Ensure sidebar stays above content and never goes behind masthead */
+  height: calc(100vh - var(--app-sidebar-top));
+}
+
+.app-sidebar--expanded {
+  width: var(--app-sidebar-expanded-width);
+}
+
+.app-sidebar--expanded {
+  box-shadow: 0.25rem 0 1rem rgba(3, 3, 3, 0.24);
+}
+
+/* Inner scroll container fills the fixed rail */
+.app-sidebar__inner {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--pf-v5-global--BackgroundColor--100, #fff);
+  border-right: 1px solid var(--pf-v5-global--BorderColor--100, #d2d2d2);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.pf-v5-theme-dark .app-sidebar__inner {
+  background-color: var(--pf-v5-global--BackgroundColor--300, #1b1d21);
+  border-right-color: var(--pf-v5-global--BorderColor--100, #444548);
+}
+
+/* Push page content clear of the collapsed rail (constant, never shifts). */
+.app-content--with-sidebar {
+  padding-left: var(--app-sidebar-rail-width);
+}
+
+/* Bottom-anchored user section */
+.app-sidebar__spacer {
+  flex: 1 1 auto;
+}

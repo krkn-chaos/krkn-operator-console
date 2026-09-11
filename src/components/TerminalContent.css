@@ -6,6 +6,23 @@
   tab-size: 4; /* Preserve tab spacing */
 }
 
+/*
+ * Full-screen terminal page wrapper. Gives the terminal a solid, opaque
+ * background and full height so it reads as a normal terminal page (no
+ * transparency/overlap of the old "Doom terminal" drawer).
+ */
+.terminal-page {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--pf-v5-global--BackgroundColor--100, #fff);
+  color: #2a2a2a;
+}
+
+.pf-v5-theme-dark .terminal-page {
+  background: #0b0e14;
+  color: #e8e8e8;
+}
+
 .terminal-line {
   margin-bottom: 0.5rem;
   white-space: pre-wrap; /* Preserve whitespace and line breaks */
