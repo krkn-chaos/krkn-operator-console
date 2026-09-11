@@ -8,7 +8,7 @@ import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio } from './components';
-import { FileManagementModal } from './components/FileManagement';
+import { FileManagementPage } from './components/FileManagement';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
 import { useRole } from './hooks/useRole';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
@@ -251,13 +251,8 @@ function App() {
 
       case 'files':
         return (
-          <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: '100%' }}>
-            <div style={{ padding: '1rem' }}>
-              <FileManagementModal
-                isOpen={true}
-                onClose={handleNavigateToHome}
-              />
-            </div>
+          <PageSection isFilled>
+            <FileManagementPage />
           </PageSection>
         );
 
