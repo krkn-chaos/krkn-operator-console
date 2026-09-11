@@ -249,4 +249,76 @@ describe('FilesTable permission-based edit/delete buttons', () => {
       expect(deleteBtn).toBeDisabled();
     });
   });
+
+  describe('filtering and pagination', () => {
+    it('filters files by multiple types and access', async () => {
+      const user = userEvent.setup();
+      const files = [
+        makeFile({ fileId: 'yaml-public', fileName: 'public.yaml', fileType: 'yaml', availableToAll: true }),
+        makeFile({ fileId: 'json-private', fileName: 'private.json', fileType: 'json', availableToAll: false }),
+        makeFile({ fileId: 'yaml-private', fileName: 'private.yaml', fileType: 'yaml', availableToAll: false }),
+      ];
+
+      render(
+        <FilesTable
+          {...defaultProps}
+          files={files}
+          fileTypes={[{ name: 'yaml', color: '#357edd' }, { name: 'json', color: '#357edd' }]}
+          isAdmin={true}
+          userGroups={[]}
+        />,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Filter by type' }));
+      await user.click(screen.getByRole('checkbox', { name: 'yaml' }));
+      await user.click(screen.getByRole('button', { name: 'Filter by access' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Public' }));
+
+      expect(screen.getByText('public.yaml')).toBeInTheDocument();
+      expect(screen.queryByText('private.json')).not.toBeInTheDocument();
+      expect(screen.queryByText('private.yaml')).not.toBeInTheDocument();
+    });
+
+    it('filters files by group name', async () => {
+      const user = userEvent.setup();
+      const files = [
+        makeFile({ fileId: 'team-a-file', fileName: 'team-a.yaml', groups: ['team-a'], availableToAll: false }),
+        makeFile({ fileId: 'team-b-file', fileName: 'team-b.yaml', groups: ['team-b'], availableToAll: false }),
+      ];
+
+      render(
+        <FilesTable
+          {...defaultProps}
+          files={files}
+          isAdmin={true}
+          userGroups={[]}
+        />,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Filter by access' }));
+      await user.click(screen.getByRole('checkbox', { name: 'team-a' }));
+
+      expect(screen.getByText('team-a.yaml')).toBeInTheDocument();
+      expect(screen.queryByText('team-b.yaml')).not.toBeInTheDocument();
+    });
+
+    it('shows pagination when more than 25 files are available', () => {
+      const files = Array.from({ length: 26 }, (_, index) =>
+        makeFile({ fileId: `file-${index + 1}`, fileName: `file-${index + 1}.yaml`, availableToAll: true }),
+      );
+
+      render(
+        <FilesTable
+          {...defaultProps}
+          files={files}
+          isAdmin={true}
+          userGroups={[]}
+        />,
+      );
+
+      expect(screen.getAllByRole('navigation').length).toBeGreaterThan(0);
+      expect(screen.getByText('file-1.yaml')).toBeInTheDocument();
+      expect(screen.queryByText('file-26.yaml')).not.toBeInTheDocument();
+    });
+  });
 });
