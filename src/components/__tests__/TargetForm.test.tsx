@@ -29,6 +29,44 @@ describe('TargetForm', () => {
     });
   });
 
+  describe('kubeconfig file selection', () => {
+    it('loads the selected file into the kubeconfig field', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const file = new File(['apiVersion: v1\nkind: Config'], 'config', { type: 'application/yaml' });
+
+      await user.upload(screen.getByLabelText(/select kubeconfig file/i), file);
+
+      await waitFor(() => {
+        expect((container.querySelector('#kubeconfig') as HTMLTextAreaElement).value).toBe(
+          'apiVersion: v1\nkind: Config'
+        );
+      });
+    });
+
+    it('UTF-8 encodes uploaded kubeconfig content before submitting', async () => {
+      const user = userEvent.setup();
+      const unicodeContent = 'apiVersion: v1\n# cluster: 東京\nkind: Config';
+      const file = new File([unicodeContent], 'config', { type: 'application/yaml' });
+      mockOnSubmit.mockResolvedValue(undefined);
+
+      render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      await user.type(screen.getByRole('textbox', { name: /cluster name/i }), 'my-cluster');
+      await user.upload(screen.getByLabelText(/select kubeconfig file/i), file);
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({
+          kubeconfig: expect.any(String),
+        }));
+      });
+
+      const encoded = mockOnSubmit.mock.calls[0][0].kubeconfig as string;
+      const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
+      expect(new TextDecoder().decode(bytes)).toBe(unicodeContent);
+    });
+  });
+
   describe('API error handling', () => {
     it('shows an inline alert with the error message when onSubmit rejects', async () => {
       const user = userEvent.setup();
