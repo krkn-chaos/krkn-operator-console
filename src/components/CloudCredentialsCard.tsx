@@ -3,6 +3,7 @@ import {
   Card,
   CardTitle,
   CardBody,
+  CardFooter,
   Button,
   EmptyState,
   EmptyStateIcon,
@@ -23,8 +24,13 @@ import {
   FormSelectOption,
   Label,
   Radio,
+  Gallery,
+  GalleryItem,
+  DescriptionList,
+  DescriptionListGroup,
+  DescriptionListTerm,
+  DescriptionListDescription,
 } from '@patternfly/react-core';
-import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { PlusCircleIcon, KeyIcon } from '@patternfly/react-icons';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { operatorApi } from '../services/operatorApi';
@@ -48,6 +54,16 @@ const PROVIDER_LABELS: Record<CloudCredentialProvider, string> = {
 };
 
 const PROVIDER_OPTIONS: CloudCredentialProvider[] = ['aws', 'gcp', 'azure', 'openstack', 'baremetal', 'vmware', 'ibmcloud'];
+
+function credentialAccessLabel(cred: CloudCredential): string {
+  if (cred.availableToAll) {
+    return 'All Users';
+  }
+  if (cred.groups && cred.groups.length > 0) {
+    return cred.groups.join(', ');
+  }
+  return 'No groups';
+}
 
 interface CloudCredentialFormProps {
   initial?: CloudCredential;
@@ -561,47 +577,67 @@ export function CloudCredentialsCard() {
               </EmptyStateBody>
             </EmptyState>
           ) : (
-            <Table aria-label="Cloud credentials table" variant="compact">
-              <Thead>
-                <Tr>
-                  <Th>Name</Th>
-                  <Th>Provider</Th>
-                  <Th>Description</Th>
-                  <Th>Access</Th>
-                  <Th>Created</Th>
-                  <Th>Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {credentials.map((cred) => (
-                  <Tr key={cred.name}>
-                    <Td dataLabel="Name"><strong>{cred.name}</strong></Td>
-                    <Td dataLabel="Provider">
-                      <Label color="blue">{PROVIDER_LABELS[cred.provider] ?? cred.provider}</Label>
-                    </Td>
-                    <Td dataLabel="Description">{cred.description || '—'}</Td>
-                    <Td dataLabel="Access">
-                      {cred.availableToAll
-                        ? 'All Users'
-                        : cred.groups && cred.groups.length > 0
-                          ? cred.groups.join(', ')
-                          : 'No groups'}
-                    </Td>
-                    <Td dataLabel="Created">
-                      {cred.createdAt ? new Date(cred.createdAt).toLocaleDateString() : '—'}
-                    </Td>
-                    <Td dataLabel="Actions">
-                      <Button variant="secondary" size="sm" onClick={() => setEditingCred(cred)} style={{ marginRight: '0.5rem' }}>
-                        Edit
-                      </Button>
-                      <Button variant="danger" size="sm" onClick={() => setDeletingName(cred.name)}>
-                        Delete
-                      </Button>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
+            <Gallery hasGutter minWidths={{ default: '22rem' }} role="list" aria-label="Cloud credentials">
+              {credentials.map((cred) => (
+                <GalleryItem key={cred.name} role="listitem">
+                  <Card isCompact isFlat>
+                    <CardTitle>
+                      <Flex
+                        justifyContent={{ default: 'justifyContentSpaceBetween' }}
+                        alignItems={{ default: 'alignItemsCenter' }}
+                        flexWrap={{ default: 'nowrap' }}
+                        spaceItems={{ default: 'spaceItemsSm' }}
+                      >
+                        <FlexItem>
+                          <Title headingLevel="h3" size="md">
+                            {cred.name}
+                          </Title>
+                        </FlexItem>
+                        <FlexItem>
+                          <Label color="blue">{PROVIDER_LABELS[cred.provider] ?? cred.provider}</Label>
+                        </FlexItem>
+                      </Flex>
+                    </CardTitle>
+                    <CardBody>
+                      <DescriptionList isCompact>
+                        <DescriptionListGroup>
+                          <DescriptionListTerm>Description</DescriptionListTerm>
+                          <DescriptionListDescription>
+                            {cred.description || '—'}
+                          </DescriptionListDescription>
+                        </DescriptionListGroup>
+                        <DescriptionListGroup>
+                          <DescriptionListTerm>Access</DescriptionListTerm>
+                          <DescriptionListDescription>
+                            {credentialAccessLabel(cred)}
+                          </DescriptionListDescription>
+                        </DescriptionListGroup>
+                        <DescriptionListGroup>
+                          <DescriptionListTerm>Created</DescriptionListTerm>
+                          <DescriptionListDescription>
+                            {cred.createdAt ? new Date(cred.createdAt).toLocaleDateString() : '—'}
+                          </DescriptionListDescription>
+                        </DescriptionListGroup>
+                      </DescriptionList>
+                    </CardBody>
+                    <CardFooter>
+                      <Flex spaceItems={{ default: 'spaceItemsSm' }}>
+                        <FlexItem>
+                          <Button variant="secondary" size="sm" onClick={() => setEditingCred(cred)}>
+                            Edit
+                          </Button>
+                        </FlexItem>
+                        <FlexItem>
+                          <Button variant="danger" size="sm" onClick={() => setDeletingName(cred.name)}>
+                            Delete
+                          </Button>
+                        </FlexItem>
+                      </Flex>
+                    </CardFooter>
+                  </Card>
+                </GalleryItem>
+              ))}
+            </Gallery>
           )}
         </CardBody>
       </Card>

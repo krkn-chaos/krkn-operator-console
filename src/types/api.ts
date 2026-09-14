@@ -1476,7 +1476,7 @@ export interface CloudCredential {
 
 export interface CreateCloudCredentialRequest {
   name: string;
-  provider: string;
+  provider: CloudCredentialProvider;
   description?: string;
   groups?: string[];
   availableToAll?: boolean;
