@@ -39,6 +39,7 @@ import { groupsApi } from '../services/groupsApi';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import type { GroupDetails, ClusterPermissions } from '../types/api';
 import { ClusterPermissionsTable } from './ClusterPermissionsTable';
+import { normalizeClusterPermissions } from './createGroupValidation';
 
 interface EditGroupModalProps {
   /** Whether modal is open */
@@ -157,7 +158,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
 
         setGroupData(group);
         setDescription(group.description || '');
-        setClusterPermissions(group.clusterPermissions || {});
+        setClusterPermissions(normalizeClusterPermissions(group.clusterPermissions || {}));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load group data');
         lastLoadedRef.current = ''; // Allow retry on error

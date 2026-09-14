@@ -1,5 +1,11 @@
 import type { ClusterPermissions, TargetResponse } from '../types/api';
 
+export function normalizeClusterPermissions(permissions: ClusterPermissions): ClusterPermissions {
+  return Object.fromEntries(
+    Object.entries(permissions).filter(([, permission]) => (permission.actions || []).length > 0)
+  );
+}
+
 export function checkRunOrCancelWithoutView(clusterPermissions: ClusterPermissions): {
   hasIssue: boolean;
   missingPermissions: string[];
