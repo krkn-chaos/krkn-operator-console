@@ -102,5 +102,21 @@ describe('CloudCredentialsCard', () => {
       expect(await screen.findByText('Delete Cloud Credential')).toBeInTheDocument();
       expect(screen.getByText('azure-dummy', { selector: 'strong' })).toBeInTheDocument();
     });
+
+    it('keeps GCP selected in create modal after editing description', async () => {
+      const user = userEvent.setup();
+      render(<CloudCredentialsCard />);
+
+      await user.click(await screen.findByRole('button', { name: 'Add Credential' }));
+      const providerSelect = await screen.findByLabelText('Provider');
+      await user.selectOptions(providerSelect, 'gcp');
+      expect(providerSelect).toHaveValue('gcp');
+      expect(await screen.findByLabelText(/Service Account JSON/i)).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText('Description'), 'test gcp cred');
+      expect(providerSelect).toHaveValue('gcp');
+      expect(screen.getByLabelText(/Service Account JSON/i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Access Key ID/i)).not.toBeInTheDocument();
+    });
   });
 });
