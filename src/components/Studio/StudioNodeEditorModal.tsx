@@ -47,6 +47,7 @@ function StudioNodeEditorModalComponent({
   const [globalFormValues, setGlobalFormValues] = useState<ScenarioFormValues>({});
   const [globalTouchedFields, setGlobalTouchedFields] = useState<TouchedFields>({});
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
+  const [cloudCredentialRef, setCloudCredentialRef] = useState('');
   const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
 
   // Step 4: Node metadata
@@ -82,6 +83,7 @@ function StudioNodeEditorModalComponent({
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
+      setCloudCredentialRef(node.config.cloudCredentialRef || '');
       setVolumes(node.config.volumes || {});
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
@@ -94,6 +96,7 @@ function StudioNodeEditorModalComponent({
       setFormValues({});
       setGlobalFormValues({});
       setGlobalTouchedFields({});
+      setCloudCredentialRef('');
       setVolumes({});
       setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
@@ -117,6 +120,7 @@ function StudioNodeEditorModalComponent({
     setSelectedScenario(null);
     setFormValues({});
     setScenarioDefaultValues({});
+    setCloudCredentialRef('');
   }, [fetchScenarios]);
 
   // Handle registry name change
@@ -128,6 +132,7 @@ function StudioNodeEditorModalComponent({
     setSelectedScenario(null);
     setFormValues({});
     setScenarioDefaultValues({});
+    setCloudCredentialRef('');
   }, [fetchScenarios]);
 
   // Validate node ID
@@ -152,6 +157,7 @@ function StudioNodeEditorModalComponent({
     // Prevents stale values from previous scenario being saved
     setFormValues({});
     setScenarioDefaultValues({});
+    setCloudCredentialRef('');
   }, [registryType, registryName]);
 
   // Reset warning when pending input is cleared
@@ -191,6 +197,7 @@ function StudioNodeEditorModalComponent({
         globalFormValues,
         globalTouchedFields,
         volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
+        cloudCredentialRef: cloudCredentialRef || undefined,
       },
     };
 
@@ -258,6 +265,8 @@ function StudioNodeEditorModalComponent({
           onFormChange={setFormValues}
           onGlobalFormChange={handleGlobalFormChange}
           onDefaultValuesLoad={handleDefaultValuesLoad}
+          cloudCredentialRef={cloudCredentialRef}
+          onCloudCredentialRefChange={setCloudCredentialRef}
         />
       ) : null,
     },
