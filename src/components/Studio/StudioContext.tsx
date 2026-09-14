@@ -11,6 +11,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode, useRef } from 'react';
 import type { StudioNode, StudioEdge, StudioWorkflow, StudioAutosave, GraphScenarioNode } from '../../types/api';
+import { isCloudEnvVar } from '../../utils/cloudProviderUtils';
 import { workflowsApi } from '../../services/workflowsApi';
 import { AUTOSAVE_VERSION, saveAutosave, clearAutosave } from './studioAutosave';
 
@@ -48,12 +49,21 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
         });
       }
 
+      if (node.config.cloudCredentialRef) {
+        for (const key of Object.keys(env)) {
+          if (isCloudEnvVar(key)) {
+            delete env[key];
+          }
+        }
+      }
+
       graph[node.nodeId] = {
         name: node.config.scenarioName,
         image: node.config.scenarioImage,
         env,
         volumes: node.config.volumes,
         depends_on: incomingEdge?.source,
+        cloudCredentialRef: node.config.cloudCredentialRef,
       };
     }
   });

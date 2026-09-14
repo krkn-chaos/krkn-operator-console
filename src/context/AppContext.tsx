@@ -476,6 +476,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
           }
         });
         formValues = initialValues;
+      } else if (!formValues) {
+        const initialValues: import('../types/api').ScenarioFormValues = {};
+        detail.fields.forEach((f) => {
+          if (f.type !== 'group' && f.default !== undefined) {
+            initialValues[f.variable] = f.default;
+          }
+        });
+        formValues = initialValues;
       }
 
       return {

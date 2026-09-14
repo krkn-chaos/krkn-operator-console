@@ -268,9 +268,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleFormChange = (values: ScenarioFormValues) => {
+    // Multiple DynamicFormBuilder instances (required + optional) each emit their own
+    // slice of fields on init — merge so a later init doesn't wipe values from an earlier one.
     dispatch({
       type: 'UPDATE_SCENARIO_FORM',
-      payload: { formValues: values },
+      payload: { formValues: { ...(scenarioFormValues || {}), ...values } },
     });
   };
 
@@ -296,7 +298,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     const errors: string[] = [];
 
     scenarioDetail.fields.forEach((field) => {
-      const value = scenarioFormValues?.[field.variable];
+      const value = scenarioFormValues?.[field.variable] ?? field.default;
 
       if (field.required && (value === undefined || value === null || value === '')) {
         errors.push(`${field.short_description} is required`);
