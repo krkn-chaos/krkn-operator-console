@@ -140,9 +140,10 @@ export function ClusterPermissionsTable({
     targets.forEach((target) => {
       const url = target.clusterAPIURL;
       const current = updated[url] || { actions: [] };
-      if (!current.actions.includes(action)) {
+      const currentActions = current.actions || [];
+      if (!currentActions.includes(action)) {
         updated[url] = {
-          actions: [...current.actions, action],
+          actions: [...currentActions, action],
         };
       }
     });
@@ -156,7 +157,7 @@ export function ClusterPermissionsTable({
 
     Object.keys(updated).forEach((url) => {
       const current = updated[url];
-      const newActions = current.actions.filter((a) => a !== action);
+      const newActions = (current.actions || []).filter((a) => a !== action);
 
       if (newActions.length === 0) {
         delete updated[url];
@@ -203,7 +204,7 @@ export function ClusterPermissionsTable({
                   variant="link"
                   isInline
                   onClick={() => deselectAllForAction('view')}
-                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('view'))}
+                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions?.includes('view'))}
                   size="sm"
                 >
                   None
@@ -225,7 +226,7 @@ export function ClusterPermissionsTable({
                   variant="link"
                   isInline
                   onClick={() => deselectAllForAction('run')}
-                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('run'))}
+                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions?.includes('run'))}
                   size="sm"
                 >
                   None
@@ -247,7 +248,7 @@ export function ClusterPermissionsTable({
                   variant="link"
                   isInline
                   onClick={() => deselectAllForAction('cancel')}
-                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions.includes('cancel'))}
+                  isDisabled={!Object.values(clusterPermissions).some((p) => p.actions?.includes('cancel'))}
                   size="sm"
                 >
                   None
