@@ -303,7 +303,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
   };
 
   const editHint = isEdit ? ' (leave blank to keep existing)' : '';
-  const activeProvider = isEdit ? existingProvider ?? provider : provider;
+  const selectedProvider = isEdit ? (existingProvider ?? provider) : provider;
 
   return (
     <Form>
@@ -324,9 +324,10 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
       <FormGroup label="Provider" isRequired fieldId="cc-provider">
         <FormSelect
           id="cc-provider"
-          value={activeProvider}
+          value={selectedProvider}
           onChange={(_e, v) => setProvider(v as CloudCredentialProvider)}
           isDisabled={isEdit}
+          aria-label="Provider"
         >
           {PROVIDER_OPTIONS.map((p) => (
             <FormSelectOption key={p} value={p} label={PROVIDER_LABELS[p]} />
@@ -375,7 +376,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         </FormGroup>
       )}
 
-      {activeProvider === 'aws' && (
+      {selectedProvider === 'aws' && (
         <>
           <FormGroup label={`Access Key ID${editHint}`} isRequired={!isEdit} fieldId="cc-aws-key">
             <TextInput id="cc-aws-key" value={awsAccessKeyId} onChange={(_e, v) => setAwsAccessKeyId(v)} placeholder="AKIAIOSFODNN7EXAMPLE" />
@@ -389,7 +390,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         </>
       )}
 
-      {activeProvider === 'gcp' && (
+      {selectedProvider === 'gcp' && (
         <FormGroup label={`Service Account JSON${editHint}`} isRequired={!isEdit} fieldId="cc-gcp-json">
           <TextArea
             id="cc-gcp-json"
@@ -402,7 +403,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         </FormGroup>
       )}
 
-      {activeProvider === 'azure' && (
+      {selectedProvider === 'azure' && (
         <>
           <FormGroup label={`Tenant ID${editHint}`} isRequired={!isEdit} fieldId="cc-az-tenant">
             <TextInput id="cc-az-tenant" value={azureTenantId} onChange={(_e, v) => setAzureTenantId(v)} />
@@ -419,7 +420,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         </>
       )}
 
-      {activeProvider === 'openstack' && (
+      {selectedProvider === 'openstack' && (
         <>
           <FormGroup label={`Auth URL${editHint}`} isRequired={!isEdit} fieldId="cc-os-auth">
             <TextInput id="cc-os-auth" value={osAuthUrl} onChange={(_e, v) => setOsAuthUrl(v)} placeholder="http://keystone:5000/v3" />
@@ -439,7 +440,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         </>
       )}
 
-      {activeProvider === 'baremetal' && (
+      {selectedProvider === 'baremetal' && (
         <>
           <FormGroup label={`BMC User${editHint}`} isRequired={!isEdit} fieldId="cc-bmc-user">
             <TextInput id="cc-bmc-user" value={bmcUser} onChange={(_e, v) => setBmcUser(v)} placeholder="admin" />
@@ -453,7 +454,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         </>
       )}
 
-      {activeProvider === 'vmware' && (
+      {selectedProvider === 'vmware' && (
         <>
           <FormGroup label={`vSphere IP${editHint}`} isRequired={!isEdit} fieldId="cc-vs-ip">
             <TextInput id="cc-vs-ip" value={vsphereIp} onChange={(_e, v) => setVsphereIp(v)} placeholder="10.0.0.1" />
@@ -467,7 +468,7 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         </>
       )}
 
-      {activeProvider === 'ibmcloud' && (
+      {selectedProvider === 'ibmcloud' && (
         <>
           <FormGroup label={`URL${editHint}`} isRequired={!isEdit} fieldId="cc-ibm-url">
             <TextInput id="cc-ibm-url" value={ibmcUrl} onChange={(_e, v) => setIbmcUrl(v)} placeholder="https://us-south.iaas.cloud.ibm.com/v1" />
