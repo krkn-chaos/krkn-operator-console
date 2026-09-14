@@ -728,6 +728,8 @@ export interface GraphScenarioNode {
   volumes?: { [key: string]: string };
   /** Node ID that this scenario depends on (parent in the graph) */
   depends_on?: string;
+  /** Saved cloud credential to inject for this node (overrides graph-level default) */
+  cloudCredentialRef?: string;
 }
 
 /**
@@ -899,6 +901,8 @@ export interface CreateGraphRunRequest {
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
   targetClusters: { [providerName: string]: string[] };
+  /** Default cloud credential for all nodes (individual nodes may override) */
+  cloudCredentialRef?: string;
 }
 
 /**
@@ -1032,6 +1036,8 @@ export interface StudioNode {
     volumes?: { [key: string]: string };
     /** File mounts (mock dropdown for now) */
     files?: string[];
+    /** Saved cloud credential injected server-side for this node */
+    cloudCredentialRef?: string;
   };
   /** Node position on canvas */
   position: { x: number; y: number };

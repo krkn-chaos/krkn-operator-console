@@ -30,6 +30,8 @@ interface ScenarioConfigStepProps {
   onFormChange: (values: ScenarioFormValues) => void;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
   onDefaultValuesLoad?: (defaults: ScenarioFormValues) => void;
+  cloudCredentialRef?: string;
+  onCloudCredentialRefChange?: (name: string) => void;
 }
 
 export function ScenarioConfigStep({
@@ -41,6 +43,8 @@ export function ScenarioConfigStep({
   onFormChange,
   onGlobalFormChange,
   onDefaultValuesLoad,
+  cloudCredentialRef: cloudCredentialRefProp = '',
+  onCloudCredentialRefChange,
 }: ScenarioConfigStepProps) {
   const [scenarioDetail, setScenarioDetail] = useState<ScenarioDetail | null>(null);
   const [scenarioGlobals, setScenarioGlobals] = useState<ScenarioGlobals | null>(null);
@@ -54,10 +58,17 @@ export function ScenarioConfigStep({
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
   const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
-  const [selectedCloudCredName, setSelectedCloudCredName] = useState('');
-  const [appliedCloudCredName, setAppliedCloudCredName] = useState('');
+  const [selectedCloudCredName, setSelectedCloudCredName] = useState(cloudCredentialRefProp);
+  const [appliedCloudCredName, setAppliedCloudCredName] = useState(cloudCredentialRefProp);
 
-  // Fetch scenario detail when scenario changes
+  useEffect(() => {
+    setSelectedCloudCredName(cloudCredentialRefProp);
+    setAppliedCloudCredName(cloudCredentialRefProp);
+  }, [cloudCredentialRefProp, scenarioName]);
+
+  const handleFormChange = (values: ScenarioFormValues) => {
+    onFormChange({ ...formValues, ...values });
+  };
   useEffect(() => {
     let mounted = true;
 
@@ -179,9 +190,11 @@ export function ScenarioConfigStep({
     setSelectedCloudCredName(credName);
     if (!credName) {
       setAppliedCloudCredName('');
+      onCloudCredentialRefChange?.('');
       return;
     }
     setAppliedCloudCredName(credName);
+    onCloudCredentialRefChange?.(credName);
 
     // Sync CLOUD_TYPE to the credential's provider so the form doesn't keep showing
     // a stale/mismatched value (e.g. default "aws" while an Azure credential is applied).
@@ -192,7 +205,7 @@ export function ScenarioConfigStep({
     if (detailCloudTypeField) {
       const targetValue = resolveCloudTypeForProvider(cred.provider, detailCloudTypeField);
       if (targetValue) {
-        onFormChange({ ...formValues, CLOUD_TYPE: targetValue });
+        handleFormChange({ CLOUD_TYPE: targetValue });
       }
       return;
     }
@@ -295,7 +308,7 @@ export function ScenarioConfigStep({
           <DynamicFormBuilder
             fields={hasGroupedScenarioFields ? (scenarioDetail?.fields || []) : requiredFields}
             values={formValues}
-            onChange={onFormChange}
+            onChange={handleFormChange}
             disabledFields={cloudDisabledFields}
           />
         </CardBody>
@@ -304,7 +317,7 @@ export function ScenarioConfigStep({
       <ScenarioParameterSections
         optionalFields={optionalFields}
         formValues={formValues}
-        onFormChange={onFormChange}
+        onFormChange={handleFormChange}
         suppressOptionalSection={hasGroupedScenarioFields}
         allGlobalFields={allGlobalFields}
         globalFormValues={globalFormValues}
