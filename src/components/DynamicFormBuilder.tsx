@@ -20,15 +20,17 @@ interface DynamicFormBuilderProps {
   fields: ScenarioField[];
   values: ScenarioFormValues;
   onChange: (values: ScenarioFormValues) => void;
+  /** Variable names to force-disable regardless of mutually_excludes (e.g. cloud fields covered by a saved credential) */
+  disabledFields?: string[];
 }
 
-export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuilderProps) {
+export function DynamicFormBuilder({ fields, values, onChange, disabledFields: externalDisabledFields = [] }: DynamicFormBuilderProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const initializedFieldsKey = useRef<string | null>(null);
   const validationTimeouts = useRef<{ [key: string]: number }>({});
 
   const disabledFields = useMemo(() => {
-    const disabled = new Set<string>();
+    const disabled = new Set<string>(externalDisabledFields);
     for (const field of fields) {
       if (field.mutually_excludes && field.type === 'enum') {
         const enumField = field as EnumField;
@@ -51,7 +53,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
       }
     }
     return disabled;
-  }, [fields, values]);
+  }, [fields, values, externalDisabledFields]);
 
   /**
    * Safe regex test with timeout protection

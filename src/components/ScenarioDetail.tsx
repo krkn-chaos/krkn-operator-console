@@ -25,7 +25,7 @@ import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
-import { hasCloudFields, isCloudEnvVar } from '../utils/cloudProviderUtils';
+import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider } from '../utils/cloudProviderUtils';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
 
@@ -171,8 +171,14 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   useEffect(() => {
     if (!showGlobalParameters) return;
     elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
-    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
   }, [showGlobalParameters]);
+
+  // Load saved cloud credentials up front — cloud fields (CLOUD_TYPE, AWS_*, AZURE_*, etc.)
+  // are typically declared as scenario-specific required/optional fields, not global fields,
+  // so this list must be available before the user ever expands Global Parameters.
+  useEffect(() => {
+    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
+  }, []);
 
   // Ensures fields whose variable name contains "PASSWORD" are always rendered as secret inputs,
   // regardless of whether the scenario definition sets secret:true.
@@ -181,7 +187,24 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     (f) => f.variable != null && (f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_'))
   ) ?? false;
 
+  // Cloud fields can live in the scenario's own required/optional fields (the common case
+  // for krkn-hub scenarios like node-scenarios, zone-outages) or in global fields.
+  const hasCloudDetailFields = scenarioDetail ? hasCloudFields(scenarioDetail.fields) : false;
   const hasCloudGlobalFields = scenarioGlobals ? hasCloudFields(scenarioGlobals.fields) : false;
+  const hasCloudCredentialFields = hasCloudDetailFields || hasCloudGlobalFields;
+  const cloudDisabledFields = getCloudDisabledFields(appliedCloudCredName);
+
+  // The CLOUD_TYPE field can live in either field set depending on the scenario.
+  const cloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE')
+    ?? scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+  // Only narrow the visible fields while a credential is actually applied — derived from the
+  // credential's provider, not the raw CLOUD_TYPE form value. The field's value stays wherever
+  // it was last set (e.g. "aws") after deselecting, so reading it directly here would keep the
+  // filter stuck on that provider even with no credential applied.
+  const appliedCloudCredential = cloudCredentials.find((c) => c.name === appliedCloudCredName);
+  const activeCloudType = appliedCloudCredential
+    ? resolveCloudTypeForProvider(appliedCloudCredential.provider, cloudTypeField)
+    : undefined;
 
   const applyCloudCredential = (credName: string) => {
     setSelectedCloudCredName(credName);
@@ -190,6 +213,30 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       return;
     }
     setAppliedCloudCredName(credName);
+
+    // Sync CLOUD_TYPE to the credential's provider so the form doesn't keep showing
+    // a stale/mismatched value (e.g. default "aws" while an Azure credential is applied).
+    const cred = cloudCredentials.find((c) => c.name === credName);
+    if (!cred) return;
+
+    const detailCloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    if (detailCloudTypeField) {
+      const targetValue = resolveCloudTypeForProvider(cred.provider, detailCloudTypeField);
+      if (targetValue) {
+        handleFormChange({ ...(scenarioFormValues || {}), CLOUD_TYPE: targetValue });
+      }
+      return;
+    }
+
+    const globalCloudTypeField = scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    const targetGlobalValue = globalCloudTypeField
+      ? resolveCloudTypeForProvider(cred.provider, globalCloudTypeField)
+      : undefined;
+    if (globalCloudTypeField && targetGlobalValue) {
+      const patch = { ...(globalFormValues || {}), CLOUD_TYPE: targetGlobalValue };
+      const touched = { ...(globalTouchedFields || {}), CLOUD_TYPE: true };
+      dispatch({ type: 'UPDATE_GLOBAL_FORM', payload: { formValues: patch, touchedFields: touched } });
+    }
   };
 
   const applyEsConfig = (configName: string) => {
@@ -239,7 +286,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const validateForm = (): boolean => {
-    if (!scenarioDetail) return false;
+    if (!scenarioDetail) {
+      // Without this, a null scenarioDetail (e.g. a re-fetch in flight) fails validation
+      // with zero feedback — the button appears to do nothing at all.
+      setValidationErrors(['Scenario configuration is not ready — please wait a moment and try again.']);
+      return false;
+    }
 
     const errors: string[] = [];
 
@@ -280,7 +332,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const proceedToPreview = () => {
     if (validateForm()) {
       setShowPreview(true);
+      return;
     }
+    // The validation error alert renders near the top of the page, well above the
+    // Preview button on a long scenario form — scroll there so failures are actually
+    // visible instead of appearing to do nothing.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleEditForm = () => {
@@ -384,6 +441,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         if (field.type === 'group') continue;
         const value = scenarioFormValues[field.variable];
 
+        // When a saved cloud credential is selected, cloud-related file fields (e.g.
+        // GOOGLE_APPLICATION_CREDENTIALS) are injected server-side via SecretVolumeSource —
+        // skip uploading the client-provided file entirely.
+        if (appliedCloudCredName && isCloudEnvVar(field.variable)) {
+          continue;
+        }
+
         if (field.type === 'file') {
           if (value && value instanceof File) {
             files.push({ name: value.name, content: await readFileAsBase64(value) });
@@ -405,6 +469,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       if (hasGlobalChanges && scenarioGlobals && globalFormValues) {
         for (const field of scenarioGlobals.fields) {
           if (!globalTouchedFields[field.variable]) continue;
+          if (appliedCloudCredName && isCloudEnvVar(field.variable)) continue;
           const value = globalFormValues[field.variable];
 
           if (field.type === 'file') {
@@ -634,6 +699,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 fields={hasGroupedScenarioFields ? scenarioDetail.fields : scenarioDetail.fields.filter(field => field.required)}
                 values={scenarioFormValues || {}}
                 onChange={handleFormChange}
+                disabledFields={cloudDisabledFields}
               />
             </CardBody>
           </Card>
@@ -673,11 +739,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             selectedEsConfigName={selectedEsConfigName}
             onSelectEsConfig={applyEsConfig}
             appliedEsConfigName={appliedEsConfigName}
-            hasCloudGlobalFields={hasCloudGlobalFields}
+            hasCloudCredentialFields={hasCloudCredentialFields}
             cloudCredentials={cloudCredentials}
             selectedCloudCredName={selectedCloudCredName}
             onSelectCloudCredential={applyCloudCredential}
             appliedCloudCredName={appliedCloudCredName}
+            activeCloudType={activeCloudType}
           />
 
           {/* Preview Button */}
