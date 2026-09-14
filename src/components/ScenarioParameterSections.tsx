@@ -107,7 +107,8 @@ export function ScenarioParameterSections({
                 <FormHelperText>
                   <HelperText>
                     <HelperTextItem variant="success">
-                      Cloud credentials will be injected automatically from &quot;{appliedCloudCredName}&quot;
+                      Cloud credential active: &quot;{appliedCloudCredName}&quot;
+                      {appliedCloudCredProvider ? ` (${appliedCloudCredProvider.toUpperCase()})` : ''}
                     </HelperTextItem>
                   </HelperText>
                 </FormHelperText>

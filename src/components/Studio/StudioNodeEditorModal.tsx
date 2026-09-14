@@ -32,7 +32,7 @@ function StudioNodeEditorModalComponent({
   onSave,
 }: StudioNodeEditorModalProps) {
   const { validateNodeId } = useStudioContext();
-  const { scenarios, loading: loadingScenarios, fetchScenarios } = useScenariosFetch();
+  const { scenarios, loading: loadingScenarios, error: scenariosError, fetchScenarios } = useScenariosFetch();
 
   // Step 1: Registry selection
   const [registryType, setRegistryType] = useState<'public' | 'private'>('public');
@@ -134,6 +134,11 @@ function StudioNodeEditorModalComponent({
     setScenarioDefaultValues({});
     setCloudCredentialRef('');
   }, [fetchScenarios]);
+
+  const retryFetchScenarios = useCallback(() => {
+    const config: ScenariosRequest = registryName ? { registryName } : {};
+    fetchScenarios(config);
+  }, [fetchScenarios, registryName]);
 
   // Validate node ID
   const handleNodeIdChange = useCallback((value: string) => {
@@ -247,6 +252,9 @@ function StudioNodeEditorModalComponent({
           scenarios={scenarios}
           selectedScenario={selectedScenario}
           onSelectScenario={handleScenarioSelect}
+          loading={loadingScenarios}
+          error={scenariosError}
+          onRetry={retryFetchScenarios}
         />
       ),
       isNextDisabled: !selectedScenario,
