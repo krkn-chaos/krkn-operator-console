@@ -24,3 +24,4 @@ export { Studio } from './Studio';
 export { FileManagementModal } from './FileManagement';
 export { FileTypesManagementModal } from './FileTypesManagement';
 export { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
+export { ElasticsearchDataView } from './ElasticsearchDataView';

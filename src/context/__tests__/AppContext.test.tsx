@@ -219,4 +219,44 @@ describe('AppContext reducer', () => {
       expect(capturedState.phase).toBe('jobs_list');
     });
   });
+
+  describe('NAVIGATE_TO_FILES', () => {
+    it('transitions to files phase', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'NAVIGATE_TO_FILES' });
+      });
+
+      expect(capturedState.phase).toBe('files');
+    });
+  });
+
+  describe('GO_BACK from files', () => {
+    it('navigates from files back to jobs_list', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'NAVIGATE_TO_FILES' });
+      });
+
+      act(() => {
+        capturedDispatch({ type: 'GO_BACK' });
+      });
+
+      expect(capturedState.phase).toBe('jobs_list');
+    });
+  });
+
+  describe('NAVIGATE_TO_ELASTICSEARCH_DATA', () => {
+    it('transitions to elasticsearch_data phase', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' });
+      });
+
+      expect(capturedState.phase).toBe('elasticsearch_data');
+    });
+  });
 });
