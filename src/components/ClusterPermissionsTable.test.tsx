@@ -138,4 +138,20 @@ describe('ClusterPermissionsTable', () => {
     expect(screen.getByText('Removed')).toBeInTheDocument();
     expect(screen.getByText('https://api.removed-cluster.example.com')).toBeInTheDocument();
   });
+
+  it('should tolerate permissions without an actions array', () => {
+    const permissions = {
+      'https://api.cluster1.example.com': {},
+    } as ClusterPermissions;
+
+    expect(() =>
+      render(
+        <ClusterPermissionsTable
+          targets={mockTargets}
+          clusterPermissions={permissions}
+          onChange={mockOnChange}
+        />
+      )
+    ).not.toThrow();
+  });
 });
