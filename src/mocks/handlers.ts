@@ -861,6 +861,48 @@ export const handlers = [
     });
   }),
 
+  // ─── BACKUPS ───
+
+  http.post(`${BASE}/backup`, () =>
+    HttpResponse.json({
+      jobId: 'backup-' + Date.now().toString(36),
+      message: 'Backup started successfully',
+    }),
+  ),
+  http.get(`${BASE}/backup/:jobId`, ({ params }) =>
+    HttpResponse.json({
+      jobId: params.jobId as string,
+      status: 'completed',
+      backupPath: `backups/krkn-backup-${params.jobId}.tar.gz`,
+      startedAt: new Date(Date.now() - 5000).toISOString(),
+      message: 'Backup completed successfully',
+    }),
+  ),
+  http.post(`${BASE}/restore`, () =>
+    HttpResponse.json({
+      jobId: 'restore-' + Date.now().toString(36),
+      message: 'Restore started successfully',
+    }),
+  ),
+  http.get(`${BASE}/backups`, () => {
+    return HttpResponse.json({
+      backups: [
+        {
+          name: 'krkn-backup-20260828-143500',
+          path: 'backups/krkn-backup-20260828-143500.tar.gz',
+          sizeBytes: 524288,
+          createdAt: '2026-08-28T14:35:00Z',
+        },
+        {
+          name: 'pre-upgrade',
+          path: 'backups/pre-upgrade.tar.gz',
+          sizeBytes: 1048576,
+          createdAt: '2026-08-27T10:00:00Z',
+        },
+      ],
+    });
+  }),
+
   // ─── CATCH-ALL ───
   http.all(`${BASE}/*`, ({ request }) => {
     if (request.method === 'GET') return HttpResponse.json({});
