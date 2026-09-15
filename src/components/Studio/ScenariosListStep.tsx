@@ -22,6 +22,7 @@ import {
   EmptyStateBody,
   Title,
   Tooltip,
+  Button,
 } from '@patternfly/react-core';
 import { FileCodeIcon } from '@patternfly/react-icons';
 import type { ScenarioTag } from '../../types/api';
@@ -30,14 +31,55 @@ interface ScenariosListStepProps {
   scenarios: ScenarioTag[];
   selectedScenario: string | null;
   onSelectScenario: (scenarioName: string) => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export function ScenariosListStep({
   scenarios,
   selectedScenario,
   onSelectScenario,
+  loading = false,
+  error = null,
+  onRetry,
 }: ScenariosListStepProps) {
   const [searchValue, setSearchValue] = useState('');
+
+  if (loading) {
+    return (
+      <EmptyState>
+        <EmptyStateIcon icon={FileCodeIcon} />
+        <Title headingLevel="h4" size="lg">
+          Loading Scenarios
+        </Title>
+        <EmptyStateBody>
+          Fetching chaos scenarios from the registry…
+        </EmptyStateBody>
+      </EmptyState>
+    );
+  }
+
+  if (error) {
+    return (
+      <EmptyState>
+        <EmptyStateIcon icon={FileCodeIcon} />
+        <Title headingLevel="h4" size="lg">
+          Failed to Load Scenarios
+        </Title>
+        <EmptyStateBody>
+          {error}
+          {onRetry && (
+            <div style={{ marginTop: '1rem' }}>
+              <Button variant="primary" onClick={onRetry}>
+                Retry
+              </Button>
+            </div>
+          )}
+        </EmptyStateBody>
+      </EmptyState>
+    );
+  }
 
   if (!scenarios || scenarios.length === 0) {
     return (

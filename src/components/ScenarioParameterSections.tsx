@@ -13,7 +13,8 @@ import {
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
-import type { ScenarioField, ScenarioFormValues, TouchedFields, ElasticsearchConfig } from '../types/api';
+import type { ScenarioField, ScenarioFormValues, TouchedFields, ElasticsearchConfig, CloudCredential } from '../types/api';
+import { getCloudDisabledFields, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
 
 interface ScenarioParameterSectionsProps {
   optionalFields: ScenarioField[];
@@ -34,6 +35,14 @@ interface ScenarioParameterSectionsProps {
   selectedEsConfigName: string;
   onSelectEsConfig: (name: string) => void;
   appliedEsConfigName: string;
+  /** True when the scenario has cloud-related fields anywhere — required, optional, or global */
+  hasCloudCredentialFields: boolean;
+  cloudCredentials: CloudCredential[];
+  selectedCloudCredName: string;
+  onSelectCloudCredential: (name: string) => void;
+  appliedCloudCredName: string;
+  /** Current value of the scenario's CLOUD_TYPE field, if it has one — used to hide irrelevant providers' fields */
+  activeCloudType?: string;
 }
 
 export function ScenarioParameterSections({
@@ -55,13 +64,60 @@ export function ScenarioParameterSections({
   selectedEsConfigName,
   onSelectEsConfig,
   appliedEsConfigName,
+  hasCloudCredentialFields,
+  cloudCredentials,
+  selectedCloudCredName,
+  onSelectCloudCredential,
+  appliedCloudCredName,
+  activeCloudType,
 }: ScenarioParameterSectionsProps) {
-  const disabledFields = appliedEsConfigName ? ['ES_PASSWORD'] : [];
+  const cloudDisabledFields = getCloudDisabledFields(appliedCloudCredName);
+  const esDisabledFields = appliedEsConfigName ? ['ES_PASSWORD'] : [];
+  const disabledFields = [...esDisabledFields, ...cloudDisabledFields];
   const requiredGlobalFields = allGlobalFields.filter((f) => f.required);
   const optionalGlobalFields = allGlobalFields.filter((f) => !f.required);
+  // Only show the active provider's cloud fields — avoids listing all 7 providers'
+  // credential fields (mostly irrelevant) at once.
+  const visibleOptionalFields = filterFieldsByCloudType(optionalFields, activeCloudType);
+  const appliedCloudCredProvider = cloudCredentials.find((c) => c.name === appliedCloudCredName)?.provider;
 
   return (
     <>
+      {hasCloudCredentialFields && cloudCredentials.length > 0 && (
+        <Card style={{ marginTop: '1.5rem' }}>
+          <CardTitle>Load Cloud Credential</CardTitle>
+          <CardBody>
+            <FormGroup label="Load from saved credential" fieldId="cloud-cred-picker">
+              <FormSelect
+                id="cloud-cred-picker"
+                value={selectedCloudCredName}
+                onChange={(_e, v) => onSelectCloudCredential(v)}
+                style={{ maxWidth: '500px' }}
+              >
+                <FormSelectOption value="" label="Select a saved cloud credential…" />
+                {cloudCredentials.map((c) => (
+                  <FormSelectOption
+                    key={c.name}
+                    value={c.name}
+                    label={`${c.name} — ${c.provider.toUpperCase()}`}
+                  />
+                ))}
+              </FormSelect>
+              {appliedCloudCredName && (
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem variant="success">
+                      Cloud credential active: &quot;{appliedCloudCredName}&quot;
+                      {appliedCloudCredProvider ? ` (${appliedCloudCredProvider.toUpperCase()})` : ''}
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
+            </FormGroup>
+          </CardBody>
+        </Card>
+      )}
+
       {!suppressOptionalSection && (
         <ExpandableSection
           style={{ marginTop: '1.5rem' }}
@@ -71,11 +127,22 @@ export function ScenarioParameterSections({
         >
           <Card>
             <CardBody>
-              {optionalFields.length > 0 ? (
+              {appliedCloudCredName && (
+                <FormHelperText style={{ marginBottom: '1rem' }}>
+                  <HelperText>
+                    <HelperTextItem variant="success">
+                      Cloud credential active: &quot;{appliedCloudCredName}&quot;
+                      {appliedCloudCredProvider ? ` (${appliedCloudCredProvider.toUpperCase()})` : ''} — matching fields below are disabled and injected automatically
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
+              {visibleOptionalFields.length > 0 ? (
                 <DynamicFormBuilder
-                  fields={optionalFields}
+                  fields={visibleOptionalFields}
                   values={formValues}
                   onChange={onFormChange}
+                  disabledFields={cloudDisabledFields}
                 />
               ) : (
                 <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
