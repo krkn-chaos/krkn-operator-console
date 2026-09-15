@@ -582,8 +582,7 @@ describe('ScenarioDetail', () => {
             targetClusters: {
               'krkn-operator': ['cluster1'],
             },
-            scenarioImage: 'krkn-hub:pod-scenarios',
-            scenarioName: 'pod-scenarios',
+            scenario: { name: 'pod-scenarios', private: false },
             environment: expect.objectContaining({
               NAMESPACE: 'default',
               KILL_COUNT: '5',
@@ -593,7 +592,7 @@ describe('ScenarioDetail', () => {
       });
     });
 
-    it('should build correct scenario image for private registry', async () => {
+    it('should build correct scenario reference for private registry', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
       vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
@@ -623,8 +622,7 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalledWith(
           expect.objectContaining({
-            scenarioImage: 'pod-scenarios', // Private registry: no krkn-hub prefix
-            registryName: 'corp-registry',
+            scenario: { name: 'pod-scenarios', private: true, registryName: 'corp-registry' },
           })
         );
       });

@@ -35,6 +35,7 @@ import { FiPlus, FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
+import { exceedsRequestBodyLimit, MAX_REQUEST_BODY_LABEL } from '../../utils/requestSize';
 import type { FileInfo, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
@@ -181,27 +182,30 @@ export function FileForm({
       // Max 1 group (or empty for public)
       const groupsArray = accessType === 'group' && selectedGroup ? [selectedGroup] : [];
 
-      if (mode === 'create') {
-        const request: CreateFileRequest = {
-          fileName,
-          content,
-          description: description.trim() || undefined,
-          groups: groupsArray.length > 0 ? groupsArray : undefined,
-          availableToAll: accessType === 'public',
-          fileType: fileType.trim() || undefined,
-        };
+      // CreateFileRequest and UpdateFileRequest share the same body shape.
+      const request: CreateFileRequest & UpdateFileRequest = {
+        fileName,
+        content,
+        description: description.trim() || undefined,
+        groups: groupsArray.length > 0 ? groupsArray : undefined,
+        availableToAll: accessType === 'public',
+        fileType: fileType.trim() || undefined,
+      };
 
+      // Guard against the API's 10MB request body limit before sending, so
+      // large pasted content fails with a clear message instead of a 413.
+      if (exceedsRequestBodyLimit(request)) {
+        setValidationErrors(prev => ({
+          ...prev,
+          content: `File is too large — the maximum allowed size is ${MAX_REQUEST_BODY_LABEL}.`,
+        }));
+        setSubmitting(false);
+        return;
+      }
+
+      if (mode === 'create') {
         await operatorApi.createFile(request);
       } else {
-        const request: UpdateFileRequest = {
-          fileName,
-          content,
-          description: description.trim() || undefined,
-          groups: groupsArray.length > 0 ? groupsArray : undefined,
-          availableToAll: accessType === 'public',
-          fileType: fileType.trim() || undefined,
-        };
-
         await operatorApi.updateFile(initialData!.fileId, request);
       }
 

@@ -17,6 +17,7 @@ import { NodeMetadataStep } from './NodeMetadataStep';
 import { useStudioContext } from './StudioContext';
 import { useScenariosFetch } from '../../hooks';
 import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields } from '../../types/api';
+import { createScenarioReference } from '../../utils/scenarioReference';
 
 interface StudioNodeEditorModalProps {
   isOpen: boolean;
@@ -40,7 +41,6 @@ function StudioNodeEditorModalComponent({
 
   // Step 2: Scenario selection
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
-  const [scenarioImage, setScenarioImage] = useState<string>('');
 
   // Step 3: Scenario configuration
   const [formValues, setFormValues] = useState<ScenarioFormValues>({});
@@ -75,22 +75,20 @@ function StudioNodeEditorModalComponent({
 
     // Initialize from node data
     if (node.config) {
-      setRegistryType(node.config.registryType);
-      setRegistryName(node.config.registryConfig.registryName || '');
-      setSelectedScenario(node.config.scenarioName);
-      setScenarioImage(node.config.scenarioImage);
+      setRegistryType(node.config.scenario ? (node.config.scenario.private ? 'private' : 'public') : (node.config.registryType ?? 'public'));
+      setRegistryName(node.config.scenario?.registryName || node.config.registryConfig?.registryName || '');
+      setSelectedScenario(node.config.scenario?.name ?? node.config.scenarioName ?? null);
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
       setVolumes(node.config.volumes || {});
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
-      fetchScenarios(node.config.registryConfig);
+      fetchScenarios(node.config.scenario?.private ? { registryName: node.config.scenario.registryName } : {});
     } else {
       setRegistryType('public');
       setRegistryName('');
       setSelectedScenario(null);
-      setScenarioImage('');
       setFormValues({});
       setGlobalFormValues({});
       setGlobalTouchedFields({});
@@ -141,18 +139,11 @@ function StudioNodeEditorModalComponent({
   const handleScenarioSelect = useCallback((scenarioName: string) => {
     setSelectedScenario(scenarioName);
 
-    // Build image URL
-    const registry = registryType === 'private' && registryName
-      ? registryName
-      : 'quay.io/krkn-chaos/krkn-hub';
-
-    setScenarioImage(`${registry}:${scenarioName}`);
-
     // Reset form values and defaults immediately when scenario changes
     // Prevents stale values from previous scenario being saved
     setFormValues({});
     setScenarioDefaultValues({});
-  }, [registryType, registryName]);
+  }, []);
 
   // Reset warning when pending input is cleared
   useEffect(() => {
@@ -174,19 +165,13 @@ function StudioNodeEditorModalComponent({
       return;
     }
 
-    // Build registryConfig from primitive
-    const registryConfig: ScenariosRequest = registryName ? { registryName } : {};
-
     // Merge default values for optional fields that weren't touched
     const finalFormValues = { ...scenarioDefaultValues, ...formValues };
 
     const updates: Partial<StudioNode> = {
       status: 'configured',
       config: {
-        registryType,
-        registryConfig,
-        scenarioName: selectedScenario,
-        scenarioImage,
+        scenario: createScenarioReference(selectedScenario, registryType === 'private', registryName),
         scenarioFormValues: finalFormValues,
         globalFormValues,
         globalTouchedFields,

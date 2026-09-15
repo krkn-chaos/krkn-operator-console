@@ -114,7 +114,7 @@ export function StudioNode({ data }: NodeProps) {
           {/* Scenario name or placeholder */}
           <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
             {isConfigured && node.config
-              ? node.config.scenarioName
+              ? node.config.scenario?.name ?? node.config.scenarioName
               : 'Right-click to configure'}
           </div>
 

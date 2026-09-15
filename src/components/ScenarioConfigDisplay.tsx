@@ -115,9 +115,9 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
       <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
         <p style={labelStyle}>Scenario Settings</p>
         <dl style={dlStyle}>
-          <dt style={dtStyle}>Scenario Image:</dt>
+          <dt style={dtStyle}>{config.scenarioImage ? 'Scenario Image:' : 'Scenario:'}</dt>
           <dd style={{ ...ddMono, wordBreak: 'break-all' }}>
-            {config.scenarioImage}
+            {config.scenario?.name ?? config.scenarioName ?? config.scenarioImage ?? 'Unknown'}
           </dd>
 
           {clusterEntries.length > 0 && (

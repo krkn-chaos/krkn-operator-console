@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TargetForm } from '../TargetForm';
 
@@ -133,6 +133,30 @@ describe('TargetForm', () => {
       await waitFor(() => {
         expect(submitButton).not.toBeDisabled();
       });
+    });
+  });
+
+  describe('request body size guard', () => {
+    it('blocks submission and shows a 10MB message when the kubeconfig is too large', async () => {
+      const user = userEvent.setup();
+
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      await user.type(screen.getByRole('textbox', { name: /cluster name/i }), 'my-cluster');
+
+      // Set an oversized kubeconfig directly (typing 11MB char-by-char is impractical).
+      const oversized = 'a'.repeat(11 * 1024 * 1024);
+      fireEvent.change(container.querySelector('#kubeconfig') as HTMLTextAreaElement, {
+        target: { value: oversized },
+      });
+
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/maximum allowed size is 10MB/i)).toBeInTheDocument();
+      });
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+      // Submit button is re-enabled so the user can correct and retry.
+      expect(screen.getByRole('button', { name: /create/i })).not.toBeDisabled();
     });
   });
 });
