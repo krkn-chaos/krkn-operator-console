@@ -26,12 +26,13 @@ vi.mock('../useWebSocket', () => ({
 vi.mock('../../services/operatorApi');
 vi.mock('../../services/websocketService', () => ({
   websocketService: {
-    buildResourceUrl: vi.fn(() => 'ws://localhost/api/v2/ws/runs'),
+    buildResourceUrl: vi.fn((resource: string) => `ws://localhost/api/v2/ws/${resource}`),
     subscribe: vi.fn(),
   },
 }));
 
 import { operatorApi } from '../../services/operatorApi';
+import { websocketService } from '../../services/websocketService';
 import { useScenarioRunsPoller } from '../useScenarioRunsPoller';
 
 function makeRunState(overrides: Partial<ScenarioRunState> = {}): ScenarioRunState {
@@ -59,6 +60,13 @@ describe('useScenarioRunsPoller initial fetch', () => {
     capturedHandler = null;
     mockScenarioRuns = [];
     mockConnectionState.value = 'connected';
+  });
+
+  it('connects to the runs WebSocket endpoint', () => {
+    renderHook(() => useScenarioRunsPoller());
+
+    expect(websocketService.buildResourceUrl).toHaveBeenCalledWith('runs');
+    expect(vi.mocked(websocketService.buildResourceUrl).mock.results[0]?.value).toBe('ws://localhost/api/v2/ws/runs');
   });
 
   it('fetches and maps ScenarioRunListResponse on connect', async () => {

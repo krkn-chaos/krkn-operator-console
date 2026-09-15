@@ -29,7 +29,7 @@ vi.mock('../../services', () => ({
 
 vi.mock('../../services/websocketService', () => ({
   websocketService: {
-    buildResourceUrl: vi.fn(() => 'ws://localhost/api/v2/ws/graphruns'),
+    buildResourceUrl: vi.fn((resource: string) => `ws://localhost/api/v2/ws/${resource}`),
     subscribe: vi.fn(),
   },
 }));
@@ -40,6 +40,7 @@ vi.mock('../../utils/resiliency', async (importOriginal) => {
 });
 
 import { graphRunsApi } from '../../services';
+import { websocketService } from '../../services/websocketService';
 import { useGraphRunsPoller } from '../useGraphRunsPoller';
 
 function makeGraphRunListItem(overrides: Partial<GraphRunListItem> = {}): GraphRunListItem {
@@ -79,6 +80,13 @@ describe('useGraphRunsPoller', () => {
     capturedHandler = null;
     mockGraphRuns = [];
     mockConnectionState.value = 'disconnected';
+  });
+
+  it('connects to the graph runs WebSocket endpoint', () => {
+    renderHook(() => useGraphRunsPoller());
+
+    expect(websocketService.buildResourceUrl).toHaveBeenCalledWith('graphruns');
+    expect(vi.mocked(websocketService.buildResourceUrl).mock.results[0]?.value).toBe('ws://localhost/api/v2/ws/graphruns');
   });
 
   describe('REST aggregation', () => {
