@@ -32,6 +32,12 @@ vi.mock('./FileManagement', () => ({
   FileManagementModal: () => null,
 }));
 
+vi.mock('./ReportDownloadButton', () => ({
+  ReportDownloadButton: ({ runId }: { runId: string }) => (
+    <div data-testid={`report-download-${runId}`}>Report controls</div>
+  ),
+}));
+
 vi.mock('react-icons/hi2', () => ({
   HiOutlineRocketLaunch: () => <span data-testid="rocket-icon" />,
 }));
@@ -202,6 +208,17 @@ describe('JobsList', () => {
         expect(screen.getByText('my-label')).toBeInTheDocument();
       });
     });
+  });
+});
+
+describe('JobsList - Report controls', () => {
+  it('passes the scenario run identity and phase to the report controls', () => {
+    const runName = 'report-run-001';
+    setMockJobs([makeScenarioJobItem(runName, 'Succeeded')]);
+
+    render(<JobsList {...defaultProps} expandedRunIds={new Set([runName])} />);
+
+    expect(screen.getByTestId(`report-download-${runName}`)).toBeInTheDocument();
   });
 });
 

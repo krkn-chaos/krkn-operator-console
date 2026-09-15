@@ -56,6 +56,7 @@ import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
 import { JobStatsSummary } from './JobStatsSummary';
+import { ReportDownloadButton } from './ReportDownloadButton';
 import { FileManagementModal } from './FileManagement';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
@@ -1051,6 +1052,18 @@ export function JobsList({
                       <>
                         <div style={{ paddingLeft: '2rem', marginBottom: '1rem' }}>
                           <ScenarioConfigDisplay scenarioRunName={run.scenarioRunName} />
+                        </div>
+
+                        {/* Report Download Section */}
+                        <div style={{ padding: '0.75rem 2rem', marginBottom: '0.5rem' }}>
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <strong>Reports:</strong>
+                          </div>
+                          <ReportDownloadButton
+                            runId={run.scenarioRunName}
+                            runName={run.scenarioRunName}
+                            runPhase={run.phase}
+                          />
                         </div>
 
                         {run.clusterJobs && run.clusterJobs.length > 0 ? (

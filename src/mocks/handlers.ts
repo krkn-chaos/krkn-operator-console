@@ -532,6 +532,27 @@ export const handlers = [
     const run = mockScenarioRuns.find((r) => r.scenarioRunName === params.scenarioRunName);
     return run ? HttpResponse.json(run) : HttpResponse.json(mockScenarioRuns[0]);
   }),
+  http.get(`${BASE}/scenarios/run/:scenarioRunName/reports/status`, ({ params }) => {
+    const run = mockScenarioRuns.find((r) => r.scenarioRunName === params.scenarioRunName);
+    const available = run?.phase === 'Succeeded';
+    return HttpResponse.json({
+      generated: available,
+      htmlAvailable: available,
+      pdfAvailable: available,
+      fileSize: available ? 1024 : 0,
+      message: available ? 'Preview report available' : undefined,
+    });
+  }),
+  http.get(`${BASE}/scenarios/run/:scenarioRunName/reports/summary.html`, () =>
+    new HttpResponse('<html><body>Preview report</body></html>', {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    }),
+  ),
+  http.get(`${BASE}/scenarios/run/:scenarioRunName/reports/summary.pdf`, () =>
+    new HttpResponse('%PDF-1.4 preview report', {
+      headers: { 'Content-Type': 'application/pdf' },
+    }),
+  ),
   http.delete(`${BASE}/scenarios/run/:scenarioRunName`, () =>
     new HttpResponse(null, { status: 204 }),
   ),
