@@ -38,6 +38,7 @@ import {
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
+import { ReportDownloadButton } from './ReportDownloadButton';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioRunStatusResponse, ClusterJobPhase } from '../types/api';
 
@@ -242,6 +243,22 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
           {/* Scenario Configuration */}
           <FlexItem>
             <ScenarioConfigDisplay scenarioRunName={scenarioRunName!} />
+          </FlexItem>
+
+          {/* Report Download Section */}
+          <FlexItem>
+            <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <strong>Reports:</strong>
+              </div>
+              {run.scenarioRunName && (
+                <ReportDownloadButton
+                  runId={run.scenarioRunName}
+                  runName={run.scenarioRunName}
+                  runPhase={run.phase}
+                />
+              )}
+            </div>
           </FlexItem>
 
           {/* Cluster Jobs */}
