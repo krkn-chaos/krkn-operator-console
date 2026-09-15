@@ -26,21 +26,27 @@ import {
   MenuToggleElement,
   SearchInput,
   Tooltip,
+  Modal,
+  ModalVariant,
 } from '@patternfly/react-core';
 import { FileCodeIcon, SortAmountDownIcon, CopyIcon } from '@patternfly/react-icons';
 import { useAppContext } from '../context/AppContext';
 import { useNotifications } from '../hooks';
 import type { ScenarioTag } from '../types/api';
+import { SignatureStatusIcon } from './SignatureStatusIcon';
+import { useSignatureVerification } from '../hooks/useSignatureVerification';
 
 type SortOption = 'name-asc' | 'name-desc' | 'date-asc' | 'date-desc';
 
 export function ScenariosList() {
   const { state, dispatch } = useAppContext();
   const { showSuccess } = useNotifications();
+  const { enabled: signatureVerificationEnabled, error: signatureVerificationError, isLoading: signatureVerificationLoading } = useSignatureVerification();
   const [sortBy, setSortBy] = useState<SortOption>('name-asc');
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [copiedDigest, setCopiedDigest] = useState<string | null>(null);
+  const [pendingScenario, setPendingScenario] = useState<ScenarioTag | null>(null);
 
   if (!state.scenarios || state.scenarios.length === 0) {
     return (
@@ -64,11 +70,20 @@ export function ScenariosList() {
     dispatch({ type: 'GO_BACK' });
   };
 
-  const handleConfigureScenario = (scenarioName: string) => {
+  const proceedToConfigureScenario = (scenarioName: string) => {
     dispatch({
       type: 'SELECT_SCENARIO_FOR_DETAIL',
       payload: { scenarioName },
     });
+  };
+
+  const handleConfigureScenario = (scenario: ScenarioTag) => {
+    const isUnsigned = scenario.signature_status !== 'signed';
+    if (signatureVerificationEnabled === false && isUnsigned) {
+      setPendingScenario(scenario);
+      return;
+    }
+    proceedToConfigureScenario(scenario.name);
   };
 
   const formatBytes = (bytes?: number): string => {
@@ -246,6 +261,7 @@ export function ScenariosList() {
                             <code style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
                               {scenario.digest ? scenario.digest.substring(0, 16) + '...' : 'N/A'}
                             </code>
+                            <SignatureStatusIcon status={scenario.signature_status} />
                             {scenario.digest && (
                               <Button
                                 variant="plain"
@@ -283,7 +299,11 @@ export function ScenariosList() {
                         </div>
                       </DataListCell>,
                       <DataListCell key="actions" width={1}>
-                        {isScenarioBlocked(scenario.name) ? (
+                        {(() => {
+                          const isUnsigned = scenario.signature_status !== 'signed';
+                          const signatureBlocked = signatureVerificationEnabled === true && isUnsigned;
+                          const canConfigure = !signatureVerificationLoading && !signatureVerificationError && !signatureBlocked;
+                          const action = isScenarioBlocked(scenario.name) ? (
                           <Tooltip
                             content="Not configured yet — cloud provider credentials support is coming in the next release (krkn-operator#43)."
                           >
@@ -298,14 +318,31 @@ export function ScenariosList() {
                               </Button>
                             </span>
                           </Tooltip>
-                        ) : (
+                          ) : (
                           <Button
                             variant="primary"
-                            onClick={() => handleConfigureScenario(scenario.name)}
+                            onClick={() => handleConfigureScenario(scenario)}
+                            isDisabled={!canConfigure}
                           >
                             Configure
                           </Button>
-                        )}
+                          );
+
+                          return (
+                            <>
+                              {signatureVerificationError && (
+                                <div style={{ color: 'var(--pf-v5-global--danger-color--100)', fontSize: 'var(--pf-v5-global--FontSize--sm)', marginBottom: '0.5rem' }}>
+                                  Signature verification status unavailable; selection is disabled.
+                                </div>
+                              )}
+                              {signatureBlocked ? (
+                                <Tooltip content="Image signature verification is enabled. Only signed images can be selected for execution.">
+                                  <span style={{ display: 'inline-block' }}>{action}</span>
+                                </Tooltip>
+                              ) : action}
+                            </>
+                          );
+                        })()}
                       </DataListCell>,
                     ]}
                   />
@@ -315,6 +352,29 @@ export function ScenariosList() {
           </DataList>
         )}
       </CardBody>
+      <Modal
+        variant={ModalVariant.small}
+        title="Run an unsigned image?"
+        isOpen={pendingScenario !== null}
+        onClose={() => setPendingScenario(null)}
+        actions={[
+          <Button
+            key="continue"
+            variant="primary"
+            onClick={() => {
+              if (pendingScenario) proceedToConfigureScenario(pendingScenario.name);
+              setPendingScenario(null);
+            }}
+          >
+            Continue
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setPendingScenario(null)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        {pendingScenario?.name}: this image is not signed. Signature verification is currently disabled, so the image may run without a valid signature.
+      </Modal>
     </Card>
   );
 }

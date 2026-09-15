@@ -16,7 +16,7 @@ import { ScenarioConfigStep } from './ScenarioConfigStep';
 import { NodeMetadataStep } from './NodeMetadataStep';
 import { useStudioContext } from './StudioContext';
 import { useScenariosFetch } from '../../hooks';
-import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields } from '../../types/api';
+import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields, SignatureStatus } from '../../types/api';
 
 interface StudioNodeEditorModalProps {
   isOpen: boolean;
@@ -40,6 +40,7 @@ function StudioNodeEditorModalComponent({
 
   // Step 2: Scenario selection
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [selectedSignatureStatus, setSelectedSignatureStatus] = useState<SignatureStatus | undefined>();
   const [scenarioImage, setScenarioImage] = useState<string>('');
 
   // Step 3: Scenario configuration
@@ -78,6 +79,7 @@ function StudioNodeEditorModalComponent({
       setRegistryType(node.config.registryType);
       setRegistryName(node.config.registryConfig.registryName || '');
       setSelectedScenario(node.config.scenarioName);
+      setSelectedSignatureStatus(node.config.signature_status);
       setScenarioImage(node.config.scenarioImage);
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
@@ -90,6 +92,7 @@ function StudioNodeEditorModalComponent({
       setRegistryType('public');
       setRegistryName('');
       setSelectedScenario(null);
+      setSelectedSignatureStatus(undefined);
       setScenarioImage('');
       setFormValues({});
       setGlobalFormValues({});
@@ -115,6 +118,7 @@ function StudioNodeEditorModalComponent({
     }
     // Clear scenario, form values and defaults when registry changes
     setSelectedScenario(null);
+    setSelectedSignatureStatus(undefined);
     setFormValues({});
     setScenarioDefaultValues({});
   }, [fetchScenarios]);
@@ -126,6 +130,7 @@ function StudioNodeEditorModalComponent({
     fetchScenarios(config);
     // Clear scenario, form values and defaults when registry name changes
     setSelectedScenario(null);
+    setSelectedSignatureStatus(undefined);
     setFormValues({});
     setScenarioDefaultValues({});
   }, [fetchScenarios]);
@@ -138,8 +143,9 @@ function StudioNodeEditorModalComponent({
   }, [validateNodeId, node?.nodeId]);
 
   // Wizard step callbacks
-  const handleScenarioSelect = useCallback((scenarioName: string) => {
+  const handleScenarioSelect = useCallback((scenarioName: string, signatureStatus?: SignatureStatus) => {
     setSelectedScenario(scenarioName);
+    setSelectedSignatureStatus(signatureStatus);
 
     // Build image URL
     const registry = registryType === 'private' && registryName
@@ -187,6 +193,7 @@ function StudioNodeEditorModalComponent({
         registryConfig,
         scenarioName: selectedScenario,
         scenarioImage,
+        signature_status: selectedSignatureStatus,
         scenarioFormValues: finalFormValues,
         globalFormValues,
         globalTouchedFields,
