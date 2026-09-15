@@ -26,6 +26,23 @@ function createApiError(message: string, status: number, statusText: string): Ap
 }
 
 /**
+ * Parses a non-ok Response into a status-bearing ApiError.
+ *
+ * Shared by fetchJson and by callers that manage the raw Response themselves
+ * (e.g. DELETE endpoints that may return an empty body on success and so
+ * can't safely route the success path through fetchJson's unconditional
+ * response.json() call).
+ */
+export async function createApiErrorFromResponse(response: Response): Promise<ApiError> {
+  let message = `HTTP ${response.status}: ${response.statusText}`;
+  try {
+    const error = await response.json();
+    if (error.message) message = error.message;
+  } catch { /* use default message */ }
+  return createApiError(message, response.status, response.statusText);
+}
+
+/**
  * Callback function called when 401 Unauthorized is received
  * This should trigger logout and redirect to login page
  */
@@ -114,12 +131,7 @@ export class BaseApiClient {
     const response = await authenticatedFetch(fullUrl, options);
 
     if (!response.ok) {
-      let message = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const error = await response.json();
-        if (error.message) message = error.message;
-      } catch { /* use default message */ }
-      throw createApiError(message, response.status, response.statusText);
+      throw await createApiErrorFromResponse(response);
     }
 
     return response.json();

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { isApiError } from '../../utils/apiClient';
 import type {
   GraphRunListItem,
   GraphRunDetail,
@@ -10,8 +11,12 @@ import type {
 const mockFetchJson = vi.fn();
 const mockFetch = vi.fn();
 
-vi.mock('../../utils/apiClient', () => {
+vi.mock('../../utils/apiClient', async (importOriginal) => {
+  // Keep the real module's other exports (e.g. createApiErrorFromResponse,
+  // isApiError) intact - only BaseApiClient's network calls are stubbed.
+  const actual = await importOriginal<typeof import('../../utils/apiClient')>();
   return {
+    ...actual,
     BaseApiClient: class {
       protected baseUrl: string;
       constructor(baseUrl: string) {
@@ -501,7 +506,7 @@ describe('graphRunsApi', () => {
       await expect(graphRunsApi.deleteGraphRun('nonexistent')).rejects.toThrow('Graph run not found');
     });
 
-    it('should throw error on 403 forbidden', async () => {
+    it('should throw a status-bearing ApiError on 403 forbidden', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 403,
@@ -509,9 +514,16 @@ describe('graphRunsApi', () => {
         json: vi.fn().mockResolvedValue({ message: 'You can only delete your own graph runs' }),
       });
 
-      await expect(graphRunsApi.deleteGraphRun('graphrun-abc123')).rejects.toThrow(
-        'You can only delete your own graph runs'
-      );
+      let caught: unknown;
+      try {
+        await graphRunsApi.deleteGraphRun('graphrun-abc123');
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(isApiError(caught)).toBe(true);
+      expect((caught as { status: number }).status).toBe(403);
+      expect((caught as Error).message).toBe('You can only delete your own graph runs');
     });
 
     it('should handle JSON parsing failure', async () => {
