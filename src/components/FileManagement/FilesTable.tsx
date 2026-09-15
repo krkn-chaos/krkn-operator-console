@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Button,
   EmptyState,
@@ -13,12 +13,68 @@ import {
   SearchInput,
   Label,
   Tooltip,
+  MenuToggle,
+  Pagination,
+  PaginationVariant,
+  Select,
+  SelectList,
+  SelectOption,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock, FiBarChart2 } from 'react-icons/fi';
 import { TopologyIcon } from '@patternfly/react-icons';
 import type { FileInfo } from '../../types/api';
 import type { ComponentType } from 'react';
+import { usePagination } from '../../hooks/usePagination';
+
+const FILES_PER_PAGE = 25;
+
+interface MultiFilterProps {
+  ariaLabel: string;
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  selected: string[];
+  isOpen: boolean;
+  onToggle: (isOpen: boolean) => void;
+  onSelect: (value: string) => void;
+}
+
+function MultiFilter({ ariaLabel, label, options, selected, isOpen, onToggle, onSelect }: MultiFilterProps) {
+  return (
+    <Select
+      isOpen={isOpen}
+      selected={selected}
+      role="menu"
+      onSelect={(_event, value) => {
+        if (value !== undefined) onSelect(String(value));
+      }}
+      onOpenChange={onToggle}
+      aria-label={ariaLabel}
+      toggle={(toggleRef) => (
+        <MenuToggle
+          ref={toggleRef}
+          onClick={() => onToggle(!isOpen)}
+          isExpanded={isOpen}
+        >
+          {selected.length > 0 ? `${label} (${selected.length})` : label}
+        </MenuToggle>
+      )}
+    >
+      <SelectList>
+        {options.map((option) => (
+          <SelectOption
+            key={option.value}
+            value={option.value}
+            hasCheckbox
+            isSelected={selected.includes(option.value)}
+          >
+            {option.label}
+          </SelectOption>
+        ))}
+      </SelectList>
+    </Select>
+  );
+}
 
 const FILE_PURPOSE_CONFIG: Record<string, { icon: ComponentType<{ style?: React.CSSProperties }>; color: string; label: string }> = {
   'file': { icon: FiFile, color: 'var(--pf-v5-global--palette--blue-300)', label: 'File' },
@@ -58,20 +114,62 @@ export function FilesTable({
   onRefresh,
 }: FilesTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
+  const [selectedAccess, setSelectedAccess] = useState<string[]>([]);
+  const [isAccessFilterOpen, setIsAccessFilterOpen] = useState(false);
 
-  const filesList = Array.isArray(files) ? files : [];
+  const filesList = useMemo(() => Array.isArray(files) ? files : [], [files]);
+  const typeOptions = useMemo(
+    () => Array.from(new Set([
+      ...fileTypes.map((type) => type.name),
+      ...filesList.flatMap((file) => file.fileType ? [file.fileType] : []),
+    ])).sort(),
+    [fileTypes, filesList],
+  );
+  const accessOptions = useMemo(
+    () => [
+      { value: 'public', label: 'Public' },
+      ...Array.from(new Set(filesList.flatMap((file) => file.groups || [])))
+        .sort()
+        .map((group) => ({ value: `group:${group}`, label: group })),
+    ],
+    [filesList],
+  );
 
-  const filteredFiles = filesList.filter(
+  const filteredFiles = useMemo(() => filesList.filter(
     (file) => {
       const term = searchTerm.toLowerCase();
-      return (
+      const matchesSearch = (
         file.fileId.toLowerCase().includes(term) ||
         file.fileName.toLowerCase().includes(term) ||
         file.workflowName?.toLowerCase().includes(term) ||
         file.description?.toLowerCase().includes(term)
       );
+      const matchesType = selectedTypes.length === 0 || (file.fileType && selectedTypes.includes(file.fileType));
+      const matchesAccess = selectedAccess.length === 0 || (
+        (file.availableToAll && selectedAccess.includes('public')) ||
+        (file.groups || []).some((group) => selectedAccess.includes(`group:${group}`))
+      );
+      return matchesSearch && matchesType && matchesAccess;
     }
-  );
+  ), [filesList, searchTerm, selectedTypes, selectedAccess]);
+
+  const {
+    paginatedData: paginatedFiles,
+    page,
+    perPage,
+    totalItems,
+    totalPages,
+    handleSetPage,
+    handlePerPageSelect,
+  } = usePagination(filteredFiles, { initialPerPage: FILES_PER_PAGE });
+
+  const toggleSelection = (value: string, setSelection: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setSelection((current) => current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value]);
+  };
 
   if (filesList.length === 0) {
     return (
@@ -108,6 +206,28 @@ export function FilesTable({
             />
           </ToolbarItem>
           <ToolbarItem>
+            <MultiFilter
+              ariaLabel="Filter files by type"
+              label="Filter by type"
+              options={typeOptions.map((typeName) => ({ value: typeName, label: typeName }))}
+              selected={selectedTypes}
+              isOpen={isTypeFilterOpen}
+              onToggle={setIsTypeFilterOpen}
+              onSelect={(value) => toggleSelection(value, setSelectedTypes)}
+            />
+          </ToolbarItem>
+          <ToolbarItem>
+            <MultiFilter
+              ariaLabel="Filter files by access"
+              label="Filter by access"
+              options={accessOptions}
+              selected={selectedAccess}
+              isOpen={isAccessFilterOpen}
+              onToggle={setIsAccessFilterOpen}
+              onSelect={(value) => toggleSelection(value, setSelectedAccess)}
+            />
+          </ToolbarItem>
+          <ToolbarItem>
             <Button variant="secondary" onClick={onRefresh} icon={<FiRefreshCw />}>
               Refresh
             </Button>
@@ -134,7 +254,7 @@ export function FilesTable({
           </Tr>
         </Thead>
         <Tbody>
-          {filteredFiles.map((file) => {
+          {paginatedFiles.map((file) => {
             const purposeKey = file.filePurpose || 'file';
             const purposeCfg = FILE_PURPOSE_CONFIG[purposeKey] || FILE_PURPOSE_CONFIG['file'];
             const PurposeIcon = purposeCfg.icon;
@@ -190,7 +310,7 @@ export function FilesTable({
                   ) : (
                     <Tooltip content={file.groups?.length ? `Only ${file.groups[0]} members` : 'No groups'}>
                       <Label color="blue" isCompact icon={<FiLock />}>
-                        {file.groups && file.groups.length > 0 ? file.groups[0] : 'Private'}
+                         {file.groups && file.groups.length > 0 ? file.groups[0] : 'No group'}
                       </Label>
                     </Tooltip>
                   )}
@@ -226,11 +346,22 @@ export function FilesTable({
         </Tbody>
       </Table>
 
-      {filteredFiles.length === 0 && searchTerm && (
+      {totalPages > 1 && (
+        <Pagination
+          itemCount={totalItems}
+          perPage={perPage}
+          page={page}
+          onSetPage={handleSetPage}
+          onPerPageSelect={handlePerPageSelect}
+          variant={PaginationVariant.bottom}
+        />
+      )}
+
+      {filteredFiles.length === 0 && (searchTerm || selectedTypes.length > 0 || selectedAccess.length > 0) && (
         <EmptyState>
           <EmptyStateHeader titleText="No results found" headingLevel="h4" />
           <EmptyStateBody>
-            No files match your search criteria. Try adjusting your search term.
+            No files match your filters. Try adjusting your search or type selection.
           </EmptyStateBody>
         </EmptyState>
       )}
