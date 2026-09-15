@@ -69,6 +69,31 @@ describe('registriesApi', () => {
       expect(result).toEqual(mockRegistries);
     });
 
+    it('normalizes missing groups to an empty array', async () => {
+      mockFetchJson.mockResolvedValue({
+        registries: [{
+          name: 'registry-without-groups',
+          registryUrl: 'registry.example.com',
+          scenarioRepository: 'org/scenarios',
+          authType: 'token',
+          skipTls: false,
+          insecure: false,
+          availableToAll: false,
+        }],
+      });
+
+      await expect(registriesApi.listRegistries()).resolves.toEqual([{
+        name: 'registry-without-groups',
+        registryUrl: 'registry.example.com',
+        scenarioRepository: 'org/scenarios',
+        authType: 'token',
+        skipTls: false,
+        insecure: false,
+        availableToAll: false,
+        groups: [],
+      }]);
+    });
+
     it('should return empty array when registries array is missing', async () => {
       mockFetchJson.mockResolvedValue({});
 

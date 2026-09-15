@@ -35,6 +35,7 @@ import { ProviderConfigTab } from './ProviderConfigTab';
 import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
+import { SignatureVerificationSettings } from './SignatureVerificationSettings';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -210,6 +211,9 @@ export function Settings() {
               <Tab eventKey={2} title={<TabTitleText>Private Registries</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <RegistriesCard />
+                  <div style={{ marginTop: '2rem' }}>
+                    <SignatureVerificationSettings />
+                  </div>
                 </div>
               </Tab>
             )}

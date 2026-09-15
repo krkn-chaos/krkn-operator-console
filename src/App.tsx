@@ -171,11 +171,13 @@ function App() {
       dispatch({
         type: 'RERUN_SCENARIO',
         payload: {
-          scenarioName: config.scenarioName,
-          registryName: run.registryName,
+          scenario: config.scenario ?? {
+            name: config.scenarioName ?? run.scenarioName,
+            private: Boolean(run.registryName),
+            ...(run.registryName ? { registryName: run.registryName } : {}),
+          },
           clusters,
           environment: config.environment,
-          scenarioImage: config.scenarioImage,
           kubeconfigPath: config.kubeconfigPath,
         },
       });
