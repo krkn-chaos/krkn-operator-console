@@ -58,7 +58,7 @@ export function useJobs(): UseJobsReturn {
     }
   }, []);
 
-  const wsUrl = websocketService.buildResourceUrl('jobs');
+  const wsUrl = websocketService.buildResourceUrl('runs');
   const { connectionState } = useWebSocket('jobs', wsUrl, handleMessage);
 
   useEffect(() => {

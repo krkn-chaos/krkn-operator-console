@@ -25,6 +25,19 @@ const mockScenarioRunUpdate = {
   registryName: 'default',
 };
 
+const mockJobsSnapshot = {
+  jobs: [
+    {
+      type: 'scenarioRun',
+      name: 'network-chaos-run-03',
+      createdAt: '2026-07-02T10:10:00Z',
+      scenarioRun: mockScenarioRunUpdate,
+    },
+  ],
+  pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  stats: { totalJobs: 1, succeededJobs: 0, failedJobs: 0 },
+};
+
 const mockGraphRunUpdate = {
   name: 'resilience-test-staging',
   namespace: 'krkn-operator-system',
@@ -37,41 +50,6 @@ const mockGraphRunUpdate = {
   resiliencyScoreEnabled: true,
   resiliencyScoreBaseline: 90.0,
   resiliencyScores: undefined as undefined | object[],
-};
-
-const mockJobsSnapshot = {
-  jobs: [
-    {
-      type: 'scenarioRun',
-      name: 'network-chaos-run-03',
-      createdAt: '2026-07-02T10:10:00Z',
-      scenarioRun: {
-        scenarioRunName: 'network-chaos-run-03',
-        scenarioName: 'network-chaos',
-        phase: 'Running',
-        totalTargets: 1,
-        successfulJobs: 0,
-        failedJobs: 0,
-        runningJobs: 1,
-        clusterJobs: [
-          {
-            providerName: 'aws',
-            clusterName: 'staging-us-east-1',
-            jobId: 'job-ghi-001',
-            podName: 'krkn-network-chaos-jkl',
-            phase: 'Running',
-            startTime: '2026-07-02T10:10:00Z',
-            containerImage: 'quay.io/krkn-chaos/krkn-hub:latest',
-          },
-        ],
-        createdAt: '2026-07-02T10:10:00Z',
-        ownerUserId: 'admin@preview.local',
-        registryName: 'default',
-      },
-    },
-  ],
-  pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
-  stats: { totalJobs: 1, succeededJobs: 0, failedJobs: 0 },
 };
 
 const mockDashboardUpdate = {
@@ -88,7 +66,6 @@ const mockDashboardUpdate = {
 // ws.link() handlers — each intercepts WebSocket connections to the matching URL pattern
 
 const runsWs = ws.link('*/api/v2/ws/runs');
-const jobsWs = ws.link('*/api/v2/ws/jobs');
 const graphrunsWs = ws.link('*/api/v2/ws/graphruns');
 const dashboardWs = ws.link('*/api/v2/ws/dashboard/active-runs');
 const logsWs = ws.link('*/api/v2/ws/scenarios/run/*/jobs/*/logs*');
@@ -98,16 +75,34 @@ const runsHandler = runsWs.addEventListener('connection', ({ client }) => {
     try {
       const msg = JSON.parse(event.data as string);
       if (msg.action === 'subscribe') {
-        setTimeout(() => {
+        const sendUpdate = () => {
+          if (msg.resource === 'jobs') {
+            client.send(JSON.stringify({
+              resource: 'jobs',
+              event: 'snapshot',
+              data: mockJobsSnapshot,
+              pagination: mockJobsSnapshot.pagination,
+              stats: mockJobsSnapshot.stats,
+            }));
+            return;
+          }
+
           client.send(JSON.stringify({
             resource: 'run',
             id: mockScenarioRunUpdate.scenarioRunName,
             event: 'updated',
             data: mockScenarioRunUpdate,
           }));
-        }, 500);
+        };
+
+        setTimeout(sendUpdate, 500);
 
         const interval = setInterval(() => {
+          if (msg.resource === 'jobs') {
+            sendUpdate();
+            return;
+          }
+
           client.send(JSON.stringify({
             resource: 'run',
             id: mockScenarioRunUpdate.scenarioRunName,
@@ -124,39 +119,6 @@ const runsHandler = runsWs.addEventListener('connection', ({ client }) => {
       }
     } catch {
       // ignore non-JSON messages
-    }
-  });
-});
-
-const jobsHandler = jobsWs.addEventListener('connection', ({ client }) => {
-  client.addEventListener('message', (event) => {
-    try {
-      const msg = JSON.parse(event.data as string);
-      if (msg.action === 'subscribe') {
-        setTimeout(() => {
-          client.send(JSON.stringify({
-            resource: 'jobs',
-            event: 'snapshot',
-            data: mockJobsSnapshot,
-            pagination: mockJobsSnapshot.pagination,
-            stats: mockJobsSnapshot.stats,
-          }));
-        }, 500);
-
-        const interval = setInterval(() => {
-          client.send(JSON.stringify({
-            resource: 'jobs',
-            event: 'snapshot',
-            data: mockJobsSnapshot,
-            pagination: mockJobsSnapshot.pagination,
-            stats: mockJobsSnapshot.stats,
-          }));
-        }, 5000);
-
-        client.addEventListener('close', () => clearInterval(interval));
-      }
-    } catch {
-      // ignore
     }
   });
 });
@@ -258,4 +220,4 @@ const logsHandler = logsWs.addEventListener('connection', ({ client }) => {
   client.addEventListener('close', () => clearInterval(interval));
 });
 
-export const websocketHandlers = [runsHandler, jobsHandler, graphrunsHandler, dashboardHandler, logsHandler];
+export const websocketHandlers = [runsHandler, graphrunsHandler, dashboardHandler, logsHandler];
