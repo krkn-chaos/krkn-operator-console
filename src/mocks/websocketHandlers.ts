@@ -70,29 +70,43 @@ const graphrunsWs = ws.link('*/api/v2/ws/graphruns');
 const dashboardWs = ws.link('*/api/v2/ws/dashboard/active-runs');
 const logsWs = ws.link('*/api/v2/ws/scenarios/run/*/jobs/*/logs*');
 
+type RunsSubscription = 'jobs' | 'run' | 'run-detail';
+
+export function createRunsMessage(
+  resource: string,
+  scenarioRun = mockScenarioRunUpdate,
+  runId = scenarioRun.scenarioRunName,
+) {
+  if (resource === 'jobs') {
+    return {
+      resource: 'jobs',
+      event: 'snapshot',
+      data: mockJobsSnapshot,
+      pagination: mockJobsSnapshot.pagination,
+      stats: mockJobsSnapshot.stats,
+    };
+  }
+
+  if (resource === 'run' || resource === 'run-detail') {
+    return {
+      resource,
+      id: runId,
+      event: 'updated',
+      data: resource === 'run-detail' ? { ...scenarioRun, scenarioRunName: runId } : scenarioRun,
+    };
+  }
+
+  return null;
+}
+
 const runsHandler = runsWs.addEventListener('connection', ({ client }) => {
   client.addEventListener('message', (event) => {
     try {
       const msg = JSON.parse(event.data as string);
-      if (msg.action === 'subscribe') {
+      if (msg.action === 'subscribe' && (['jobs', 'run', 'run-detail'] as RunsSubscription[]).includes(msg.resource)) {
         const sendUpdate = () => {
-          if (msg.resource === 'jobs') {
-            client.send(JSON.stringify({
-              resource: 'jobs',
-              event: 'snapshot',
-              data: mockJobsSnapshot,
-              pagination: mockJobsSnapshot.pagination,
-              stats: mockJobsSnapshot.stats,
-            }));
-            return;
-          }
-
-          client.send(JSON.stringify({
-            resource: 'run',
-            id: mockScenarioRunUpdate.scenarioRunName,
-            event: 'updated',
-            data: mockScenarioRunUpdate,
-          }));
+          const message = createRunsMessage(msg.resource, undefined, msg.ids?.[0]);
+          if (message) client.send(JSON.stringify(message));
         };
 
         setTimeout(sendUpdate, 500);
@@ -103,16 +117,7 @@ const runsHandler = runsWs.addEventListener('connection', ({ client }) => {
             return;
           }
 
-          client.send(JSON.stringify({
-            resource: 'run',
-            id: mockScenarioRunUpdate.scenarioRunName,
-            event: 'updated',
-            data: {
-              ...mockScenarioRunUpdate,
-              runningJobs: Math.random() > 0.5 ? 1 : 0,
-              successfulJobs: Math.random() > 0.5 ? 1 : 0,
-            },
-          }));
+          sendUpdate();
         }, 5000);
 
         client.addEventListener('close', () => clearInterval(interval));
