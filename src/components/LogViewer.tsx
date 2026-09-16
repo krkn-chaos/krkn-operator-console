@@ -22,6 +22,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const isFirstMessageRef = useRef<boolean>(true);
+  const hasStreamErrorRef = useRef<boolean>(false);
 
   const isPending = status === 'Pending';
   const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
@@ -42,7 +43,12 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
 
   const handleRawMessage: RawMessageHandler = useCallback((data: string) => {
     if (data.startsWith('ERROR:')) {
-      setLogs(prev => [...prev, `⚠️  ${data}`]);
+      if (hasStreamErrorRef.current) return;
+      hasStreamErrorRef.current = true;
+      // The server closes after reporting terminal errors such as InvalidImageName.
+      // Stop this managed connection so the service does not reconnect and repeat it.
+      // Do not add the transport error to the scenario log output.
+      websocketService.disconnect(connectionId);
       return;
     }
 
@@ -53,7 +59,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
       }
       return [...prev, data];
     });
-  }, []);
+  }, [connectionId]);
 
   useWebSocket(connectionId, wsUrl, handleRawMessage, {
     disabled: isPending,
