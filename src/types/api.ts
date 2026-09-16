@@ -289,7 +289,7 @@ export interface JobsListResponse {
 // NEW API Types for ScenarioRun (CRD-based)
 
 export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed';
-export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed';
+export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'MaxRetriesExceeded' | 'Cancelled';
 
 export interface ClusterJob {
   providerName: string; // Provider that owns this cluster (e.g., 'krkn-operator', 'krkn-operator-acm')
