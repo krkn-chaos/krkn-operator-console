@@ -45,9 +45,9 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
     if (data.startsWith('ERROR:')) {
       if (hasStreamErrorRef.current) return;
       hasStreamErrorRef.current = true;
+      setLogs(prev => [...prev, `⚠️  ${data}`]);
       // The server closes after reporting terminal errors such as InvalidImageName.
       // Stop this managed connection so the service does not reconnect and repeat it.
-      // Do not add the transport error to the scenario log output.
       websocketService.disconnect(connectionId);
       return;
     }
