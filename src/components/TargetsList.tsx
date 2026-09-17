@@ -149,7 +149,16 @@ export function TargetsList() {
                             {target.clusterName}
                           </strong>
                         </div>
-                        <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                        <div
+                          title={target.clusterAPIURL}
+                          style={{
+                            fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                            color: 'var(--pf-v5-global--Color--200)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {target.clusterAPIURL}
                         </div>
                       </div>
