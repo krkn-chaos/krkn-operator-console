@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CloudCredentialsCard } from './CloudCredentialsCard';
+import { CloudCredentialsCard, filterCloudCredentials } from './CloudCredentialsCard';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { operatorApi } from '../services/operatorApi';
 import { useNotifications } from '../hooks';
@@ -54,17 +54,17 @@ describe('CloudCredentialsCard', () => {
   });
 
   describe('rendering', () => {
-    it('renders each credential in its own card with provider, access, and actions', async () => {
+    it('renders each credential in a compact list with provider, access, and actions', async () => {
       render(<CloudCredentialsCard />);
 
-      expect(await screen.findByRole('heading', { name: 'aws-dummy' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'azure-dummy' })).toBeInTheDocument();
-      expect(screen.getByText('AWS')).toBeInTheDocument();
-      expect(screen.getByText('Azure')).toBeInTheDocument();
+      expect(await screen.findByText('aws-dummy')).toBeInTheDocument();
+      expect(screen.getByText('azure-dummy')).toBeInTheDocument();
+      expect(screen.getAllByText('AWS').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Azure').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('aws test key')).toBeInTheDocument();
-      expect(screen.getByText('All Users')).toBeInTheDocument();
+      expect(screen.getAllByText('All Users').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('chaos-team')).toBeInTheDocument();
-      expect(screen.getByRole('list', { name: 'Cloud credentials' })).toBeInTheDocument();
+      expect(screen.getByRole('grid', { name: 'Cloud credentials' })).toBeInTheDocument();
       expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2);
       expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(2);
     });
@@ -78,6 +78,61 @@ describe('CloudCredentialsCard', () => {
       expect(
         screen.getByText('Add cloud provider credentials to enable node, zone, and power outage scenarios.')
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('filtering', () => {
+    it('filters credentials by provider', async () => {
+      const user = userEvent.setup();
+      render(<CloudCredentialsCard />);
+
+      await screen.findByText('aws-dummy');
+      await user.selectOptions(screen.getByLabelText('Filter by cloud provider'), 'azure');
+
+      expect(screen.queryByText('aws-dummy')).not.toBeInTheDocument();
+      expect(screen.getByText('azure-dummy')).toBeInTheDocument();
+    });
+
+    it('filters credentials by name search', async () => {
+      const user = userEvent.setup();
+      render(<CloudCredentialsCard />);
+
+      await screen.findByText('aws-dummy');
+      await user.type(screen.getByLabelText('Filter cloud credentials by name'), 'azure-dummy');
+
+      expect(screen.queryByText('aws-dummy')).not.toBeInTheDocument();
+      expect(screen.getByText('azure-dummy')).toBeInTheDocument();
+    });
+
+    it('shows empty state when filters match nothing', async () => {
+      const user = userEvent.setup();
+      render(<CloudCredentialsCard />);
+
+      await user.type(await screen.findByLabelText('Filter cloud credentials by name'), 'does-not-exist');
+      expect(await screen.findByText('No Matching Credentials')).toBeInTheDocument();
+    });
+  });
+
+  describe('filterCloudCredentials helper', () => {
+    it('sorts and filters credentials by provider', () => {
+      const result = filterCloudCredentials(mockCredentials, {
+        search: '',
+        provider: 'aws',
+        access: 'all',
+        sortDirection: 'asc',
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('aws-dummy');
+    });
+
+    it('filters credentials by public access', () => {
+      const result = filterCloudCredentials(mockCredentials, {
+        search: '',
+        provider: 'all',
+        access: 'public',
+        sortDirection: 'asc',
+      });
+      expect(result.map((c) => c.name)).toEqual(['aws-dummy']);
     });
   });
 
