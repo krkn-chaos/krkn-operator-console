@@ -27,6 +27,26 @@ describe('TargetsList', () => {
     vi.mocked(targetsApi.listTargets).mockResolvedValue([]);
   });
 
+  it('truncates long target URLs while preserving the full URL in the title', async () => {
+    const longUrl = 'https://api.cluster.example.com:6443/this/is/a/very/long/api/path';
+    vi.mocked(targetsApi.listTargets).mockResolvedValue([
+      {
+        uuid: 'abc-123',
+        clusterName: 'long-url-cluster',
+        clusterAPIURL: longUrl,
+        secretType: 'token',
+        ready: true,
+        createdAt: '2024-01-01T00:00:00Z',
+      },
+    ]);
+
+    render(<TargetsList />);
+
+    await waitFor(() => expect(screen.getByText(longUrl)).toBeInTheDocument());
+    const url = screen.getByTitle(longUrl);
+    expect(url).toHaveStyle({ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+  });
+
   describe('form submission errors', () => {
     it('does not call showError when target creation fails', async () => {
       const user = userEvent.setup();
