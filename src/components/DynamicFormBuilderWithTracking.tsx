@@ -109,6 +109,10 @@ export function DynamicFormBuilderWithTracking({
   }, []);
 
   const handleChange = (variable: string, value: string | number | boolean | File) => {
+    if (disabledFields.has(variable)) {
+      return;
+    }
+
     const newValues = { ...values, [variable]: value };
     const newTouchedFields = { ...touchedFields, [variable]: true };
 

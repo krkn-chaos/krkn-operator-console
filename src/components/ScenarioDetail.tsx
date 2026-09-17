@@ -25,7 +25,7 @@ import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
-import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider } from '../utils/cloudProviderUtils';
+import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider, resolveEffectiveCloudType, filterScenarioFieldsByCloudType, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
 import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
@@ -198,14 +198,14 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   // The CLOUD_TYPE field can live in either field set depending on the scenario.
   const cloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE')
     ?? scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
-  // Only narrow the visible fields while a credential is actually applied — derived from the
-  // credential's provider, not the raw CLOUD_TYPE form value. The field's value stays wherever
-  // it was last set (e.g. "aws") after deselecting, so reading it directly here would keep the
-  // filter stuck on that provider even with no credential applied.
   const appliedCloudCredential = cloudCredentials.find((c) => c.name === appliedCloudCredName);
-  const activeCloudType = appliedCloudCredential
+  const credentialCloudType = appliedCloudCredential
     ? resolveCloudTypeForProvider(appliedCloudCredential.provider, cloudTypeField)
     : undefined;
+  const effectiveCloudType = resolveEffectiveCloudType(cloudTypeField, {
+    credentialCloudType,
+    formCloudType: scenarioFormValues?.CLOUD_TYPE ?? globalFormValues?.CLOUD_TYPE,
+  });
 
   const applyCloudCredential = (credName: string) => {
     setSelectedCloudCredName(credName);
@@ -607,6 +607,33 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     [scenarioDetail?.fields]
   );
 
+  const cloudFilterOptions = useMemo(
+    () => ({
+      hideCloudTypeWhenCredentialApplied: true,
+      appliedCloudCredName,
+    }),
+    [appliedCloudCredName]
+  );
+
+  const mainFormFields = useMemo(() => {
+    if (!scenarioDetail) return [];
+    const base = hasGroupedScenarioFields
+      ? scenarioDetail.fields
+      : scenarioDetail.fields.filter((field) => field.required);
+    return hasGroupedScenarioFields
+      ? filterScenarioFieldsByCloudType(base, effectiveCloudType, cloudFilterOptions)
+      : base;
+  }, [scenarioDetail, hasGroupedScenarioFields, effectiveCloudType, cloudFilterOptions]);
+
+  const previewScenarioFields = useMemo(
+    () => filterFieldsByCloudType(
+      scenarioDetail?.fields.filter((f) => f.type !== 'group') ?? [],
+      effectiveCloudType,
+      cloudFilterOptions
+    ),
+    [scenarioDetail?.fields, effectiveCloudType, cloudFilterOptions]
+  );
+
   if (!scenarioDetail) {
     return (
       <div style={{ textAlign: 'center', padding: '3rem' }}>
@@ -699,7 +726,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
             <CardBody>
               <DynamicFormBuilder
-                fields={hasGroupedScenarioFields ? scenarioDetail.fields : scenarioDetail.fields.filter(field => field.required)}
+                fields={mainFormFields}
                 values={scenarioFormValues || {}}
                 onChange={handleFormChange}
                 disabledFields={cloudDisabledFields}
@@ -747,7 +774,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             selectedCloudCredName={selectedCloudCredName}
             onSelectCloudCredential={applyCloudCredential}
             appliedCloudCredName={appliedCloudCredName}
-            activeCloudType={activeCloudType}
+            activeCloudType={effectiveCloudType}
           />
 
           {/* Preview Button */}
@@ -780,7 +807,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {scenarioDetail.fields.filter(f => f.type !== 'group').map((field) => {
+                  {previewScenarioFields.map((field) => {
                     const value = scenarioFormValues?.[field.variable];
                     const displayValue = getFieldPreviewDisplayValue(field, value, {
                       appliedCloudCredName,
@@ -813,9 +840,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                       </Tr>
                     </Thead>
                     <Tbody>
-                      {scenarioGlobals.fields
-                        .filter(field => globalTouchedFields[field.variable])
-                        .map((field) => {
+                      {filterFieldsByCloudType(
+                        scenarioGlobals.fields.filter((field) => globalTouchedFields[field.variable]),
+                        effectiveCloudType,
+                        cloudFilterOptions
+                      ).map((field) => {
                           const value = globalFormValues?.[field.variable];
                           const displayValue = getFieldPreviewDisplayValue(field, value, {
                             appliedCloudCredName,

@@ -41,8 +41,9 @@ interface ScenarioParameterSectionsProps {
   selectedCloudCredName: string;
   onSelectCloudCredential: (name: string) => void;
   appliedCloudCredName: string;
-  /** Current value of the scenario's CLOUD_TYPE field, if it has one — used to hide irrelevant providers' fields */
+  /** CLOUD_TYPE used to hide other providers' optional credential fields */
   activeCloudType?: string;
+  appliedCloudCredName?: string;
 }
 
 export function ScenarioParameterSections({
@@ -78,7 +79,13 @@ export function ScenarioParameterSections({
   const optionalGlobalFields = allGlobalFields.filter((f) => !f.required);
   // Only show the active provider's cloud fields — avoids listing all 7 providers'
   // credential fields (mostly irrelevant) at once.
-  const visibleOptionalFields = filterFieldsByCloudType(optionalFields, activeCloudType);
+  const cloudFilterOptions = {
+    hideCloudTypeWhenCredentialApplied: true,
+    appliedCloudCredName,
+  };
+  const visibleOptionalFields = filterFieldsByCloudType(optionalFields, activeCloudType, cloudFilterOptions);
+  const visibleRequiredGlobalFields = filterFieldsByCloudType(requiredGlobalFields, activeCloudType, cloudFilterOptions);
+  const visibleOptionalGlobalFields = filterFieldsByCloudType(optionalGlobalFields, activeCloudType, cloudFilterOptions);
   const appliedCloudCredProvider = cloudCredentials.find((c) => c.name === appliedCloudCredName)?.provider;
 
   return (
@@ -204,12 +211,12 @@ export function ScenarioParameterSections({
                 </CardBody>
               </Card>
             )}
-            {requiredGlobalFields.length > 0 && (
+            {visibleRequiredGlobalFields.length > 0 && (
               <Card style={{ marginBottom: '1rem' }}>
                 <CardTitle>Required Global Parameters</CardTitle>
                 <CardBody>
                   <DynamicFormBuilderWithTracking
-                    fields={requiredGlobalFields}
+                    fields={visibleRequiredGlobalFields}
                     values={globalFormValues}
                     touchedFields={globalTouchedFields}
                     onChange={onGlobalFormChange}
@@ -218,12 +225,12 @@ export function ScenarioParameterSections({
                 </CardBody>
               </Card>
             )}
-            {optionalGlobalFields.length > 0 && (
+            {visibleOptionalGlobalFields.length > 0 && (
               <Card>
                 <CardTitle>Optional Global Parameters</CardTitle>
                 <CardBody>
                   <DynamicFormBuilderWithTracking
-                    fields={optionalGlobalFields}
+                    fields={visibleOptionalGlobalFields}
                     values={globalFormValues}
                     touchedFields={globalTouchedFields}
                     onChange={onGlobalFormChange}

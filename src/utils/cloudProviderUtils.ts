@@ -87,10 +87,68 @@ const CLOUD_TYPE_FIELD_MATCHERS: Record<string, (variable: string) => boolean> =
   azure: (v) => v.startsWith('AZURE_'),
   gcp: (v) => v.startsWith('GOOGLE_'),
   vmware: (v) => v.startsWith('VSPHERE_'),
-  ibmcloud: (v) => v.startsWith('IBMC_'),
+  ibmcloud: (v) => v === 'IBMC_URL' || v === 'IBMC_APIKEY',
   ibmcloudpower: (v) => v.startsWith('IBMC_'),
   bm: (v) => v.startsWith('BMC_') || v === 'DISKS',
 };
+
+/** Labels like "[*IBM Cloud only*]" in krkn-hub scenario field definitions. */
+const CLOUD_TYPE_DESCRIPTION_TAGS: Record<string, readonly string[]> = {
+  aws: ['AWS only'],
+  azure: ['Azure only'],
+  gcp: ['GCP only'],
+  vmware: ['VSphere only'],
+  ibmcloud: ['IBM Cloud only'],
+  ibmcloudpower: ['IBM Power Cloud only', 'IBM Cloud only'],
+  bm: ['Bare Metal only'],
+};
+
+const PROVIDER_TAG_RE = /\[\*([^*]+)\*\]/gi;
+
+function getFieldProviderTags(shortDescription: string | undefined): string[] {
+  if (!shortDescription) return [];
+  const tags: string[] = [];
+  for (const match of shortDescription.matchAll(PROVIDER_TAG_RE)) {
+    tags.push(match[1].trim());
+  }
+  return tags;
+}
+
+function descriptionMatchesCloudType(shortDescription: string | undefined, cloudType: string): boolean | undefined {
+  const tags = getFieldProviderTags(shortDescription);
+  if (tags.length === 0) return undefined;
+
+  const allowedTags = CLOUD_TYPE_DESCRIPTION_TAGS[cloudType];
+  if (!allowedTags) return false;
+
+  const normalizedAllowed = allowedTags.map((t) => t.toLowerCase());
+  return tags.some((tag) => normalizedAllowed.includes(tag.toLowerCase()));
+}
+
+/**
+ * Returns true when a scenario field belongs to the active CLOUD_TYPE provider.
+ * Non-cloud fields (no env-var prefix and no "[*Provider only*]" tag) always match.
+ */
+export function fieldMatchesCloudType(
+  field: { variable: string; short_description?: string },
+  cloudType: string
+): boolean {
+  if (field.variable === 'CLOUD_TYPE') {
+    return true;
+  }
+
+  const tagMatch = descriptionMatchesCloudType(field.short_description, cloudType);
+  if (tagMatch !== undefined) {
+    return tagMatch;
+  }
+
+  if (isCloudProviderSpecificField(field.variable)) {
+    const matcher = CLOUD_TYPE_FIELD_MATCHERS[cloudType];
+    return matcher ? matcher(field.variable) : false;
+  }
+
+  return true;
+}
 
 function isCloudProviderSpecificField(variable: string): boolean {
   return variable !== 'CLOUD_TYPE' && (isCloudEnvVar(variable) || variable === 'DISKS');
@@ -103,11 +161,75 @@ function isCloudProviderSpecificField(variable: string): boolean {
  * through. When cloudType is unset or unrecognized, every field passes
  * through unchanged (fail-safe — never hides fields we can't confidently place).
  */
-export function filterFieldsByCloudType<T extends { variable: string }>(
+export function filterFieldsByCloudType<T extends { variable: string; short_description?: string }>(
   fields: T[],
-  cloudType: string | undefined
+  cloudType: string | undefined,
+  options: { hideCloudTypeWhenCredentialApplied?: boolean; appliedCloudCredName?: string } = {}
 ): T[] {
-  const matcher = cloudType ? CLOUD_TYPE_FIELD_MATCHERS[cloudType] : undefined;
-  if (!matcher) return fields;
-  return fields.filter((f) => !isCloudProviderSpecificField(f.variable) || matcher(f.variable));
+  if (!cloudType) return fields;
+
+  return fields.filter((f) => {
+    if (options.hideCloudTypeWhenCredentialApplied && options.appliedCloudCredName && f.variable === 'CLOUD_TYPE') {
+      return false;
+    }
+    return fieldMatchesCloudType(f, cloudType);
+  });
+}
+
+/**
+ * Resolves which CLOUD_TYPE drives optional-parameter filtering.
+ * Saved credentials take precedence; otherwise use the form value or the
+ * scenario field default (e.g. node-scenarios defaults to "aws").
+ */
+export function resolveEffectiveCloudType(
+  cloudTypeField: EnumLikeField | undefined,
+  options: {
+    credentialCloudType?: string;
+    formCloudType?: string | number | boolean | null;
+  } = {}
+): string | undefined {
+  if (options.credentialCloudType) {
+    return options.credentialCloudType;
+  }
+
+  const rawFormValue = options.formCloudType;
+  if (rawFormValue !== undefined && rawFormValue !== null && rawFormValue !== '') {
+    const asString = String(rawFormValue);
+    if (cloudTypeField && !isValidEnumValue(cloudTypeField, asString)) {
+      return undefined;
+    }
+    return asString;
+  }
+
+  const defaultValue = cloudTypeField?.default;
+  if (defaultValue !== undefined && defaultValue !== null && defaultValue !== '') {
+    const asString = String(defaultValue);
+    if (cloudTypeField && !isValidEnumValue(cloudTypeField, asString)) {
+      return undefined;
+    }
+    return asString;
+  }
+
+  return undefined;
+}
+
+/** Like filterFieldsByCloudType but preserves group headers that still have visible members. */
+export function filterScenarioFieldsByCloudType<T extends { variable: string; type: string; group?: string; short_description?: string }>(
+  fields: T[],
+  cloudType: string | undefined,
+  options: { hideCloudTypeWhenCredentialApplied?: boolean; appliedCloudCredName?: string } = {}
+): T[] {
+  const visibleValueFields = filterFieldsByCloudType(
+    fields.filter((f) => f.type !== 'group'),
+    cloudType,
+    options
+  );
+  const visibleVars = new Set(visibleValueFields.map((f) => f.variable));
+
+  return fields.filter((f) => {
+    if (f.type === 'group') {
+      return fields.some((member) => member.group === f.variable && visibleVars.has(member.variable));
+    }
+    return visibleVars.has(f.variable);
+  });
 }

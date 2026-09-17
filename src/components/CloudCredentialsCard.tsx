@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import {
   Card,
   CardTitle,
   CardBody,
-  CardFooter,
   Button,
   EmptyState,
   EmptyStateIcon,
@@ -24,14 +23,13 @@ import {
   FormSelectOption,
   Label,
   Radio,
-  Gallery,
-  GalleryItem,
-  DescriptionList,
-  DescriptionListGroup,
-  DescriptionListTerm,
-  DescriptionListDescription,
+  Toolbar,
+  ToolbarContent,
+  ToolbarItem,
+  SearchInput,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, KeyIcon } from '@patternfly/react-icons';
+import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
+import { PlusCircleIcon, KeyIcon, SortAmountDownIcon, SortAmountUpIcon, EditIcon, TrashIcon } from '@patternfly/react-icons';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { operatorApi } from '../services/operatorApi';
 import { useNotifications } from '../hooks';
@@ -55,6 +53,52 @@ const PROVIDER_LABELS: Record<CloudCredentialProvider, string> = {
 
 const PROVIDER_OPTIONS: CloudCredentialProvider[] = ['aws', 'gcp', 'azure', 'openstack', 'baremetal', 'vmware', 'ibmcloud'];
 
+const PROVIDER_LABEL_COLORS: Record<CloudCredentialProvider, 'blue' | 'orange' | 'green' | 'purple' | 'grey' | 'teal' | 'cyan'> = {
+  aws: 'orange',
+  gcp: 'green',
+  azure: 'blue',
+  openstack: 'purple',
+  baremetal: 'grey',
+  vmware: 'teal',
+  ibmcloud: 'cyan',
+};
+
+const PROVIDER_ACCENT_COLORS: Record<CloudCredentialProvider, string> = {
+  aws: 'var(--pf-v5-global--palette--orange-400)',
+  gcp: 'var(--pf-v5-global--palette--green-400)',
+  azure: 'var(--pf-v5-global--palette--blue-400)',
+  openstack: 'var(--pf-v5-global--palette--purple-400)',
+  baremetal: 'var(--pf-v5-global--palette--black-400)',
+  vmware: 'var(--pf-v5-global--palette--teal-400)',
+  ibmcloud: 'var(--pf-v5-global--palette--cyan-400)',
+};
+
+const mutedTextStyle: CSSProperties = {
+  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+  color: 'var(--pf-v5-global--Color--200)',
+};
+
+const credentialsTableStyle: CSSProperties = {
+  minWidth: '44rem',
+  tableLayout: 'fixed',
+  width: '100%',
+  borderCollapse: 'collapse',
+};
+
+const credentialsCellStyle: CSSProperties = {
+  paddingBlock: 'var(--pf-v5-global--spacer--md)',
+  verticalAlign: 'middle',
+  borderBottom: '1px solid var(--pf-v5-global--BorderColor--100)',
+};
+
+const credentialsHeaderCellStyle: CSSProperties = {
+  ...credentialsCellStyle,
+  borderBottom: '1px solid var(--pf-v5-global--BorderColor--200)',
+  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+  fontWeight: 600,
+  color: 'var(--pf-v5-global--Color--200)',
+};
+
 function credentialAccessLabel(cred: CloudCredential): string {
   if (cred.availableToAll) {
     return 'All Users';
@@ -63,6 +107,54 @@ function credentialAccessLabel(cred: CloudCredential): string {
     return cred.groups.join(', ');
   }
   return 'No groups';
+}
+
+export type CloudCredentialAccessFilter = 'all' | 'public' | 'group';
+export type CloudCredentialProviderFilter = 'all' | CloudCredentialProvider;
+
+export function filterCloudCredentials(
+  credentials: CloudCredential[],
+  options: {
+    search: string;
+    provider: CloudCredentialProviderFilter;
+    access: CloudCredentialAccessFilter;
+    sortDirection: 'asc' | 'desc';
+  }
+): CloudCredential[] {
+  const query = options.search.trim().toLowerCase();
+
+  const filtered = credentials.filter((cred) => {
+    if (options.provider !== 'all' && cred.provider !== options.provider) {
+      return false;
+    }
+
+    if (options.access === 'public' && !cred.availableToAll) {
+      return false;
+    }
+
+    if (options.access === 'group' && (cred.availableToAll || !cred.groups?.length)) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    const haystack = [
+      cred.name,
+      cred.description ?? '',
+      PROVIDER_LABELS[cred.provider] ?? cred.provider,
+      credentialAccessLabel(cred),
+      ...(cred.groups ?? []),
+    ].join(' ').toLowerCase();
+
+    return haystack.includes(query);
+  });
+
+  return filtered.sort((a, b) => {
+    const cmp = a.name.localeCompare(b.name);
+    return options.sortDirection === 'asc' ? cmp : -cmp;
+  });
 }
 
 interface CloudCredentialFormProps {
@@ -496,6 +588,20 @@ export function CloudCredentialsCard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingCred, setEditingCred] = useState<CloudCredential | null>(null);
   const [deletingName, setDeletingName] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState('');
+  const [providerFilter, setProviderFilter] = useState<CloudCredentialProviderFilter>('all');
+  const [accessFilter, setAccessFilter] = useState<CloudCredentialAccessFilter>('all');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const filteredCredentials = useMemo(
+    () => filterCloudCredentials(credentials, {
+      search: searchValue,
+      provider: providerFilter,
+      access: accessFilter,
+      sortDirection,
+    }),
+    [credentials, searchValue, providerFilter, accessFilter, sortDirection]
+  );
 
   const fetchCredentials = useCallback(async () => {
     try {
@@ -578,67 +684,157 @@ export function CloudCredentialsCard() {
               </EmptyStateBody>
             </EmptyState>
           ) : (
-            <Gallery hasGutter minWidths={{ default: '22rem' }} role="list" aria-label="Cloud credentials">
-              {credentials.map((cred) => (
-                <GalleryItem key={cred.name} role="listitem">
-                  <Card isCompact isFlat>
-                    <CardTitle>
-                      <Flex
-                        justifyContent={{ default: 'justifyContentSpaceBetween' }}
-                        alignItems={{ default: 'alignItemsCenter' }}
-                        flexWrap={{ default: 'nowrap' }}
-                        spaceItems={{ default: 'spaceItemsSm' }}
-                      >
-                        <FlexItem>
-                          <Title headingLevel="h3" size="md">
-                            {cred.name}
-                          </Title>
-                        </FlexItem>
-                        <FlexItem>
-                          <Label color="blue">{PROVIDER_LABELS[cred.provider] ?? cred.provider}</Label>
-                        </FlexItem>
-                      </Flex>
-                    </CardTitle>
-                    <CardBody>
-                      <DescriptionList isCompact>
-                        <DescriptionListGroup>
-                          <DescriptionListTerm>Description</DescriptionListTerm>
-                          <DescriptionListDescription>
-                            {cred.description || '—'}
-                          </DescriptionListDescription>
-                        </DescriptionListGroup>
-                        <DescriptionListGroup>
-                          <DescriptionListTerm>Access</DescriptionListTerm>
-                          <DescriptionListDescription>
-                            {credentialAccessLabel(cred)}
-                          </DescriptionListDescription>
-                        </DescriptionListGroup>
-                        <DescriptionListGroup>
-                          <DescriptionListTerm>Created</DescriptionListTerm>
-                          <DescriptionListDescription>
-                            {cred.createdAt ? new Date(cred.createdAt).toLocaleDateString() : '—'}
-                          </DescriptionListDescription>
-                        </DescriptionListGroup>
-                      </DescriptionList>
-                    </CardBody>
-                    <CardFooter>
-                      <Flex spaceItems={{ default: 'spaceItemsSm' }}>
-                        <FlexItem>
-                          <Button variant="secondary" size="sm" onClick={() => setEditingCred(cred)}>
-                            Edit
-                          </Button>
-                        </FlexItem>
-                        <FlexItem>
-                          <Button variant="danger" size="sm" onClick={() => setDeletingName(cred.name)}>
-                            Delete
-                          </Button>
-                        </FlexItem>
-                      </Flex>
-                    </CardFooter>
-                  </Card>
-                </GalleryItem>
-              ))}
-            </Gallery>
+            <>
+              <Toolbar style={{ marginBottom: '1rem' }}>
+                <ToolbarContent>
+                  <ToolbarItem variant="search-filter">
+                    <SearchInput
+                      placeholder="Filter by name"
+                      value={searchValue}
+                      onChange={(_event, value) => setSearchValue(value)}
+                      onClear={() => setSearchValue('')}
+                      aria-label="Filter cloud credentials by name"
+                    />
+                  </ToolbarItem>
+                  <ToolbarItem>
+                    <FormSelect
+                      id="cc-filter-provider"
+                      aria-label="Filter by cloud provider"
+                      value={providerFilter}
+                      onChange={(_event, value) => setProviderFilter(value as CloudCredentialProviderFilter)}
+                      style={{ minWidth: '10rem' }}
+                    >
+                      <FormSelectOption value="all" label="All providers" />
+                      {PROVIDER_OPTIONS.map((provider) => (
+                        <FormSelectOption
+                          key={provider}
+                          value={provider}
+                          label={PROVIDER_LABELS[provider]}
+                        />
+                      ))}
+                    </FormSelect>
+                  </ToolbarItem>
+                  <ToolbarItem>
+                    <FormSelect
+                      id="cc-filter-access"
+                      aria-label="Filter by access"
+                      value={accessFilter}
+                      onChange={(_event, value) => setAccessFilter(value as CloudCredentialAccessFilter)}
+                      style={{ minWidth: '10rem' }}
+                    >
+                      <FormSelectOption value="all" label="All access" />
+                      <FormSelectOption value="public" label="All Users" />
+                      <FormSelectOption value="group" label="Group assigned" />
+                    </FormSelect>
+                  </ToolbarItem>
+                  <ToolbarItem>
+                    <Button
+                      variant="plain"
+                      aria-label={`Sort ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+                      onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                    >
+                      {sortDirection === 'asc' ? <SortAmountUpIcon /> : <SortAmountDownIcon />}
+                    </Button>
+                  </ToolbarItem>
+                </ToolbarContent>
+              </Toolbar>
+
+              {filteredCredentials.length === 0 ? (
+                <EmptyState>
+                  <EmptyStateIcon icon={KeyIcon} />
+                  <Title headingLevel="h2" size="lg">No Matching Credentials</Title>
+                  <EmptyStateBody>
+                    No cloud credentials match your search or filters. Try adjusting your criteria.
+                  </EmptyStateBody>
+                </EmptyState>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <Table
+                    aria-label="Cloud credentials"
+                    style={credentialsTableStyle}
+                  >
+                    <Thead>
+                      <Tr>
+                        <Th width={35} style={credentialsHeaderCellStyle}>Name</Th>
+                        <Th width={15} style={credentialsHeaderCellStyle}>Provider</Th>
+                        <Th width={20} style={credentialsHeaderCellStyle}>Access</Th>
+                        <Th width={15} style={credentialsHeaderCellStyle}>Created</Th>
+                        <Th width={15} style={credentialsHeaderCellStyle}>Actions</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {filteredCredentials.map((cred) => (
+                        <Tr
+                          key={cred.name}
+                          style={{ borderLeft: `3px solid ${PROVIDER_ACCENT_COLORS[cred.provider]}` }}
+                        >
+                          <Td dataLabel="Name" style={credentialsCellStyle}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>
+                                {cred.name}
+                              </div>
+                              <div
+                                style={{
+                                  ...mutedTextStyle,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={cred.description || undefined}
+                              >
+                                {cred.description || 'No description'}
+                              </div>
+                            </div>
+                          </Td>
+                          <Td dataLabel="Provider" style={credentialsCellStyle}>
+                            <Label color={PROVIDER_LABEL_COLORS[cred.provider]} isCompact>
+                              {PROVIDER_LABELS[cred.provider] ?? cred.provider}
+                            </Label>
+                          </Td>
+                          <Td dataLabel="Access" style={credentialsCellStyle}>
+                            <span style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                              {credentialAccessLabel(cred)}
+                            </span>
+                          </Td>
+                          <Td dataLabel="Created" style={credentialsCellStyle}>
+                            <span style={mutedTextStyle}>
+                              {cred.createdAt ? new Date(cred.createdAt).toLocaleDateString() : '—'}
+                            </span>
+                          </Td>
+                          <Td dataLabel="Actions" style={credentialsCellStyle}>
+                            <Flex
+                              spaceItems={{ default: 'spaceItemsSm' }}
+                              flexWrap={{ default: 'nowrap' }}
+                            >
+                              <FlexItem>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={<EditIcon />}
+                                  onClick={() => setEditingCred(cred)}
+                                >
+                                  Edit
+                                </Button>
+                              </FlexItem>
+                              <FlexItem>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  icon={<TrashIcon />}
+                                  onClick={() => setDeletingName(cred.name)}
+                                >
+                                  Delete
+                                </Button>
+                              </FlexItem>
+                            </Flex>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </div>
+              )}
+            </>
           )}
         </CardBody>
       </Card>
