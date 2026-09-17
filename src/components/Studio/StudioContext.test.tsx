@@ -1156,5 +1156,26 @@ describe('StudioContext', () => {
       const graph = buildGraph(wf);
       expect(graph['env-node'].env).toEqual({ KEY: 'val', GLOBAL_KEY: 'global_val' });
     });
+
+    it('strips cloud env vars and sets cloudCredentialRef when a credential is saved on the node', () => {
+      const node = makeConfiguredNode('cloud-node');
+      node.config!.scenarioFormValues = {
+        ACTION: 'node_stop_start_scenario',
+        AWS_ACCESS_KEY_ID: 'should-be-stripped',
+        CLOUD_TYPE: 'aws',
+      };
+      node.config!.cloudCredentialRef = 'aws-dummy';
+      const wf: StudioWorkflow = {
+        nodes: [node],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+
+      const graph = buildGraph(wf);
+      expect(graph['cloud-node'].cloudCredentialRef).toBe('aws-dummy');
+      expect(graph['cloud-node'].env).toEqual({ ACTION: 'node_stop_start_scenario' });
+      expect(graph['cloud-node'].env?.AWS_ACCESS_KEY_ID).toBeUndefined();
+      expect(graph['cloud-node'].env?.CLOUD_TYPE).toBeUndefined();
+    });
   });
 });

@@ -17,7 +17,9 @@ import { DynamicFormBuilder } from '../DynamicFormBuilder';
 import { ScenarioParameterSections } from '../ScenarioParameterSections';
 import { operatorApi } from '../../services/operatorApi';
 import { elasticsearchApi } from '../../services/elasticsearchApi';
-import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig } from '../../types/api';
+import { cloudCredentialsApi } from '../../services/cloudCredentialsApi';
+import { hasCloudFields, getCloudDisabledFields, resolveCloudTypeForProvider, resolveEffectiveCloudType, filterScenarioFieldsByCloudType } from '../../utils/cloudProviderUtils';
+import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig, CloudCredential } from '../../types/api';
 
 interface ScenarioConfigStepProps {
   scenarioName: string;
@@ -28,6 +30,8 @@ interface ScenarioConfigStepProps {
   onFormChange: (values: ScenarioFormValues) => void;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
   onDefaultValuesLoad?: (defaults: ScenarioFormValues) => void;
+  cloudCredentialRef?: string;
+  onCloudCredentialRefChange?: (name: string) => void;
 }
 
 export function ScenarioConfigStep({
@@ -39,6 +43,8 @@ export function ScenarioConfigStep({
   onFormChange,
   onGlobalFormChange,
   onDefaultValuesLoad,
+  cloudCredentialRef: cloudCredentialRefProp = '',
+  onCloudCredentialRefChange,
 }: ScenarioConfigStepProps) {
   const [scenarioDetail, setScenarioDetail] = useState<ScenarioDetail | null>(null);
   const [scenarioGlobals, setScenarioGlobals] = useState<ScenarioGlobals | null>(null);
@@ -51,7 +57,18 @@ export function ScenarioConfigStep({
   const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
-  // Fetch scenario detail when scenario changes
+  const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
+  const [selectedCloudCredName, setSelectedCloudCredName] = useState(cloudCredentialRefProp);
+  const [appliedCloudCredName, setAppliedCloudCredName] = useState(cloudCredentialRefProp);
+
+  useEffect(() => {
+    setSelectedCloudCredName(cloudCredentialRefProp);
+    setAppliedCloudCredName(cloudCredentialRefProp);
+  }, [cloudCredentialRefProp, scenarioName]);
+
+  const handleFormChange = (values: ScenarioFormValues) => {
+    onFormChange({ ...formValues, ...values });
+  };
   useEffect(() => {
     let mounted = true;
 
@@ -144,9 +161,67 @@ export function ScenarioConfigStep({
     elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
   }, [showGlobalParameters]);
 
+  // Cloud fields (CLOUD_TYPE, AWS_*, AZURE_*, etc.) are typically declared as scenario-specific
+  // required/optional fields, not global fields — load credentials up front so the selector
+  // is available without requiring the user to expand Global Parameters.
+  useEffect(() => {
+    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
+  }, []);
+
   const hasEsGlobalFields = scenarioGlobals?.fields.some(
     (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
   ) ?? false;
+
+  const hasCloudDetailFields = scenarioDetail ? hasCloudFields(scenarioDetail.fields) : false;
+  const hasCloudGlobalFields = scenarioGlobals ? hasCloudFields(scenarioGlobals.fields) : false;
+  const hasCloudCredentialFields = hasCloudDetailFields || hasCloudGlobalFields;
+  const cloudDisabledFields = getCloudDisabledFields(appliedCloudCredName);
+
+  const cloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE')
+    ?? scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+  const appliedCloudCredential = cloudCredentials.find((c) => c.name === appliedCloudCredName);
+  const credentialCloudType = appliedCloudCredential
+    ? resolveCloudTypeForProvider(appliedCloudCredential.provider, cloudTypeField)
+    : undefined;
+  const effectiveCloudType = resolveEffectiveCloudType(cloudTypeField, {
+    credentialCloudType,
+    formCloudType: formValues?.CLOUD_TYPE ?? globalFormValues?.CLOUD_TYPE,
+  });
+
+  const applyCloudCredential = (credName: string) => {
+    setSelectedCloudCredName(credName);
+    if (!credName) {
+      setAppliedCloudCredName('');
+      onCloudCredentialRefChange?.('');
+      return;
+    }
+    setAppliedCloudCredName(credName);
+    onCloudCredentialRefChange?.(credName);
+
+    // Sync CLOUD_TYPE to the credential's provider so the form doesn't keep showing
+    // a stale/mismatched value (e.g. default "aws" while an Azure credential is applied).
+    const cred = cloudCredentials.find((c) => c.name === credName);
+    if (!cred) return;
+
+    const detailCloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    if (detailCloudTypeField) {
+      const targetValue = resolveCloudTypeForProvider(cred.provider, detailCloudTypeField);
+      if (targetValue) {
+        handleFormChange({ CLOUD_TYPE: targetValue });
+      }
+      return;
+    }
+
+    const globalCloudTypeField = scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    const targetGlobalValue = globalCloudTypeField
+      ? resolveCloudTypeForProvider(cred.provider, globalCloudTypeField)
+      : undefined;
+    if (globalCloudTypeField && targetGlobalValue) {
+      const patch = { ...globalFormValues, CLOUD_TYPE: targetGlobalValue };
+      const touched = { ...globalTouchedFields, CLOUD_TYPE: true };
+      onGlobalFormChange(patch, touched);
+    }
+  };
 
   const applyEsConfig = (configName: string) => {
     setSelectedEsConfigName(configName);
@@ -191,6 +266,24 @@ export function ScenarioConfigStep({
     [scenarioDetail?.fields]
   );
 
+  const cloudFilterOptions = useMemo(
+    () => ({
+      hideCloudTypeWhenCredentialApplied: true,
+      appliedCloudCredName,
+    }),
+    [appliedCloudCredName]
+  );
+
+  const mainFormFields = useMemo(() => {
+    if (!scenarioDetail) return [];
+    const base = hasGroupedScenarioFields
+      ? scenarioDetail.fields
+      : requiredFields;
+    return hasGroupedScenarioFields
+      ? filterScenarioFieldsByCloudType(base, effectiveCloudType, cloudFilterOptions)
+      : base;
+  }, [scenarioDetail, hasGroupedScenarioFields, requiredFields, effectiveCloudType, cloudFilterOptions]);
+
   const allGlobalFields = useMemo(
     () => (scenarioGlobals?.fields || []).map((f) =>
       f.variable?.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
@@ -233,9 +326,10 @@ export function ScenarioConfigStep({
         <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
         <CardBody>
           <DynamicFormBuilder
-            fields={hasGroupedScenarioFields ? (scenarioDetail?.fields || []) : requiredFields}
+            fields={mainFormFields}
             values={formValues}
-            onChange={onFormChange}
+            onChange={handleFormChange}
+            disabledFields={cloudDisabledFields}
           />
         </CardBody>
       </Card>
@@ -243,7 +337,7 @@ export function ScenarioConfigStep({
       <ScenarioParameterSections
         optionalFields={optionalFields}
         formValues={formValues}
-        onFormChange={onFormChange}
+        onFormChange={handleFormChange}
         suppressOptionalSection={hasGroupedScenarioFields}
         allGlobalFields={allGlobalFields}
         globalFormValues={globalFormValues}
@@ -259,6 +353,13 @@ export function ScenarioConfigStep({
         selectedEsConfigName={selectedEsConfigName}
         onSelectEsConfig={applyEsConfig}
         appliedEsConfigName={appliedEsConfigName}
+        hasCloudCredentialFields={hasCloudCredentialFields}
+        cloudCredentials={cloudCredentials}
+        selectedCloudCredName={selectedCloudCredName}
+        onSelectCloudCredential={applyCloudCredential}
+        appliedCloudCredName={appliedCloudCredName}
+        activeCloudType={effectiveCloudType}
+        appliedCloudCredName={appliedCloudCredName}
       />
     </div>
   );

@@ -15,20 +15,23 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, StringField, EnumField } from '../types/api';
+import { getInjectedFieldPlaceholder, isSecretField } from '../utils/fieldUtils';
 
 interface DynamicFormBuilderProps {
   fields: ScenarioField[];
   values: ScenarioFormValues;
   onChange: (values: ScenarioFormValues) => void;
+  /** Variable names to force-disable regardless of mutually_excludes (e.g. cloud fields covered by a saved credential) */
+  disabledFields?: string[];
 }
 
-export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuilderProps) {
+export function DynamicFormBuilder({ fields, values, onChange, disabledFields: externalDisabledFields = [] }: DynamicFormBuilderProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const initializedFieldsKey = useRef<string | null>(null);
   const validationTimeouts = useRef<{ [key: string]: number }>({});
 
   const disabledFields = useMemo(() => {
-    const disabled = new Set<string>();
+    const disabled = new Set<string>(externalDisabledFields);
     for (const field of fields) {
       if (field.mutually_excludes && field.type === 'enum') {
         const enumField = field as EnumField;
@@ -51,7 +54,7 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
       }
     }
     return disabled;
-  }, [fields, values]);
+  }, [fields, values, externalDisabledFields]);
 
   /**
    * Safe regex test with timeout protection
@@ -92,6 +95,10 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
   }, []);
 
   const handleChange = (variable: string, value: string | number | boolean | File) => {
+    if (disabledFields.has(variable)) {
+      return;
+    }
+
     const newValues = { ...values, [variable]: value };
 
     const changedField = fields.find(f => f.variable === variable);
@@ -138,6 +145,11 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
     const value = values[field.variable] ?? field.default ?? '';
     const error = errors[field.variable];
     const validated = error ? 'error' : 'default';
+    const injectedPlaceholder = getInjectedFieldPlaceholder(
+      field.variable,
+      isFieldDisabled,
+      externalDisabledFields
+    );
 
     switch (field.type) {
       case 'string': {
@@ -151,12 +163,12 @@ export function DynamicFormBuilder({ fields, values, onChange }: DynamicFormBuil
           >
             <TextInput
               id={field.variable}
-              type={field.secret ? 'password' : 'text'}
+              type={isSecretField(field) ? 'password' : 'text'}
               value={value as string}
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
-              placeholder={field.default}
-              autoComplete={field.secret ? 'off' : undefined}
+              placeholder={injectedPlaceholder ?? field.default}
+              autoComplete={isSecretField(field) ? 'off' : undefined}
               isDisabled={isFieldDisabled}
             />
             {field.description && (
