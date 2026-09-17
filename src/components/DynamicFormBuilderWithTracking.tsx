@@ -16,6 +16,7 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField, EnumField } from '../types/api';
+import { getInjectedFieldPlaceholder, isSecretField } from '../utils/fieldUtils';
 
 interface DynamicFormBuilderWithTrackingProps {
   fields: ScenarioField[];
@@ -167,6 +168,12 @@ export function DynamicFormBuilderWithTracking({
     const value = values[field.variable] ?? field.default ?? '';
     const error = errors[field.variable];
     const validated = error ? 'error' : 'default';
+    const injectedPlaceholder = getInjectedFieldPlaceholder(
+      field.variable,
+      isFieldDisabled,
+      externalDisabledFields
+    );
+    const isInjectedField = injectedPlaceholder != null;
 
     switch (field.type) {
       case 'string': {
@@ -181,12 +188,12 @@ export function DynamicFormBuilderWithTracking({
           >
             <TextInput
               id={field.variable}
-              type={field.secret ? 'password' : 'text'}
-              value={isDisabled ? '***' : value as string}
+              type={isSecretField(field) ? 'password' : 'text'}
+              value={isFieldDisabled && !isInjectedField && isDisabled ? '***' : value as string}
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
-              placeholder={field.default}
-              autoComplete={field.secret ? 'off' : undefined}
+              placeholder={injectedPlaceholder ?? field.default}
+              autoComplete={isSecretField(field) ? 'off' : undefined}
               isDisabled={isFieldDisabled}
             />
             {field.description && (

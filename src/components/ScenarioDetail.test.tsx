@@ -5,6 +5,7 @@ import { ScenarioDetail } from './ScenarioDetail';
 import { AppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
+import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import type { AppState } from '../types/api';
 import type {
   ScenarioDetail as ScenarioDetailType,
@@ -17,6 +18,7 @@ import type {
 
 vi.mock('../services/operatorApi');
 vi.mock('../services/elasticsearchApi');
+vi.mock('../services/cloudCredentialsApi');
 
 describe('ScenarioDetail', () => {
   const mockDispatch = vi.fn();
@@ -131,6 +133,7 @@ describe('ScenarioDetail', () => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({ files: [] });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
+    vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
   });
 
   describe('Component Loading', () => {
@@ -492,6 +495,62 @@ describe('ScenarioDetail', () => {
 
       // KILL_COUNT should show default value '1'
       expect(screen.getByText('1')).toBeInTheDocument();
+    });
+
+    it('should mask cloud-injected fields in preview when credential is applied', async () => {
+      const user = userEvent.setup();
+      const detailWithCloudFields: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [
+          ...mockScenarioDetail.fields,
+          {
+            name: 'ibmc-url',
+            variable: 'IBMC_URL',
+            short_description: 'IBM Cloud URL [*IBM Cloud only*]',
+            title: 'IBM Cloud URL',
+            description: 'IBM Cloud URL',
+            type: 'string',
+            required: false,
+            default: '',
+          },
+          {
+            name: 'ibmc-api-key',
+            variable: 'IBMC_APIKEY',
+            short_description: 'IBM Cloud API key [*IBM Cloud only*]',
+            title: 'IBM Cloud API key',
+            description: 'IBM Cloud API Key',
+            type: 'string',
+            required: false,
+            default: '',
+            secret: true,
+          },
+        ],
+      };
+
+      vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([
+        { name: 'ibm1', provider: 'ibmcloud', description: 'IBM test cred' },
+      ]);
+
+      renderWithContext({
+        scenarioDetail: detailWithCloudFields,
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Load Cloud Credential')).toBeInTheDocument();
+      });
+
+      const credSelect = screen.getByRole('combobox', { name: /Load from saved credential/i });
+      await user.selectOptions(credSelect, 'ibm1');
+
+      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
+      await user.click(previewButton);
+
+      const maskedValues = screen.getAllByText('••••••••');
+      expect(maskedValues.length).toBeGreaterThanOrEqual(2);
+      expect(screen.queryByText('(empty)')).not.toBeInTheDocument();
     });
   });
 

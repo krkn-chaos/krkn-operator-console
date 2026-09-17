@@ -26,6 +26,7 @@ import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider } from '../utils/cloudProviderUtils';
+import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
 
@@ -781,17 +782,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 <Tbody>
                   {scenarioDetail.fields.filter(f => f.type !== 'group').map((field) => {
                     const value = scenarioFormValues?.[field.variable];
-                    let displayValue: string;
-
-                    if (value === undefined || value === null || value === '') {
-                      displayValue = field.default?.toString() || '(empty)';
-                    } else if (field.secret) {
-                      displayValue = '••••••••';
-                    } else if (field.type === 'file' || field.type === 'file_base64') {
-                      displayValue = (value as File)?.name || String(value);
-                    } else {
-                      displayValue = String(value);
-                    }
+                    const displayValue = getFieldPreviewDisplayValue(field, value, {
+                      appliedCloudCredName,
+                      appliedEsConfigName,
+                    });
 
                     return (
                       <Tr key={field.variable}>
@@ -823,17 +817,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                         .filter(field => globalTouchedFields[field.variable])
                         .map((field) => {
                           const value = globalFormValues?.[field.variable];
-                          let displayValue: string;
-
-                          if (value === undefined || value === null || value === '') {
-                            displayValue = field.default?.toString() || '(empty)';
-                          } else if (field.secret) {
-                            displayValue = '••••••••';
-                          } else if (field.type === 'file' || field.type === 'file_base64') {
-                            displayValue = (value as File)?.name || String(value);
-                          } else {
-                            displayValue = String(value);
-                          }
+                          const displayValue = getFieldPreviewDisplayValue(field, value, {
+                            appliedCloudCredName,
+                            appliedEsConfigName,
+                          });
 
                           return (
                             <Tr key={field.variable}>

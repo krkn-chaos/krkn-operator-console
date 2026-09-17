@@ -15,6 +15,7 @@ import {
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, StringField, EnumField } from '../types/api';
+import { getInjectedFieldPlaceholder, isSecretField } from '../utils/fieldUtils';
 
 interface DynamicFormBuilderProps {
   fields: ScenarioField[];
@@ -140,6 +141,11 @@ export function DynamicFormBuilder({ fields, values, onChange, disabledFields: e
     const value = values[field.variable] ?? field.default ?? '';
     const error = errors[field.variable];
     const validated = error ? 'error' : 'default';
+    const injectedPlaceholder = getInjectedFieldPlaceholder(
+      field.variable,
+      isFieldDisabled,
+      externalDisabledFields
+    );
 
     switch (field.type) {
       case 'string': {
@@ -153,12 +159,12 @@ export function DynamicFormBuilder({ fields, values, onChange, disabledFields: e
           >
             <TextInput
               id={field.variable}
-              type={field.secret ? 'password' : 'text'}
+              type={isSecretField(field) ? 'password' : 'text'}
               value={value as string}
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
-              placeholder={field.default}
-              autoComplete={field.secret ? 'off' : undefined}
+              placeholder={injectedPlaceholder ?? field.default}
+              autoComplete={isSecretField(field) ? 'off' : undefined}
               isDisabled={isFieldDisabled}
             />
             {field.description && (
