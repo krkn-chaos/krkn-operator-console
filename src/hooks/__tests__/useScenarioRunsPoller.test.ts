@@ -192,6 +192,31 @@ describe('hasChanges', () => {
     expect(hasChanges(prev, next)).toBe(true);
   });
 
+  it('detects resiliencyScores added', () => {
+    const prev = makeRunState({ resiliencyScores: undefined });
+    const next = makeRunState({ resiliencyScores: [{ clusterName: 'c1', score: 85 }] });
+    expect(hasChanges(prev, next)).toBe(true);
+  });
+
+  it('detects resiliencyScores value change (same length)', () => {
+    const prev = makeRunState({ resiliencyScores: [{ clusterName: 'c1', score: 70 }] });
+    const next = makeRunState({ resiliencyScores: [{ clusterName: 'c1', score: 85 }] });
+    expect(hasChanges(prev, next)).toBe(true);
+  });
+
+  it('returns false for identical resiliencyScores', () => {
+    const scores = [{ clusterName: 'c1', score: 85 }];
+    const prev = makeRunState({ resiliencyScores: scores });
+    const next = makeRunState({ resiliencyScores: [...scores] });
+    expect(hasChanges(prev, next)).toBe(false);
+  });
+
+  it('returns false when both resiliencyScores are undefined', () => {
+    const prev = makeRunState({ resiliencyScores: undefined });
+    const next = makeRunState({ resiliencyScores: undefined });
+    expect(hasChanges(prev, next)).toBe(false);
+  });
+
   it('detects missing clusterJob in next state', () => {
     const prev = makeRunState({
       clusterJobs: [{
