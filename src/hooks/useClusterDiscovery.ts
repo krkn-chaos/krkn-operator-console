@@ -111,6 +111,8 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
             clusterAPIURL: cluster['cluster-api-url'],
             ready: true,
             operatorSource: operatorName, // Source operator for grouping
+            online: cluster.online,
+            checkedAt: cluster['checked-at'],
             // Optional fields
             secretType: 'kubeconfig',
             createdAt: new Date().toISOString(),
