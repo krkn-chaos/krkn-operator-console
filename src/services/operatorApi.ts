@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { BaseApiClient, authenticatedFetch } from '../utils/apiClient';
+import { BaseApiClient, authenticatedFetch, createApiErrorFromResponse } from '../utils/apiClient';
 import type {
   CreateTargetResponse,
   ClustersResponse,
@@ -252,17 +252,7 @@ class OperatorApiClient extends BaseApiClient {
     });
 
     if (!response.ok) {
-      // Try to parse error message from response
-      try {
-        const error = await response.json();
-        throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
-      } catch (e) {
-        // If JSON parsing fails, throw error with status code
-        if (e instanceof Error && e.message.startsWith('HTTP')) {
-          throw e;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      throw await createApiErrorFromResponse(response);
     }
   }
 
@@ -278,17 +268,7 @@ class OperatorApiClient extends BaseApiClient {
     });
 
     if (!response.ok) {
-      // Try to parse error message from response
-      try {
-        const error = await response.json();
-        throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
-      } catch (e) {
-        // If JSON parsing fails, throw error with status code
-        if (e instanceof Error && e.message.startsWith('HTTP')) {
-          throw e;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      throw await createApiErrorFromResponse(response);
     }
   }
 
