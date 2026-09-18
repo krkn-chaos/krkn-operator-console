@@ -173,4 +173,26 @@ describe('TargetForm', () => {
       });
     });
   });
+
+  describe('credentials authentication', () => {
+    it('submits a password without displaying or requiring a username', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+
+      await user.type(screen.getByRole('textbox', { name: /cluster name/i }), 'my-cluster');
+      await user.click(screen.getByRole('radio', { name: /^credentials$/i }));
+      await user.type(screen.getByRole('textbox', { name: /cluster api url/i }), 'https://api.example.com:6443');
+      await user.type(container.querySelector('#password') as HTMLInputElement, 'secret');
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => expect(mockOnSubmit).toHaveBeenCalledTimes(1));
+      expect(container.querySelector('#username')).not.toBeInTheDocument();
+      expect(mockOnSubmit).toHaveBeenCalledWith({
+        clusterName: 'my-cluster',
+        secretType: 'credentials',
+        password: 'secret',
+        clusterAPIURL: 'https://api.example.com:6443',
+      });
+    });
+  });
 });

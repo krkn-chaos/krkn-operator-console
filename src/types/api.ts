@@ -655,7 +655,7 @@ export interface RegistryDetails {
   skipTls: boolean;
   insecure: boolean;
   groups: string[];
-  availableToAll: boolean;
+  availableToAll?: boolean;
   createdAt?: string;
   createdBy?: string;
   updatedAt?: string;
@@ -1358,13 +1358,13 @@ export interface ElasticsearchConfig {
   metricsIndex?: string;
   alertsIndex?: string;
   grafanaUrl?: string;
+  insecureSkipTlsVerify?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
   createdAt?: string;
   createdBy?: string;
   updatedAt?: string;
   updatedBy?: string;
-  // Whether TLS certificate verification is disabled for this config. Admin-only
-  // setting, surfaced so the edit form can show and re-submit the current value.
-  insecureSkipTlsVerify?: boolean;
 }
 
 export interface CreateElasticsearchConfigRequest {
@@ -1377,8 +1377,9 @@ export interface CreateElasticsearchConfigRequest {
   metricsIndex?: string;
   alertsIndex?: string;
   grafanaUrl?: string;
-  // Admin-only: disable TLS certificate verification for this config.
   insecureSkipTlsVerify?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
 }
 
 export interface UpdateElasticsearchConfigRequest {
@@ -1390,9 +1391,9 @@ export interface UpdateElasticsearchConfigRequest {
   metricsIndex?: string;
   alertsIndex?: string;
   grafanaUrl?: string;
-  // Admin-only: disable TLS certificate verification. Omitting the field leaves
-  // the stored setting unchanged; an explicit boolean sets or clears it.
   insecureSkipTlsVerify?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
 }
 
 export interface ListElasticsearchConfigsResponse {

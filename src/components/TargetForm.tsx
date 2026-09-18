@@ -55,7 +55,6 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
   const [caBundle, setCaBundle] = useState('');
   const [kubeconfig, setKubeconfig] = useState('');
   const [token, setToken] = useState('');
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -106,9 +105,6 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
         break;
 
       case 'credentials':
-        if (!username.trim()) {
-          newErrors.username = 'Username is required for credentials auth';
-        }
         if (!password.trim()) {
           newErrors.password = 'Password is required for credentials auth';
         }
@@ -131,11 +127,10 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
 
     setSubmitting(true);
 
-    try {
-      const data: CreateTargetRequest = {
+    const data: CreateTargetRequest = {
         clusterName: clusterName.trim(),
         secretType,
-      };
+    };
 
       switch (secretType) {
         case 'kubeconfig': {
@@ -164,7 +159,6 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
           break;
 
         case 'credentials':
-          data.username = username.trim();
           data.password = password.trim();
           data.clusterAPIURL = clusterAPIURL.trim();
           if (caBundle.trim()) {
@@ -178,207 +172,192 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
           break;
       }
 
-      await onSubmit(data);
-    } catch (error) {
-      setApiError(error instanceof Error ? error.message : 'An unexpected error occurred');
-    } finally {
-      setSubmitting(false);
-    }
+      try {
+        await onSubmit(data);
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      } finally {
+        setSubmitting(false);
+      }
+
   };
 
-  return (
-    <Form>
-      {apiError && (
-        <Alert variant="danger" isInline title={apiError} style={{ marginBottom: '1rem' }} />
+return (
+  <Form>
+    {apiError && (
+      <Alert variant="danger" isInline title={apiError} style={{ marginBottom: '1rem' }} />
+    )}
+    <FormGroup label="Cluster Name" isRequired fieldId="cluster-name">
+      <TextInput
+        id="cluster-name"
+        value={clusterName}
+        onChange={(_event, value) => setClusterName(value)}
+        isRequired
+        validated={errors.clusterName ? 'error' : 'default'}
+      />
+      {errors.clusterName && (
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem variant="error">{errors.clusterName}</HelperTextItem>
+          </HelperText>
+        </FormHelperText>
       )}
-      <FormGroup label="Cluster Name" isRequired fieldId="cluster-name">
-        <TextInput
-          id="cluster-name"
-          value={clusterName}
-          onChange={(_event, value) => setClusterName(value)}
-          isRequired
-          validated={errors.clusterName ? 'error' : 'default'}
+    </FormGroup>
+
+    <FormGroup label="Authentication Type" isRequired fieldId="secret-type">
+      <Radio
+        id="type-kubeconfig"
+        name="secret-type"
+        label="Kubeconfig"
+        isChecked={secretType === 'kubeconfig'}
+        onChange={() => setSecretType('kubeconfig')}
+      />
+      <Radio
+        id="type-token"
+        name="secret-type"
+        label="Service Account Token"
+        isChecked={secretType === 'token'}
+        onChange={() => setSecretType('token')}
+      />
+      <Radio
+        id="type-credentials"
+        name="secret-type"
+        label="Credentials"
+        isChecked={secretType === 'credentials'}
+        onChange={() => setSecretType('credentials')}
+      />
+    </FormGroup>
+
+    {secretType === 'kubeconfig' && (
+      <FormGroup label="Kubeconfig" isRequired fieldId="kubeconfig">
+        <input
+          ref={kubeconfigFileInputRef}
+          id="kubeconfig-file"
+          type="file"
+          aria-label="Select kubeconfig file"
+          hidden
+          onChange={handleKubeconfigFileChange}
         />
-        {errors.clusterName && (
+        <Button
+          variant="secondary"
+          onClick={() => kubeconfigFileInputRef.current?.click()}
+          style={{ marginBottom: '0.75rem' }}
+        >
+          Select kubeconfig file
+        </Button>
+        <TextArea
+          id="kubeconfig"
+          value={kubeconfig}
+          onChange={(_event, value) => setKubeconfig(value)}
+          rows={10}
+          isRequired
+          validated={errors.kubeconfig ? 'error' : 'default'}
+        />
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem>
+              Select a kubeconfig file or paste its content here. It will be automatically base64-encoded.
+            </HelperTextItem>
+          </HelperText>
+        </FormHelperText>
+        {errors.kubeconfig && (
           <FormHelperText>
             <HelperText>
-              <HelperTextItem variant="error">{errors.clusterName}</HelperTextItem>
+              <HelperTextItem variant="error">{errors.kubeconfig}</HelperTextItem>
             </HelperText>
           </FormHelperText>
         )}
       </FormGroup>
+    )}
 
-      <FormGroup label="Authentication Type" isRequired fieldId="secret-type">
-        <Radio
-          id="type-kubeconfig"
-          name="secret-type"
-          label="Kubeconfig"
-          isChecked={secretType === 'kubeconfig'}
-          onChange={() => setSecretType('kubeconfig')}
-        />
-        <Radio
-          id="type-token"
-          name="secret-type"
-          label="Service Account Token"
-          isChecked={secretType === 'token'}
-          onChange={() => setSecretType('token')}
-        />
-        <Radio
-          id="type-credentials"
-          name="secret-type"
-          label="Username/Password"
-          isChecked={secretType === 'credentials'}
-          onChange={() => setSecretType('credentials')}
-        />
-      </FormGroup>
-
-      {secretType === 'kubeconfig' && (
-        <FormGroup label="Kubeconfig" isRequired fieldId="kubeconfig">
-          <input
-            ref={kubeconfigFileInputRef}
-            id="kubeconfig-file"
-            type="file"
-            aria-label="Select kubeconfig file"
-            hidden
-            onChange={handleKubeconfigFileChange}
-          />
-          <Button
-            variant="secondary"
-            onClick={() => kubeconfigFileInputRef.current?.click()}
-            style={{ marginBottom: '0.75rem' }}
-          >
-            Select kubeconfig file
-          </Button>
-          <TextArea
-            id="kubeconfig"
-            value={kubeconfig}
-            onChange={(_event, value) => setKubeconfig(value)}
-            rows={10}
+    {(secretType === 'token' || secretType === 'credentials') && (
+      <>
+        <FormGroup label="Cluster API URL" isRequired fieldId="cluster-api-url">
+          <TextInput
+            id="cluster-api-url"
+            value={clusterAPIURL}
+            onChange={(_event, value) => setClusterAPIURL(value)}
+            placeholder="https://api.example.com:6443"
             isRequired
-            validated={errors.kubeconfig ? 'error' : 'default'}
+            validated={errors.clusterAPIURL ? 'error' : 'default'}
+          />
+          {errors.clusterAPIURL && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem variant="error">{errors.clusterAPIURL}</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </FormGroup>
+
+        <FormGroup label="CA Bundle (optional)" fieldId="ca-bundle">
+          <TextArea
+            id="ca-bundle"
+            value={caBundle}
+            onChange={(_event, value) => setCaBundle(value)}
+            rows={5}
           />
           <FormHelperText>
             <HelperText>
               <HelperTextItem>
-                Select a kubeconfig file or paste its content here. It will be automatically base64-encoded.
+                Optional CA certificate bundle for TLS verification. Will be base64-encoded automatically.
               </HelperTextItem>
             </HelperText>
           </FormHelperText>
-          {errors.kubeconfig && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{errors.kubeconfig}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )}
         </FormGroup>
-      )}
+      </>
+    )}
 
-      {(secretType === 'token' || secretType === 'credentials') && (
-        <>
-          <FormGroup label="Cluster API URL" isRequired fieldId="cluster-api-url">
-            <TextInput
-              id="cluster-api-url"
-              value={clusterAPIURL}
-              onChange={(_event, value) => setClusterAPIURL(value)}
-              placeholder="https://api.example.com:6443"
-              isRequired
-              validated={errors.clusterAPIURL ? 'error' : 'default'}
-            />
-            {errors.clusterAPIURL && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.clusterAPIURL}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
+    {secretType === 'token' && (
+      <FormGroup label="Service Account Token" isRequired fieldId="token">
+        <TextArea
+          id="token"
+          value={token}
+          onChange={(_event, value) => setToken(value)}
+          rows={3}
+          isRequired
+          validated={errors.token ? 'error' : 'default'}
+        />
+        {errors.token && (
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem variant="error">{errors.token}</HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+        )}
+      </FormGroup>
+    )}
 
-          <FormGroup label="CA Bundle (optional)" fieldId="ca-bundle">
-            <TextArea
-              id="ca-bundle"
-              value={caBundle}
-              onChange={(_event, value) => setCaBundle(value)}
-              rows={5}
-            />
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem>
-                  Optional CA certificate bundle for TLS verification. Will be base64-encoded automatically.
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          </FormGroup>
-        </>
-      )}
-
-      {secretType === 'token' && (
-        <FormGroup label="Service Account Token" isRequired fieldId="token">
-          <TextArea
-            id="token"
-            value={token}
-            onChange={(_event, value) => setToken(value)}
-            rows={3}
+    {secretType === 'credentials' && (
+      <>
+        <FormGroup label="Password" isRequired fieldId="password">
+          <TextInput
+            id="password"
+            type="password"
+            value={password}
+            onChange={(_event, value) => setPassword(value)}
             isRequired
-            validated={errors.token ? 'error' : 'default'}
+            validated={errors.password ? 'error' : 'default'}
           />
-          {errors.token && (
+          {errors.password && (
             <FormHelperText>
               <HelperText>
-                <HelperTextItem variant="error">{errors.token}</HelperTextItem>
+                <HelperTextItem variant="error">{errors.password}</HelperTextItem>
               </HelperText>
             </FormHelperText>
           )}
         </FormGroup>
-      )}
+      </>
+    )}
 
-      {secretType === 'credentials' && (
-        <>
-          <FormGroup label="Username" isRequired fieldId="username">
-            <TextInput
-              id="username"
-              value={username}
-              onChange={(_event, value) => setUsername(value)}
-              isRequired
-              validated={errors.username ? 'error' : 'default'}
-            />
-            {errors.username && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.username}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-
-          <FormGroup label="Password" isRequired fieldId="password">
-            <TextInput
-              id="password"
-              type="password"
-              value={password}
-              onChange={(_event, value) => setPassword(value)}
-              isRequired
-              validated={errors.password ? 'error' : 'default'}
-            />
-            {errors.password && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.password}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-        </>
-      )}
-
-      <ActionGroup>
-        <Button variant="primary" onClick={handleSubmit} isLoading={submitting} isDisabled={submitting}>
-          {initialData ? 'Update' : 'Create'}
-        </Button>
-        <Button variant="link" onClick={onCancel} isDisabled={submitting}>
-          Cancel
-        </Button>
-      </ActionGroup>
-    </Form>
-  );
+    <ActionGroup>
+      <Button variant="primary" onClick={handleSubmit} isLoading={submitting} isDisabled={submitting}>
+        {initialData ? 'Update' : 'Create'}
+      </Button>
+      <Button variant="link" onClick={onCancel} isDisabled={submitting}>
+        Cancel
+      </Button>
+    </ActionGroup>
+  </Form>
+);
 }
