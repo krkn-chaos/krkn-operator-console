@@ -451,6 +451,7 @@ export interface AppState {
   // Graph runs list (GraphRun orchestration)
   graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
+  studioReplayWorkflow?: StudioWorkflow | null;
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
@@ -515,6 +516,7 @@ export type AppAction =
   | { type: 'LOAD_GRAPH_RUNS_SUCCESS'; payload: { runs: GraphRunState[] } }
   | { type: 'TOGGLE_GRAPH_RUN_ACCORDION'; payload: { graphRunName: string } }
   | { type: 'DELETE_GRAPH_RUN'; payload: { graphRunName: string } }
+  | { type: 'OPEN_STUDIO_REPLAY'; payload: { workflow: StudioWorkflow } }
 
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }
@@ -722,6 +724,12 @@ export interface GraphScenarioNode {
   image?: string;
   /** Name of the scenario */
   name?: string;
+  /** Registry-aware scenario reference returned by the graph-run API */
+  scenario?: {
+    name: string;
+    private?: boolean;
+    registryName?: string;
+  };
   /** Environment variables for the scenario */
   env?: { [key: string]: string };
   /** Volume mounts for the scenario */

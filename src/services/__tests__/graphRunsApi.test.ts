@@ -529,12 +529,11 @@ describe('graphRunsApi', () => {
   describe('getGraphRunConfig', () => {
     it('should fetch config by graph run name', async () => {
       const mockConfig = {
+        graph: {
+          node1: { scenario: { name: 'pod-scenarios', private: false } },
+        },
         targetRequestId: 'target-001',
         targetClusters: { 'krkn-operator': ['staging'] },
-        scenarioImage: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
-        scenarioName: 'pod-scenarios',
-        kubeconfigPath: '/root/.kube/config',
-        environment: { NAMESPACE: 'default' },
       };
 
       mockFetchJson.mockResolvedValue(mockConfig);

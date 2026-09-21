@@ -57,7 +57,7 @@ import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
+import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem, StudioWorkflow } from '../types/api';
 
 export type UnifiedRunItem =
   | {
@@ -153,6 +153,7 @@ interface JobsListProps {
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
+  onReplayWorkflow?: (workflow: StudioWorkflow) => void;
   loadingRunDetails: Set<string>;
 }
 
@@ -167,6 +168,7 @@ export function JobsList({
   expandedGraphRunIds,
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
+  onReplayWorkflow,
   loadingRunDetails,
 }: JobsListProps) {
   const { isAdmin } = useRole();
@@ -770,7 +772,7 @@ export function JobsList({
                       isHidden={!isGraphExpanded}
                     >
                       {isGraphExpanded && (
-                        <GraphRunDetail graphRunName={item.graphRunName} />
+                        <GraphRunDetail graphRunName={item.graphRunName} onReplayWorkflow={onReplayWorkflow} />
                       )}
                     </DataListContent>
                   </DataListItem>
