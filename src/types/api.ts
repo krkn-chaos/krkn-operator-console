@@ -119,6 +119,7 @@ export interface ScenarioReference {
   name: string;
   private: boolean;
   registryName?: string;
+  signature_status?: SignatureStatus;
 }
 
 export interface RerunIntent {
@@ -489,6 +490,7 @@ export interface AppState {
   // Graph runs list (GraphRun orchestration)
   graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
+  studioReplayWorkflow?: StudioWorkflow | null;
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
@@ -553,6 +555,7 @@ export type AppAction =
   | { type: 'LOAD_GRAPH_RUNS_SUCCESS'; payload: { runs: GraphRunState[] } }
   | { type: 'TOGGLE_GRAPH_RUN_ACCORDION'; payload: { graphRunName: string } }
   | { type: 'DELETE_GRAPH_RUN'; payload: { graphRunName: string } }
+  | { type: 'OPEN_STUDIO_REPLAY'; payload: { workflow: StudioWorkflow } }
 
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }
@@ -1116,6 +1119,8 @@ export interface StudioWorkflow {
   edges: StudioEdge[];
   /** Next node number for auto-positioning */
   nextNodeNumber: number;
+  /** Resiliency scoring configuration restored when replaying a workflow. */
+  resiliencyScoreConfig?: ResiliencyScoreConfig;
 }
 
 /**

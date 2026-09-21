@@ -10,6 +10,18 @@ describe('runs WebSocket mock messages', () => {
       event: 'snapshot',
       data: { jobs: expect.any(Array) },
     });
+
+    const jobsMessage = message as { data: { jobs: Array<{ type: string; graphRun?: unknown }> } };
+    const graphRun = jobsMessage.data.jobs.find((job) => job.type === 'graphRun');
+    expect(graphRun?.graphRun).toMatchObject({
+      name: 'chaos-workflow-daily',
+      resiliencyScoreEnabled: true,
+      resiliencyScoreBaseline: 80,
+      resiliencyScores: [
+        { clusterName: 'staging-us-east-1', calculated: 87.5 },
+        { clusterName: 'staging-eu-west-1', calculated: 82 },
+      ],
+    });
   });
 
   it.each([

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GraphRunDetail as GraphRunDetailType, NodeStatus } from '../../types/api';
 
@@ -67,9 +67,17 @@ vi.mock('dagre', () => ({
 }));
 
 const mockGetGraphRun = vi.fn();
+const mockGetGraphRunConfig = vi.fn();
+const mockCreateGraphRun = vi.fn();
+const mockGetScenarios = vi.fn();
 vi.mock('../../services', () => ({
   graphRunsApi: {
     getGraphRun: (...args: unknown[]) => mockGetGraphRun(...args),
+    getGraphRunConfig: (...args: unknown[]) => mockGetGraphRunConfig(...args),
+    createGraphRun: (...args: unknown[]) => mockCreateGraphRun(...args),
+  },
+  operatorApi: {
+    getScenarios: (...args: unknown[]) => mockGetScenarios(...args),
   },
 }));
 
@@ -120,6 +128,10 @@ const makeMockDetail = (overrides?: Partial<GraphRunDetailType>): GraphRunDetail
 describe('GraphRunDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetScenarios.mockResolvedValue({ scenarios: [
+      { name: 'pod-kill', signature_status: 'signed' },
+      { name: 'net-chaos', signature_status: 'signed' },
+    ] });
   });
 
   describe('Loading State', () => {
@@ -158,6 +170,106 @@ describe('GraphRunDetail', () => {
         expect(screen.getByText(/Running: 0/)).toBeInTheDocument();
         expect(screen.getByText(/Failed: 0/)).toBeInTheDocument();
         expect(screen.getByText(/Pending: 0/)).toBeInTheDocument();
+      });
+    });
+
+    it('should replay a terminal workflow from its saved configuration', async () => {
+      const replayConfig = {
+        graph: makeMockDetail().spec.graph,
+        targetRequestId: 'target-001',
+        targetClusters: { 'krkn-operator': ['cluster1'] },
+      };
+      mockGetGraphRun.mockResolvedValue(makeMockDetail());
+      mockGetGraphRunConfig.mockResolvedValue(replayConfig);
+      mockCreateGraphRun.mockResolvedValue({ name: 'replayed-graph-run' });
+
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+      const replayButton = await screen.findByRole('button', { name: 'Re-run workflow' });
+      fireEvent.click(replayButton);
+
+      await waitFor(() => {
+        expect(mockGetGraphRunConfig).toHaveBeenCalledWith('test-graph-run');
+        expect(mockCreateGraphRun).toHaveBeenCalledWith(replayConfig, {
+          'X-Resiliency-Score': 'true',
+          'X-Resiliency-Baseline': '80',
+        });
+        expect(screen.getByText('GraphRun replayed-graph-run created successfully')).toBeInTheDocument();
+      });
+    });
+
+    it('should open the saved workflow in Studio instead of submitting when requested', async () => {
+      const replayConfig = {
+        graph: {
+          'node-a': {
+            scenario: { name: 'pod-kill', private: true, registryName: 'private-registry' },
+            image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
+            cloudCredentialRef: 'aws-credential',
+          },
+          'node-b': {
+            scenario: { name: 'net-chaos', private: false },
+            image: 'quay.io/krkn-chaos/krkn-hub:network-chaos',
+            depends_on: 'node-a',
+          },
+        },
+        targetRequestId: 'target-001',
+        targetClusters: { 'krkn-operator': ['cluster1'] },
+      };
+      const onReplayWorkflow = vi.fn();
+      mockGetGraphRun.mockResolvedValue(makeMockDetail());
+      mockGetGraphRunConfig.mockResolvedValue(replayConfig);
+
+      render(<GraphRunDetail graphRunName="test-graph-run" onReplayWorkflow={onReplayWorkflow} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Re-run workflow' }));
+
+      await waitFor(() => expect(onReplayWorkflow).toHaveBeenCalledTimes(1));
+      expect(mockCreateGraphRun).not.toHaveBeenCalled();
+      expect(onReplayWorkflow.mock.calls[0][0].nodes).toHaveLength(2);
+      expect(onReplayWorkflow.mock.calls[0][0].edges).toEqual([
+        { id: 'node-a-node-b', source: 'node-a', target: 'node-b' },
+      ]);
+      expect(onReplayWorkflow.mock.calls[0][0].nodes[0].config).toMatchObject({
+        registryType: 'private',
+        registryConfig: { registryName: 'private-registry' },
+        cloudCredentialRef: 'aws-credential',
+        signature_status: 'signed',
+      });
+      expect(onReplayWorkflow.mock.calls[0][0].resiliencyScoreConfig).toEqual({
+        baseline: 80,
+        mountPath: '/etc/krkn/metrics.yaml',
+      });
+      expect(onReplayWorkflow.mock.calls[0][0].nextNodeNumber).toBe(1);
+    });
+
+    it('should show the config error and reset replay state when loading fails', async () => {
+      mockGetGraphRun.mockResolvedValue(makeMockDetail());
+      mockGetGraphRunConfig.mockRejectedValue(new Error('Config unavailable'));
+
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Re-run workflow' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Config unavailable')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Re-run workflow' })).not.toBeDisabled();
+      });
+      expect(mockCreateGraphRun).not.toHaveBeenCalled();
+    });
+
+    it('should show the create error and reset replay state for non-Error failures', async () => {
+      const replayConfig = {
+        graph: makeMockDetail().spec.graph,
+        targetRequestId: 'target-001',
+        targetClusters: { 'krkn-operator': ['cluster1'] },
+      };
+      mockGetGraphRun.mockResolvedValue(makeMockDetail());
+      mockGetGraphRunConfig.mockResolvedValue(replayConfig);
+      mockCreateGraphRun.mockRejectedValue('Create failed');
+
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Re-run workflow' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Unable to replay workflow')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Re-run workflow' })).not.toBeDisabled();
       });
     });
 

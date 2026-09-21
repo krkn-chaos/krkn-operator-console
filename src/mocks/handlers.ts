@@ -130,8 +130,9 @@ const mockGraphRuns = [
     phase: 'Running',
     ownerUserId: 'admin@preview.local',
     targetRequestId: 'target-002',
-    summary: { totalNodes: 3, completedNodes: 1, runningNodes: 1, failedNodes: 0, pendingNodes: 1 },
+    summary: { totalNodes: 3, completedNodes: 3, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
     startTime: '2026-07-02T10:05:00Z',
+    completionTime: '2026-07-02T10:25:00Z',
     resiliencyScoreEnabled: true,
     resiliencyScoreBaseline: 90.0,
     resiliencyScores: [
@@ -197,7 +198,7 @@ const mockGraphRunDetails: Record<string, object> = {
         'time-skew': { name: 'time-skew', image: 'quay.io/krkn-chaos/krkn-hub:time-skew', depends_on: 'net-chaos' },
       },
       targetRequestId: 'target-001',
-      targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
+      targetClusters: { 'krkn-operator': ['staging-us-east-1', 'staging-eu-west-1'] },
       ownerUserId: 'admin@preview.local',
       resiliencyScoreEnabled: true,
       resiliencyMountPath: '/etc/krkn/metrics.yaml',
@@ -451,6 +452,7 @@ function updateMockCategoryAssociation(
 const mockWorkflows = [
   { workflowId: 'wf-001', workflowName: 'chaos-daily-suite', description: 'Daily chaos workflow for staging', nodeCount: 4 },
   { workflowId: 'wf-002', workflowName: 'resilience-quick-check', description: 'Quick resilience validation', nodeCount: 2 },
+  { workflowId: 'wf-dummy', workflowName: 'dummy-scenario-pair', description: 'Two-node preview workflow using dummy-scenario', nodeCount: 2 },
 ];
 
 const mockWorkflowDetail = {
@@ -472,6 +474,50 @@ const mockWorkflowDetail = {
   },
   createdAt: '2026-07-01T00:00:00Z',
   updatedAt: '2026-07-02T08:00:00Z',
+  createdBy: 'admin@preview.local',
+};
+
+const mockDummyWorkflowDetail = {
+  workflowId: 'wf-dummy',
+  workflowName: 'dummy-scenario-pair',
+  description: 'Two-node preview workflow using dummy-scenario',
+  availableToAll: true,
+  graph: {
+    'dummy-node-1': { name: 'dummy-scenario', image: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario', env: {} },
+    'dummy-node-2': { name: 'dummy-scenario', image: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario', env: {}, depends_on: 'dummy-node-1' },
+  },
+  studioLayout: {
+    edges: [{ id: 'dummy-node-1-dummy-node-2', source: 'dummy-node-1', target: 'dummy-node-2' }],
+    nextNodeNumber: 3,
+    nodes: [
+      {
+        nodeId: 'dummy-node-1',
+        position: { x: 100, y: 200 },
+        status: 'configured',
+        config: {
+          registryType: 'public',
+          registryConfig: {},
+          scenarioName: 'dummy-scenario',
+          scenarioImage: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario',
+          scenarioFormValues: {},
+        },
+      },
+      {
+        nodeId: 'dummy-node-2',
+        position: { x: 400, y: 200 },
+        status: 'configured',
+        config: {
+          registryType: 'public',
+          registryConfig: {},
+          scenarioName: 'dummy-scenario',
+          scenarioImage: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario',
+          scenarioFormValues: {},
+        },
+      },
+    ],
+  },
+  createdAt: '2026-07-02T00:00:00Z',
+  updatedAt: '2026-07-02T00:00:00Z',
   createdBy: 'admin@preview.local',
 };
 
@@ -888,6 +934,7 @@ export const handlers = [
   ),
   http.get(`${BASE}/workflows/:workflowId`, ({ params }) => {
     if (params.workflowId === 'wf-001') return HttpResponse.json(mockWorkflowDetail);
+    if (params.workflowId === 'wf-dummy') return HttpResponse.json(mockDummyWorkflowDetail);
     return HttpResponse.json({ ...mockWorkflowDetail, workflowId: params.workflowId, workflowName: 'loaded-workflow' });
   }),
   http.post(`${BASE}/workflows`, () =>

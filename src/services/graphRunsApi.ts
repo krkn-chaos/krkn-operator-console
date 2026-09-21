@@ -13,7 +13,6 @@ import type {
   CreateGraphRunRequest,
   ListGraphRunsFilters,
   GraphScenarioNode,
-  JobConfigResponse,
 } from '../types/api';
 
 class GraphRunsApiClient extends BaseApiClient {
@@ -173,8 +172,8 @@ class GraphRunsApiClient extends BaseApiClient {
    * @param graphRunName - Graph run name
    * @returns Promise with the graph run's environment configuration
    */
-  async getGraphRunConfig(graphRunName: string): Promise<JobConfigResponse> {
-    return this.fetchJson<JobConfigResponse>(`/graphruns/${encodeURIComponent(graphRunName)}/config`);
+  async getGraphRunConfig(graphRunName: string): Promise<CreateGraphRunRequest> {
+    return this.fetchJson<CreateGraphRunRequest>(`/graphruns/${encodeURIComponent(graphRunName)}/config`);
   }
 
   /**

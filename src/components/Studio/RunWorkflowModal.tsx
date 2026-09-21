@@ -71,6 +71,13 @@ export function RunWorkflowModal({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen && workflow.resiliencyScoreConfig) {
+      setEnableResiliencyScore(true);
+      setResiliencyConfig(workflow.resiliencyScoreConfig);
+    }
+  }, [isOpen, workflow.resiliencyScoreConfig]);
+
   const handleCancel = () => {
     // Delete target request if exists
     if (targetFetchState.uuid) {

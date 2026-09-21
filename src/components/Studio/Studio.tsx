@@ -332,14 +332,21 @@ function StudioContent() {
   );
 }
 
-export function Studio() {
-  const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(undefined);
+export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: StudioWorkflow }) {
+  const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(replayWorkflow);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; timestamp: number } | null>(null);
   const [isReady, setIsReady] = useState(false); // Wait for user decision
 
   // Check for autosave on mount
   useEffect(() => {
+    if (replayWorkflow) {
+      clearAutosave();
+      setInitialWorkflow(replayWorkflow);
+      setIsReady(true);
+      return;
+    }
+
     const autosave = loadAutosave();
     if (autosave) {
       setAutosaveData({
@@ -352,7 +359,7 @@ export function Studio() {
       // No autosave, ready to start fresh
       setIsReady(true);
     }
-  }, []);
+  }, [replayWorkflow]);
 
   // Handle recovery modal actions
   const handleResumeAutosave = () => {
