@@ -55,6 +55,20 @@ describe('ElasticsearchDataView', () => {
     });
   });
 
+  it('does not render configs excluded by the access-controlled API response', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([
+      mockConfigs[0],
+    ]);
+
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => {
+      expect(screen.getByText('prod-es')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('restricted-es')).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'restricted-es' })).not.toBeInTheDocument();
+  });
+
   it('runs a query and renders telemetry rows in the table', async () => {
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
     vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(mockQueryResult);

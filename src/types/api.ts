@@ -593,6 +593,8 @@ export interface ClusterPermissions {
 
 export interface GroupDetails {
   name: string;
+  /** Canonical Kubernetes-safe group identifier used in access assignments. */
+  id?: string;
   description?: string;
   clusterPermissions: ClusterPermissions;
   memberCount?: number;
@@ -655,7 +657,7 @@ export interface RegistryDetails {
   skipTls: boolean;
   insecure: boolean;
   groups: string[];
-  availableToAll: boolean;
+  availableToAll?: boolean;
   createdAt?: string;
   createdBy?: string;
   updatedAt?: string;
@@ -1357,14 +1359,13 @@ export interface ElasticsearchConfig {
   telemetryIndex?: string;
   metricsIndex?: string;
   alertsIndex?: string;
-  grafanaUrl?: string;
+  insecureSkipTlsVerify?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
   createdAt?: string;
   createdBy?: string;
   updatedAt?: string;
   updatedBy?: string;
-  // Whether TLS certificate verification is disabled for this config. Admin-only
-  // setting, surfaced so the edit form can show and re-submit the current value.
-  insecureSkipTlsVerify?: boolean;
 }
 
 export interface CreateElasticsearchConfigRequest {
@@ -1376,9 +1377,9 @@ export interface CreateElasticsearchConfigRequest {
   telemetryIndex?: string;
   metricsIndex?: string;
   alertsIndex?: string;
-  grafanaUrl?: string;
-  // Admin-only: disable TLS certificate verification for this config.
   insecureSkipTlsVerify?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
 }
 
 export interface UpdateElasticsearchConfigRequest {
@@ -1389,10 +1390,9 @@ export interface UpdateElasticsearchConfigRequest {
   telemetryIndex?: string;
   metricsIndex?: string;
   alertsIndex?: string;
-  grafanaUrl?: string;
-  // Admin-only: disable TLS certificate verification. Omitting the field leaves
-  // the stored setting unchanged; an explicit boolean sets or clears it.
   insecureSkipTlsVerify?: boolean;
+  groups?: string[];
+  availableToAll?: boolean;
 }
 
 export interface ListElasticsearchConfigsResponse {
