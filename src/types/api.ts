@@ -745,6 +745,8 @@ export interface GraphScenarioNode {
   depends_on?: string;
   /** Saved cloud credential to inject for this node (overrides graph-level default) */
   cloudCredentialRef?: string;
+  /** Positive multiplier for this scenario's resiliency score contribution */
+  resiliencyWeight?: number;
 }
 
 /**
@@ -1053,6 +1055,8 @@ export interface StudioNode {
     files?: string[];
     /** Saved cloud credential injected server-side for this node */
     cloudCredentialRef?: string;
+    /** Positive multiplier for this scenario's resiliency score contribution */
+    resiliencyWeight?: number;
   };
   /** Node position on canvas */
   position: { x: number; y: number };

@@ -816,70 +816,70 @@ describe('StudioContext', () => {
       expectedValid: boolean;
       expectedErrorSubstring?: string;
     }> = [
-      {
-        name: 'rejects when source node does not exist',
-        nodes: [makeConfiguredNode('only-target')],
-        edges: [],
-        source: 'ghost',
-        target: 'only-target',
-        expectedValid: false,
-        expectedErrorSubstring: 'not found',
-      },
-      {
-        name: 'rejects when source is unconfigured',
-        nodes: [
-          { nodeId: 'unconf', status: 'unconfigured', position: { x: 0, y: 0 } },
-          makeConfiguredNode('conf-tgt'),
-        ],
-        edges: [],
-        source: 'unconf',
-        target: 'conf-tgt',
-        expectedValid: false,
-        expectedErrorSubstring: 'Source node must be configured',
-      },
-      {
-        name: 'rejects when target is unconfigured',
-        nodes: [
-          makeConfiguredNode('conf-src'),
-          { nodeId: 'unconf-tgt', status: 'unconfigured', position: { x: 0, y: 0 } },
-        ],
-        edges: [],
-        source: 'conf-src',
-        target: 'unconf-tgt',
-        expectedValid: false,
-        expectedErrorSubstring: 'Target node must be configured',
-      },
-      {
-        name: 'rejects when target already has a dependency',
-        nodes: [
-          makeConfiguredNode('dep-src-1'),
-          makeConfiguredNode('dep-src-2'),
-          makeConfiguredNode('dep-tgt'),
-        ],
-        edges: [{ id: 'dep-src-1-dep-tgt', source: 'dep-src-1', target: 'dep-tgt' }],
-        source: 'dep-src-2',
-        target: 'dep-tgt',
-        expectedValid: false,
-        expectedErrorSubstring: 'one dependency',
-      },
-      {
-        name: 'rejects cycles (A->B->A)',
-        nodes: [makeConfiguredNode('cyc-a'), makeConfiguredNode('cyc-b')],
-        edges: [{ id: 'cyc-a-cyc-b', source: 'cyc-a', target: 'cyc-b' }],
-        source: 'cyc-b',
-        target: 'cyc-a',
-        expectedValid: false,
-        expectedErrorSubstring: 'Circular dependency',
-      },
-      {
-        name: 'allows a valid connection',
-        nodes: [makeConfiguredNode('ok-src'), makeConfiguredNode('ok-tgt')],
-        edges: [],
-        source: 'ok-src',
-        target: 'ok-tgt',
-        expectedValid: true,
-      },
-    ];
+        {
+          name: 'rejects when source node does not exist',
+          nodes: [makeConfiguredNode('only-target')],
+          edges: [],
+          source: 'ghost',
+          target: 'only-target',
+          expectedValid: false,
+          expectedErrorSubstring: 'not found',
+        },
+        {
+          name: 'rejects when source is unconfigured',
+          nodes: [
+            { nodeId: 'unconf', status: 'unconfigured', position: { x: 0, y: 0 } },
+            makeConfiguredNode('conf-tgt'),
+          ],
+          edges: [],
+          source: 'unconf',
+          target: 'conf-tgt',
+          expectedValid: false,
+          expectedErrorSubstring: 'Source node must be configured',
+        },
+        {
+          name: 'rejects when target is unconfigured',
+          nodes: [
+            makeConfiguredNode('conf-src'),
+            { nodeId: 'unconf-tgt', status: 'unconfigured', position: { x: 0, y: 0 } },
+          ],
+          edges: [],
+          source: 'conf-src',
+          target: 'unconf-tgt',
+          expectedValid: false,
+          expectedErrorSubstring: 'Target node must be configured',
+        },
+        {
+          name: 'rejects when target already has a dependency',
+          nodes: [
+            makeConfiguredNode('dep-src-1'),
+            makeConfiguredNode('dep-src-2'),
+            makeConfiguredNode('dep-tgt'),
+          ],
+          edges: [{ id: 'dep-src-1-dep-tgt', source: 'dep-src-1', target: 'dep-tgt' }],
+          source: 'dep-src-2',
+          target: 'dep-tgt',
+          expectedValid: false,
+          expectedErrorSubstring: 'one dependency',
+        },
+        {
+          name: 'rejects cycles (A->B->A)',
+          nodes: [makeConfiguredNode('cyc-a'), makeConfiguredNode('cyc-b')],
+          edges: [{ id: 'cyc-a-cyc-b', source: 'cyc-a', target: 'cyc-b' }],
+          source: 'cyc-b',
+          target: 'cyc-a',
+          expectedValid: false,
+          expectedErrorSubstring: 'Circular dependency',
+        },
+        {
+          name: 'allows a valid connection',
+          nodes: [makeConfiguredNode('ok-src'), makeConfiguredNode('ok-tgt')],
+          edges: [],
+          source: 'ok-src',
+          target: 'ok-tgt',
+          expectedValid: true,
+        },
+      ];
 
     cases.forEach(({ name, nodes, edges, source, target, expectedValid, expectedErrorSubstring }) => {
       it(name, () => {
@@ -913,50 +913,50 @@ describe('StudioContext', () => {
       expectedValid: boolean;
       expectedErrorSubstring?: string;
     }> = [
-      {
-        name: 'rejects IDs shorter than 5 characters',
-        nodeId: 'abc',
-        expectedValid: false,
-        expectedErrorSubstring: '5-25 characters',
-      },
-      {
-        name: 'rejects IDs longer than 25 characters',
-        nodeId: 'abcdefghijklmnopqrstuvwxyz',
-        expectedValid: false,
-        expectedErrorSubstring: '5-25 characters',
-      },
-      {
-        name: 'rejects IDs with uppercase letters',
-        nodeId: 'Node-One',
-        expectedValid: false,
-        expectedErrorSubstring: 'lowercase',
-      },
-      {
-        name: 'rejects IDs with special characters',
-        nodeId: 'node_one',
-        expectedValid: false,
-        expectedErrorSubstring: 'lowercase',
-      },
-      {
-        name: 'accepts a valid lowercase-hyphen ID',
-        nodeId: 'my-node',
-        expectedValid: true,
-      },
-      {
-        name: 'rejects duplicate nodeId',
-        nodeId: 'existing',
-        existingNodes: [makeConfiguredNode('existing')],
-        expectedValid: false,
-        expectedErrorSubstring: 'already exists',
-      },
-      {
-        name: 'allows duplicate when excluded (renaming self)',
-        nodeId: 'existing',
-        excludeId: 'existing',
-        existingNodes: [makeConfiguredNode('existing')],
-        expectedValid: true,
-      },
-    ];
+        {
+          name: 'rejects IDs shorter than 5 characters',
+          nodeId: 'abc',
+          expectedValid: false,
+          expectedErrorSubstring: '5-25 characters',
+        },
+        {
+          name: 'rejects IDs longer than 25 characters',
+          nodeId: 'abcdefghijklmnopqrstuvwxyz',
+          expectedValid: false,
+          expectedErrorSubstring: '5-25 characters',
+        },
+        {
+          name: 'rejects IDs with uppercase letters',
+          nodeId: 'Node-One',
+          expectedValid: false,
+          expectedErrorSubstring: 'lowercase',
+        },
+        {
+          name: 'rejects IDs with special characters',
+          nodeId: 'node_one',
+          expectedValid: false,
+          expectedErrorSubstring: 'lowercase',
+        },
+        {
+          name: 'accepts a valid lowercase-hyphen ID',
+          nodeId: 'my-node',
+          expectedValid: true,
+        },
+        {
+          name: 'rejects duplicate nodeId',
+          nodeId: 'existing',
+          existingNodes: [makeConfiguredNode('existing')],
+          expectedValid: false,
+          expectedErrorSubstring: 'already exists',
+        },
+        {
+          name: 'allows duplicate when excluded (renaming self)',
+          nodeId: 'existing',
+          excludeId: 'existing',
+          existingNodes: [makeConfiguredNode('existing')],
+          expectedValid: true,
+        },
+      ];
 
     validationCases.forEach(({ name, nodeId, excludeId, existingNodes, expectedValid, expectedErrorSubstring }) => {
       it(name, () => {
@@ -1044,7 +1044,7 @@ describe('StudioContext', () => {
   // =========================================================================
   describe('useStudioContext outside provider', () => {
     it('throws when used without StudioProvider', () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
       const { result } = renderHook(() => {
         try {
@@ -1174,8 +1174,22 @@ describe('StudioContext', () => {
       const graph = buildGraph(wf);
       expect(graph['cloud-node'].cloudCredentialRef).toBe('aws-dummy');
       expect(graph['cloud-node'].env).toEqual({ ACTION: 'node_stop_start_scenario' });
-      expect(graph['cloud-node'].env?.AWS_ACCESS_KEY_ID).toBeUndefined();
-      expect(graph['cloud-node'].env?.CLOUD_TYPE).toBeUndefined();
+       expect(graph['cloud-node'].env?.AWS_ACCESS_KEY_ID).toBeUndefined();
+       expect(graph['cloud-node'].env?.CLOUD_TYPE).toBeUndefined();
+    });
+
+    it('exports the node resiliency weight and defaults legacy nodes to one', () => {
+      const weightedNode = makeConfiguredNode('weighted-node');
+      weightedNode.config!.resiliencyWeight = 2.5;
+
+      const graph = buildGraph({
+        nodes: [weightedNode, makeConfiguredNode('legacy-node')],
+        edges: [],
+        nextNodeNumber: 3,
+      });
+
+      expect(graph['weighted-node'].resiliencyWeight).toBe(2.5);
+      expect(graph['legacy-node'].resiliencyWeight).toBe(1);
     });
   });
 });

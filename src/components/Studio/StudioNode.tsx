@@ -129,6 +129,12 @@ export function StudioNode({ data }: NodeProps) {
             {node.nodeId}
           </div>
 
+          {isConfigured && node.config && (
+            <div style={{ fontSize: '11px', color: 'var(--pf-v5-global--Color--200)' }}>
+              Weight: {node.config.resiliencyWeight ?? 1}
+            </div>
+          )}
+
           {/* Hint */}
           <div
             style={{

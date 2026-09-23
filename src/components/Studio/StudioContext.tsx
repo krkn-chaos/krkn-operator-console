@@ -64,6 +64,7 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
         volumes: node.config.volumes,
         depends_on: incomingEdge?.source,
         cloudCredentialRef: node.config.cloudCredentialRef,
+        resiliencyWeight: node.config.resiliencyWeight ?? 1,
       };
     }
   });
