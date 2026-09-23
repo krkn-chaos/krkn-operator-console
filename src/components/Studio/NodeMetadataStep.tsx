@@ -29,6 +29,8 @@ interface NodeMetadataStepProps {
   volumes?: { [fileId: string]: string }; // fileId -> mountPath mapping
   onVolumesChange?: (volumes: { [fileId: string]: string }) => void;
   onPendingChange?: (hasPending: boolean) => void;
+  resiliencyWeight: number;
+  onResiliencyWeightChange: (weight: number) => void;
 }
 
 export function NodeMetadataStep({
@@ -38,6 +40,8 @@ export function NodeMetadataStep({
   volumes = {},
   onVolumesChange,
   onPendingChange,
+  resiliencyWeight,
+  onResiliencyWeightChange,
 }: NodeMetadataStepProps) {
   const validated = nodeIdError ? 'error' : nodeId ? 'success' : 'default';
 
@@ -91,6 +95,23 @@ export function NodeMetadataStep({
             </HelperText>
           </FormHelperText>
         )}
+      </FormGroup>
+
+      <FormGroup label="Resiliency Weight" isRequired>
+        <TextInput
+          type="number"
+          min={0.000001}
+          step={0.1}
+          value={Number.isNaN(resiliencyWeight) ? '' : resiliencyWeight}
+          onChange={(_event, value) => onResiliencyWeightChange(Number(value))}
+          validated={Number.isFinite(resiliencyWeight) && resiliencyWeight > 0 ? 'success' : 'error'}
+          aria-label="Resiliency weight"
+        />
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem>Positive multiplier used when calculating the graph resiliency score.</HelperTextItem>
+          </HelperText>
+        </FormHelperText>
       </FormGroup>
 
       <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>

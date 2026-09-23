@@ -55,10 +55,10 @@ export function RunWorkflowModal({
   const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
   const [showResiliencyModal, setShowResiliencyModal] = useState(false);
   const [resiliencyConfig, setResiliencyConfig] = useState<ResiliencyScoreConfig | null>(null);
+  const [maxRetries, setMaxRetries] = useState(3);
   const unsignedNodes = workflow.nodes.filter(
     (node) => node.status === 'configured' && node.config && node.config.signature_status !== 'signed',
   );
-  const [maxRetries, setMaxRetries] = useState(3);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -114,7 +114,6 @@ export function RunWorkflowModal({
       showError('No clusters selected', 'Please select at least one cluster');
       return;
     }
-
     if (!Number.isInteger(maxRetries) || maxRetries < 0) {
       showError('Invalid retry count', 'Maximum retries must be a non-negative whole number');
       return;
@@ -366,6 +365,7 @@ export function RunWorkflowModal({
             )}
           </div>
 
+          {/* Custom actions aligned left */}
           <div style={{ marginTop: '1.5rem' }}>
             <FormGroup label="Maximum retries" fieldId="workflow-max-retries" isRequired>
               <TextInput
@@ -385,7 +385,6 @@ export function RunWorkflowModal({
             </FormGroup>
           </div>
 
-          {/* Custom actions aligned left */}
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
             <Button
               variant="primary"

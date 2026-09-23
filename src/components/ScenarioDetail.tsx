@@ -85,6 +85,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
   const [customRunName, setCustomRunName] = useState('');
   const [digestCopyStatus, setDigestCopyStatus] = useState<'success' | 'error' | null>(null);
+  const [maxRetries, setMaxRetries] = useState(3);
   const [rerunSignatureStatus, setRerunSignatureStatus] = useState<SignatureStatus | null>(null);
   const [rerunSignatureLoading, setRerunSignatureLoading] = useState(false);
   const [rerunSignatureError, setRerunSignatureError] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     if (!rerunScenario) {
       setRerunSignatureStatus(null);
       setRerunSignatureError(null);
+      setRerunSignatureLoading(false);
       return;
     }
 
@@ -100,6 +102,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     if (state.scenarios !== null) {
       setRerunSignatureStatus(loadedScenario?.signature_status ?? 'unknown');
       setRerunSignatureError(null);
+      setRerunSignatureLoading(false);
       return;
     }
 
@@ -108,13 +111,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     setRerunSignatureError(null);
     operatorApi.getScenarios(registryConfig || {})
       .then((response) => {
-        if (!mounted) return;
-        const scenario = response.scenarios.find((item) => item.name === rerunScenario.name);
-        setRerunSignatureStatus(scenario?.signature_status ?? 'unknown');
+        if (mounted) {
+          setRerunSignatureStatus(response.scenarios.find((scenario) => scenario.name === rerunScenario.name)?.signature_status ?? 'unknown');
+        }
       })
       .catch((error) => {
-        if (!mounted) return;
-        setRerunSignatureError(error instanceof Error ? error.message : 'Unable to verify the scenario image signature.');
+        if (mounted) setRerunSignatureError(error instanceof Error ? error.message : 'Unable to verify the scenario image signature.');
       })
       .finally(() => {
         if (mounted) setRerunSignatureLoading(false);
@@ -124,7 +126,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       mounted = false;
     };
   }, [registryConfig, rerunScenario, state.scenarios]);
-  const [maxRetries, setMaxRetries] = useState(3);
   const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
 
   // Load available files for file reference mapping
@@ -507,7 +508,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       setValidationErrors(['Maximum retries must be a non-negative whole number.']);
       return;
     }
-
     if (rerunScenario && (signatureVerificationLoading || rerunSignatureLoading)) {
       setValidationErrors(['Image signature verification is still loading — please try again.']);
       return;

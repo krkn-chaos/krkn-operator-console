@@ -50,6 +50,7 @@ function StudioNodeEditorModalComponent({
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
   const [cloudCredentialRef, setCloudCredentialRef] = useState('');
   const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
+  const [resiliencyWeight, setResiliencyWeight] = useState(1);
 
   // Step 4: Node metadata
   const [newNodeId, setNewNodeId] = useState<string>('');
@@ -87,6 +88,7 @@ function StudioNodeEditorModalComponent({
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
       setCloudCredentialRef(node.config.cloudCredentialRef || '');
       setVolumes(node.config.volumes || {});
+      setResiliencyWeight(node.config.resiliencyWeight ?? 1);
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
       fetchScenarios(node.config.registryConfig);
@@ -101,6 +103,7 @@ function StudioNodeEditorModalComponent({
       setGlobalTouchedFields({});
       setCloudCredentialRef('');
       setVolumes({});
+      setResiliencyWeight(1);
       setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
       fetchScenarios({});
@@ -182,6 +185,11 @@ function StudioNodeEditorModalComponent({
   const handleSave = () => {
     if (!node || !selectedScenario || nodeIdError) return;
 
+    if (!Number.isFinite(resiliencyWeight) || resiliencyWeight <= 0) {
+      setValidationWarnings(['Resiliency weight must be greater than 0.']);
+      return;
+    }
+
     // Check for pending file input (file selected or path typed but not added)
     if (hasPendingFileInput && !pendingFileWarningShown) {
       setValidationWarnings([
@@ -209,6 +217,7 @@ function StudioNodeEditorModalComponent({
         globalFormValues,
         globalTouchedFields,
         volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
+        resiliencyWeight,
         cloudCredentialRef: cloudCredentialRef || undefined,
       },
     };
@@ -300,8 +309,10 @@ function StudioNodeEditorModalComponent({
             setPendingFileWarningShown(false);
             setValidationWarnings([]);
           }}
-          onPendingChange={setHasPendingFileInput}
-        />
+           onPendingChange={setHasPendingFileInput}
+           resiliencyWeight={resiliencyWeight}
+           onResiliencyWeightChange={setResiliencyWeight}
+         />
       ),
       isNextDisabled: !!nodeIdError || !newNodeId,
     },
