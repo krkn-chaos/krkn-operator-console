@@ -172,6 +172,26 @@ describe('NodeDetailModal', () => {
       });
     });
 
+    it('should render retry exhaustion as a red terminal job status', async () => {
+      mockGetScenarioRunStatus.mockResolvedValueOnce(makeScenarioRun({
+        phase: 'MaxRetriesExceeded',
+        successfulJobs: 0,
+        failedJobs: 1,
+        clusterJobs: [{
+          providerName: 'aws',
+          clusterName: 'staging-us-east-1',
+          jobId: 'job-001',
+          podName: 'krkn-pod-kill-abc',
+          phase: 'MaxRetriesExceeded',
+        }],
+      }));
+      render(<NodeDetailModal nodeStatus={makeNodeStatus()} onClose={onClose} />);
+
+      await waitFor(() => expect(screen.getByText('Max retries exceeded')).toBeInTheDocument());
+      const label = screen.getByText('Max retries exceeded').closest('.pf-v5-c-label');
+      expect(label).toHaveClass('pf-m-red');
+    });
+
     it('should fetch scenario run with correct ref', async () => {
       render(<NodeDetailModal nodeStatus={makeNodeStatus({ scenarioRunRef: 'sr-abc' })} onClose={onClose} />);
       await waitFor(() => {

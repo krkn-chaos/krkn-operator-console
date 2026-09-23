@@ -130,6 +130,34 @@ describe('JobsList', () => {
     expect(screen.getByText('Loading Jobs')).toBeInTheDocument();
   });
 
+  it('shows logs for jobs that exceeded the retry limit', () => {
+    const expandedRunIds = new Set(['run-retries']);
+    const expandedJobIds = new Set(['job-max-retries']);
+    setMockJobs([
+      makeScenarioJobItem('run-retries', 'Failed', {
+        clusterJobs: [{
+          providerName: 'krkn-operator',
+          clusterName: 'cluster-1',
+          jobId: 'job-max-retries',
+          podName: 'pod-1',
+          phase: 'MaxRetriesExceeded',
+        }],
+      }),
+    ]);
+
+    render(
+      <JobsList
+        {...defaultProps}
+        expandedRunIds={expandedRunIds}
+        expandedJobIds={expandedJobIds}
+      />
+    );
+
+    expect(screen.getByText('Max retries exceeded')).toBeInTheDocument();
+    expect(screen.getByTestId('log-viewer-mock')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete Job' })).not.toBeInTheDocument();
+  });
+
   it('renders JobStatsSummary when jobs are present', () => {
     const makeJob = (phase: 'Succeeded' | 'Failed'): ClusterJob => ({
       providerName: 'krkn-operator',

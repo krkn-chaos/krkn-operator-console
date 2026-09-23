@@ -272,6 +272,8 @@ export interface ScenarioRunRequest {
   elasticsearchConfigName?: string;
   /** Name of a saved cloud credential — backend injects via SecretKeyRef at controller level */
   cloudCredentialRef?: string;
+  /** Maximum retries after the initial attempt; zero disables retries */
+  maxRetries?: number;
 }
 
 export interface TargetJobResult {
@@ -312,8 +314,8 @@ export interface JobsListResponse {
 
 // NEW API Types for ScenarioRun (CRD-based)
 
-export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed';
-export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed';
+export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed' | 'MaxRetriesExceeded';
+export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'MaxRetriesExceeded';
 
 export interface ClusterJob {
   providerName: string; // Provider that owns this cluster (e.g., 'krkn-operator', 'krkn-operator-acm')
@@ -825,6 +827,8 @@ export interface GraphRunSpec {
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
   targetClusters: { [providerName: string]: string[] };
+  /** Maximum retries after the initial attempt for each node */
+  maxRetries?: number;
   /** Email address of the user who created this graph run */
   ownerUserId?: string;
 
@@ -944,6 +948,8 @@ export interface CreateGraphRunRequest {
   targetClusters: { [providerName: string]: string[] };
   /** Default cloud credential for all nodes (individual nodes may override) */
   cloudCredentialRef?: string;
+  /** Maximum retries after the initial attempt for each node; zero disables retries */
+  maxRetries?: number;
 }
 
 /**

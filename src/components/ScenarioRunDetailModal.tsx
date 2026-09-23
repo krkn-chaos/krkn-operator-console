@@ -131,6 +131,8 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
         return { icon: <ExclamationTriangleIcon />, color: 'orange' as const, label: 'Partially Failed' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
@@ -146,6 +148,8 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
         return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
