@@ -145,7 +145,7 @@ export function ScenarioConfigStep({
   }, [showGlobalParameters]);
 
   const hasEsGlobalFields = scenarioGlobals?.fields.some(
-    (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
+    (f) => f.variable != null && (f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_'))
   ) ?? false;
 
   const applyEsConfig = (configName: string) => {
