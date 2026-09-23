@@ -13,6 +13,11 @@ import {
   Alert,
   Spinner,
   Checkbox,
+  FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
+  TextInput,
 } from '@patternfly/react-core';
 import { ClusterMultiSelector } from '../ClusterMultiSelector';
 import { ResiliencyScoreModal } from '../ResiliencyScoreModal';
@@ -48,6 +53,7 @@ export function RunWorkflowModal({
   const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
   const [showResiliencyModal, setShowResiliencyModal] = useState(false);
   const [resiliencyConfig, setResiliencyConfig] = useState<ResiliencyScoreConfig | null>(null);
+  const [maxRetries, setMaxRetries] = useState(3);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -56,6 +62,7 @@ export function RunWorkflowModal({
       setEnableResiliencyScore(false);
       setShowResiliencyModal(false);
       setResiliencyConfig(null);
+      setMaxRetries(3);
     }
   }, [isOpen]);
 
@@ -93,6 +100,11 @@ export function RunWorkflowModal({
 
     if (selectedClusters.length === 0) {
       showError('No clusters selected', 'Please select at least one cluster');
+      return;
+    }
+
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+      showError('Invalid retry count', 'Maximum retries must be a non-negative whole number');
       return;
     }
 
@@ -154,6 +166,7 @@ export function RunWorkflowModal({
       graph,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
+      maxRetries,
     };
 
     setIsSubmitting(true);
@@ -321,6 +334,25 @@ export function RunWorkflowModal({
                 style={{ marginTop: '0.5rem' }}
               />
             )}
+          </div>
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <FormGroup label="Maximum retries" fieldId="workflow-max-retries" isRequired>
+              <TextInput
+                id="workflow-max-retries"
+                type="number"
+                min={0}
+                step={1}
+                value={maxRetries}
+                onChange={(_event, value) => setMaxRetries(Math.max(0, Number(value) || 0))}
+                isDisabled={isSubmitting}
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>Retries after the initial attempt for each scenario node. Set to 0 to disable retries.</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
           </div>
 
           {/* Custom actions aligned left */}

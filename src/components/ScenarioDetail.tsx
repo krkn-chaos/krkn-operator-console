@@ -74,6 +74,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
   const [customRunName, setCustomRunName] = useState('');
+  const [maxRetries, setMaxRetries] = useState(3);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -392,7 +393,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
       // Handle partial failures
       if (statusResponse.failedJobs > 0) {
-        const failedJobs = statusResponse.clusterJobs.filter((j) => j.phase === 'Failed');
+        const failedJobs = statusResponse.clusterJobs.filter((j) =>
+          j.phase === 'Failed' || j.phase === 'MaxRetriesExceeded'
+        );
         const failedErrors = failedJobs
           .map((j) => `${j.clusterName}: ${j.message || 'Unknown error'}`)
           .join('\n');
@@ -434,6 +437,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     }
     if (!scenarioFormValues || !scenarioDetail) {
       setValidationErrors(['Scenario configuration is not ready — please reload the page.']);
+      return;
+    }
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+      setValidationErrors(['Maximum retries must be a non-negative whole number.']);
       return;
     }
 
@@ -536,6 +543,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         customRunName: customRunName.trim() || undefined,
         elasticsearchConfigName: appliedEsConfigName || undefined,
         cloudCredentialRef: appliedCloudCredName || undefined,
+        maxRetries,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -872,22 +880,22 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                         effectiveCloudType,
                         cloudFilterOptions
                       ).map((field) => {
-                          const value = globalFormValues?.[field.variable];
-                          const displayValue = getFieldPreviewDisplayValue(field, value, {
-                            appliedCloudCredName,
-                            appliedEsConfigName,
-                          });
+                        const value = globalFormValues?.[field.variable];
+                        const displayValue = getFieldPreviewDisplayValue(field, value, {
+                          appliedCloudCredName,
+                          appliedEsConfigName,
+                        });
 
-                          return (
-                            <Tr key={field.variable}>
-                              <Td>
-                                <code>{field.variable}</code>
-                              </Td>
-                              <Td>{field.short_description}</Td>
-                              <Td style={{ fontFamily: 'monospace' }}>{displayValue}</Td>
-                            </Tr>
-                          );
-                        })}
+                        return (
+                          <Tr key={field.variable}>
+                            <Td>
+                              <code>{field.variable}</code>
+                            </Td>
+                            <Td>{field.short_description}</Td>
+                            <Td style={{ fontFamily: 'monospace' }}>{displayValue}</Td>
+                          </Tr>
+                        );
+                      })}
                     </Tbody>
                   </Table>
                 </>
@@ -919,6 +927,28 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   </Table>
                 </>
               )}
+            </CardBody>
+          </Card>
+
+          {/* Retry configuration */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardBody>
+              <FormGroup label="Maximum retries" fieldId="max-retries" isRequired>
+                <TextInput
+                  id="max-retries"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={maxRetries}
+                  onChange={(_event, value) => setMaxRetries(Math.max(0, Number(value) || 0))}
+                  isDisabled={isSubmitting}
+                />
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>Retries after the initial attempt. Set to 0 to disable retries.</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              </FormGroup>
             </CardBody>
           </Card>
 

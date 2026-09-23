@@ -616,6 +616,65 @@ describe('ScenarioDetail', () => {
       });
     });
 
+    it('should serialize a customized maximum retry count', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      const retriesInput = screen.getByRole('spinbutton', { name: /Maximum retries/i });
+      await user.clear(retriesInput);
+      await user.type(retriesInput, '5');
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 5 }));
+      });
+    });
+
+    it('rejects fractional maximum retries before submitting', async () => {
+      const user = userEvent.setup();
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      const retriesInput = screen.getByRole('spinbutton', { name: /Maximum retries/i });
+      await user.clear(retriesInput);
+      await user.type(retriesInput, '1.5');
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      expect(await screen.findByText('Maximum retries must be a non-negative whole number.')).toBeInTheDocument();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('includes retry-exhausted jobs in the immediate failure summary', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce({
+        ...mockStatusResponse,
+        failedJobs: 1,
+        clusterJobs: [{
+          providerName: 'krkn-operator',
+          clusterName: 'cluster1',
+          jobId: 'job-123',
+          podName: 'pod-123',
+          phase: 'MaxRetriesExceeded',
+          message: 'retry limit reached',
+        }],
+      });
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/cluster1: retry limit reached/)).toBeInTheDocument();
+      });
+    });
+
     it('should run scenario when Enter is pressed in a parameter field', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
