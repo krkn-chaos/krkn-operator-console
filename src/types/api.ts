@@ -1288,7 +1288,9 @@ export interface DeleteWorkflowResponse {
  * GroupResponse - User group information
  */
 export interface GroupResponse {
-  /** Group name */
+  /** Canonical Kubernetes-safe group identifier (CR name / label suffix) */
+  id?: string;
+  /** Human-readable display name */
   name: string;
   /** Group description */
   description?: string;

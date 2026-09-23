@@ -126,18 +126,39 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
   const [name, setName] = useState(initial?.name ?? '');
   const [provider, setProvider] = useState<CloudCredentialProvider>(existingProvider ?? initial?.provider ?? 'aws');
   const [description, setDescription] = useState(initial?.description ?? '');
-  const [accessType, setAccessType] = useState<'public' | 'group'>(
-    initial?.availableToAll || (!initial?.groups?.length) ? 'public' : 'group'
-  );
+  // Create defaults to public. Edit never escalates a non-public credential to
+  // "All Users" just because groups were empty — require an explicit public choice.
+  const [accessType, setAccessType] = useState<'public' | 'group'>(() => {
+    if (initial?.availableToAll) return 'public';
+    if (initial?.groups && initial.groups.length > 0) return 'group';
+    if (isEdit && initial) return 'group';
+    return 'public';
+  });
   const [selectedGroup, setSelectedGroup] = useState(initial?.groups?.[0] ?? '');
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
+
+  const groupOptionValue = (group: GroupResponse): string => group.id || group.name;
 
   useEffect(() => {
     let mounted = true;
     operatorApi.getGroups()
-      .then(response => { if (mounted) setAvailableGroups(response.groups || []); })
+      .then(response => {
+        if (!mounted) return;
+        const groups = response.groups || [];
+        setAvailableGroups(groups);
+        // Reconcile stored sanitized id with selector options (id or display name).
+        if (selectedGroup && groups.length > 0) {
+          const match = groups.find(
+            (g) => groupOptionValue(g) === selectedGroup || g.name === selectedGroup
+          );
+          if (match) {
+            setSelectedGroup(groupOptionValue(match));
+          }
+        }
+      })
       .catch(() => { if (mounted) setAvailableGroups([]); });
     return () => { mounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount to load groups
   }, []);
 
   // AWS
@@ -259,6 +280,11 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
         setError(`GCP Service Account JSON: ${gcpErr}`);
         return;
       }
+    }
+
+    if (accessType === 'group' && !selectedGroup) {
+      setError('Select a group when assigning group access');
+      return;
     }
 
     setError(null);
@@ -419,7 +445,11 @@ function CloudCredentialForm({ initial, onSubmit, onCancel, isEdit = false, exis
           >
             <FormSelectOption value="" label="Select a group…" />
             {availableGroups.map((g) => (
-              <FormSelectOption key={g.name} value={g.name} label={g.name} />
+              <FormSelectOption
+                key={groupOptionValue(g)}
+                value={groupOptionValue(g)}
+                label={g.name}
+              />
             ))}
           </FormSelect>
         </FormGroup>

@@ -82,6 +82,24 @@ describe('cloudProviderUtils', () => {
       expect(visible).toContain('IBMC_POWER_URL');
       expect(visible).toContain('IBMC_APIKEY');
     });
+
+    it('shows OpenStack OS_ fields when cloud type is openstack', () => {
+      const fields = [
+        ...cloudFields,
+        { variable: 'OS_AUTH_URL', type: 'string', short_description: 'Auth URL [*OpenStack only*]' },
+        { variable: 'OS_PASSWORD', type: 'string', short_description: 'Password [*OpenStack only*]' },
+      ];
+      const visible = filterFieldsByCloudType(fields, 'openstack').map((f) => f.variable);
+      expect(visible).toContain('OS_AUTH_URL');
+      expect(visible).toContain('OS_PASSWORD');
+      expect(visible).not.toContain('AWS_ACCESS_KEY_ID');
+    });
+
+    it('leaves all fields visible for unrecognized cloud types (fail-safe)', () => {
+      const visible = filterFieldsByCloudType(cloudFields, 'weird-cloud').map((f) => f.variable);
+      expect(visible).toEqual(cloudFields.map((f) => f.variable));
+    });
+
   });
 
   describe('filterScenarioFieldsByCloudType', () => {

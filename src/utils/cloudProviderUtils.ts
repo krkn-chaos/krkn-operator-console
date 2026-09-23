@@ -41,13 +41,14 @@ export function getCloudDisabledFields(appliedCloudCredName: string): string[] {
 /**
  * Maps a saved cloud credential's provider to the value a scenario's
  * CLOUD_TYPE enum field expects (krkn-hub convention). Providers with no
- * CLOUD_TYPE equivalent (e.g. openstack, which these scenarios don't support)
- * are omitted — callers should leave CLOUD_TYPE untouched in that case.
+ * CLOUD_TYPE equivalent are omitted when the scenario does not list that value
+ * in allowed_values — callers should leave CLOUD_TYPE untouched in that case.
  */
 export const PROVIDER_TO_CLOUD_TYPE: Partial<Record<CloudCredentialProvider, string>> = {
   aws: 'aws',
   azure: 'azure',
   gcp: 'gcp',
+  openstack: 'openstack',
   vmware: 'vmware',
   ibmcloud: 'ibmcloud',
   baremetal: 'bm',
@@ -156,6 +157,7 @@ const CLOUD_TYPE_FIELD_MATCHERS: Record<string, (variable: string) => boolean> =
   aws: (v) => v.startsWith('AWS_'),
   azure: (v) => v.startsWith('AZURE_'),
   gcp: (v) => v.startsWith('GOOGLE_'),
+  openstack: (v) => v.startsWith('OS_'),
   vmware: (v) => v.startsWith('VSPHERE_'),
   ibmcloud: (v) => v === 'IBMC_URL' || v === 'IBMC_APIKEY',
   ibmcloudpower: (v) => v.startsWith('IBMC_'),
@@ -167,6 +169,7 @@ const CLOUD_TYPE_DESCRIPTION_TAGS: Record<string, readonly string[]> = {
   aws: ['AWS only'],
   azure: ['Azure only'],
   gcp: ['GCP only'],
+  openstack: ['OpenStack only'],
   vmware: ['VSphere only'],
   ibmcloud: ['IBM Cloud only'],
   ibmcloudpower: ['IBM Power Cloud only', 'IBM Cloud only'],
@@ -237,6 +240,13 @@ export function filterFieldsByCloudType<T extends { variable: string; short_desc
   options: { hideCloudTypeWhenCredentialApplied?: boolean; appliedCloudCredName?: string } = {}
 ): T[] {
   if (!cloudType) return fields;
+
+  // Fail-safe: unrecognized cloud types must not hide fields we cannot place.
+  const knownCloudType =
+    cloudType in CLOUD_TYPE_FIELD_MATCHERS || cloudType in CLOUD_TYPE_DESCRIPTION_TAGS;
+  if (!knownCloudType) {
+    return fields;
+  }
 
   return fields.filter((f) => {
     if (options.hideCloudTypeWhenCredentialApplied && options.appliedCloudCredName && f.variable === 'CLOUD_TYPE') {
