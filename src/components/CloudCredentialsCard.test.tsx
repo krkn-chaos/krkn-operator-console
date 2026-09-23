@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CloudCredentialsCard, filterCloudCredentials } from './CloudCredentialsCard';
+import { CloudCredentialsCard } from './CloudCredentialsCard';
+import { filterCloudCredentials } from '../utils/cloudProviderUtils';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { operatorApi } from '../services/operatorApi';
 import { useNotifications } from '../hooks';

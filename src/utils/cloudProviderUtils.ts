@@ -1,4 +1,4 @@
-import type { CloudCredentialProvider } from '../types/api';
+import type { CloudCredential, CloudCredentialProvider } from '../types/api';
 
 export const CLOUD_ENV_VAR_PREFIXES = ['AWS_', 'AZURE_', 'OS_', 'GOOGLE_', 'BMC_', 'VSPHERE_', 'IBMC_'] as const;
 
@@ -57,6 +57,76 @@ interface EnumLikeField {
   type: string;
   allowed_values?: string;
   separator?: string;
+  default?: string | number | boolean | null;
+}
+
+export type CloudCredentialAccessFilter = 'all' | 'public' | 'group';
+export type CloudCredentialProviderFilter = 'all' | CloudCredentialProvider;
+
+const PROVIDER_LABELS: Record<CloudCredentialProvider, string> = {
+  aws: 'AWS',
+  gcp: 'GCP',
+  azure: 'Azure',
+  openstack: 'OpenStack',
+  baremetal: 'Baremetal',
+  vmware: 'VMware',
+  ibmcloud: 'IBM Cloud',
+};
+
+function credentialAccessLabel(cred: CloudCredential): string {
+  if (cred.availableToAll) {
+    return 'All Users';
+  }
+  if (cred.groups && cred.groups.length > 0) {
+    return cred.groups.join(', ');
+  }
+  return 'No groups';
+}
+
+/** Filters and sorts the Settings cloud-credentials list by search/provider/access. */
+export function filterCloudCredentials(
+  credentials: CloudCredential[],
+  options: {
+    search: string;
+    provider: CloudCredentialProviderFilter;
+    access: CloudCredentialAccessFilter;
+    sortDirection: 'asc' | 'desc';
+  }
+): CloudCredential[] {
+  const query = options.search.trim().toLowerCase();
+
+  const filtered = credentials.filter((cred) => {
+    if (options.provider !== 'all' && cred.provider !== options.provider) {
+      return false;
+    }
+
+    if (options.access === 'public' && !cred.availableToAll) {
+      return false;
+    }
+
+    if (options.access === 'group' && (cred.availableToAll || !cred.groups?.length)) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    const haystack = [
+      cred.name,
+      cred.description ?? '',
+      PROVIDER_LABELS[cred.provider] ?? cred.provider,
+      credentialAccessLabel(cred),
+      ...(cred.groups ?? []),
+    ].join(' ').toLowerCase();
+
+    return haystack.includes(query);
+  });
+
+  return filtered.sort((a, b) => {
+    const cmp = a.name.localeCompare(b.name);
+    return options.sortDirection === 'asc' ? cmp : -cmp;
+  });
 }
 
 function isValidEnumValue(field: EnumLikeField, value: string): boolean {

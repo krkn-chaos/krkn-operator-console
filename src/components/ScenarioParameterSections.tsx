@@ -43,7 +43,6 @@ interface ScenarioParameterSectionsProps {
   appliedCloudCredName: string;
   /** CLOUD_TYPE used to hide other providers' optional credential fields */
   activeCloudType?: string;
-  appliedCloudCredName?: string;
 }
 
 export function ScenarioParameterSections({

@@ -40,6 +40,11 @@ import type {
   UpdateCloudCredentialRequest,
   GroupResponse,
 } from '../types/api';
+import {
+  filterCloudCredentials,
+  type CloudCredentialAccessFilter,
+  type CloudCredentialProviderFilter,
+} from '../utils/cloudProviderUtils';
 
 const PROVIDER_LABELS: Record<CloudCredentialProvider, string> = {
   aws: 'AWS',
@@ -53,13 +58,13 @@ const PROVIDER_LABELS: Record<CloudCredentialProvider, string> = {
 
 const PROVIDER_OPTIONS: CloudCredentialProvider[] = ['aws', 'gcp', 'azure', 'openstack', 'baremetal', 'vmware', 'ibmcloud'];
 
-const PROVIDER_LABEL_COLORS: Record<CloudCredentialProvider, 'blue' | 'orange' | 'green' | 'purple' | 'grey' | 'teal' | 'cyan'> = {
+const PROVIDER_LABEL_COLORS: Record<CloudCredentialProvider, 'blue' | 'orange' | 'green' | 'purple' | 'grey' | 'gold' | 'cyan'> = {
   aws: 'orange',
   gcp: 'green',
   azure: 'blue',
   openstack: 'purple',
   baremetal: 'grey',
-  vmware: 'teal',
+  vmware: 'gold',
   ibmcloud: 'cyan',
 };
 
@@ -107,54 +112,6 @@ function credentialAccessLabel(cred: CloudCredential): string {
     return cred.groups.join(', ');
   }
   return 'No groups';
-}
-
-export type CloudCredentialAccessFilter = 'all' | 'public' | 'group';
-export type CloudCredentialProviderFilter = 'all' | CloudCredentialProvider;
-
-export function filterCloudCredentials(
-  credentials: CloudCredential[],
-  options: {
-    search: string;
-    provider: CloudCredentialProviderFilter;
-    access: CloudCredentialAccessFilter;
-    sortDirection: 'asc' | 'desc';
-  }
-): CloudCredential[] {
-  const query = options.search.trim().toLowerCase();
-
-  const filtered = credentials.filter((cred) => {
-    if (options.provider !== 'all' && cred.provider !== options.provider) {
-      return false;
-    }
-
-    if (options.access === 'public' && !cred.availableToAll) {
-      return false;
-    }
-
-    if (options.access === 'group' && (cred.availableToAll || !cred.groups?.length)) {
-      return false;
-    }
-
-    if (!query) {
-      return true;
-    }
-
-    const haystack = [
-      cred.name,
-      cred.description ?? '',
-      PROVIDER_LABELS[cred.provider] ?? cred.provider,
-      credentialAccessLabel(cred),
-      ...(cred.groups ?? []),
-    ].join(' ').toLowerCase();
-
-    return haystack.includes(query);
-  });
-
-  return filtered.sort((a, b) => {
-    const cmp = a.name.localeCompare(b.name);
-    return options.sortDirection === 'asc' ? cmp : -cmp;
-  });
 }
 
 interface CloudCredentialFormProps {

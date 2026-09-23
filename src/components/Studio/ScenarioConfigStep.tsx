@@ -183,9 +183,10 @@ export function ScenarioConfigStep({
   const credentialCloudType = appliedCloudCredential
     ? resolveCloudTypeForProvider(appliedCloudCredential.provider, cloudTypeField)
     : undefined;
+  const formCloudTypeValue = formValues?.CLOUD_TYPE ?? globalFormValues?.CLOUD_TYPE;
   const effectiveCloudType = resolveEffectiveCloudType(cloudTypeField, {
     credentialCloudType,
-    formCloudType: formValues?.CLOUD_TYPE ?? globalFormValues?.CLOUD_TYPE,
+    formCloudType: formCloudTypeValue instanceof File ? undefined : formCloudTypeValue,
   });
 
   const applyCloudCredential = (credName: string) => {
@@ -359,7 +360,6 @@ export function ScenarioConfigStep({
         onSelectCloudCredential={applyCloudCredential}
         appliedCloudCredName={appliedCloudCredName}
         activeCloudType={effectiveCloudType}
-        appliedCloudCredName={appliedCloudCredName}
       />
     </div>
   );
