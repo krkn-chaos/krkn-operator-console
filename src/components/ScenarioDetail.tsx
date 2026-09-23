@@ -24,8 +24,10 @@ import { FileSelector } from './FileSelector';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
+import { useSignatureVerification } from '../hooks/useSignatureVerification';
 
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference } from '../types/api';
+import { createScenarioReference } from '../utils/scenarioReference';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -53,7 +55,14 @@ interface ScenarioDetailProps {
 
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenarioImage, rerunKubeconfigPath } = state;
+  const {
+    enabled: signatureVerificationEnabled,
+    error: signatureVerificationError,
+    isLoading: signatureVerificationLoading,
+  } = useSignatureVerification();
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath } = state;
+  const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
+  const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
@@ -280,7 +289,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       // Build ScenarioRunState
       const newRun: ScenarioRunState = {
         scenarioRunName: createResponse.scenarioRunName,
-        scenarioName,
+        scenarioName: runRequest.scenario.name,
         phase: statusResponse.phase,
         totalTargets: statusResponse.totalTargets,
         successfulJobs: statusResponse.successfulJobs,
@@ -355,6 +364,19 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       return;
     }
 
+    if (rerunScenario && signatureVerificationLoading) {
+      setValidationErrors(['Image signature verification is still loading — please try again.']);
+      return;
+    }
+    if (rerunScenario && (signatureVerificationError || signatureVerificationEnabled === null)) {
+      setValidationErrors([signatureVerificationError || 'Image signature verification status is unavailable.']);
+      return;
+    }
+    if (rerunScenario && signatureVerificationEnabled && selectedScenario?.signature_status !== 'signed') {
+      setValidationErrors(['This scenario cannot run because its image signature is not verified.']);
+      return;
+    }
+
     setIsSubmitting(true);
     setValidationErrors([]);
 
@@ -405,8 +427,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         }
       }
 
-      const isPrivateRegistry = !!registryConfig?.registryName;
-      const scenarioImage = rerunScenarioImage ?? (isPrivateRegistry ? scenarioName : `krkn-hub:${scenarioName}`);
+      const scenario: ScenarioReference = rerunScenario ?? createScenarioReference(
+        scenarioName,
+        Boolean(registryConfig?.registryName),
+        registryConfig?.registryName,
+      );
 
       const targetClusters: { [providerName: string]: string[] } = {};
       state.selectedClusters.forEach(cluster => {
@@ -425,13 +450,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid,
         targetClusters,
-        scenarioImage,
-        scenarioName,
+        scenario,
         kubeconfigPath: rerunKubeconfigPath ?? '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
         fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
-        registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
         customRunName: customRunName.trim() || undefined,
         elasticsearchConfigName: appliedEsConfigName || undefined,
       };
@@ -543,6 +566,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           )}
         </CardBody>
       </Card>
+
+      {showSignatureOverrideWarning && (
+        <Alert
+          variant="warning"
+          isInline
+          title="Image signature verification override is active"
+          style={{ marginBottom: '1.5rem' }}
+        >
+          {scenarioName}: this image is not signed and may be executed because signature verification is disabled.
+        </Alert>
+      )}
 
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
