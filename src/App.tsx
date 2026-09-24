@@ -136,6 +136,10 @@ function App() {
     }
   };
 
+  const handleReplayWorkflow = (workflow: import('./types/api').StudioWorkflow) => {
+    dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow } });
+  };
+
   const handleCreateJob = () => {
     const proceed = async () => {
       // Create initial target for fetching clusters
@@ -236,6 +240,7 @@ function App() {
                 dispatch({ type: 'TOGGLE_GRAPH_RUN_ACCORDION', payload: { graphRunName } })
               }
               onDeleteGraphRun={handleDeleteGraphRun}
+              onReplayWorkflow={handleReplayWorkflow}
               loadingRunDetails={state.loadingRunDetails}
             />
           </PageSection>
@@ -271,7 +276,7 @@ function App() {
       case 'studio':
         return (
           <PageSection>
-            <Studio />
+            <Studio initialWorkflow={state.studioReplayWorkflow ?? undefined} />
           </PageSection>
         );
 

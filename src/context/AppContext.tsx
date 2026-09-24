@@ -20,6 +20,7 @@ const initialState: AppState = {
   // Graph runs list (GraphRun orchestration)
   graphRuns: [],
   expandedGraphRunIds: new Set<string>(),
+  studioReplayWorkflow: null,
 
   // Workflow state
   clusters: null,
@@ -335,6 +336,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
         expandedGraphRunIds: new Set(
           [...state.expandedGraphRunIds].filter(id => id !== action.payload.graphRunName)
         ),
+      };
+
+    case 'OPEN_STUDIO_REPLAY':
+      return {
+        ...state,
+        phase: 'studio',
+        studioReplayWorkflow: action.payload.workflow,
       };
 
     // Workflow control
