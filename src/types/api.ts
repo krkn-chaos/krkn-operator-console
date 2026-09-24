@@ -314,6 +314,16 @@ export interface CreateScenarioRunResponse {
 }
 
 // Response from GET /api/v1/scenarios/run/{scenarioRunName}
+export interface ReportStatus {
+  generated: boolean;
+  htmlAvailable: boolean;
+  pdfAvailable: boolean;
+  generatedAt?: string;
+  location?: string;
+  fileSize?: number;
+  message?: string;
+}
+
 export interface ScenarioRunStatusResponse {
   scenarioRunName: string;
   scenarioName?: string; // Optional - backend may include it in the future
@@ -330,6 +340,7 @@ export interface ScenarioRunStatusResponse {
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
   customRunName?: string;
   resiliencyScores?: ClusterResiliencyScore[];
+  reportStatus?: ReportStatus;
 }
 
 // Internal state for tracking scenario runs

@@ -32,6 +32,7 @@ import type {
   JobConfigResponse,
   UnifiedJobsResponse,
   ScenarioRunListResponse,
+  ReportStatus,
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -646,6 +647,26 @@ class OperatorApiClient extends BaseApiClient {
       }
       throw error;
     }
+  }
+
+  async getReportStatus(runId: string): Promise<ReportStatus> {
+    return this.fetchJson<ReportStatus>(`/scenarios/run/${encodeURIComponent(runId)}/reports/status`);
+  }
+
+  private async downloadReport(runId: string, format: 'html' | 'pdf'): Promise<Blob> {
+    const response = await this.fetch(`/scenarios/run/${encodeURIComponent(runId)}/reports/summary.${format}`);
+    if (!response.ok) {
+      throw new Error(`Failed to download ${format.toUpperCase()} report: ${response.statusText}`);
+    }
+    return response.blob();
+  }
+
+  async downloadReportHTML(runId: string): Promise<Blob> {
+    return this.downloadReport(runId, 'html');
+  }
+
+  async downloadReportPDF(runId: string): Promise<Blob> {
+    return this.downloadReport(runId, 'pdf');
   }
 }
 
