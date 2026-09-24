@@ -6,6 +6,7 @@ import {
   allClustersPassed,
   calculateNodeScoreAverage,
   isScoreCalculating,
+  toGraphClusterScores,
   SCORE_CALCULATING,
   aggregateResiliencyScores,
 } from '../resiliency';
@@ -147,6 +148,32 @@ describe('calculateNodeScoreAverage', () => {
 describe('SCORE_CALCULATING', () => {
   it('is -1', () => {
     expect(SCORE_CALCULATING).toBe(-1);
+  });
+});
+
+describe('toGraphClusterScores', () => {
+  it('converts ClusterResiliencyScore[] to GraphClusterScore[]', () => {
+    const scores: ClusterResiliencyScore[] = [
+      { clusterName: 'cluster-a', score: 92.3 },
+      { clusterName: 'cluster-b', score: 78.1 },
+    ];
+    const result = toGraphClusterScores(scores);
+    expect(result).toEqual([
+      { clusterName: 'cluster-a', calculated: 92.3, status: 'no-baseline' },
+      { clusterName: 'cluster-b', calculated: 78.1, status: 'no-baseline' },
+    ]);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(toGraphClusterScores([])).toEqual([]);
+  });
+
+  it('sets status to no-baseline for all entries', () => {
+    const scores: ClusterResiliencyScore[] = [
+      { clusterName: 'c1', score: 100 },
+    ];
+    const result = toGraphClusterScores(scores);
+    expect(result[0].status).toBe('no-baseline');
   });
 });
 

@@ -250,6 +250,8 @@ export interface ScenarioRunRequest {
   elasticsearchConfigName?: string;
   /** Name of a saved cloud credential — backend injects via SecretKeyRef at controller level */
   cloudCredentialRef?: string;
+  /** Enable resiliency score calculation for this run */
+  resiliencyScoreEnabled?: boolean;
 }
 
 export interface TargetJobResult {
@@ -329,6 +331,7 @@ export interface ScenarioRunStatusResponse {
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
   customRunName?: string;
+  resiliencyScoreEnabled?: boolean;
   resiliencyScores?: ClusterResiliencyScore[];
 }
 
@@ -348,6 +351,8 @@ export interface ScenarioRunState {
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
   customRunName?: string; // User-provided label for the run
+  resiliencyScoreEnabled?: boolean;
+  resiliencyScores?: ClusterResiliencyScore[];
 }
 
 // User Management Types

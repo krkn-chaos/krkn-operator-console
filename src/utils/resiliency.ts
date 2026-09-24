@@ -42,6 +42,14 @@ export function allClustersPassed(scores: GraphClusterScore[]): boolean {
   return scores.every(cs => cs.status === 'pass');
 }
 
+export function toGraphClusterScores(scores: ClusterResiliencyScore[]): GraphClusterScore[] {
+  return scores.map(cs => ({
+    clusterName: cs.clusterName,
+    calculated: cs.score,
+    status: 'no-baseline' as const,
+  }));
+}
+
 export function calculateNodeScoreAverage(scores: ClusterResiliencyScore[]): number {
   if (!scores || scores.length === 0) return 0;
   return scores.reduce((sum, cs) => sum + cs.score, 0) / scores.length;
