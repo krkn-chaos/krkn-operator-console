@@ -1441,6 +1441,65 @@ export interface QueryTelemetryRequest {
   endDate?: string;
 }
 
+// Run-level cluster/infrastructure metadata surfaced for an expanded row. All
+// fields are optional; the backend omits any it did not find in the source doc.
+export interface ClusterMetadata {
+  // Object kind (e.g. "Pod", "ConfigMap") to count present in the cluster.
+  kubernetes_objects_count?: Record<string, number>;
+  network_plugins?: string[];
+  total_node_count?: number;
+  cloud_infrastructure?: string;
+  cloud_type?: string;
+  cluster_version?: string;
+  major_version?: string;
+  build_url?: string;
+  fips_enabled?: boolean;
+  tag?: string;
+  etcd_encryption_enabled?: boolean;
+  ipsec_enabled?: boolean;
+  // Per-node-group summaries describing each distinct node role/shape.
+  node_summary_infos?: NodeSummaryInfo[];
+}
+
+// One node-group summary krkn records per distinct node role/shape.
+export interface NodeSummaryInfo {
+  count: number;
+  nodes_type: string;
+  architecture: string;
+  instance_type: string;
+  kernel_version: string;
+  kubelet_version: string;
+  os_version: string;
+}
+
+// Recovery timings krkn records for a single pod that came back after a
+// pod_disruption scenario. Times are fractional seconds.
+export interface RecoveredPod {
+  pod_name: string;
+  namespace: string;
+  total_recovery_time: number;
+  pod_readiness_time: number;
+  pod_rescheduling_time: number;
+}
+
+// Pods a scenario disrupted. Only recovered pods carry recovery timings, used by
+// the pod-recovery chart.
+export interface TelemetryAffectedPods {
+  recovered?: RecoveredPod[];
+}
+
+// A single scenario within a telemetry run. parameters is left untyped because
+// its shape varies by scenario type (e.g. application_outage vs pod-scenario).
+export interface TelemetryScenarioDetail {
+  scenario_type: string;
+  start_timestamp: number;
+  end_timestamp: number;
+  exit_status: number;
+  parameters?: Record<string, unknown>;
+  // Per-pod recovery timings for pod_disruption scenarios; absent otherwise.
+  affected_pods?: TelemetryAffectedPods;
+}
+
 export interface TelemetryDocument {
   run_uuid: string;
   scenario_type: string;
@@ -1450,6 +1509,10 @@ export interface TelemetryDocument {
   namespace: string;
   // true = passed, false = failed.
   status: boolean;
+  // Run-level cluster detail; absent when the source doc had no metadata.
+  metadata?: ClusterMetadata;
+  // Every scenario in the run, each with its raw parameters.
+  scenarios?: TelemetryScenarioDetail[];
 }
 
 // Pass/fail aggregates across the whole matched window (not just the returned

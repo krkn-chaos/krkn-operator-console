@@ -430,4 +430,428 @@ describe('ElasticsearchDataView', () => {
     // The inline form is available to admins too.
     expect(screen.getByText('Connect without saving')).toBeInTheDocument();
   });
+
+  it('does not render expand toggle for rows without metadata or pod disruption data', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithoutMetadata: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'no-metadata-uuid',
+          scenario_type: 'node_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'default',
+          status: true,
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithoutMetadata);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('no-meta')).toBeInTheDocument());
+
+    // Find table row containing document data
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1]; // Skip thead, get tbody
+    const rows = within(tbody).getAllByRole('row');
+
+    // First row in tbody should be the data row (not expandable row)
+    const dataRow = rows[0];
+    const cells = within(dataRow).getAllByRole('cell');
+
+    // First cell should be empty (no expand button) for non-expandable rows
+    expect(cells[0]).toBeEmptyDOMElement();
+  });
+
+  it('renders expand toggle for rows with metadata', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithMetadata: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'has-metadata-uuid',
+          scenario_type: 'pod_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'default',
+          status: true,
+          metadata: {
+            cluster_version: '4.15.0',
+            total_node_count: 3,
+          },
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithMetadata);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('has-met')).toBeInTheDocument());
+
+    // Find table and verify expand button exists
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1];
+    const rows = within(tbody).getAllByRole('row');
+    const dataRow = rows[0];
+    const cells = within(dataRow).getAllByRole('cell');
+
+    // First cell should contain expand button
+    const expandButton = within(cells[0]).getByRole('button');
+    expect(expandButton).toBeInTheDocument();
+
+    // Click expand and verify expandable content appears
+    await userEvent.click(expandButton);
+    await waitFor(() => {
+      expect(screen.getByText('Cluster Config')).toBeInTheDocument();
+      expect(screen.getByText('Node summary')).toBeInTheDocument();
+    });
+  });
+
+  it('displays flattened cluster config values when metadata exists', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithFullMetadata: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'full-metadata-uuid',
+          scenario_type: 'pod_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'default',
+          status: true,
+          metadata: {
+            cluster_version: '4.15.0',
+            cloud_infrastructure: 'AWS',
+            cloud_type: 'aws',
+            total_node_count: 6,
+            network_plugins: ['OVNKubernetes', 'Multus'],
+            fips_enabled: true,
+            etcd_encryption_enabled: false,
+            ipsec_enabled: true,
+            build_url: 'https://prow.example.com/build/123',
+          },
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithFullMetadata);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('full-me')).toBeInTheDocument());
+
+    // Expand row
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1];
+    const expandButton = within(within(tbody).getAllByRole('row')[0]).getByRole('button');
+    await userEvent.click(expandButton);
+
+    // Verify flattened metadata values appear in cluster config table
+    await waitFor(() => {
+      expect(screen.getByText('cluster_version')).toBeInTheDocument();
+      expect(screen.getByText('4.15.0')).toBeInTheDocument();
+      expect(screen.getByText('cloud_infrastructure')).toBeInTheDocument();
+      expect(screen.getByText('AWS')).toBeInTheDocument();
+      expect(screen.getByText('total_node_count')).toBeInTheDocument();
+      expect(screen.getByText('6')).toBeInTheDocument();
+      expect(screen.getByText('network_plugins')).toBeInTheDocument();
+      expect(screen.getByText('OVNKubernetes, Multus')).toBeInTheDocument();
+      expect(screen.getByText('fips_enabled')).toBeInTheDocument();
+      // Multiple boolean fields may have "true", so just verify one exists
+      expect(screen.getAllByText('true').length).toBeGreaterThan(0);
+      expect(screen.getByText('etcd_encryption_enabled')).toBeInTheDocument();
+      expect(screen.getByText('false')).toBeInTheDocument();
+    });
+  });
+
+  it('displays node summary table with multiple node groups', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithNodeSummary: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'node-summary-uuid',
+          scenario_type: 'node_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'default',
+          status: true,
+          metadata: {
+            node_summary_infos: [
+              {
+                count: 3,
+                nodes_type: 'worker',
+                architecture: 'amd64',
+                instance_type: 'm5.xlarge',
+                kernel_version: '5.14.0',
+                kubelet_version: 'v1.27.6',
+                os_version: 'RHCOS 4.15',
+              },
+              {
+                count: 3,
+                nodes_type: 'master',
+                architecture: 'amd64',
+                instance_type: 'm5.2xlarge',
+                kernel_version: '5.14.0',
+                kubelet_version: 'v1.27.6',
+                os_version: 'RHCOS 4.15',
+              },
+            ],
+          },
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithNodeSummary);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('node-su')).toBeInTheDocument());
+
+    // Expand row
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1];
+    const expandButton = within(within(tbody).getAllByRole('row')[0]).getByRole('button');
+    await userEvent.click(expandButton);
+
+    // Verify node summary table shows both node groups
+    await waitFor(() => {
+      expect(screen.getByText('Node summary')).toBeInTheDocument();
+      expect(screen.getByText('worker')).toBeInTheDocument();
+      expect(screen.getByText('master')).toBeInTheDocument();
+      expect(screen.getByText('m5.xlarge')).toBeInTheDocument();
+      expect(screen.getByText('m5.2xlarge')).toBeInTheDocument();
+      // Verify count column shows 3 for both groups
+      const nodeSummaryCard = screen.getByText('Node summary').closest('div[class*="pf-v5-c-card"]');
+      expect(nodeSummaryCard).toBeInTheDocument();
+    });
+  });
+
+  it('displays pod recovery chart when pod disruption scenario has recovered pods', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithPodRecovery: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'pod-recovery-uuid',
+          scenario_type: 'pod_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'openshift-kube-apiserver',
+          status: true,
+          scenarios: [
+            {
+              scenario_type: 'pod_disruption_scenarios',
+              start_timestamp: 1735689600,
+              end_timestamp: 1735689900,
+              exit_status: 0,
+              parameters: {
+                namespace: 'openshift-kube-apiserver',
+              },
+              affected_pods: {
+                recovered: [
+                  {
+                    pod_name: 'kube-apiserver-1',
+                    namespace: 'openshift-kube-apiserver',
+                    total_recovery_time: 45.2,
+                    pod_readiness_time: 30.1,
+                    pod_rescheduling_time: 15.1,
+                  },
+                  {
+                    pod_name: 'kube-apiserver-2',
+                    namespace: 'openshift-kube-apiserver',
+                    total_recovery_time: 120.5,
+                    pod_readiness_time: 90.3,
+                    pod_rescheduling_time: 30.2,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithPodRecovery);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('pod-rec')).toBeInTheDocument());
+
+    // Expand row
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1];
+    const expandButton = within(within(tbody).getAllByRole('row')[0]).getByRole('button');
+    await userEvent.click(expandButton);
+
+    // Verify pod recovery chart appears
+    await waitFor(() => {
+      expect(screen.getByText('Pod-Recovery Analysis')).toBeInTheDocument();
+      // Chart renders with Victory components - verify pod names appear
+      expect(screen.getByText('kube-apiserver-1')).toBeInTheDocument();
+      expect(screen.getByText('kube-apiserver-2')).toBeInTheDocument();
+    });
+  });
+
+  it('displays run_uuid in cluster config even when metadata has only skipped fields', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithMinimalMetadata: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'minimal-metadata-uuid',
+          scenario_type: 'pod_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'default',
+          status: true,
+          metadata: {
+            // Only contains internal fields that are skipped from table display
+            node_summary_infos: [],
+          },
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithMinimalMetadata);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('minimal')).toBeInTheDocument());
+
+    // Expand row
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1];
+    const expandButton = within(within(tbody).getAllByRole('row')[0]).getByRole('button');
+    await userEvent.click(expandButton);
+
+    // Verify run_uuid is still displayed in cluster config table
+    await waitFor(() => {
+      expect(screen.getByText('run_uuid')).toBeInTheDocument();
+      expect(screen.getByText('minimal-metadata-uuid')).toBeInTheDocument();
+    });
+  });
+
+  it('shows empty state for node summary when no node_summary_infos exist', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithoutNodes: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'no-nodes-uuid',
+          scenario_type: 'pod_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'default',
+          status: true,
+          metadata: {
+            cluster_version: '4.15.0',
+            // No node_summary_infos
+          },
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithoutNodes);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('no-node')).toBeInTheDocument());
+
+    // Expand row
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1];
+    const expandButton = within(within(tbody).getAllByRole('row')[0]).getByRole('button');
+    await userEvent.click(expandButton);
+
+    // Verify empty state message for node summary
+    await waitFor(() => {
+      expect(screen.getByText('No node summary data')).toBeInTheDocument();
+    });
+  });
+
+  it('displays recovery threshold line when pod recovery times exceed expected threshold', async () => {
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    const resultWithSlowRecovery: QueryTelemetryResponse = {
+      documents: [
+        {
+          run_uuid: 'slow-recovery-uuid',
+          scenario_type: 'pod_disruption_scenarios',
+          start_timestamp: 1735689600,
+          end_timestamp: 1735689900,
+          namespace: 'openshift-kube-apiserver',
+          status: true,
+          scenarios: [
+            {
+              scenario_type: 'pod_disruption_scenarios',
+              start_timestamp: 1735689600,
+              end_timestamp: 1735689900,
+              exit_status: 0,
+              parameters: {
+                expected_recovery_time: 60,
+              },
+              affected_pods: {
+                recovered: [
+                  {
+                    pod_name: 'slow-pod',
+                    namespace: 'openshift-kube-apiserver',
+                    total_recovery_time: 120.5,
+                    pod_readiness_time: 90.0,
+                    pod_rescheduling_time: 30.5,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      total: 1,
+      stats: { pass: 1, fail: 0, pass_percent: 100 },
+    };
+    vi.mocked(elasticsearchApi.queryTelemetry).mockResolvedValue(resultWithSlowRecovery);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+
+    await waitFor(() => expect(screen.getByText('slow-re')).toBeInTheDocument());
+
+    // Expand row
+    const table = screen.getByLabelText('Telemetry documents');
+    const tbody = within(table).getAllByRole('rowgroup')[1];
+    const expandButton = within(within(tbody).getAllByRole('row')[0]).getByRole('button');
+    await userEvent.click(expandButton);
+
+    // Verify chart renders (Victory renders threshold as ChartThreshold)
+    await waitFor(() => {
+      expect(screen.getByText('Pod-Recovery Analysis')).toBeInTheDocument();
+      expect(screen.getByText('slow-pod')).toBeInTheDocument();
+    });
+  });
 });

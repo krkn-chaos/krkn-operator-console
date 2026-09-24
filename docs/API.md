@@ -7,6 +7,7 @@ This document describes the REST API endpoints used by the krkn-operator-console
 - [Authentication](#authentication)
 - [Registry Management Endpoints](#registry-management-endpoints)
 - [Scenario Endpoints](#scenario-endpoints)
+- [Elasticsearch / Telemetry Endpoints](#elasticsearch--telemetry-endpoints)
 - [User Management Endpoints](#user-management-endpoints)
 - [Error Responses](#error-responses)
 
@@ -384,6 +385,236 @@ Executes a chaos scenario on selected clusters.
   "totalTargets": 2
 }
 ```
+
+---
+
+## Elasticsearch / Telemetry Endpoints
+
+Base URL: `/api/v1`
+
+### Query Telemetry
+
+Retrieves telemetry documents from Elasticsearch for a given time range. Supports both saved Elasticsearch configs and inline connections.
+
+**Endpoint:** `POST /api/v1/elasticsearch-query`
+
+**Authorization:** All authenticated users
+
+**Request Body (Using Saved Config):**
+```json
+{
+  "configName": "my-es-config",
+  "size": 100,
+  "startDate": "2024-01-01",
+  "endDate": "2024-01-31"
+}
+```
+
+**Request Body (Using Inline Connection):**
+```json
+{
+  "inline": {
+    "host": "https://es.example.com",
+    "port": 9200,
+    "username": "myuser",
+    "password": "mypassword",
+    "telemetryIndex": "krkn-telemetry"
+  },
+  "size": 50,
+  "startDate": "2024-01-01",
+  "endDate": "2024-01-31"
+}
+```
+
+**Example (curl with saved config):**
+```bash
+curl -X POST http://localhost:8080/api/v1/elasticsearch-query \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "configName": "my-es-config",
+    "size": 100,
+    "startDate": "2024-01-01",
+    "endDate": "2024-01-31"
+  }'
+```
+
+**Example (JavaScript with inline connection):**
+```javascript
+const response = await fetch('http://localhost:8080/api/v1/elasticsearch-query', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    inline: {
+      host: 'https://es.example.com',
+      port: 9200,
+      username: 'myuser',
+      password: 'mypassword',
+      telemetryIndex: 'krkn-telemetry'
+    },
+    size: 50,
+    startDate: '2024-01-01',
+    endDate: '2024-01-31'
+  })
+});
+
+if (response.ok) {
+  const data = await response.json();
+  console.log(`Found ${data.total} telemetry runs`);
+  console.log(`Pass rate: ${data.stats.pass_percent}%`);
+  data.documents.forEach(doc => {
+    console.log(`Run ${doc.run_uuid}: ${doc.status ? 'PASS' : 'FAIL'}`);
+  });
+} else {
+  const error = await response.json();
+  console.error('Query failed:', error.error);
+}
+```
+
+**Request Fields:**
+- `configName` (string, optional) - Name of saved Elasticsearch config. Mutually exclusive with `inline`.
+- `inline` (object, optional) - Ephemeral connection details. Mutually exclusive with `configName`.
+  - `host` (string, required) - Elasticsearch host URL
+  - `port` (integer, optional) - Port (0-65535, defaults to 9200)
+  - `username` (string, optional) - Basic auth username
+  - `password` (string, optional) - Basic auth password
+  - `telemetryIndex` (string, required) - Index to query
+- `size` (integer, optional) - Max documents to return (default: 50, max: 500)
+- `startDate` (string, optional) - Start date in "yyyy-MM-dd" format
+- `endDate` (string, optional) - End date in "yyyy-MM-dd" format
+
+**Note:** Exactly one of `configName` or `inline` must be provided.
+
+**Success Response:**
+
+**Status Code:** `200 OK`
+
+**Body:**
+```json
+{
+  "documents": [
+    {
+      "run_uuid": "abc-123-def",
+      "scenario_type": "pod_disruption_scenarios",
+      "start_timestamp": 1704067200,
+      "end_timestamp": 1704070800,
+      "namespace": "default",
+      "status": true,
+      "metadata": {
+        "cluster_version": "4.14.0",
+        "major_version": "4.14",
+        "cloud_infrastructure": "AWS",
+        "cloud_type": "aws",
+        "total_node_count": 6,
+        "network_plugins": ["OVNKubernetes"],
+        "fips_enabled": false,
+        "etcd_encryption_enabled": true,
+        "ipsec_enabled": false,
+        "build_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/12345",
+        "tag": "ci-4.14-upgrade",
+        "kubernetes_objects_count": {
+          "Pod": 150,
+          "Service": 45,
+          "Deployment": 20
+        },
+        "node_summary_infos": [
+          {
+            "count": 3,
+            "nodes_type": "worker",
+            "architecture": "amd64",
+            "instance_type": "m5.xlarge",
+            "kernel_version": "5.14.0",
+            "kubelet_version": "v1.27.6",
+            "os_version": "RHCOS 4.14"
+          }
+        ]
+      },
+      "scenarios": [
+        {
+          "scenario_type": "pod_disruption_scenarios",
+          "start_timestamp": 1704067200,
+          "end_timestamp": 1704070800,
+          "exit_status": 0,
+          "parameters": {
+            "namespace": "default",
+            "label_selector": "app=test"
+          },
+          "affected_pods": {
+            "recovered": [
+              {
+                "pod_name": "test-pod-1",
+                "namespace": "default",
+                "total_recovery_time": 45.2,
+                "pod_readiness_time": 30.1,
+                "pod_rescheduling_time": 15.1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "total": 1,
+  "stats": {
+    "pass": 85,
+    "fail": 15,
+    "pass_percent": 85.0
+  }
+}
+```
+
+**Response Fields:**
+- `documents` (array) - Telemetry documents matching query
+  - `run_uuid` (string) - Unique run identifier
+  - `scenario_type` (string) - Scenario type from first scenario
+  - `start_timestamp` (integer) - Unix timestamp (seconds, UTC)
+  - `end_timestamp` (integer) - Unix timestamp (seconds, UTC)
+  - `namespace` (string) - Target namespace
+  - `status` (boolean) - Run outcome (true=pass, false=fail)
+  - `metadata` (object, optional) - Cluster/infrastructure details
+    - `cluster_version` (string, optional) - Kubernetes/OpenShift version
+    - `major_version` (string, optional) - Major version number
+    - `cloud_infrastructure` (string, optional) - Infrastructure provider
+    - `cloud_type` (string, optional) - Cloud provider type
+    - `total_node_count` (integer, optional) - Total nodes in cluster
+    - `network_plugins` (array of strings, optional) - Network plugins
+    - `fips_enabled` (boolean, optional) - FIPS mode status
+    - `etcd_encryption_enabled` (boolean, optional) - Etcd encryption status
+    - `ipsec_enabled` (boolean, optional) - IPsec status
+    - `build_url` (string, optional) - Build/CI job URL
+    - `tag` (string, optional) - Build tag or identifier
+    - `kubernetes_objects_count` (object, optional) - Object counts by kind
+    - `node_summary_infos` (array, optional) - Node group summaries
+      - `count` (integer) - Nodes in group
+      - `nodes_type` (string) - Node role
+      - `architecture` (string) - CPU architecture
+      - `instance_type` (string) - Instance type
+      - `kernel_version` (string) - Kernel version
+      - `kubelet_version` (string) - Kubelet version
+      - `os_version` (string) - OS version
+  - `scenarios` (array) - All scenarios in run
+    - `scenario_type` (string) - Scenario type
+    - `start_timestamp` (integer) - Scenario start time
+    - `end_timestamp` (integer) - Scenario end time
+    - `exit_status` (integer) - Exit code
+    - `parameters` (object) - Scenario-specific parameters (raw JSON)
+    - `affected_pods` (object, optional) - Pod disruption details
+      - `recovered` (array) - Recovered pods with timings
+        - `pod_name` (string) - Pod name
+        - `namespace` (string) - Namespace
+        - `total_recovery_time` (number) - Total recovery seconds
+        - `pod_readiness_time` (number) - Readiness time seconds
+        - `pod_rescheduling_time` (number) - Rescheduling time seconds
+- `total` (integer) - Count of documents in response
+- `stats` (object) - Aggregate statistics across entire query window
+  - `pass` (integer) - Total passing runs
+  - `fail` (integer) - Total failing runs
+  - `pass_percent` (number) - Pass percentage (0-100)
+
+**Note:** Stats counts apply to entire matched window, not just returned page. `stats.pass + stats.fail` may exceed `total`.
 
 ---
 
