@@ -224,6 +224,8 @@ export function JobsList({
         return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
@@ -1148,7 +1150,7 @@ export function JobsList({
                                           </FlexItem>
 
                                           {/* Logs for running, succeeded, and failed jobs */}
-                                          {['Running', 'Succeeded', 'Failed'].includes(job.phase) && job.jobId && (
+                                          {['Running', 'Succeeded', 'Failed', 'MaxRetriesExceeded'].includes(job.phase) && job.jobId && (
                                             <FlexItem>
                                               <LogViewer
                                                 scenarioRunName={run.scenarioRunName}
@@ -1162,7 +1164,7 @@ export function JobsList({
                                           )}
 
                                           {/* Delete button for non-terminal jobs */}
-                                          {!['Succeeded', 'Failed'].includes(job.phase) && (
+                                          {!['Succeeded', 'Failed', 'MaxRetriesExceeded'].includes(job.phase) && (
                                             <FlexItem>
                                               <Button
                                                 variant="danger"
