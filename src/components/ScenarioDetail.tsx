@@ -24,8 +24,11 @@ import { FileSelector } from './FileSelector';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
+import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
+import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider, resolveEffectiveCloudType, filterScenarioFieldsByCloudType, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
+import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -88,6 +91,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
   const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
+
+  const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
+  const [selectedCloudCredName, setSelectedCloudCredName] = useState('');
+  const [appliedCloudCredName, setAppliedCloudCredName] = useState('');
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -167,12 +174,72 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
   }, [showGlobalParameters]);
 
+  // Load saved cloud credentials up front — cloud fields (CLOUD_TYPE, AWS_*, AZURE_*, etc.)
+  // are typically declared as scenario-specific required/optional fields, not global fields,
+  // so this list must be available before the user ever expands Global Parameters.
+  useEffect(() => {
+    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
+  }, []);
+
   // Ensures fields whose variable name contains "PASSWORD" are always rendered as secret inputs,
   // regardless of whether the scenario definition sets secret:true.
   // Returns true when the loaded globals contain at least one ES-related variable
   const hasEsGlobalFields = scenarioGlobals?.fields.some(
     (f) => f.variable != null && (f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_'))
   ) ?? false;
+
+  // Cloud fields can live in the scenario's own required/optional fields (the common case
+  // for krkn-hub scenarios like node-scenarios, zone-outages) or in global fields.
+  const hasCloudDetailFields = scenarioDetail ? hasCloudFields(scenarioDetail.fields) : false;
+  const hasCloudGlobalFields = scenarioGlobals ? hasCloudFields(scenarioGlobals.fields) : false;
+  const hasCloudCredentialFields = hasCloudDetailFields || hasCloudGlobalFields;
+  const cloudDisabledFields = getCloudDisabledFields(appliedCloudCredName);
+
+  // The CLOUD_TYPE field can live in either field set depending on the scenario.
+  const cloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE')
+    ?? scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+  const appliedCloudCredential = cloudCredentials.find((c) => c.name === appliedCloudCredName);
+  const credentialCloudType = appliedCloudCredential
+    ? resolveCloudTypeForProvider(appliedCloudCredential.provider, cloudTypeField)
+    : undefined;
+  const formCloudTypeValue = scenarioFormValues?.CLOUD_TYPE ?? globalFormValues?.CLOUD_TYPE;
+  const effectiveCloudType = resolveEffectiveCloudType(cloudTypeField, {
+    credentialCloudType,
+    formCloudType: formCloudTypeValue instanceof File ? undefined : formCloudTypeValue,
+  });
+
+  const applyCloudCredential = (credName: string) => {
+    setSelectedCloudCredName(credName);
+    if (!credName) {
+      setAppliedCloudCredName('');
+      return;
+    }
+    setAppliedCloudCredName(credName);
+
+    // Sync CLOUD_TYPE to the credential's provider so the form doesn't keep showing
+    // a stale/mismatched value (e.g. default "aws" while an Azure credential is applied).
+    const cred = cloudCredentials.find((c) => c.name === credName);
+    if (!cred) return;
+
+    const detailCloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    if (detailCloudTypeField) {
+      const targetValue = resolveCloudTypeForProvider(cred.provider, detailCloudTypeField);
+      if (targetValue) {
+        handleFormChange({ ...(scenarioFormValues || {}), CLOUD_TYPE: targetValue });
+      }
+      return;
+    }
+
+    const globalCloudTypeField = scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    const targetGlobalValue = globalCloudTypeField
+      ? resolveCloudTypeForProvider(cred.provider, globalCloudTypeField)
+      : undefined;
+    if (globalCloudTypeField && targetGlobalValue) {
+      const patch = { ...(globalFormValues || {}), CLOUD_TYPE: targetGlobalValue };
+      const touched = { ...(globalTouchedFields || {}), CLOUD_TYPE: true };
+      dispatch({ type: 'UPDATE_GLOBAL_FORM', payload: { formValues: patch, touchedFields: touched } });
+    }
+  };
 
   const applyEsConfig = (configName: string) => {
     setSelectedEsConfigName(configName);
@@ -203,9 +270,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleFormChange = (values: ScenarioFormValues) => {
+    // Multiple DynamicFormBuilder instances (required + optional) each emit their own
+    // slice of fields on init — merge so a later init doesn't wipe values from an earlier one.
     dispatch({
       type: 'UPDATE_SCENARIO_FORM',
-      payload: { formValues: values },
+      payload: { formValues: { ...(scenarioFormValues || {}), ...values } },
     });
   };
 
@@ -221,12 +290,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const validateForm = (): boolean => {
-    if (!scenarioDetail) return false;
+    if (!scenarioDetail) {
+      // Without this, a null scenarioDetail (e.g. a re-fetch in flight) fails validation
+      // with zero feedback — the button appears to do nothing at all.
+      setValidationErrors(['Scenario configuration is not ready — please wait a moment and try again.']);
+      return false;
+    }
 
     const errors: string[] = [];
 
     scenarioDetail.fields.forEach((field) => {
-      const value = scenarioFormValues?.[field.variable];
+      const value = scenarioFormValues?.[field.variable] ?? field.default;
 
       if (field.required && (value === undefined || value === null || value === '')) {
         errors.push(`${field.short_description} is required`);
@@ -262,7 +336,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const proceedToPreview = () => {
     if (validateForm()) {
       setShowPreview(true);
+      return;
     }
+    // The validation error alert renders near the top of the page, well above the
+    // Preview button on a long scenario form — scroll there so failures are actually
+    // visible instead of appearing to do nothing.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleEditForm = () => {
@@ -366,6 +445,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         if (field.type === 'group') continue;
         const value = scenarioFormValues[field.variable];
 
+        // When a saved cloud credential is selected, cloud-related file fields (e.g.
+        // GOOGLE_APPLICATION_CREDENTIALS) are injected server-side via SecretVolumeSource —
+        // skip uploading the client-provided file entirely.
+        if (appliedCloudCredName && isCloudEnvVar(field.variable)) {
+          continue;
+        }
+
         if (field.type === 'file') {
           if (value && value instanceof File) {
             files.push({ name: value.name, content: await readFileAsBase64(value) });
@@ -387,6 +473,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       if (hasGlobalChanges && scenarioGlobals && globalFormValues) {
         for (const field of scenarioGlobals.fields) {
           if (!globalTouchedFields[field.variable]) continue;
+          if (appliedCloudCredName && isCloudEnvVar(field.variable)) continue;
           const value = globalFormValues[field.variable];
 
           if (field.type === 'file') {
@@ -421,6 +508,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         delete environment['ES_PASSWORD'];
       }
 
+      // When a cloud credential is selected, strip all cloud-related vars from environment.
+      // The controller injects them via SecretKeyRef — plaintext values in the CRD spec
+      // would defeat the security model.
+      if (appliedCloudCredName) {
+        for (const key of Object.keys(environment)) {
+          if (isCloudEnvVar(key)) {
+            delete environment[key];
+          }
+        }
+      }
+
       // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid,
@@ -434,6 +532,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
         customRunName: customRunName.trim() || undefined,
         elasticsearchConfigName: appliedEsConfigName || undefined,
+        cloudCredentialRef: appliedCloudCredName || undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -507,6 +606,33 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const optionalFields = useMemo(
     () => scenarioDetail?.fields.filter(f => !f.required && f.type !== 'group') || [],
     [scenarioDetail?.fields]
+  );
+
+  const cloudFilterOptions = useMemo(
+    () => ({
+      hideCloudTypeWhenCredentialApplied: true,
+      appliedCloudCredName,
+    }),
+    [appliedCloudCredName]
+  );
+
+  const mainFormFields = useMemo(() => {
+    if (!scenarioDetail) return [];
+    const base = hasGroupedScenarioFields
+      ? scenarioDetail.fields
+      : scenarioDetail.fields.filter((field) => field.required);
+    return hasGroupedScenarioFields
+      ? filterScenarioFieldsByCloudType(base, effectiveCloudType, cloudFilterOptions)
+      : base;
+  }, [scenarioDetail, hasGroupedScenarioFields, effectiveCloudType, cloudFilterOptions]);
+
+  const previewScenarioFields = useMemo(
+    () => filterFieldsByCloudType(
+      scenarioDetail?.fields.filter((f) => f.type !== 'group') ?? [],
+      effectiveCloudType,
+      cloudFilterOptions
+    ),
+    [scenarioDetail?.fields, effectiveCloudType, cloudFilterOptions]
   );
 
   if (!scenarioDetail) {
@@ -601,9 +727,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
             <CardBody>
               <DynamicFormBuilder
-                fields={hasGroupedScenarioFields ? scenarioDetail.fields : scenarioDetail.fields.filter(field => field.required)}
+                fields={mainFormFields}
                 values={scenarioFormValues || {}}
                 onChange={handleFormChange}
+                disabledFields={cloudDisabledFields}
               />
             </CardBody>
           </Card>
@@ -643,6 +770,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             selectedEsConfigName={selectedEsConfigName}
             onSelectEsConfig={applyEsConfig}
             appliedEsConfigName={appliedEsConfigName}
+            hasCloudCredentialFields={hasCloudCredentialFields}
+            cloudCredentials={cloudCredentials}
+            selectedCloudCredName={selectedCloudCredName}
+            onSelectCloudCredential={applyCloudCredential}
+            appliedCloudCredName={appliedCloudCredName}
+            activeCloudType={effectiveCloudType}
           />
 
           {/* Preview Button */}
@@ -675,19 +808,12 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {scenarioDetail.fields.filter(f => f.type !== 'group').map((field) => {
+                  {previewScenarioFields.map((field) => {
                     const value = scenarioFormValues?.[field.variable];
-                    let displayValue: string;
-
-                    if (value === undefined || value === null || value === '') {
-                      displayValue = field.default?.toString() || '(empty)';
-                    } else if (field.secret) {
-                      displayValue = '••••••••';
-                    } else if (field.type === 'file' || field.type === 'file_base64') {
-                      displayValue = (value as File)?.name || String(value);
-                    } else {
-                      displayValue = String(value);
-                    }
+                    const displayValue = getFieldPreviewDisplayValue(field, value, {
+                      appliedCloudCredName,
+                      appliedEsConfigName,
+                    });
 
                     return (
                       <Tr key={field.variable}>
@@ -715,21 +841,16 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                       </Tr>
                     </Thead>
                     <Tbody>
-                      {scenarioGlobals.fields
-                        .filter(field => globalTouchedFields[field.variable])
-                        .map((field) => {
+                      {filterFieldsByCloudType(
+                        scenarioGlobals.fields.filter((field) => globalTouchedFields[field.variable]),
+                        effectiveCloudType,
+                        cloudFilterOptions
+                      ).map((field) => {
                           const value = globalFormValues?.[field.variable];
-                          let displayValue: string;
-
-                          if (value === undefined || value === null || value === '') {
-                            displayValue = field.default?.toString() || '(empty)';
-                          } else if (field.secret) {
-                            displayValue = '••••••••';
-                          } else if (field.type === 'file' || field.type === 'file_base64') {
-                            displayValue = (value as File)?.name || String(value);
-                          } else {
-                            displayValue = String(value);
-                          }
+                          const displayValue = getFieldPreviewDisplayValue(field, value, {
+                            appliedCloudCredName,
+                            appliedEsConfigName,
+                          });
 
                           return (
                             <Tr key={field.variable}>

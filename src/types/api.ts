@@ -248,6 +248,8 @@ export interface ScenarioRunRequest {
   customRunName?: string;
   /** Name of a saved Elasticsearch config — backend injects its credentials server-side so the password is never sent by the client */
   elasticsearchConfigName?: string;
+  /** Name of a saved cloud credential — backend injects via SecretKeyRef at controller level */
+  cloudCredentialRef?: string;
 }
 
 export interface TargetJobResult {
@@ -730,6 +732,8 @@ export interface GraphScenarioNode {
   volumes?: { [key: string]: string };
   /** Node ID that this scenario depends on (parent in the graph) */
   depends_on?: string;
+  /** Saved cloud credential to inject for this node (overrides graph-level default) */
+  cloudCredentialRef?: string;
 }
 
 /**
@@ -901,6 +905,8 @@ export interface CreateGraphRunRequest {
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
   targetClusters: { [providerName: string]: string[] };
+  /** Default cloud credential for all nodes (individual nodes may override) */
+  cloudCredentialRef?: string;
 }
 
 /**
@@ -1034,6 +1040,8 @@ export interface StudioNode {
     volumes?: { [key: string]: string };
     /** File mounts (mock dropdown for now) */
     files?: string[];
+    /** Saved cloud credential injected server-side for this node */
+    cloudCredentialRef?: string;
   };
   /** Node position on canvas */
   position: { x: number; y: number };
@@ -1282,7 +1290,9 @@ export interface DeleteWorkflowResponse {
  * GroupResponse - User group information
  */
 export interface GroupResponse {
-  /** Group name */
+  /** Canonical Kubernetes-safe group identifier (CR name / label suffix) */
+  id?: string;
+  /** Human-readable display name */
   name: string;
   /** Group description */
   description?: string;
@@ -1454,4 +1464,100 @@ export interface QueryTelemetryResponse {
   documents: TelemetryDocument[];
   total: number;
   stats: TelemetryStats;
+}
+
+// Cloud Credential Types
+
+export type CloudCredentialProvider = 'aws' | 'gcp' | 'azure' | 'openstack' | 'baremetal' | 'vmware' | 'ibmcloud';
+
+export interface CloudCredential {
+  name: string;
+  provider: CloudCredentialProvider;
+  description?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface CreateCloudCredentialRequest {
+  name: string;
+  provider: CloudCredentialProvider;
+  description?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+  // AWS
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsDefaultRegion?: string;
+  // GCP (base64-encoded service account JSON)
+  gcpServiceAccountJson?: string;
+  // Azure
+  azureTenantId?: string;
+  azureClientId?: string;
+  azureClientSecret?: string;
+  azureSubscriptionId?: string;
+  // OpenStack
+  osAuthUrl?: string;
+  osUsername?: string;
+  osPassword?: string;
+  osProjectName?: string;
+  osDomainName?: string;
+  // Baremetal (IPMI/BMC)
+  bmcUser?: string;
+  bmcPassword?: string;
+  bmcAddr?: string;
+  // VMware vSphere
+  vsphereIp?: string;
+  vsphereUsername?: string;
+  vspherePassword?: string;
+  // IBM Cloud
+  ibmcUrl?: string;
+  ibmcApikey?: string;
+}
+
+export interface UpdateCloudCredentialRequest {
+  description?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+  // AWS
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsDefaultRegion?: string;
+  // GCP
+  gcpServiceAccountJson?: string;
+  // Azure
+  azureTenantId?: string;
+  azureClientId?: string;
+  azureClientSecret?: string;
+  azureSubscriptionId?: string;
+  // OpenStack
+  osAuthUrl?: string;
+  osUsername?: string;
+  osPassword?: string;
+  osProjectName?: string;
+  osDomainName?: string;
+  // Baremetal
+  bmcUser?: string;
+  bmcPassword?: string;
+  bmcAddr?: string;
+  // VMware
+  vsphereIp?: string;
+  vsphereUsername?: string;
+  vspherePassword?: string;
+  // IBM Cloud
+  ibmcUrl?: string;
+  ibmcApikey?: string;
+}
+
+export interface ListCloudCredentialsResponse {
+  credentials: CloudCredential[];
+  total: number;
+}
+
+export interface CloudCredentialOperationResponse {
+  message: string;
+  name?: string;
 }
