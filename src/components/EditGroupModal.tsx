@@ -39,6 +39,7 @@ import { groupsApi } from '../services/groupsApi';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import type { GroupDetails, ClusterPermissions } from '../types/api';
 import { ClusterPermissionsTable } from './ClusterPermissionsTable';
+import { normalizeClusterPermissions } from './createGroupValidation';
 
 interface EditGroupModalProps {
   /** Whether modal is open */
@@ -157,7 +158,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
 
         setGroupData(group);
         setDescription(group.description || '');
-        setClusterPermissions(group.clusterPermissions || {});
+        setClusterPermissions(normalizeClusterPermissions(group.clusterPermissions || {}));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load group data');
         lastLoadedRef.current = ''; // Allow retry on error
@@ -188,11 +189,11 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
     const issues: string[] = [];
 
     const hasRunWithoutView = Object.values(clusterPermissions).some(
-      (perms) => perms.actions.includes('run') && !perms.actions.includes('view')
+      (perms) => (perms.actions || []).includes('run') && !(perms.actions || []).includes('view')
     );
 
     const hasCancelWithoutView = Object.values(clusterPermissions).some(
-      (perms) => perms.actions.includes('cancel') && !perms.actions.includes('view')
+      (perms) => (perms.actions || []).includes('cancel') && !(perms.actions || []).includes('view')
     );
 
     if (hasRunWithoutView) {
@@ -212,7 +213,7 @@ export function EditGroupModal({ isOpen, onClose, groupName, onSuccess }: EditGr
   const checkDuplicateClusters = (): { hasDuplicates: boolean; duplicates: string[] } => {
     const duplicates: string[] = [];
     const selectedUrls = Object.keys(clusterPermissions).filter(
-      (url) => clusterPermissions[url].actions.length > 0
+      (url) => (clusterPermissions[url].actions || []).length > 0
     );
 
     // Check if the same API URL is selected more than once (from different sources)

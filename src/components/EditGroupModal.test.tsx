@@ -10,6 +10,7 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EditGroupModal } from './EditGroupModal';
 import { groupsApi } from '../services/groupsApi';
@@ -198,6 +199,45 @@ describe('EditGroupModal', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Removed/i).length).toBeGreaterThan(0);
       expect(screen.getByText('https://api.removed-cluster.example.com')).toBeInTheDocument();
+    });
+  });
+
+  it('should omit malformed permissions when saving an edit', async () => {
+    const user = userEvent.setup();
+    const groupWithMalformedPermissions: GroupDetails = {
+      ...mockGroupData,
+      clusterPermissions: {
+        malformed: {},
+        'https://api.cluster2.example.com': { actions: ['view'] },
+      },
+    };
+    vi.mocked(groupsApi).getGroup.mockResolvedValue(groupWithMalformedPermissions);
+    vi.mocked(groupsApi).updateGroup.mockResolvedValue({ name: 'test-group' });
+
+    render(
+      <EditGroupModal
+        isOpen={true}
+        onClose={mockOnClose}
+        groupName="test-group"
+        onSuccess={mockOnSuccess}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(vi.mocked(groupsApi).updateGroup).toHaveBeenCalledWith(
+        'test-group',
+        expect.objectContaining({
+          clusterPermissions: {
+            'https://api.cluster2.example.com': { actions: ['view'] },
+          },
+        })
+      );
     });
   });
 });

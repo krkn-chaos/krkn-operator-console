@@ -54,6 +54,10 @@ import { useNotifications } from '../hooks/useNotifications';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { ClusterPermissionsTable } from './ClusterPermissionsTable';
 import type { ClusterPermissions } from '../types/api';
+import {
+  checkDuplicateClusters,
+  checkRunOrCancelWithoutView,
+} from './createGroupValidation';
 
 interface CreateGroupModalProps {
   /**
@@ -140,65 +144,13 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     return Object.keys(newErrors).length === 0;
   };
 
-  const checkRunOrCancelWithoutView = (): { hasIssue: boolean; missingPermissions: string[] } => {
-    const issues: string[] = [];
-
-    const hasRunWithoutView = Object.values(clusterPermissions).some(
-      (perms) => perms.actions.includes('run') && !perms.actions.includes('view')
-    );
-
-    const hasCancelWithoutView = Object.values(clusterPermissions).some(
-      (perms) => perms.actions.includes('cancel') && !perms.actions.includes('view')
-    );
-
-    if (hasRunWithoutView) {
-      issues.push('Run');
-    }
-
-    if (hasCancelWithoutView) {
-      issues.push('Cancel');
-    }
-
-    return {
-      hasIssue: issues.length > 0,
-      missingPermissions: issues
-    };
-  };
-
-  const checkDuplicateClusters = (): { hasDuplicates: boolean; duplicates: string[] } => {
-    const duplicates: string[] = [];
-    const selectedUrls = Object.keys(clusterPermissions).filter(
-      (url) => clusterPermissions[url].actions.length > 0
-    );
-
-    // Check if the same API URL is selected more than once (from different sources)
-    selectedUrls.forEach((url) => {
-      // Find all clusters with this URL
-      const clustersWithUrl = targets.filter((t) => t.clusterAPIURL === url);
-
-      if (clustersWithUrl.length > 1) {
-        // Same cluster from multiple sources
-        const clusterNames = clustersWithUrl
-          .map((c) => `${c.clusterName} (${c.operatorSource || 'unknown'})`)
-          .join(', ');
-
-        duplicates.push(`${url}: ${clusterNames}`);
-      }
-    });
-
-    return {
-      hasDuplicates: duplicates.length > 0,
-      duplicates
-    };
-  };
-
   const handleSubmit = async () => {
     if (!validate()) {
       return;
     }
 
     // Check for duplicate clusters (same API URL from different sources)
-    const { hasDuplicates, duplicates } = checkDuplicateClusters();
+    const { hasDuplicates, duplicates } = checkDuplicateClusters(clusterPermissions, targets);
     if (hasDuplicates) {
       setDuplicateClusters(duplicates);
       setShowDuplicateWarning(true);
@@ -206,7 +158,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     }
 
     // Check for "run" or "cancel" without "view" warning
-    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView();
+    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView(clusterPermissions);
     if (hasIssue) {
       setMissingViewPermissions(missingPermissions);
       setShowRunWithoutViewWarning(true);
@@ -243,7 +195,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     setShowDuplicateWarning(false);
 
     // Check for "run" or "cancel" without "view" warning after duplicates confirmed
-    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView();
+    const { hasIssue, missingPermissions } = checkRunOrCancelWithoutView(clusterPermissions);
     if (hasIssue) {
       setMissingViewPermissions(missingPermissions);
       setShowRunWithoutViewWarning(true);

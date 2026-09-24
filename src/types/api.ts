@@ -589,7 +589,7 @@ export interface ActiveRunsResponse {
 
 export interface ClusterPermissions {
   [clusterAPIURL: string]: {
-    actions: Array<'view' | 'run' | 'cancel'>;
+    actions?: Array<'view' | 'run' | 'cancel'>;
   };
 }
 
