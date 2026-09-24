@@ -14,6 +14,7 @@ import type {
   CreateScenarioRunResponse,
   ScenarioRunStatusResponse,
   ActiveRunsResponse,
+  StringField,
 } from '../types/api';
 
 vi.mock('../services/operatorApi');
@@ -613,6 +614,196 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalled();
       });
+    });
+
+    it('should run scenario when Enter is pressed in a parameter field', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('should ignore repeated Enter while a scenario submission is pending', async () => {
+      const user = userEvent.setup();
+      let resolveActiveRuns!: (response: ActiveRunsResponse) => void;
+      vi.mocked(operatorApi.getActiveRuns).mockImplementation(
+        () => new Promise((resolve) => { resolveActiveRuns = resolve; })
+      );
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+      await waitFor(() => expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(1));
+
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(1);
+      resolveActiveRuns(mockActiveRuns);
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledTimes(1));
+    });
+
+    it('should not run scenario when Shift+Enter is pressed in a parameter field', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Shift>}{Enter}{/Shift}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('should not run scenario for non-Enter keys in a parameter field', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('a');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('should run scenario when Enter is pressed on a select field', async () => {
+      const user = userEvent.setup();
+      const detailWithEnum: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [
+          {
+            name: 'mode',
+            variable: 'MODE',
+            short_description: 'Mode',
+            title: 'Mode',
+            description: 'Scenario mode',
+            type: 'enum',
+            required: true,
+            allowed_values: 'safe,fast',
+            separator: ',',
+          },
+        ],
+      };
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioDetail: detailWithEnum,
+        scenarioFormValues: { MODE: 'safe' },
+      });
+
+      const modeSelect = screen.getByRole('combobox');
+      await user.click(modeSelect);
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('should not run scenario when Enter is pressed in preview mode', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        startInPreview: true,
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const runNameInput = screen.getByPlaceholderText('e.g. nightly-pod-disruption-test');
+      await user.click(runNameInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('should validate required fields before running from Enter', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({ scenarioFormValues: {} });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      expect(screen.getByText(/Target namespace is required/i)).toBeInTheDocument();
+    });
+
+    it('should validate pattern-constrained fields before running from Enter', async () => {
+      const user = userEvent.setup();
+      const detailWithValidator: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [
+          {
+            ...(mockScenarioDetail.fields[0] as StringField),
+            validator: '^[a-z]+$',
+            validation_message: 'Use lowercase letters only',
+          },
+        ],
+      };
+
+      renderWithContext({
+        scenarioDetail: detailWithValidator,
+        scenarioFormValues: { NAMESPACE: 'INVALID_VALUE' },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      expect(screen.getAllByText(/Use lowercase letters only/i).length).toBeGreaterThan(0);
+    });
+
+    it('should block Enter while a managed file input is pending', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+        files: [
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config', availableToAll: true },
+        ],
+      });
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await waitFor(() => expect(operatorApi.getAvailableFiles).toHaveBeenCalled());
+      await user.click(await screen.findByText('Select a file'));
+      await user.click(await screen.findByText('metrics.yaml'));
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      expect(screen.getByText('Pending file not added')).toBeInTheDocument();
     });
 
     it('should build correct scenario run request with public registry', async () => {
@@ -1252,6 +1443,21 @@ describe('ScenarioDetail', () => {
 
       // When hasGroupedScenarioFields is true, optional section is suppressed
       expect(screen.queryByRole('button', { name: /Optional Parameters/i })).not.toBeInTheDocument();
+    });
+
+    it('should not run when Enter is pressed in a grouped-field search input', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        scenarioDetail: groupedScenarioDetail,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Filter fields...');
+      await user.click(searchInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
     });
   });
 });

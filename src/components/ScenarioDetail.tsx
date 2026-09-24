@@ -27,6 +27,7 @@ import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider, resolveEffectiveCloudType, filterScenarioFieldsByCloudType, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
 import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
+import { runOnEnterFromFormControl } from '../utils/keyboard';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
 
@@ -421,6 +422,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleRunScenario = async () => {
+    if (isSubmitting) return;
+
     if (!state.uuid) {
       setValidationErrors(['Missing target request — please restart the workflow.']);
       return;
@@ -559,6 +562,22 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     }
   };
 
+  const handleKeyboardRunScenario = () => {
+    if (isSubmitting) return;
+
+    if (hasPendingFileInput) {
+      setIsPendingFileModalOpen(true);
+      return;
+    }
+
+    if (!validateForm()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    void handleRunScenario();
+  };
+
   const handleConflictCancel = () => {
     setConflictWarning(null);
     setPendingRunRequest(null);
@@ -645,7 +664,14 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   }
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+    <div
+      style={{ maxWidth: '900px', margin: '0 auto' }}
+      onKeyDown={(event) => {
+        if (!showPreview) {
+          runOnEnterFromFormControl(event, handleKeyboardRunScenario);
+        }
+      }}
+    >
       {/* Back Button */}
       <div style={{ marginBottom: '1rem' }}>
         <Button variant="link" onClick={handleBack}>
