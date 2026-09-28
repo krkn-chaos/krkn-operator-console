@@ -26,7 +26,7 @@ import { krknAiApi, KrknAIConfigValidationError } from '../../services/krknAiApi
 import type { KrknAIRunResource, KrknAIConfigValidationIssue } from '../../services/krknAiApi';
 import { isApiError } from '../../utils/apiClient';
 import { operatorApi } from '../../services/operatorApi';
-import type { Cluster, FileInfo, SelectedCluster } from '../../types/api';
+import type { FileInfo, SelectedCluster, TargetResponse } from '../../types/api';
 import { FitnessFunctionEditor } from './FitnessFunctionEditor';
 import { HealthChecksEditor } from './HealthChecksEditor';
 import { DiscoveryOptionsEditor } from './DiscoveryOptionsEditor';
@@ -69,8 +69,17 @@ interface SavedConfig {
   targetClusters: Record<string, string[]>;
 }
 
+interface ClusterOption extends SelectedCluster {
+  value: string;
+}
+
 interface CreateRunProps {
   existingNames: string[];
+  targetRequestId: string;
+  discoveredClusters: TargetResponse[];
+  targetLoading: boolean;
+  targetError: string | null;
+  onRetryTargetDiscovery: () => void;
   onStart: (run: KrknAIRunResource) => void;
   onCancel: () => void;
 }
@@ -125,16 +134,19 @@ function apiErrorMessage(error: unknown): string {
 }
 
 
-export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) {
+export function CreateRun({
+  existingNames,
+  targetRequestId,
+  discoveredClusters,
+  targetLoading,
+  targetError,
+  onRetryTargetDiscovery,
+  onStart,
+  onCancel,
+}: CreateRunProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [runName, setRunName] = useState('');
-  const [targetRequestId, setTargetRequestId] = useState('');
-  const [targetClusters, setTargetClusters] = useState<Record<string, Cluster[]>>({});
-  const [targetLoading, setTargetLoading] = useState(false);
-  const [targetStarted, setTargetStarted] = useState(false);
-  const [targetError, setTargetError] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState('');
-  const [selectedClusterName, setSelectedClusterName] = useState('');
+  const [selectedClusterValue, setSelectedClusterValue] = useState('');
   const [discoveryOptions, setDiscoveryOptions] = useState<DiscoveryOptions>(defaultDiscoveryOptions);
   const [discoveryWarnings, setDiscoveryWarnings] = useState<string[]>([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
@@ -155,88 +167,28 @@ export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) 
   const [existingFileYaml, setExistingFileYaml] = useState('');
   const [existingFileError, setExistingFileError] = useState('');
   const documentRef = useRef<Document | null>(null);
-  const targetControllerRef = useRef<AbortController | null>(null);
-  const targetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const requestControllerRef = useRef<AbortController | null>(null);
 
-  const startTargetRequest = async () => {
-    if (targetStarted || targetControllerRef.current) return;
-    const controller = new AbortController();
-    targetControllerRef.current = controller;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    setTargetStarted(true);
-    setTargetLoading(true);
-    setTargetError('');
-    const finish = () => {
-      if (targetControllerRef.current === controller) targetControllerRef.current = null;
-      targetTimerRef.current = undefined;
-    };
-    const poll = async (uuid: string) => {
-      try {
-        const status = await operatorApi.getTargetStatus(uuid, { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        if (status === 202) {
-          timer = setTimeout(() => { void poll(uuid); }, 2000);
-          targetTimerRef.current = timer;
-          return;
-        }
-        if (status !== 200) throw new Error(`Target request failed with HTTP ${status}.`);
-        clearTimeout(timer);
-        timer = undefined;
-        targetTimerRef.current = undefined;
-        const clustersResponse = await operatorApi.getClusters(uuid, { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        const clusters = clustersResponse.targetData;
-        setTargetClusters(clusters);
-        const firstProvider = Object.keys(clusters)[0] ?? '';
-        const firstCluster = clusters[firstProvider]?.[0];
-        setSelectedProvider(firstProvider);
-        setSelectedClusterName(firstCluster?.['cluster-name'] ?? '');
-        if (!firstProvider || !firstCluster) setTargetError('No authorized clusters are available for this target request.');
-        setTargetLoading(false);
-        finish();
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        controller.abort();
-        clearTimeout(timer);
-        setTargetError(apiErrorMessage(error));
-        setTargetLoading(false);
-        finish();
-      }
-    };
-    try {
-      const response = await operatorApi.createTargetRequest({ signal: controller.signal });
-      if (controller.signal.aborted) return;
-      if (!response.uuid) throw new Error('Target request did not return a request ID.');
-      setTargetRequestId(response.uuid);
-      await poll(response.uuid);
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      controller.abort();
-      clearTimeout(timer);
-      setTargetError(apiErrorMessage(error));
-      setTargetLoading(false);
-      finish();
-    }
-  };
 
   useEffect(() => () => {
-    targetControllerRef.current?.abort();
-    clearTimeout(targetTimerRef.current);
-    targetTimerRef.current = undefined;
     requestControllerRef.current?.abort();
     requestControllerRef.current = null;
   }, []);
 
-  const selectedCluster = useMemo<SelectedCluster | null>(() => {
-    const cluster = targetClusters[selectedProvider]?.find((item) => item['cluster-name'] === selectedClusterName);
-    if (!cluster || !selectedProvider) return null;
-    return {
-      operatorName: selectedProvider,
-      clusterName: cluster['cluster-name'],
-      clusterApiUrl: cluster['cluster-api-url'],
-    };
-  }, [targetClusters, selectedProvider, selectedClusterName]);
+  const clusterOptions = useMemo<ClusterOption[]>(() => discoveredClusters.flatMap((cluster) => {
+    if (!cluster.operatorSource) return [];
+    return [{
+      value: JSON.stringify([cluster.operatorSource, cluster.clusterName]),
+      operatorName: cluster.operatorSource,
+      clusterName: cluster.clusterName,
+      clusterApiUrl: cluster.clusterAPIURL,
+    }];
+  }), [discoveredClusters]);
+  const resolvedClusterValue = clusterOptions.some((cluster) => cluster.value === selectedClusterValue)
+    ? selectedClusterValue
+    : clusterOptions[0]?.value ?? '';
+  const selectedCluster = clusterOptions.find((cluster) => cluster.value === resolvedClusterValue) ?? null;
+
 
   const trimmedName = runName.trim();
   const nameError = !trimmedName
@@ -252,6 +204,7 @@ export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) 
   const previousSection = configurationSections[sectionIndex - 1];
   const nextSection = configurationSections[sectionIndex + 1];
   const targetMap = selectedCluster ? { [selectedCluster.operatorName]: [selectedCluster.clusterName] } : {};
+  const noAuthorizedClusters = !!targetRequestId && !targetLoading && !targetError && discoveredClusters.length === 0;
   const canDiscover = !!selectedCluster && !!targetRequestId && !targetLoading && !nameError
     && !Object.keys(discoveryOptionErrors).length && !discoveryLoading;
   const canSaveConfig = !!draft && !!documentRef.current && !!selectedCluster && !nameError && !yamlError
@@ -407,20 +360,9 @@ export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) 
     }
   };
 
-  const handleProviderChange = (provider: string) => {
+  const handleClusterChange = (value: string) => {
     abortActiveRequest();
-    setSelectedProvider(provider);
-    setSelectedClusterName(targetClusters[provider]?.[0]?.['cluster-name'] ?? '');
-    documentRef.current = null;
-    setDraft(null);
-    setCreatedConfig(null);
-    setConfigYaml('');
-    setStep(1);
-  };
-
-  const handleClusterChange = (clusterName: string) => {
-    abortActiveRequest();
-    setSelectedClusterName(clusterName);
+    setSelectedClusterValue(value);
     documentRef.current = null;
     setDraft(null);
     setCreatedConfig(null);
@@ -469,10 +411,7 @@ export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) 
   };
 
   const cancel = () => {
-    targetControllerRef.current?.abort();
     requestControllerRef.current?.abort();
-    clearTimeout(targetTimerRef.current);
-    targetTimerRef.current = undefined;
     onCancel();
   };
 
@@ -502,32 +441,36 @@ export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) 
         <>
           <Card>
             <CardTitle>
-              <div className="krkn-ai-config-wizard__title"><span className="krkn-ai-config-wizard__title-icon" aria-hidden="true"><TopologyIcon /></span><span>Run name and authorized cluster</span></div>
+              <div className="krkn-ai-config-wizard__title"><span className="krkn-ai-config-wizard__title-icon" aria-hidden="true"><TopologyIcon /></span><span>Run name and cluster</span></div>
             </CardTitle>
             <CardBody>
               <FormGroup label="Run name" fieldId="krkn-ai-run-name" isRequired>
                 <TextInput id="krkn-ai-run-name" value={runName} onChange={(_event, value) => { abortActiveRequest(); setRunName(value); setCreatedConfig(null); }} validated={nameError ? 'error' : 'default'} aria-invalid={!!nameError} />
                 {nameError && <p className="krkn-ai-field-error" role="alert">{nameError}</p>}
               </FormGroup>
-              {targetLoading && <Alert variant="info" title="Waiting for authorized cluster discovery" isInline>Target access is being prepared. Cluster status is checked every two seconds; authorized clusters load when it completes.</Alert>}
-              {targetError && <Alert variant="danger" title="Target discovery unavailable" isInline>{targetError}</Alert>}
-              {targetRequestId && <p className="krkn-ai-muted">Authorized target request: <code>{targetRequestId}</code></p>}
-              <div className="krkn-ai-config-fields">
-                <FormGroup label="Provider" fieldId="krkn-ai-provider" isRequired>
-                  <FormSelect id="krkn-ai-provider" value={selectedProvider} onChange={(_event, value) => handleProviderChange(value)} isDisabled={targetLoading || !Object.keys(targetClusters).length}>
-                    {Object.keys(targetClusters).map((provider) => <FormSelectOption key={provider} value={provider} label={provider} />)}
-                  </FormSelect>
-                </FormGroup>
-                <FormGroup label="Cluster" fieldId="krkn-ai-target" isRequired>
-                  <FormSelect id="krkn-ai-target" value={selectedClusterName} onChange={(_event, value) => handleClusterChange(value)} isDisabled={targetLoading || !selectedProvider}>
-                    {(targetClusters[selectedProvider] ?? []).map((cluster) => <FormSelectOption key={cluster['cluster-name']} value={cluster['cluster-name']} label={cluster['cluster-name']} />)}
-                  </FormSelect>
-                </FormGroup>
-              </div>
+              {targetLoading && <Alert variant="info" title="Loading available clusters" isInline>Cluster discovery runs automatically. Select a cluster when it completes.</Alert>}
+              {targetError && <Alert variant="danger" title="Cluster discovery unavailable" isInline>{targetError}</Alert>}
+              {noAuthorizedClusters && <Alert variant="warning" title="No clusters available" isInline>No authorized clusters are available for this account.</Alert>}
+              {(targetError || noAuthorizedClusters) && <div className="krkn-ai-actions"><Button variant="link" onClick={onRetryTargetDiscovery}>Retry cluster discovery</Button></div>}
+              <FormGroup label="Cluster" fieldId="krkn-ai-target" isRequired>
+                <FormSelect
+                  id="krkn-ai-target"
+                  value={resolvedClusterValue}
+                  onChange={(_event, value) => handleClusterChange(value)}
+                  isDisabled={targetLoading || !clusterOptions.length}
+                >
+                  {clusterOptions.map((cluster) => (
+                    <FormSelectOption
+                      key={cluster.value}
+                      value={cluster.value}
+                      label={`${cluster.clusterName} (${cluster.operatorName})`}
+                    />
+                  ))}
+                </FormSelect>
+              </FormGroup>
               {selectedCluster && <p className="krkn-ai-muted">Selected cluster API: <code>{selectedCluster.clusterApiUrl}</code></p>}
             </CardBody>
           </Card>
-          <div className="krkn-ai-actions"><Button variant="secondary" isDisabled={targetStarted} isLoading={targetLoading} onClick={() => void startTargetRequest()}>{targetLoading ? 'Preparing target access…' : targetStarted ? (targetError ? 'Target request unavailable' : 'Target access requested') : 'Request authorized clusters'}</Button></div>
           <DiscoveryOptionsEditor options={discoveryOptions} errors={discoveryOptionErrors} onChange={(field, value) => { abortActiveRequest(); setDiscoveryOptions((current) => ({ ...current, [field]: value })); setCreatedConfig(null); }} />
           {discoveryError && <Alert variant="danger" title="Krkn AI discovery failed" isInline>{discoveryError}</Alert>}
           <div className="krkn-ai-actions"><Button variant="primary" isDisabled={!canDiscover} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>

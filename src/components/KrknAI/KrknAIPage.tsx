@@ -5,6 +5,7 @@ import { CreateRun } from './CreateRun';
 import { RunDetail } from './RunDetail';
 import { RunList } from './RunList';
 import type { KrknAIRunListEntry } from './RunList';
+import { useClusterDiscovery } from '../../hooks/useClusterDiscovery';
 import './KrknAI.css';
 
 const ACTIVE_PHASES: Record<string, true> = { Pending: true, Provisioning: true, Running: true };
@@ -63,6 +64,15 @@ export function KrknAIPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedRun, setSelectedRun] = useState<KrknAIRunResource | null>(null);
   const refreshRef = useRef<(reason: RefreshReason) => void>(() => undefined);
+  const {
+    clusters: discoveredClusters,
+    discoveryUuid: targetRequestId,
+    isLoading: targetLoading,
+    error: targetError,
+    startDiscovery,
+    retry: retryTargetDiscovery,
+    reset: resetTargetDiscovery,
+  } = useClusterDiscovery();
 
   const updateRuns = useCallback((next: KrknAIRunListEntry[]) => {
     runsRef.current = next;
@@ -219,13 +229,28 @@ export function KrknAIPage() {
     setSelectedRun(run);
   }, [updateRuns]);
 
+  const handleCreateRun = useCallback(() => {
+    setIsCreating(true);
+    void startDiscovery();
+  }, [startDiscovery]);
+
+  const handleCancelCreate = useCallback(() => {
+    resetTargetDiscovery();
+    setIsCreating(false);
+  }, [resetTargetDiscovery]);
+
   if (isCreating) {
     return (
       <div className="krkn-ai">
         <CreateRun
           existingNames={runs.map((entry) => entry.resource.metadata.name)}
+          targetRequestId={targetRequestId ?? ''}
+          discoveredClusters={discoveredClusters ?? []}
+          targetLoading={targetLoading}
+          targetError={targetError}
+          onRetryTargetDiscovery={retryTargetDiscovery}
           onStart={handleStart}
-          onCancel={() => setIsCreating(false)}
+          onCancel={handleCancelCreate}
         />
       </div>
     );
@@ -246,7 +271,7 @@ export function KrknAIPage() {
         loading={loading}
         refreshing={refreshing}
         error={error}
-        onCreate={() => setIsCreating(true)}
+        onCreate={handleCreateRun}
         onRefresh={handleRefresh}
         onSelect={setSelectedRun}
       />

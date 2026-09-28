@@ -219,7 +219,6 @@ function setDocumentHidden(hidden: boolean): void {
 async function openWizardToPreview(user: ReturnType<typeof userEvent.setup>, name: string): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'Create run' }));
   await user.type(screen.getByRole('textbox', { name: 'Run name' }), name);
-  await user.click(screen.getByRole('button', { name: 'Request authorized clusters' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Discover components' })).toBeEnabled());
   await user.click(screen.getByRole('button', { name: 'Discover components' }));
   await waitFor(() => expect(screen.getByRole('button', { name: /Review YAML/ })).toBeInTheDocument());
@@ -246,6 +245,9 @@ describe('Krkn-AI real run lifecycle', () => {
           { 'cluster-name': 'staging', 'cluster-api-url': 'https://api.staging.example.test' },
           { 'cluster-name': 'staging-west', 'cluster-api-url': 'https://api.west.example.test' },
         ],
+        'krkn-operator-acm': [
+          { 'cluster-name': 'prod', 'cluster-api-url': 'https://api.prod.example.test' },
+        ],
       },
     });
     mocks.operator.getAvailableFiles.mockResolvedValue({ files: [] });
@@ -261,26 +263,28 @@ describe('Krkn-AI real run lifecycle', () => {
     else Reflect.deleteProperty(document, 'hidden');
   });
 
-  it('waits through target 202, loads authorized clusters once, preserves discovery YAML, and launches the returned CR', async () => {
+  it('discovers clusters automatically, lets users pick one, and reuses its target for discovery/config/run', async () => {
     const user = userEvent.setup();
     mocks.operator.getTargetStatus.mockResolvedValueOnce(202).mockResolvedValueOnce(200);
     mocks.ai.createRun.mockResolvedValue(makeRun('real-run-1', 'Pending'));
     render(<KrknAIPage />);
     await flushReact();
     expect(operatorApi.createTargetRequest).toBe(mocks.operator.createTargetRequest);
+    expect(mocks.operator.createTargetRequest).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Create run' }));
     await user.type(screen.getByRole('textbox', { name: 'Run name' }), 'real-run-1');
-    expect(screen.getByRole('button', { name: 'Request authorized clusters' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Request authorized clusters' }));
+    expect(screen.queryByRole('button', { name: 'Request authorized clusters' })).not.toBeInTheDocument();
     await waitFor(() => expect(mocks.operator.createTargetRequest).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mocks.operator.getTargetStatus).toHaveBeenCalledTimes(1));
     expect(mocks.operator.getClusters).not.toHaveBeenCalled();
     await waitFor(() => expect(mocks.operator.getTargetStatus).toHaveBeenCalledTimes(2), { timeout: 5_000 });
     await waitFor(() => expect(mocks.operator.getClusters).toHaveBeenCalledTimes(1));
 
-    expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveValue('krkn-operator');
-    expect(screen.getByRole('combobox', { name: 'Cluster' })).toHaveValue('staging');
+    const clusterSelect = screen.getByRole('combobox', { name: 'Cluster' });
+    expect(screen.queryByRole('combobox', { name: 'Provider' })).not.toBeInTheDocument();
+    expect(clusterSelect).toHaveDisplayValue('staging (krkn-operator)');
+    await user.selectOptions(clusterSelect, screen.getByRole('option', { name: 'prod (krkn-operator-acm)' }));
     await user.click(screen.getByRole('button', { name: 'Discover components' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /Review YAML/ })).toBeInTheDocument());
     expect(screen.getAllByRole('checkbox')).toHaveLength(14);
@@ -295,7 +299,7 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(dangerous).toBeChecked();
     expect(mocks.ai.discover).toHaveBeenCalledWith(expect.objectContaining({
       targetRequestId: 'target-request-1',
-      targetClusters: { 'krkn-operator': ['staging'] },
+      targetClusters: { 'krkn-operator-acm': ['prod'] },
     }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
     await user.click(screen.getByRole('button', { name: /Review YAML/ }));
@@ -316,7 +320,7 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.ai.createConfig).toHaveBeenCalledWith(expect.objectContaining({
       name: expect.stringMatching(/^ai-real-run-1-[a-f0-9]{8}$/),
       targetRequestId: 'target-request-1',
-      targetClusters: { 'krkn-operator': ['staging'] },
+      targetClusters: { 'krkn-operator-acm': ['prod'] },
     }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(screen.getByText('saved-config-uuid')).toBeInTheDocument();
 
@@ -326,7 +330,7 @@ describe('Krkn-AI real run lifecycle', () => {
       name: 'real-run-1',
       configId: 'saved-config-uuid',
       targetRequestId: 'target-request-1',
-      targetClusters: { 'krkn-operator': ['staging'] },
+      targetClusters: { 'krkn-operator-acm': ['prod'] },
     }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(await screen.findByRole('heading', { name: 'real-run-1' })).toBeInTheDocument();
   }, 15_000);
