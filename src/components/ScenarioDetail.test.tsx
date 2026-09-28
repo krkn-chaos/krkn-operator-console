@@ -908,6 +908,52 @@ describe('ScenarioDetail', () => {
       });
     });
 
+    it('allows a signed rerun when the scenario list was not loaded', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        scenarios: null,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.getScenarios).toHaveBeenCalledWith({});
+        expect(operatorApi.runScenario).toHaveBeenCalled();
+      });
+    });
+
+    it('blocks an unsigned rerun when the scenario list was not loaded', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'unsigned' }],
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        scenarios: null,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('This scenario cannot run because its image signature is not verified.')).toBeInTheDocument();
+      });
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
     it('should dispatch scenario run created action', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);

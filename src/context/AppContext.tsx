@@ -95,7 +95,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       if (state.rerunIntent) {
         return {
           ...state,
-          phase: 'loading_scenario_detail',
+          phase: 'selecting_clusters',
+          clusters: null,
           selectedClusters: state.rerunIntent.clusters.map(c => ({
             operatorName: c.operatorName,
             clusterName: c.clusterName,
@@ -390,6 +391,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'CLUSTERS_SELECTED':
+      if (state.rerunIntent) {
+        return {
+          ...state,
+          phase: 'loading_scenario_detail',
+          registryType: state.rerunIntent.scenario.private ? 'private' : 'public',
+          registryConfig: state.rerunIntent.scenario.registryName
+            ? { registryName: state.rerunIntent.scenario.registryName }
+            : {},
+          selectedScenario: state.rerunIntent.scenario.name,
+          startInPreview: true,
+          error: null,
+        };
+      }
+
       // Proceed directly to registry configuration (no need to create targets)
       return {
         ...state,

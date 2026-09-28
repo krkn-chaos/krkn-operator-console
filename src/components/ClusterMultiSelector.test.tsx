@@ -64,4 +64,11 @@ describe('ClusterMultiSelector offline clusters', () => {
       expect.objectContaining({ clusterName: 'offline-cluster' })
     );
   });
+
+  it('removes a previously selected offline cluster and explains the change', () => {
+    renderSelector([{ operatorName: 'operator', clusterName: 'offline-cluster', clusterApiUrl: 'https://offline.example' }]);
+
+    expect(screen.getByText('Offline clusters removed from this selection')).toBeInTheDocument();
+    expect(screen.getByText(/offline-cluster is offline and cannot be included/)).toBeInTheDocument();
+  });
 });

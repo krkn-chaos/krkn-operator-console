@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardBody,
@@ -20,6 +20,7 @@ import {
   ActionGroup,
   Spinner,
   Tooltip,
+  Alert,
 } from '@patternfly/react-core';
 import { DisconnectedIcon, TopologyIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
@@ -41,6 +42,7 @@ export function ClusterMultiSelector({
   onCancel,
   showActions = true,
 }: ClusterMultiSelectorProps) {
+  const [removedOfflineClusterNames, setRemovedOfflineClusterNames] = useState<string[]>([]);
   const formatCheckedAt = (checkedAt?: string): string => {
     if (!checkedAt) return 'unknown';
 
@@ -93,6 +95,11 @@ export function ClusterMultiSelector({
   }, [clusters, selectedClusters]);
 
   useEffect(() => {
+    if (selectedOfflineClusters.length > 0) {
+      setRemovedOfflineClusterNames((previous) => [
+        ...new Set([...previous, ...selectedOfflineClusters.map((cluster) => cluster.clusterName)]),
+      ]);
+    }
     selectedOfflineClusters.forEach((cluster) => onToggle(cluster));
   }, [onToggle, selectedOfflineClusters]);
 
@@ -244,6 +251,17 @@ export function ClusterMultiSelector({
               </CardBody>
             </Card>
           ))}
+
+          {removedOfflineClusterNames.length > 0 && (
+            <Alert
+              variant="warning"
+              isInline
+              title="Offline clusters removed from this selection"
+              style={{ marginTop: '1rem' }}
+            >
+              {removedOfflineClusterNames.join(', ')} is offline and cannot be included in the run.
+            </Alert>
+          )}
 
           {showActions && (
             <Flex style={{ marginTop: '1.5rem', gap: '2rem' }}>

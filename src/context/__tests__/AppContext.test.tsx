@@ -33,6 +33,50 @@ const makeGraphRun = (overrides: Partial<GraphRunState> = {}): GraphRunState => 
 });
 
 describe('AppContext reducer', () => {
+  describe('rerun cluster refresh', () => {
+    it('refreshes clusters before loading rerun details', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({
+          type: 'RERUN_SCENARIO',
+          payload: {
+            scenario: { name: 'pod-scenarios', private: false },
+            clusters: [{ operatorName: 'operator', clusterName: 'cluster' }],
+            environment: {},
+            kubeconfigPath: '/tmp/kubeconfig',
+          },
+        });
+        capturedDispatch({ type: 'INIT_SUCCESS', payload: { uuid: 'target-1' } });
+        capturedDispatch({ type: 'POLL_SUCCESS' });
+      });
+
+      expect(capturedState.phase).toBe('selecting_clusters');
+      expect(capturedState.clusters).toBeNull();
+      expect(capturedState.selectedClusters).toEqual([
+        { operatorName: 'operator', clusterName: 'cluster', clusterApiUrl: '' },
+      ]);
+
+      act(() => {
+        capturedDispatch({
+          type: 'CLUSTERS_SUCCESS',
+          payload: {
+            clusters: {
+              operator: [
+                { 'cluster-name': 'cluster', 'cluster-api-url': 'https://cluster.example', online: false },
+              ],
+            },
+          },
+        });
+      });
+      expect(capturedState.clusters?.operator[0].online).toBe(false);
+
+      act(() => capturedDispatch({ type: 'CLUSTERS_SELECTED' }));
+      expect(capturedState.phase).toBe('loading_scenario_detail');
+      expect(capturedState.selectedScenario).toBe('pod-scenarios');
+    });
+  });
+
   describe('SET_RUN_DETAILS_LOADING', () => {
     it('adds a run name when loading is true', () => {
       renderWithProvider();

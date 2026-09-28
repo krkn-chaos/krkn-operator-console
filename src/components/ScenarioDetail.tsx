@@ -30,7 +30,7 @@ import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 import { runOnEnterFromFormControl } from '../utils/keyboard';
 import { useSignatureVerification } from '../hooks/useSignatureVerification';
 
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus } from '../types/api';
 import { createScenarioReference } from '../utils/scenarioReference';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
@@ -83,6 +83,45 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
   const [customRunName, setCustomRunName] = useState('');
+  const [rerunSignatureStatus, setRerunSignatureStatus] = useState<SignatureStatus | null>(null);
+  const [rerunSignatureLoading, setRerunSignatureLoading] = useState(false);
+  const [rerunSignatureError, setRerunSignatureError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!rerunScenario) {
+      setRerunSignatureStatus(null);
+      setRerunSignatureError(null);
+      return;
+    }
+
+    const loadedScenario = state.scenarios?.find((scenario) => scenario.name === rerunScenario.name);
+    if (state.scenarios !== null) {
+      setRerunSignatureStatus(loadedScenario?.signature_status ?? 'unknown');
+      setRerunSignatureError(null);
+      return;
+    }
+
+    let mounted = true;
+    setRerunSignatureLoading(true);
+    setRerunSignatureError(null);
+    operatorApi.getScenarios(registryConfig || {})
+      .then((response) => {
+        if (!mounted) return;
+        const scenario = response.scenarios.find((item) => item.name === rerunScenario.name);
+        setRerunSignatureStatus(scenario?.signature_status ?? 'unknown');
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        setRerunSignatureError(error instanceof Error ? error.message : 'Unable to verify the scenario image signature.');
+      })
+      .finally(() => {
+        if (mounted) setRerunSignatureLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [registryConfig, rerunScenario, state.scenarios]);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -446,15 +485,15 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       return;
     }
 
-    if (rerunScenario && signatureVerificationLoading) {
+    if (rerunScenario && (signatureVerificationLoading || rerunSignatureLoading)) {
       setValidationErrors(['Image signature verification is still loading — please try again.']);
       return;
     }
-    if (rerunScenario && (signatureVerificationError || signatureVerificationEnabled === null)) {
-      setValidationErrors([signatureVerificationError || 'Image signature verification status is unavailable.']);
+    if (rerunScenario && (signatureVerificationError || rerunSignatureError || signatureVerificationEnabled === null || rerunSignatureStatus === null)) {
+      setValidationErrors([signatureVerificationError || rerunSignatureError || 'Image signature verification status is unavailable.']);
       return;
     }
-    if (rerunScenario && signatureVerificationEnabled && selectedScenario?.signature_status !== 'signed') {
+    if (rerunScenario && signatureVerificationEnabled && rerunSignatureStatus !== 'signed') {
       setValidationErrors(['This scenario cannot run because its image signature is not verified.']);
       return;
     }
