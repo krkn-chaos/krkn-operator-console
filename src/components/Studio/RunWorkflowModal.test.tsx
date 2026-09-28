@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunWorkflowModal } from './RunWorkflowModal';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
+import type { StudioNode } from '../../types/api';
 
 const signatureState = vi.hoisted(() => ({
   enabled: true as boolean | null,
@@ -31,7 +32,7 @@ vi.mock('../ClusterMultiSelector', () => ({
 }));
 vi.mock('../ResiliencyScoreModal', () => ({ ResiliencyScoreModal: () => null }));
 
-const signedNode = {
+const signedNode: StudioNode = {
   nodeId: 'node-1',
   status: 'configured' as const,
   position: { x: 0, y: 0 },
@@ -45,9 +46,16 @@ const signedNode = {
   },
 };
 
-const unsignedNode = {
+const unsignedNode: StudioNode = {
   ...signedNode,
-  config: { ...signedNode.config, scenarioName: 'unsigned-scenario', signature_status: 'unsigned' as const },
+  config: {
+    registryType: 'public',
+    registryConfig: {},
+    scenarioName: 'unsigned-scenario',
+    scenarioImage: 'quay.io/example:unsigned-scenario',
+    signature_status: 'unsigned',
+    scenarioFormValues: {},
+  },
 };
 
 function renderModal(node = unsignedNode) {
