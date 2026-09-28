@@ -1,4 +1,4 @@
-import { Checkbox } from '@patternfly/react-core';
+import { Button, Checkbox } from '@patternfly/react-core';
 import type { ClusterComponents } from './types';
 
 interface ClusterComponentsEditorProps {
@@ -14,6 +14,23 @@ type ComponentLocation =
   | { kind: 'pvc'; namespaceIndex: number; componentIndex: number }
   | { kind: 'node'; componentIndex: number };
 
+type NamespaceComponent = ClusterComponents['namespaces'][number];
+
+function withNamespaceDisabled(namespace: NamespaceComponent, disabled: boolean): NamespaceComponent {
+  return {
+    ...namespace,
+    disabled,
+    pods: namespace.pods.map((pod) => ({
+      ...pod,
+      disabled,
+      containers: pod.containers.map((container) => ({ ...container, disabled })),
+    })),
+    services: namespace.services.map((service) => ({ ...service, disabled })),
+    pvcs: namespace.pvcs.map((pvc) => ({ ...pvc, disabled })),
+    ...(namespace.vmis ? { vmis: namespace.vmis.map((vmi) => ({ ...vmi, disabled })) } : {}),
+  };
+}
+
 function withDisabledFlag(components: ClusterComponents, location: ComponentLocation, disabled: boolean): ClusterComponents {
   if (location.kind === 'node') {
     return {
@@ -26,7 +43,7 @@ function withDisabledFlag(components: ClusterComponents, location: ComponentLoca
     ...components,
     namespaces: components.namespaces.map((namespace, namespaceIndex) => {
       if (namespaceIndex !== location.namespaceIndex) return namespace;
-      if (location.kind === 'namespace') return { ...namespace, disabled };
+      if (location.kind === 'namespace') return withNamespaceDisabled(namespace, disabled);
       if (location.kind === 'pod') {
         return {
           ...namespace,
@@ -63,22 +80,48 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
     onChange(withDisabledFlag(components, location, !enabled));
   };
 
+  const setAllNamespacesEnabled = (enabled: boolean) => {
+    onChange({
+      ...components,
+      namespaces: components.namespaces.map((namespace) => withNamespaceDisabled(namespace, !enabled)),
+    });
+  };
+
   return (
     <div className="krkn-ai-component-editor">
       <p className="krkn-ai-muted">Components start enabled. Uncheck an item to set <code>disabled: true</code>; disabling a namespace disables its descendants.</p>
+      <div className="krkn-ai-component-actions">
+        <Button
+          variant="secondary"
+          isDisabled={components.namespaces.length === 0}
+          onClick={() => setAllNamespacesEnabled(true)}
+        >
+          Select all namespaces
+        </Button>
+        <Button
+          variant="secondary"
+          isDisabled={components.namespaces.length === 0}
+          onClick={() => setAllNamespacesEnabled(false)}
+        >
+          Disable all namespaces
+        </Button>
+      </div>
       <div className="krkn-ai-component-namespaces">
         {components.namespaces.map((namespace, namespaceIndex) => (
           <details key={namespace.name} className="krkn-ai-component-namespace" open={namespaceIndex === 0}>
-            <summary>
-              <strong>Namespace {namespace.name}</strong> · {namespace.disabled ? 'Not enabled' : 'Enabled'}
+            <summary className="krkn-ai-component-namespace__summary">
+              <strong>Namespace {namespace.name}</strong>
+              <span className="krkn-ai-component-namespace__state">{namespace.disabled ? 'Disabled' : 'Enabled'}</span>
+              <span onClick={(event) => event.stopPropagation()}>
+                <Checkbox
+                  id={`krkn-ai-enable-namespace-${namespaceIndex}`}
+                  label={`Enable namespace ${namespace.name}`}
+                  isChecked={!namespace.disabled}
+                  onChange={(_event, checked) => toggleEnabled({ kind: 'namespace', namespaceIndex }, checked)}
+                />
+              </span>
             </summary>
             <div className="krkn-ai-component-namespace-content">
-              <Checkbox
-                id={`krkn-ai-enable-namespace-${namespaceIndex}`}
-                label={`Enable namespace ${namespace.name}`}
-                isChecked={!namespace.disabled}
-                onChange={(_event, checked) => toggleEnabled({ kind: 'namespace', namespaceIndex }, checked)}
-              />
               <fieldset className="krkn-ai-component-group">
                 <legend>Pods and containers</legend>
                 {namespace.pods.length === 0 && <p className="krkn-ai-muted">No pods were returned by discovery.</p>}

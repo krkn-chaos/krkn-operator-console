@@ -65,6 +65,10 @@ sending kubeconfig or service credentials to the browser. It edits the returned
 YAML, validates it against the Krkn-AI schema, saves a target-bound config, and
 launches only after the operator returns a `201` `KrknAIRun`.
 
+The wizard's Components section provides Select all and Disable all controls for
+namespaces. Each namespace toggle sits beside its accordion title and applies
+the disabled state to all of that namespace's descendants.
+
 Run lists and details read persisted operator resources and typed artifact
 results. While a visible list or detail contains an active run, the console
 refreshes status and partial results on a non-overlapping 10-second timer; it

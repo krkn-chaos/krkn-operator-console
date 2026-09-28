@@ -11,8 +11,10 @@ import type {
 } from '../../services/krknAiApi';
 import { operatorApi } from '../../services/operatorApi';
 import { websocketService } from '../../services/websocketService';
-import { validateConfigDraft, createEditableConfigDraft } from './configModel';
+import { validateConfigDraft, createEditableConfigDraft, updateConfigDocument } from './configModel';
 import { KrknAIPage } from './KrknAIPage';
+import { ClusterComponentsEditor } from './ClusterComponentsEditor';
+import type { ClusterComponents } from './types';
 
 const mocks = vi.hoisted(() => ({
   ai: {
@@ -531,5 +533,57 @@ describe('Krkn-AI real run lifecycle', () => {
       'genetic.compositionRate': expect.any(String),
       'fitnessItem.1.weight': expect.any(String),
     });
+  });
+  it('bulk-toggles namespaces and propagates individual namespace disables to descendants', async () => {
+    const user = userEvent.setup();
+    const components: ClusterComponents = {
+      namespaces: [{
+        name: 'shop',
+        disabled: false,
+        pods: [{ name: 'web', disabled: false, labels: {}, containers: [{ name: 'web', disabled: false }] }],
+        services: [{ name: 'web', disabled: false }],
+        pvcs: [{ name: 'data', disabled: false }],
+        vmis: [{ name: 'guest', disabled: false }],
+      }],
+      nodes: [{ name: 'worker-a', disabled: false }],
+    };
+    const onChange = vi.fn((_next: ClusterComponents) => undefined);
+    render(<ClusterComponentsEditor components={components} onChange={onChange} />);
+    const accordion = screen.getByText('Namespace shop').closest('details');
+    expect(accordion?.open).toBe(true);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Enable namespace shop' }));
+    expect(accordion?.open).toBe(true);
+    const disabledNamespace = onChange.mock.calls[0][0].namespaces[0];
+    expect(disabledNamespace.disabled).toBe(true);
+    expect(disabledNamespace.pods[0].disabled).toBe(true);
+    expect(disabledNamespace.pods[0].containers[0].disabled).toBe(true);
+    expect(disabledNamespace.services[0].disabled).toBe(true);
+    expect(disabledNamespace.pvcs[0].disabled).toBe(true);
+    expect(disabledNamespace.vmis?.[0].disabled).toBe(true);
+
+    const editable = createEditableConfigDraft(DISCOVERED_YAML);
+    const serialized = updateConfigDocument(editable.document, {
+      ...editable.draft,
+      clusterComponents: { ...editable.draft.clusterComponents, namespaces: [disabledNamespace] },
+    });
+    expect(createEditableConfigDraft(serialized).draft.clusterComponents.namespaces[0].vmis?.[0].disabled).toBe(true);
+
+    onChange.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Disable all namespaces' }));
+    const allDisabled = onChange.mock.calls[0][0].namespaces[0];
+    expect(allDisabled.disabled).toBe(true);
+    expect(allDisabled.pods[0].containers[0].disabled).toBe(true);
+    expect(onChange.mock.calls[0][0].nodes[0].disabled).toBe(false);
+
+    onChange.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Select all namespaces' }));
+    const allEnabled = onChange.mock.calls[0][0].namespaces[0];
+    expect(allEnabled.disabled).toBe(false);
+    expect(allEnabled.pods[0].disabled).toBe(false);
+    expect(allEnabled.pods[0].containers[0].disabled).toBe(false);
+    expect(allEnabled.services[0].disabled).toBe(false);
+    expect(allEnabled.pvcs[0].disabled).toBe(false);
+    expect(allEnabled.vmis?.[0].disabled).toBe(false);
   });
 });

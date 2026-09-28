@@ -961,6 +961,12 @@
   min-width: 0;
 }
 
+.krkn-ai-component-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .krkn-ai-component-namespace {
   min-width: 0;
   border: 1px solid var(--krkn-ai-border);
@@ -969,9 +975,30 @@
 }
 
 .krkn-ai-component-namespace > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.8rem;
   cursor: pointer;
   overflow-wrap: anywhere;
+}
+
+.krkn-ai-component-namespace > summary::before {
+  content: '▸';
+  flex: 0 0 auto;
+  color: var(--krkn-ai-muted);
+}
+
+.krkn-ai-component-namespace[open] > summary::before {
+  content: '▾';
+}
+
+.krkn-ai-component-namespace__state {
+  color: var(--krkn-ai-muted);
+}
+
+.krkn-ai-component-namespace__summary > span:last-child {
+  margin-inline-start: auto;
 }
 
 .krkn-ai-component-namespace-content {

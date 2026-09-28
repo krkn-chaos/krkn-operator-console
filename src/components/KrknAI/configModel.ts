@@ -302,6 +302,7 @@ export function updateConfigDocument(document: Document, draft: EditableConfigDr
     });
     namespace.services.forEach((service, componentIndex) => updateDisabled(['namespaces', namespaceIndex, 'services', componentIndex], service.disabled ?? false));
     namespace.pvcs.forEach((pvc, componentIndex) => updateDisabled(['namespaces', namespaceIndex, 'pvcs', componentIndex], pvc.disabled ?? false));
+    namespace.vmis?.forEach((vmi, componentIndex) => updateDisabled(['namespaces', namespaceIndex, 'vmis', componentIndex], vmi.disabled ?? false));
   });
   edited.nodes.forEach((node, index) => updateDisabled(['nodes', index], node.disabled ?? false));
   return document.toString();
