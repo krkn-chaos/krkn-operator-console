@@ -376,6 +376,80 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(screen.getByLabelText('Existing config file content')).toHaveTextContent('site_extension');
   });
 
+  it('loads the run config through the permission-filtered file ID', async () => {
+    const run = makeRun('config-review-run', 'Running');
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.operator.getAvailableFiles.mockResolvedValue({
+      files: [{
+        fileId: 'run-config-file-id',
+        fileName: run.spec.configMapName!,
+        filePurpose: 'krkn-ai-config',
+        availableToAll: false,
+      }],
+    });
+    mocks.operator.getFile.mockResolvedValue({
+      fileId: 'run-config-file-id',
+      fileName: run.spec.configMapName!,
+      content: DISCOVERED_YAML,
+      availableToAll: false,
+    });
+
+    render(<KrknAIPage />);
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open run config-review-run/ }));
+    await waitFor(() => expect(mocks.operator.getFile).toHaveBeenCalledWith(
+      'run-config-file-id',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ));
+    fireEvent.click(screen.getByText('View krkn-ai.yaml used for this run'));
+    expect(await screen.findByText(/Preserve this discovery comment/)).toBeInTheDocument();
+    expect(mocks.operator.getAvailableFiles).toHaveBeenCalledWith(
+      'krkn-ai-config',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('keeps config authorization failures distinct from retriable file-service errors', async () => {
+    const run = makeRun('config-retry-run', 'Running');
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.operator.getAvailableFiles
+      .mockRejectedValueOnce(Object.assign(new Error('temporary file service outage'), { status: 503, statusText: 'Service Unavailable' }))
+      .mockResolvedValueOnce({
+        files: [{
+          fileId: 'retry-config-id',
+          fileName: run.spec.configMapName!,
+          filePurpose: 'krkn-ai-config',
+          availableToAll: false,
+        }],
+      });
+    mocks.operator.getFile.mockResolvedValue({
+      fileId: 'retry-config-id',
+      fileName: run.spec.configMapName!,
+      content: DISCOVERED_YAML,
+      availableToAll: false,
+    });
+
+    render(<KrknAIPage />);
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open run config-retry-run/ }));
+    fireEvent.click(screen.getByText('View krkn-ai.yaml used for this run'));
+    const retry = await screen.findByRole('button', { name: 'Retry configuration load' });
+    fireEvent.click(retry);
+    expect(await screen.findByText(/Preserve this discovery comment/)).toBeInTheDocument();
+
+    cleanup();
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.operator.getAvailableFiles.mockRejectedValueOnce(
+      Object.assign(new Error('Forbidden'), { status: 403, statusText: 'Forbidden' }),
+    );
+    render(<KrknAIPage />);
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open run config-retry-run/ }));
+    fireEvent.click(screen.getByText('View krkn-ai.yaml used for this run'));
+    expect(await screen.findByText('This configuration is not available to your account, or is no longer available.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry configuration load' })).not.toBeInTheDocument();
+  });
+
   it('keeps the last successful summary and retries transient artifact updates', async () => {
     vi.useFakeTimers();
     const run = makeRun('retry-run', 'Running');
@@ -505,6 +579,44 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(4);
     expect(mocks.ai.getScenarioIndex).toHaveBeenCalledTimes(3);
     expect(mocks.ai.getScenario).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries an in-progress scenario detail 404 after visibility returns and retains indexed rows', async () => {
+    vi.useFakeTimers();
+    const run = makeRun('late-artifact-run', 'Running');
+    const row = makeScenarioRow({ fitnessScore: 4 });
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.ai.getRunSummary
+      .mockResolvedValueOnce(makeSummary(run.metadata.name, 'Running'))
+      .mockRejectedValueOnce(Object.assign(new Error('run cache miss'), { status: 404, statusText: 'Not Found' }));
+    mocks.ai.getScenarioIndex
+      .mockResolvedValueOnce(makeIndex([row]))
+      .mockResolvedValueOnce(makeIndex([]));
+    mocks.ai.getScenario
+      .mockRejectedValueOnce(Object.assign(new Error('scenario artifact not uploaded'), { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValue(makeScenarioDetail(9));
+
+    render(<KrknAIPage />);
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open run late-artifact-run/ }));
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
+    await flushReact();
+    expect(screen.getByText('The scenario result is not committed yet. Will retry when run results refresh.')).toBeInTheDocument();
+
+    setDocumentHidden(true);
+    await advance(20_000);
+    expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(2);
+    expect(mocks.ai.getScenarioIndex).toHaveBeenCalledTimes(1);
+
+    setDocumentHidden(false);
+    await flushReact();
+    expect(screen.getByText('9 fitness units')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ })).toBeInTheDocument();
+    expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(3);
+    expect(mocks.ai.getScenarioIndex).toHaveBeenCalledTimes(2);
+    expect(mocks.ai.getScenario).toHaveBeenCalledTimes(2);
   });
 
   it('accepts real health URLs and unrestricted nonnegative weights but rejects invalid local bounds', () => {

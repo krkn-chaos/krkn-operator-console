@@ -26,7 +26,30 @@ const TERMINAL_PHASES: Record<string, true> = { Succeeded: true, Failed: true, C
 const POLL_INTERVAL_MS = 10_000;
 const SCENARIO_PAGE_LIMIT = 500;
 
-type ConfigState = 'loading' | 'available' | 'unavailable';
+type ConfigState = 'loading' | 'available' | 'unavailable' | 'error';
+
+function mergeIndexWhileActive(
+  previous: KrknAIScenarioIndexResponse | null,
+  next: KrknAIScenarioIndexResponse,
+  active: boolean,
+): KrknAIScenarioIndexResponse {
+  if (!active || !previous) return next;
+  const visible = new Set(next.scenarios.map((row) => scenarioKey(row.generation, row.scenarioId)));
+  const scenarios = [
+    ...next.scenarios,
+    ...previous.scenarios.filter((row) => !visible.has(scenarioKey(row.generation, row.scenarioId))),
+  ];
+  const total = Math.max(next.pagination.total, scenarios.length);
+  return {
+    ...next,
+    scenarios,
+    pagination: {
+      ...next.pagination,
+      total,
+      totalPages: Math.max(next.pagination.totalPages, Math.ceil(total / next.pagination.limit)),
+    },
+  };
+}
 
 
 function errorStatus(error: unknown): number | undefined {
@@ -117,15 +140,15 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
   const [scenarioErrors, setScenarioErrors] = useState<Record<string, string>>({});
   const [configYaml, setConfigYaml] = useState<string | null>(null);
   const [configState, setConfigState] = useState<ConfigState>('loading');
-  const summaryRef = useRef(summary);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [configRetry, setConfigRetry] = useState(0);
+  const detailControllers = useRef(new Map<string, AbortController>());
   const indexRef = useRef(scenarioIndex);
   const phaseRef = useRef(run.status?.phase ?? 'Pending');
   const selectedScenarioRef = useRef(selectedScenario);
   const scenarioDetailsRef = useRef(scenarioDetails);
   const scenarioUpdatingRef = useRef(scenarioUpdating);
-  const detailControllers = useRef(new Map<string, AbortController>());
   const missingRunCount = useRef(0);
-  summaryRef.current = summary;
   indexRef.current = scenarioIndex;
   phaseRef.current = summary?.phase ?? run.status?.phase ?? 'Pending';
   selectedScenarioRef.current = selectedScenario;
@@ -151,10 +174,14 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
       setScenarioUpdating((current) => ({ ...current, [key]: false }));
     } catch (detailError) {
       if (!controller.signal.aborted) {
-        const isUpdating = errorStatus(detailError) === 503;
+        const status = errorStatus(detailError);
+        const isUpdating = status === 503 || (status === 404 && ACTIVE_PHASES[phaseRef.current] === true);
         scenarioUpdatingRef.current = { ...scenarioUpdatingRef.current, [key]: isUpdating };
         setScenarioUpdating((current) => ({ ...current, [key]: isUpdating }));
-        setScenarioErrors((current) => ({ ...current, [key]: errorText(detailError) }));
+        setScenarioErrors((current) => ({
+          ...current,
+          [key]: isUpdating ? '' : errorText(detailError),
+        }));
       }
     } finally {
       if (detailControllers.current.get(key) === controller) detailControllers.current.delete(key);
@@ -164,9 +191,10 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setConfigState('loading');
     setConfigYaml(null);
+    setConfigError(null);
     if (!run.spec.configMapName) {
+      setConfigYaml(null);
       setConfigState('unavailable');
       return () => controller.abort();
     }
@@ -181,13 +209,20 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         const file = await operatorApi.getFile(configFile.fileId, { signal: controller.signal });
         setConfigYaml(file.content);
         setConfigState('available');
-      } catch {
-        if (!controller.signal.aborted) setConfigState('unavailable');
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const status = errorStatus(error);
+        if (status === 401 || status === 403 || status === 404) {
+          setConfigState('unavailable');
+        } else {
+          setConfigError(errorText(error));
+          setConfigState('error');
+        }
       }
     };
     void loadConfig();
     return () => controller.abort();
-  }, [name, run.spec.configMapName]);
+  }, [name, run.spec.configMapName, configRetry]);
 
   useEffect(() => {
     let disposed = false;
@@ -241,23 +276,28 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
       if (summaryResult.status === 'fulfilled') {
         missingRunCount.current = 0;
         setSummary(summaryResult.value);
-        summaryRef.current = summaryResult.value;
         setSummaryError(null);
         setDeleted(false);
       } else {
         const failure = summaryResult.reason;
-        setSummaryError(errorText(failure));
+        const cacheMiss = summaryStatus === 404 && ACTIVE_PHASES[phaseRef.current] === true;
+        setSummaryError(cacheMiss ? 'Run results are not visible in the operator cache yet; retrying while the run is active.' : errorText(failure));
         if (summaryStatus === 404) {
           missingRunCount.current += 1;
           if (missingRunCount.current >= 2 || TERMINAL_PHASES[phaseRef.current] === true) {
             setDeleted(true);
           }
+        } else {
+          missingRunCount.current = 0;
         }
       }
-
       if (indexResult.status === 'fulfilled') {
-        const nextIndex = indexResult.value;
         const oldIndex = indexRef.current;
+        const nextIndex = mergeIndexWhileActive(
+          oldIndex,
+          indexResult.value,
+          ACTIVE_PHASES[phaseRef.current] === true,
+        );
         const selected = selectedScenarioRef.current;
         if (selected) {
           const key = scenarioKey(selected.generation, selected.scenarioId);
@@ -275,10 +315,12 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         indexRef.current = nextIndex;
         setIndexError(null);
       } else {
-        setIndexError(errorText(indexResult.reason));
+        const cacheMiss = indexStatus === 404 && ACTIVE_PHASES[phaseRef.current] === true;
+        setIndexError(cacheMiss ? 'Scenario results are not visible in the operator cache yet; retrying while the run is active.' : errorText(indexResult.reason));
       }
 
-      const transientFailure = summaryStatus === 503 || indexStatus === 503;
+      const transientFailure = summaryStatus === 503 || indexStatus === 503
+        || (ACTIVE_PHASES[phaseRef.current] === true && (summaryStatus === 404 || indexStatus === 404));
       setUpdating(transientFailure);
       setInitialLoading(false);
       inFlight = false;
@@ -401,12 +443,17 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
           <p>Config: <code>{run.spec.configMapName || 'Not available'}</code></p>
           <details>
             <summary>View krkn-ai.yaml used for this run</summary>
-            {configState === 'loading' ? (
-              <p role="status">Loading saved configuration…</p>
-            ) : configYaml ? (
-              <pre className="krkn-ai-run-detail__yaml">{configYaml}</pre>
-            ) : (
-              <p className="krkn-ai-not-available">Saved configuration is not available to this account.</p>
+            {configYaml && <pre className="krkn-ai-run-detail__yaml">{configYaml}</pre>}
+            {configState === 'loading' && !configYaml && <p role="status">Loading saved configuration…</p>}
+            {configState === 'error' && (
+              <Alert variant="warning" title="Unable to load saved configuration" isInline>
+                {configError || 'The config file request failed.'}
+                {' '}
+                <Button variant="link" onClick={() => setConfigRetry((value) => value + 1)}>Retry configuration load</Button>
+              </Alert>
+            )}
+            {configState === 'unavailable' && (
+              <p className="krkn-ai-not-available">This configuration is not available to your account, or is no longer available.</p>
             )}
           </details>
         </CardBody>

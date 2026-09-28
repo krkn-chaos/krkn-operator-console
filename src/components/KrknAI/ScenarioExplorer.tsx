@@ -128,7 +128,7 @@ function ScenarioDetail({
         </div>
       </div>
 
-      {updating && <p className="krkn-ai-run-detail__updating">Result upload is updating. Showing the last committed scenario result.</p>}
+      {updating && <p className="krkn-ai-run-detail__updating">{detail ? 'Result upload is updating. Showing the last committed scenario result.' : 'The scenario result is not committed yet. Will retry when run results refresh.'}</p>}
       {error && (
         <div className="krkn-ai-scenario-detail__error" role="alert">
           <p>{error}</p>
@@ -136,7 +136,7 @@ function ScenarioDetail({
         </div>
       )}
       {loading && !detail && <p role="status">Loading committed scenario details…</p>}
-      {!detail && !loading && !error && (
+      {!detail && !loading && !error && !updating && (
         <p className="krkn-ai-not-available">The scenario result has not been committed yet. Child run status and logs remain available below.</p>
       )}
 
