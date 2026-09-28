@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
   Alert,
   Button,
@@ -22,40 +22,27 @@ import {
   SlidersHIcon,
   TopologyIcon,
 } from '@patternfly/react-icons';
-import { mockAiTargets } from './mockData';
+import { krknAiApi, KrknAIConfigValidationError } from '../../services/krknAiApi';
+import type { KrknAIRunResource, KrknAIConfigValidationIssue } from '../../services/krknAiApi';
+import { isApiError } from '../../utils/apiClient';
+import { operatorApi } from '../../services/operatorApi';
+import type { Cluster, FileInfo, SelectedCluster } from '../../types/api';
 import { FitnessFunctionEditor } from './FitnessFunctionEditor';
 import { HealthChecksEditor } from './HealthChecksEditor';
 import { DiscoveryOptionsEditor } from './DiscoveryOptionsEditor';
 import { ClusterComponentsEditor } from './ClusterComponentsEditor';
 import {
-  buildMockConfigYaml,
-  copyClusterComponents,
-  createDefaultConfigDraft,
+  createEditableConfigDraft,
   scenarioTypeOptions,
+  updateConfigDocument,
   validateConfigDraft,
 } from './configModel';
-import {
-  defaultMockDiscoveryOptions,
-  discoverMockComponents,
-  preserveDisabledComponentFlags,
-  validateMockDiscoveryOptions,
-} from './discoveryOptions';
-import type { MockDiscoveryOptions } from './discoveryOptions';
-import type {
-  ConfigValidationErrors,
-  EditableConfigDraft,
-  GeneticSettingsDraft,
-  ScenarioType,
-} from './configModel';
-import type { MockAiRun } from './types';
-type ConfigurationSectionId =
-  | 'scenarios'
-  | 'components'
-  | 'genetic'
-  | 'fitness'
-  | 'health'
-  | 'run-settings'
-  | 'preview';
+import { defaultDiscoveryOptions, validateDiscoveryOptions } from './discoveryOptions';
+import type { DiscoveryOptions } from './discoveryOptions';
+import type { ConfigValidationErrors, EditableConfigDraft, GeneticSettingsDraft } from './configModel';
+import type { Document } from 'yaml';
+
+type ConfigurationSectionId = 'scenarios' | 'components' | 'genetic' | 'fitness' | 'health' | 'run-settings' | 'preview';
 
 interface ConfigurationSection {
   id: ConfigurationSectionId;
@@ -69,27 +56,22 @@ const configurationSections: ConfigurationSection[] = [
   { id: 'components', label: 'Cluster components', summary: 'Set the mutation scope', icon: CubesIcon },
   { id: 'genetic', label: 'Genetic algorithm', summary: 'Tune the search strategy', icon: DnaIcon },
   { id: 'fitness', label: 'Fitness functions', summary: 'Define scoring signals', icon: ChartLineIcon },
-  { id: 'health', label: 'Health checks', summary: 'Configure mock endpoints', icon: HeartbeatIcon },
+  { id: 'health', label: 'Health checks', summary: 'Configure measured endpoints', icon: HeartbeatIcon },
   { id: 'run-settings', label: 'Run settings', summary: 'Set timing and output', icon: SlidersHIcon },
-  { id: 'preview', label: 'Review YAML', summary: 'Inspect the generated config', icon: FileCodeIcon },
+  { id: 'preview', label: 'Review YAML', summary: 'Inspect the discovered config', icon: FileCodeIcon },
 ];
 
-interface MockConfig {
+interface SavedConfig {
   id: string;
-  targetRequestId: string;
-  clusterName: string;
+  name: string;
   yaml: string;
-  generations: number;
-  populationSize: number;
-  scenarioTypes: ScenarioType[];
-  fitnessItemCount: number;
-  healthCheckCount: number;
-  discoveryOptions: MockDiscoveryOptions;
+  targetRequestId: string;
+  targetClusters: Record<string, string[]>;
 }
 
 interface CreateRunProps {
   existingNames: string[];
-  onStart: (run: MockAiRun) => void;
+  onStart: (run: KrknAIRunResource) => void;
   onCancel: () => void;
 }
 
@@ -99,22 +81,13 @@ interface ConfigTextFieldProps {
   value: string;
   onChange: (value: string) => void;
   error?: string;
-  helperText?: string;
 }
 
-function ConfigTextField({ id, label, value, onChange, error, helperText }: ConfigTextFieldProps) {
+function ConfigTextField({ id, label, value, onChange, error }: ConfigTextFieldProps) {
   return (
     <FormGroup label={label} fieldId={id} isRequired>
-      <TextInput
-        id={id}
-        value={value}
-        onChange={(_event, nextValue) => onChange(nextValue)}
-        validated={error ? 'error' : 'default'}
-        aria-invalid={!!error}
-        aria-describedby={error ? `${id}-error` : undefined}
-      />
-      {error && <p id={`${id}-error`} className="krkn-ai-field-error" role="alert">{error}</p>}
-      {!error && helperText && <p className="krkn-ai-muted">{helperText}</p>}
+      <TextInput id={id} value={value} onChange={(_event, nextValue) => onChange(nextValue)} validated={error ? 'error' : 'default'} aria-invalid={!!error} />
+      {error && <p className="krkn-ai-field-error" role="alert">{error}</p>}
     </FormGroup>
   );
 }
@@ -134,20 +107,9 @@ interface ConfigNumberFieldProps {
 function ConfigNumberField({ id, label, value, onChange, error, min, max, step, optional = false }: ConfigNumberFieldProps) {
   return (
     <FormGroup label={label} fieldId={id} isRequired={!optional}>
-      <TextInput
-        id={id}
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(_event, nextValue) => onChange(nextValue)}
-        validated={error ? 'error' : 'default'}
-        aria-invalid={!!error}
-        aria-describedby={error ? `${id}-error` : undefined}
-      />
-      {error && <p id={`${id}-error`} className="krkn-ai-field-error" role="alert">{error}</p>}
-      {!error && optional && <p className="krkn-ai-muted">Leave blank for null.</p>}
+      <TextInput id={id} type="number" min={min} max={max} step={step} value={value} onChange={(_event, nextValue) => onChange(nextValue)} validated={error ? 'error' : 'default'} aria-invalid={!!error} />
+      {error && <p className="krkn-ai-field-error" role="alert">{error}</p>}
+      {!error && optional && <p className="krkn-ai-muted">Leave blank to omit this optional value.</p>}
     </FormGroup>
   );
 }
@@ -156,156 +118,370 @@ function errorFor(errors: ConfigValidationErrors, field: string): string | undef
   return errors[field];
 }
 
+function apiErrorMessage(error: unknown): string {
+  if (isApiError(error)) return `HTTP ${error.status}: ${error.message}`;
+  if (error instanceof Error) return error.message;
+  return 'The request failed. Try again.';
+}
+
+
 export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) {
-  const firstTarget = mockAiTargets[0];
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [runName, setRunName] = useState('');
-  const [selectedTargetRequestId, setSelectedTargetRequestId] = useState(firstTarget.targetRequestId);
-  const [draft, setDraft] = useState<EditableConfigDraft>(() => createDefaultConfigDraft(firstTarget));
-  const [discoveryOptions, setDiscoveryOptions] = useState<MockDiscoveryOptions>(defaultMockDiscoveryOptions);
+  const [targetRequestId, setTargetRequestId] = useState('');
+  const [targetClusters, setTargetClusters] = useState<Record<string, Cluster[]>>({});
+  const [targetLoading, setTargetLoading] = useState(false);
+  const [targetStarted, setTargetStarted] = useState(false);
+  const [targetError, setTargetError] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState('');
+  const [selectedClusterName, setSelectedClusterName] = useState('');
+  const [discoveryOptions, setDiscoveryOptions] = useState<DiscoveryOptions>(defaultDiscoveryOptions);
   const [discoveryWarnings, setDiscoveryWarnings] = useState<string[]>([]);
-  const [createdConfig, setCreatedConfig] = useState<MockConfig | null>(null);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState('');
+  const [draft, setDraft] = useState<EditableConfigDraft | null>(null);
+  const [configYaml, setConfigYaml] = useState('');
+  const [yamlError, setYamlError] = useState('');
   const [configurationSection, setConfigurationSection] = useState<ConfigurationSectionId>('scenarios');
+  const [createdConfig, setCreatedConfig] = useState<SavedConfig | null>(null);
+  const [serverValidationErrors, setServerValidationErrors] = useState<KrknAIConfigValidationIssue[]>([]);
+  const [actionError, setActionError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [dangerousConfirmed, setDangerousConfirmed] = useState(false);
+  const [fileList, setFileList] = useState<FileInfo[]>([]);
+  const [filesUnavailable, setFilesUnavailable] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState('');
+  const [existingFileYaml, setExistingFileYaml] = useState('');
+  const [existingFileError, setExistingFileError] = useState('');
+  const documentRef = useRef<Document | null>(null);
+  const targetControllerRef = useRef<AbortController | null>(null);
+  const targetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
-  const selectedTarget = mockAiTargets.find((target) => target.targetRequestId === selectedTargetRequestId);
+  const startTargetRequest = async () => {
+    if (targetStarted || targetControllerRef.current) return;
+    const controller = new AbortController();
+    targetControllerRef.current = controller;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setTargetStarted(true);
+    setTargetLoading(true);
+    setTargetError('');
+    const finish = () => {
+      if (targetControllerRef.current === controller) targetControllerRef.current = null;
+      targetTimerRef.current = undefined;
+    };
+    const poll = async (uuid: string) => {
+      try {
+        const status = await operatorApi.getTargetStatus(uuid, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        if (status === 202) {
+          timer = setTimeout(() => { void poll(uuid); }, 2000);
+          targetTimerRef.current = timer;
+          return;
+        }
+        if (status !== 200) throw new Error(`Target request failed with HTTP ${status}.`);
+        clearTimeout(timer);
+        timer = undefined;
+        targetTimerRef.current = undefined;
+        const clustersResponse = await operatorApi.getClusters(uuid, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        const clusters = clustersResponse.targetData;
+        setTargetClusters(clusters);
+        const firstProvider = Object.keys(clusters)[0] ?? '';
+        const firstCluster = clusters[firstProvider]?.[0];
+        setSelectedProvider(firstProvider);
+        setSelectedClusterName(firstCluster?.['cluster-name'] ?? '');
+        if (!firstProvider || !firstCluster) setTargetError('No authorized clusters are available for this target request.');
+        setTargetLoading(false);
+        finish();
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        controller.abort();
+        clearTimeout(timer);
+        setTargetError(apiErrorMessage(error));
+        setTargetLoading(false);
+        finish();
+      }
+    };
+    try {
+      const response = await operatorApi.createTargetRequest({ signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (!response.uuid) throw new Error('Target request did not return a request ID.');
+      setTargetRequestId(response.uuid);
+      await poll(response.uuid);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      controller.abort();
+      clearTimeout(timer);
+      setTargetError(apiErrorMessage(error));
+      setTargetLoading(false);
+      finish();
+    }
+  };
+
+  useEffect(() => () => {
+    targetControllerRef.current?.abort();
+    clearTimeout(targetTimerRef.current);
+    targetTimerRef.current = undefined;
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+  }, []);
+
+  const selectedCluster = useMemo<SelectedCluster | null>(() => {
+    const cluster = targetClusters[selectedProvider]?.find((item) => item['cluster-name'] === selectedClusterName);
+    if (!cluster || !selectedProvider) return null;
+    return {
+      operatorName: selectedProvider,
+      clusterName: cluster['cluster-name'],
+      clusterApiUrl: cluster['cluster-api-url'],
+    };
+  }, [targetClusters, selectedProvider, selectedClusterName]);
+
   const trimmedName = runName.trim();
-  const nameError = trimmedName.length === 0
+  const nameError = !trimmedName
     ? 'Run name is required.'
     : !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(trimmedName)
       ? 'Use a DNS label: 1–63 lowercase letters, numbers, or hyphens; start and end with a letter or number.'
       : existingNames.some((name) => name.toLowerCase() === trimmedName.toLowerCase())
         ? 'A run with this name already exists.'
         : undefined;
-  const discoveryOptionErrors = validateMockDiscoveryOptions(discoveryOptions);
-  const discoveryComponentError = draft.clusterComponents.namespaces.length === 0
-    ? `No mock namespaces matched pattern "${discoveryOptions.namespacePattern}". Update the pattern and discover again.`
-    : undefined;
-  const configErrors = validateConfigDraft(draft);
-  const generationCount = Number(draft.genetic.generations);
-  const populationCount = Number(draft.genetic.populationSize);
-  const enabledTypes = scenarioTypeOptions.filter((option) => draft.scenarioFlags[option.id]).map((option) => option.id);
-  const canDiscover = !nameError && !!selectedTarget && Object.keys(discoveryOptionErrors).length === 0;
-  const canCreateConfig = !!selectedTarget && !nameError && !discoveryComponentError && Object.keys(configErrors).length === 0;
-  const canStart = !!createdConfig
-    && !!selectedTarget
-    && !nameError
-    && Object.keys(configErrors).length === 0
-    && !discoveryComponentError
-    && createdConfig.targetRequestId === selectedTarget.targetRequestId
-    && createdConfig.clusterName === selectedTarget.cluster.clusterName
-    && createdConfig.id === `mock-config-${trimmedName}`;
-  const configPreview = selectedTarget ? buildMockConfigYaml(selectedTarget, draft) : '';
+  const discoveryOptionErrors = validateDiscoveryOptions(discoveryOptions);
+  const configErrors = draft ? validateConfigDraft(draft) : {};
+  const sectionIndex = configurationSections.findIndex((section) => section.id === configurationSection);
+  const previousSection = configurationSections[sectionIndex - 1];
+  const nextSection = configurationSections[sectionIndex + 1];
+  const targetMap = selectedCluster ? { [selectedCluster.operatorName]: [selectedCluster.clusterName] } : {};
+  const canDiscover = !!selectedCluster && !!targetRequestId && !targetLoading && !nameError
+    && !Object.keys(discoveryOptionErrors).length && !discoveryLoading;
+  const canSaveConfig = !!draft && !!documentRef.current && !!selectedCluster && !nameError && !yamlError
+    && !Object.keys(configErrors).length && !actionLoading && !discoveryLoading
+    && (!draft.scenarioFlags['service-disruption'] || dangerousConfirmed);
+  const canStart = !!createdConfig && !actionLoading && createdConfig.targetRequestId === targetRequestId
+    && selectedCluster !== null && createdConfig.targetClusters[selectedCluster.operatorName]?.[0] === selectedCluster.clusterName;
+  const abortActiveRequest = () => {
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    setActionLoading(false);
+    setDiscoveryLoading(false);
+  };
 
   const updateDraft = (updates: Partial<EditableConfigDraft>) => {
-    setDraft((current) => ({ ...current, ...updates }));
+    if (!draft || !documentRef.current) return;
+    abortActiveRequest();
+    const nextDraft = { ...draft, ...updates };
+    setDraft(nextDraft);
+    setConfigYaml(updateConfigDocument(documentRef.current, nextDraft));
     setCreatedConfig(null);
+    setServerValidationErrors([]);
+    setActionError('');
   };
 
   const updateGenetic = (field: keyof GeneticSettingsDraft, value: string | boolean) => {
+    if (!draft) return;
     updateDraft({ genetic: { ...draft.genetic, [field]: value } as GeneticSettingsDraft });
   };
 
-  const updateDiscoveryOption = (field: keyof MockDiscoveryOptions, value: string) => {
-    setDiscoveryOptions((current) => ({ ...current, [field]: value }));
-    setDiscoveryWarnings([]);
+  const startRequest = () => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    return controller;
+  };
+
+  const handleDiscover = async () => {
+    if (!canDiscover || !selectedCluster) return;
+    setDiscoveryLoading(true);
+    setDiscoveryError('');
+    setActionError('');
     setCreatedConfig(null);
+    const controller = startRequest();
+    try {
+      const response = await krknAiApi.discover({
+        targetRequestId,
+        targetClusters: targetMap,
+        namespacePattern: discoveryOptions.namespacePattern,
+        podLabelPattern: discoveryOptions.podLabelPattern,
+        nodeLabelPattern: discoveryOptions.nodeLabelPattern,
+      }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      const editable = createEditableConfigDraft(response.configYaml);
+      documentRef.current = editable.document;
+      setDraft(editable.draft);
+      setConfigYaml(updateConfigDocument(editable.document, editable.draft));
+      setDiscoveryWarnings(response.warnings ?? []);
+      setDangerousConfirmed(false);
+      setServerValidationErrors([]);
+      setYamlError('');
+      setConfigurationSection('scenarios');
+      setStep(2);
+    } catch (error) {
+      if (!controller.signal.aborted) setDiscoveryError(apiErrorMessage(error));
+    } finally {
+      if (requestControllerRef.current === controller) requestControllerRef.current = null;
+      if (!controller.signal.aborted) setDiscoveryLoading(false);
+    }
   };
 
-  const handleDiscover = () => {
-    if (!canDiscover || !selectedTarget) return;
-    const result = discoverMockComponents(selectedTarget, discoveryOptions);
-    if (Object.keys(result.errors).length > 0) return;
-    setDraft((current) => ({
-      ...current,
-      clusterComponents: preserveDisabledComponentFlags(result.components, current.clusterComponents),
-    }));
-    setDiscoveryWarnings(result.warnings);
-    setConfigurationSection('scenarios');
-    setStep(2);
-  };
-
-  const handleTargetChange = (targetRequestId: string) => {
-    const nextTarget = mockAiTargets.find((target) => target.targetRequestId === targetRequestId);
-    if (!nextTarget) return;
-    const oldNamespace = selectedTarget?.components.namespaces[0]?.name;
-    const nextNamespace = nextTarget.components.namespaces[0]?.name;
-    setSelectedTargetRequestId(targetRequestId);
-    setDraft((current) => ({
-      ...current,
-      clusterComponents: copyClusterComponents(nextTarget.components),
-      fitnessItems: oldNamespace && nextNamespace
-        ? current.fitnessItems.map((item) => ({
-          ...item,
-          query: item.query.split(`namespace="${oldNamespace}"`).join(`namespace="${nextNamespace}"`),
-        }))
-        : current.fitnessItems,
-      healthChecks: nextTarget.healthChecks.map((healthCheck, key) => ({
-        key,
-        name: healthCheck.name,
-        url: healthCheck.url,
-        statusCode: String(healthCheck.statusCode),
-        timeout: String(healthCheck.timeoutSeconds),
-        interval: String(healthCheck.intervalSeconds),
-      })),
-    }));
+  const updateYaml = (yaml: string) => {
+    abortActiveRequest();
+    setConfigYaml(yaml);
     setCreatedConfig(null);
-    setDiscoveryWarnings([]);
+    setServerValidationErrors([]);
+    setActionError('');
+    try {
+      const editable = createEditableConfigDraft(yaml);
+      documentRef.current = editable.document;
+      setDraft(editable.draft);
+      setYamlError('');
+    } catch (error) {
+      documentRef.current = null;
+      setYamlError(apiErrorMessage(error));
+    }
   };
 
-  const handleCreateConfig = () => {
-    if (!canCreateConfig || !selectedTarget) return;
-    const frozenYaml = buildMockConfigYaml(selectedTarget, draft);
-    setCreatedConfig({
-      id: `mock-config-${trimmedName}`,
-      targetRequestId: selectedTarget.targetRequestId,
-      clusterName: selectedTarget.cluster.clusterName,
-      yaml: frozenYaml,
-      generations: generationCount,
-      populationSize: populationCount,
-      scenarioTypes: enabledTypes,
-      fitnessItemCount: draft.fitnessItems.length,
-      healthCheckCount: draft.healthChecks.length,
-      discoveryOptions: { ...discoveryOptions },
-    });
-    setStep(3);
-    setConfigurationSection('preview');
+  const handleScenarioToggle = (scenarioId: (typeof scenarioTypeOptions)[number]['id'], enabled: boolean) => {
+    if (!draft) return;
+    if (scenarioId === 'service-disruption' && enabled) {
+      const confirmed = window.confirm('Service disruption can delete entire namespaces. Confirm that you intend to authorize this cluster-critical scenario.');
+      if (!confirmed) return;
+      setDangerousConfirmed(true);
+    }
+    if (scenarioId === 'service-disruption' && !enabled) setDangerousConfirmed(false);
+    updateDraft({ scenarioFlags: { ...draft.scenarioFlags, [scenarioId]: enabled } });
   };
 
-  const handleStart = () => {
-    if (!canStart || !selectedTarget || !createdConfig) return;
-    onStart({
-      name: trimmedName,
-      runId: `mock-run-${trimmedName}`,
-      cluster: selectedTarget.cluster,
-      targetRequestId: createdConfig.targetRequestId,
-      configId: createdConfig.id,
-      configYaml: createdConfig.yaml,
-      phase: 'Provisioning',
-      createdAt: new Date().toISOString(),
-      generations: createdConfig.generations,
-      populationSize: createdConfig.populationSize,
-      completedGenerations: 0,
-      scenarios: [],
-      progression: [],
-      mainPod: {
-        status: 'Pending',
-        logText: 'Illustrative mock run request queued; no Kubernetes resources were created.',
-      },
-    });
+  const handleCreateConfig = async () => {
+    if (!canSaveConfig || !selectedCluster) return;
+    const currentYaml = updateConfigDocument(documentRef.current!, draft!);
+    setConfigYaml(currentYaml);
+    setActionLoading(true);
+    setActionError('');
+    setServerValidationErrors([]);
+    const controller = startRequest();
+    try {
+      await krknAiApi.validateConfig(currentYaml, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      const configName = `ai-${trimmedName.slice(0, 47)}-${crypto.randomUUID().slice(0, 8)}`;
+      const response = await krknAiApi.createConfig({
+        name: configName,
+        configYaml: currentYaml,
+        targetRequestId,
+        targetClusters: targetMap,
+      }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (!response.configId) throw new Error('Config creation did not return a config ID.');
+      setCreatedConfig({ id: response.configId, name: configName, yaml: currentYaml, targetRequestId, targetClusters: targetMap });
+      setConfigurationSection('preview');
+      setStep(3);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (error instanceof KrknAIConfigValidationError) setServerValidationErrors(error.errors);
+      else setActionError(apiErrorMessage(error));
+    } finally {
+      if (requestControllerRef.current === controller) requestControllerRef.current = null;
+      if (!controller.signal.aborted) setActionLoading(false);
+    }
   };
-  const configurationSectionIndex = configurationSections.findIndex((section) => section.id === configurationSection);
-  const previousConfigurationSection = configurationSections[configurationSectionIndex - 1];
-  const nextConfigurationSection = configurationSections[configurationSectionIndex + 1];
+
+  const handleStart = async () => {
+    if (!canStart || !createdConfig) return;
+    setActionLoading(true);
+    setActionError('');
+    const controller = startRequest();
+    try {
+      const run = await krknAiApi.createRun({
+        name: trimmedName,
+        configId: createdConfig.id,
+        targetRequestId: createdConfig.targetRequestId,
+        targetClusters: createdConfig.targetClusters,
+      }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (!run?.metadata?.name || !run.metadata.uid) throw new Error('Run creation did not return a Kubernetes run identity.');
+      onStart(run);
+    } catch (error) {
+      if (!controller.signal.aborted) setActionError(apiErrorMessage(error));
+    } finally {
+      if (requestControllerRef.current === controller) requestControllerRef.current = null;
+      if (!controller.signal.aborted) setActionLoading(false);
+    }
+  };
+
+  const handleProviderChange = (provider: string) => {
+    abortActiveRequest();
+    setSelectedProvider(provider);
+    setSelectedClusterName(targetClusters[provider]?.[0]?.['cluster-name'] ?? '');
+    documentRef.current = null;
+    setDraft(null);
+    setCreatedConfig(null);
+    setConfigYaml('');
+    setStep(1);
+  };
+
+  const handleClusterChange = (clusterName: string) => {
+    abortActiveRequest();
+    setSelectedClusterName(clusterName);
+    documentRef.current = null;
+    setDraft(null);
+    setCreatedConfig(null);
+    setConfigYaml('');
+    setStep(1);
+  };
+
+  const loadSavedConfigFiles = async () => {
+    requestControllerRef.current?.abort();
+    const controller = startRequest();
+    setFileLoading(true);
+    setFilesUnavailable(false);
+    setExistingFileError('');
+    try {
+      const response = await operatorApi.getAvailableFiles('krkn-ai-config', { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      setFileList(response.files);
+      if (!response.files.length) setFilesUnavailable(true);
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setFilesUnavailable(true);
+        setFileList([]);
+        setExistingFileError(apiErrorMessage(error));
+      }
+    } finally {
+      if (requestControllerRef.current === controller) requestControllerRef.current = null;
+      if (!controller.signal.aborted) setFileLoading(false);
+    }
+  };
+
+  const handleSavedFileChange = async (fileId: string) => {
+    requestControllerRef.current?.abort();
+    setSelectedFileId(fileId);
+    setExistingFileYaml('');
+    setExistingFileError('');
+    if (!fileId) return;
+    const controller = startRequest();
+    try {
+      const file = await operatorApi.getFile(fileId, { signal: controller.signal });
+      if (!controller.signal.aborted) setExistingFileYaml(file.content);
+    } catch (error) {
+      if (!controller.signal.aborted) setExistingFileError(apiErrorMessage(error));
+    } finally {
+      if (requestControllerRef.current === controller) requestControllerRef.current = null;
+    }
+  };
+
+  const cancel = () => {
+    targetControllerRef.current?.abort();
+    requestControllerRef.current?.abort();
+    clearTimeout(targetTimerRef.current);
+    targetTimerRef.current = undefined;
+    onCancel();
+  };
 
   const configurationTitle = (section: ConfigurationSection) => {
     const Icon = section.icon;
     return (
       <div className="krkn-ai-config-wizard__title">
         <span className="krkn-ai-config-wizard__title-icon" aria-hidden="true"><Icon /></span>
-        <div>
-          <span>{section.label}</span>
-          <small>{section.summary}</small>
-        </div>
+        <div><span>{section.label}</span><small>{section.summary}</small></div>
       </div>
     );
   };
@@ -313,13 +489,9 @@ export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) 
   return (
     <section className="krkn-ai-create" aria-labelledby="krkn-ai-create-title">
       <div className="krkn-ai-page-heading">
-        <div>
-          <Title id="krkn-ai-create-title" headingLevel="h1">Create Krkn AI run</Title>
-          <p>Configure a single-cluster exploration using static mock discovery data.</p>
-        </div>
-        <Button variant="link" onClick={onCancel}>Cancel</Button>
+        <div><Title id="krkn-ai-create-title" headingLevel="h1">Create Krkn AI run</Title><p>Discover an authorized cluster and save its real Krkn AI configuration.</p></div>
+        <Button variant="link" onClick={cancel}>Cancel</Button>
       </div>
-      <Alert variant="info" title="Mock preview — no cluster resources will be created" isInline />
       <ol className="krkn-ai-steps" aria-label="Run creation steps">
         <li aria-current={step === 1 ? 'step' : undefined} className={step === 1 ? 'is-current' : ''}>1. Select target</li>
         <li aria-current={step === 2 ? 'step' : undefined} className={step === 2 ? 'is-current' : ''}>2. Configure run</li>
@@ -328,279 +500,154 @@ export function CreateRun({ existingNames, onStart, onCancel }: CreateRunProps) 
 
       {step === 1 && (
         <>
-        <Card>
-          <CardTitle>
-            <div className="krkn-ai-config-wizard__title">
-              <span className="krkn-ai-config-wizard__title-icon" aria-hidden="true"><TopologyIcon /></span>
-              <span>Run name and cluster</span>
-            </div>
-          </CardTitle>
-          <CardBody>
-            <FormGroup label="Run name" fieldId="krkn-ai-run-name" isRequired>
-              <TextInput
-                id="krkn-ai-run-name"
-                value={runName}
-                onChange={(_event, value) => {
-                  setRunName(value);
-                  setCreatedConfig(null);
-                }}
-                validated={nameError ? 'error' : 'default'}
-                aria-invalid={!!nameError}
-                aria-describedby="krkn-ai-run-name-error"
-              />
-              {nameError && <p id="krkn-ai-run-name-error" className="krkn-ai-field-error" role="alert">{nameError}</p>}
-            </FormGroup>
-            <FormGroup label="Cluster" fieldId="krkn-ai-target" isRequired>
-              <FormSelect
-                id="krkn-ai-target"
-                value={selectedTargetRequestId}
-                onChange={(_event, value) => handleTargetChange(value)}
-                aria-label="Select one cluster"
-              >
-                {mockAiTargets.map((target) => (
-                  <FormSelectOption key={target.targetRequestId} value={target.targetRequestId} label={target.cluster.clusterName} />
-                ))}
-              </FormSelect>
-            </FormGroup>
-          </CardBody>
-        </Card>
-        <DiscoveryOptionsEditor
-          options={discoveryOptions}
-          errors={discoveryOptionErrors}
-          onChange={updateDiscoveryOption}
-        />
-        <div className="krkn-ai-actions">
-          <Button variant="primary" isDisabled={!canDiscover} onClick={handleDiscover}>Discover components</Button>
-        </div>
-        </>
-      )}
-
-
-      {step === 2 && selectedTarget && (
-        <div className="krkn-ai-config-wizard">
-          <div className="krkn-ai-config-wizard__heading">
-            <div>
-              <Title headingLevel="h2">Configure the exploration</Title>
-              <p>Complete one focused section at a time. Your entries are retained when you move between sections.</p>
-            </div>
-            <span>Section {configurationSectionIndex + 1} of {configurationSections.length}</span>
-          </div>
-
-          <nav aria-label="Configuration sections">
-            <ol className="krkn-ai-config-wizard__nav">
-              {configurationSections.map((section, index) => {
-                const Icon = section.icon;
-                const isCurrent = section.id === configurationSection;
-                return (
-                  <li key={section.id} className={isCurrent ? 'is-current' : index < configurationSectionIndex ? 'is-visited' : ''}>
-                    <button
-                      type="button"
-                      aria-current={isCurrent ? 'step' : undefined}
-                      onClick={() => setConfigurationSection(section.id)}
-                    >
-                      <span className="krkn-ai-config-wizard__nav-icon" aria-hidden="true"><Icon /></span>
-                      <span>
-                        <strong>{section.label}</strong>
-                        <small>{section.summary}</small>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </nav>
-
-          {configurationSection === 'scenarios' && (
-            <Card>
-              <CardTitle>{configurationTitle(configurationSections[0])}</CardTitle>
-              <CardBody>
-                <Alert variant="info" title="Choose what Krkn AI can explore" isInline>
-                  Start with the scenario families relevant to this run. At least one family must remain enabled.
-                </Alert>
-                <fieldset className="krkn-ai-scenario-options" aria-describedby="krkn-ai-scenario-error">
-                  <legend>Recommended safe scenario types</legend>
-                  {scenarioTypeOptions.map((option) => (
-                    <Checkbox
-                      key={option.id}
-                      id={`krkn-ai-scenario-${option.id}`}
-                      label={option.label}
-                      isChecked={draft.scenarioFlags[option.id]}
-                      onChange={(_event, checked) => updateDraft({ scenarioFlags: { ...draft.scenarioFlags, [option.id]: checked } })}
-                    />
-                  ))}
-                  {configErrors.scenarioFlags && <p id="krkn-ai-scenario-error" className="krkn-ai-field-error" role="alert">{configErrors.scenarioFlags}</p>}
-                </fieldset>
-              </CardBody>
-            </Card>
-          )}
-
-          {configurationSection === 'components' && (
-            <Card>
-              <CardTitle>{configurationTitle(configurationSections[1])}</CardTitle>
-              <CardBody>
-                <Alert variant="info" title="Limit the cluster mutation scope" isInline>
-                  Disable anything Krkn AI must not target. Disabling a namespace or pod also disables its descendants.
-                </Alert>
-                {selectedTarget.recommendations.map((recommendation) => (
-                  <Alert key={recommendation} variant="success" title="Recommendation" isInline>{recommendation}</Alert>
-                ))}
-                {selectedTarget.warnings.map((warning) => (
-                  <Alert key={warning} variant="warning" title="Discovery warning" isInline>{warning}</Alert>
-                ))}
-                {discoveryWarnings.map((warning) => (
-                  <Alert key={warning} variant="warning" title="Discovery filter warning" isInline>{warning}</Alert>
-                ))}
-                <ClusterComponentsEditor
-                  components={draft.clusterComponents}
-                  onChange={(components) => updateDraft({ clusterComponents: components })}
-                />
-              </CardBody>
-            </Card>
-          )}
-
-          {configurationSection === 'genetic' && (
-            <Card>
-              <CardTitle>{configurationTitle(configurationSections[2])}</CardTitle>
-              <CardBody>
-                <Alert variant="info" title="Control the search breadth" isInline>
-                  Generations and population size determine the expected scenario count. Rates must remain between 0 and 1.
-                </Alert>
-                <div className="krkn-ai-config-fields">
-                  <ConfigTextField
-                    id="krkn-ai-algorithm"
-                    label="Algorithm"
-                    value={draft.algorithm}
-                    onChange={(value) => updateDraft({ algorithm: value })}
-                    error={errorFor(configErrors, 'algorithm')}
-                  />
-                  <ConfigNumberField id="krkn-ai-generations" label="Generations" value={draft.genetic.generations} onChange={(value) => updateGenetic('generations', value)} error={errorFor(configErrors, 'generations')} min={1} step={1} />
-                  <ConfigNumberField id="krkn-ai-population" label="Population size" value={draft.genetic.populationSize} onChange={(value) => updateGenetic('populationSize', value)} error={errorFor(configErrors, 'populationSize')} min={1} step={1} />
-                  <ConfigNumberField id="krkn-ai-genetic-duration" label="Genetic duration (seconds)" value={draft.genetic.duration} onChange={(value) => updateGenetic('duration', value)} error={errorFor(configErrors, 'genetic.duration')} min={0} step="any" optional />
-                  <ConfigNumberField id="krkn-ai-mutation-rate" label="Mutation rate" value={draft.genetic.mutationRate} onChange={(value) => updateGenetic('mutationRate', value)} error={errorFor(configErrors, 'genetic.mutationRate')} min={0} max={1} step="any" />
-                  <ConfigNumberField id="krkn-ai-scenario-mutation-rate" label="Scenario mutation rate" value={draft.genetic.scenarioMutationRate} onChange={(value) => updateGenetic('scenarioMutationRate', value)} error={errorFor(configErrors, 'genetic.scenarioMutationRate')} min={0} max={1} step="any" />
-                  <ConfigNumberField id="krkn-ai-crossover-rate" label="Crossover rate" value={draft.genetic.crossoverRate} onChange={(value) => updateGenetic('crossoverRate', value)} error={errorFor(configErrors, 'genetic.crossoverRate')} min={0} max={1} step="any" />
-                  <ConfigNumberField id="krkn-ai-composition-rate" label="Composition rate" value={draft.genetic.compositionRate} onChange={(value) => updateGenetic('compositionRate', value)} error={errorFor(configErrors, 'genetic.compositionRate')} min={0} max={1} step="any" />
-                  <ConfigTextField id="krkn-ai-selection-strategy" label="Selection strategy" value={draft.genetic.selectionStrategy} onChange={(value) => updateGenetic('selectionStrategy', value)} error={errorFor(configErrors, 'genetic.selectionStrategy')} />
-                  <ConfigNumberField id="krkn-ai-tournament-size" label="Tournament size" value={draft.genetic.tournamentSize} onChange={(value) => updateGenetic('tournamentSize', value)} error={errorFor(configErrors, 'genetic.tournamentSize')} min={1} step={1} />
-                  <ConfigNumberField id="krkn-ai-population-injection-rate" label="Population injection rate" value={draft.genetic.populationInjectionRate} onChange={(value) => updateGenetic('populationInjectionRate', value)} error={errorFor(configErrors, 'genetic.populationInjectionRate')} min={0} max={1} step="any" />
-                  <ConfigNumberField id="krkn-ai-population-injection-size" label="Population injection size" value={draft.genetic.populationInjectionSize} onChange={(value) => updateGenetic('populationInjectionSize', value)} error={errorFor(configErrors, 'genetic.populationInjectionSize')} min={0} step={1} />
-                </div>
-              </CardBody>
-            </Card>
-          )}
-
-          {configurationSection === 'fitness' && (
-            <Card>
-              <CardTitle>{configurationTitle(configurationSections[3])}</CardTitle>
-              <CardBody>
-                <Alert variant="info" title="Define how scenarios are ranked" isInline>
-                  Fitness signals guide scenario selection between generations. Expand only the items you need to adjust.
-                </Alert>
-                <FitnessFunctionEditor draft={draft} errors={configErrors} onChange={updateDraft} />
-              </CardBody>
-            </Card>
-          )}
-
-          {configurationSection === 'health' && (
-            <Card>
-              <CardTitle>{configurationTitle(configurationSections[4])}</CardTitle>
-              <CardBody>
-                <Alert variant="info" title="Describe application availability checks" isInline>
-                  These reserved example URLs are serialized into the mock configuration but are never requested.
-                </Alert>
-                <HealthChecksEditor draft={draft} errors={configErrors} onChange={updateDraft} />
-              </CardBody>
-            </Card>
-          )}
-
-          {configurationSection === 'run-settings' && (
-            <>
-              <Card>
-                <CardTitle>{configurationTitle(configurationSections[5])}</CardTitle>
-                <CardBody>
-                  <Alert variant="info" title="Set execution defaults" isInline>
-                    Kubeconfig remains on the runtime mount. Seed, timing, baseline, and output naming are safe to customize here.
-                  </Alert>
-                  <div className="krkn-ai-config-fields">
-                    <ConfigNumberField id="krkn-ai-seed" label="Seed" value={draft.seed} onChange={(value) => updateDraft({ seed: value })} error={errorFor(configErrors, 'seed')} step={1} optional />
-                    <ConfigNumberField id="krkn-ai-wait-duration" label="Wait duration (seconds)" value={draft.waitDuration} onChange={(value) => updateDraft({ waitDuration: value })} error={errorFor(configErrors, 'waitDuration')} min={0} step="any" />
-                  </div>
-                  <section className="krkn-ai-config-subsection" aria-labelledby="krkn-ai-baseline-heading">
-                    <h3 id="krkn-ai-baseline-heading">Baseline</h3>
-                    <Checkbox id="krkn-ai-baseline-enabled" label="Enable baseline run" isChecked={draft.baselineEnabled} onChange={(_event, checked) => updateDraft({ baselineEnabled: checked })} />
-                    <div className="krkn-ai-config-fields">
-                      <ConfigNumberField id="krkn-ai-baseline-duration" label="Duration (seconds)" value={draft.baselineDuration} onChange={(value) => updateDraft({ baselineDuration: value })} error={errorFor(configErrors, 'baselineDuration')} min={0} step="any" />
-                    </div>
-                  </section>
-                  <section className="krkn-ai-config-subsection" aria-labelledby="krkn-ai-output-heading">
-                    <h3 id="krkn-ai-output-heading">Output formats</h3>
-                    <p className="krkn-ai-muted">Each filename format must retain the <code>%s</code> scenario placeholder.</p>
-                    <div className="krkn-ai-config-fields">
-                      <ConfigTextField id="krkn-ai-result-name-format" label="result_name_fmt" value={draft.resultNameFormat} onChange={(value) => updateDraft({ resultNameFormat: value })} error={errorFor(configErrors, 'resultNameFormat')} />
-                      <ConfigTextField id="krkn-ai-graph-name-format" label="graph_name_fmt" value={draft.graphNameFormat} onChange={(value) => updateDraft({ graphNameFormat: value })} error={errorFor(configErrors, 'graphNameFormat')} />
-                      <ConfigTextField id="krkn-ai-log-name-format" label="log_name_fmt" value={draft.logNameFormat} onChange={(value) => updateDraft({ logNameFormat: value })} error={errorFor(configErrors, 'logNameFormat')} />
-                    </div>
-                  </section>
-                </CardBody>
-              </Card>
-            </>
-          )}
-
-          {configurationSection === 'preview' && (
-            <Card>
-              <CardTitle>{configurationTitle(configurationSections[6])}</CardTitle>
-              <CardBody>
-                <Alert variant="info" title="Final configuration check" isInline>
-                  Review the generated YAML before creating the mock config. Return to any section above to make changes.
-                </Alert>
-                <p className="krkn-ai-muted">Read-only deterministic preview. Health-check URLs use reserved mock example.com hosts and are never requested. Kubeconfig stays on its runtime mount; credentials, host parameters, headers, and live endpoints are omitted.</p>
-                <textarea className="krkn-ai-yaml" aria-label="Generated krkn-ai.yaml preview" value={configPreview} readOnly rows={32} />
-                {Object.keys(configErrors).length > 0 && <p className="krkn-ai-field-error" role="status">Fix the highlighted settings before creating this mock config.</p>}
-              </CardBody>
-            </Card>
-          )}
-
-          <div className="krkn-ai-actions krkn-ai-actions-between">
-            <Button
-              variant="secondary"
-              onClick={() => previousConfigurationSection ? setConfigurationSection(previousConfigurationSection.id) : setStep(1)}
-            >
-              {previousConfigurationSection ? 'Previous section' : 'Back to target'}
-            </Button>
-            {nextConfigurationSection ? (
-              <Button variant="primary" onClick={() => setConfigurationSection(nextConfigurationSection.id)}>Continue</Button>
-            ) : (
-              <Button variant="primary" isDisabled={!canCreateConfig} onClick={handleCreateConfig}>Create config (mock)</Button>
-            )}
-          </div>
-        </div>
-      )}
-      {step === 3 && selectedTarget && createdConfig && (
-        <>
           <Card>
-            <CardTitle>Review mock configuration</CardTitle>
+            <CardTitle>
+              <div className="krkn-ai-config-wizard__title"><span className="krkn-ai-config-wizard__title-icon" aria-hidden="true"><TopologyIcon /></span><span>Run name and authorized cluster</span></div>
+            </CardTitle>
             <CardBody>
-              <dl className="krkn-ai-review-grid">
-                <div><dt>Run</dt><dd>{trimmedName}</dd></div>
-                <div><dt>Cluster</dt><dd>{createdConfig.clusterName}</dd></div>
-                <div><dt>Mock config ID</dt><dd>{createdConfig.id}</dd></div>
-                <div><dt>Expected scenarios</dt><dd>{createdConfig.generations * createdConfig.populationSize}</dd></div>
-                <div><dt>Fitness items</dt><dd>{createdConfig.fitnessItemCount}</dd></div>
-                <div><dt>Health checks</dt><dd>{createdConfig.healthCheckCount}</dd></div>
-                <div><dt>Namespace pattern</dt><dd>{createdConfig.discoveryOptions.namespacePattern}</dd></div>
-                <div><dt>Pod label-key pattern</dt><dd>{createdConfig.discoveryOptions.podLabelPattern}</dd></div>
-                <div><dt>Node label-key pattern</dt><dd>{createdConfig.discoveryOptions.nodeLabelPattern}</dd></div>
-              </dl>
-              <p className="krkn-ai-muted">This complete YAML config is frozen in memory. Returning to edit any setting requires creating the config again.</p>
-              <pre className="krkn-ai-yaml" aria-label="Frozen mock configuration YAML">{createdConfig.yaml}</pre>
+              <FormGroup label="Run name" fieldId="krkn-ai-run-name" isRequired>
+                <TextInput id="krkn-ai-run-name" value={runName} onChange={(_event, value) => { abortActiveRequest(); setRunName(value); setCreatedConfig(null); }} validated={nameError ? 'error' : 'default'} aria-invalid={!!nameError} />
+                {nameError && <p className="krkn-ai-field-error" role="alert">{nameError}</p>}
+              </FormGroup>
+              {targetLoading && <Alert variant="info" title="Waiting for authorized cluster discovery" isInline>Target access is being prepared. Cluster status is checked every two seconds; authorized clusters load when it completes.</Alert>}
+              {targetError && <Alert variant="danger" title="Target discovery unavailable" isInline>{targetError}</Alert>}
+              {targetRequestId && <p className="krkn-ai-muted">Authorized target request: <code>{targetRequestId}</code></p>}
+              <div className="krkn-ai-config-fields">
+                <FormGroup label="Provider" fieldId="krkn-ai-provider" isRequired>
+                  <FormSelect id="krkn-ai-provider" value={selectedProvider} onChange={(_event, value) => handleProviderChange(value)} isDisabled={targetLoading || !Object.keys(targetClusters).length}>
+                    {Object.keys(targetClusters).map((provider) => <FormSelectOption key={provider} value={provider} label={provider} />)}
+                  </FormSelect>
+                </FormGroup>
+                <FormGroup label="Cluster" fieldId="krkn-ai-target" isRequired>
+                  <FormSelect id="krkn-ai-target" value={selectedClusterName} onChange={(_event, value) => handleClusterChange(value)} isDisabled={targetLoading || !selectedProvider}>
+                    {(targetClusters[selectedProvider] ?? []).map((cluster) => <FormSelectOption key={cluster['cluster-name']} value={cluster['cluster-name']} label={cluster['cluster-name']} />)}
+                  </FormSelect>
+                </FormGroup>
+              </div>
+              {selectedCluster && <p className="krkn-ai-muted">Selected cluster API: <code>{selectedCluster.clusterApiUrl}</code></p>}
             </CardBody>
           </Card>
-          <div className="krkn-ai-actions krkn-ai-actions-between">
-            <Button variant="secondary" onClick={() => setStep(2)}>Back</Button>
-            <Button variant="primary" isDisabled={!canStart} onClick={handleStart}>Start run (mock)</Button>
-          </div>
+          <div className="krkn-ai-actions"><Button variant="secondary" isDisabled={targetStarted} isLoading={targetLoading} onClick={() => void startTargetRequest()}>{targetLoading ? 'Preparing target access…' : targetStarted ? (targetError ? 'Target request unavailable' : 'Target access requested') : 'Request authorized clusters'}</Button></div>
+          <DiscoveryOptionsEditor options={discoveryOptions} errors={discoveryOptionErrors} onChange={(field, value) => { abortActiveRequest(); setDiscoveryOptions((current) => ({ ...current, [field]: value })); setCreatedConfig(null); }} />
+          {discoveryError && <Alert variant="danger" title="Krkn AI discovery failed" isInline>{discoveryError}</Alert>}
+          <div className="krkn-ai-actions"><Button variant="primary" isDisabled={!canDiscover} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>
+
+          <Card>
+            <CardTitle>Review an available configuration file</CardTitle>
+            <CardBody>
+              <p className="krkn-ai-muted">Available files are permission-filtered by the operator. This review does not expose cluster credentials.</p>
+              <Button variant="secondary" isLoading={fileLoading} onClick={() => void loadSavedConfigFiles()}>Load available configs</Button>
+              {filesUnavailable && <Alert variant="info" title="Configuration files unavailable" isInline>No accessible Krkn AI config files are available for review.</Alert>}
+              {fileList.length > 0 && <FormGroup label="Saved config" fieldId="krkn-ai-existing-config">
+                <FormSelect id="krkn-ai-existing-config" value={selectedFileId} onChange={(_event, value) => void handleSavedFileChange(value)}>
+                  <FormSelectOption value="" label="Select a config file" />
+                  {fileList.map((file) => <FormSelectOption key={file.fileId} value={file.fileId} label={file.fileName} />)}
+                </FormSelect>
+              </FormGroup>}
+              {existingFileError && <Alert variant="warning" title="Configuration file unavailable" isInline>{existingFileError}</Alert>}
+              {existingFileYaml && <pre className="krkn-ai-yaml" aria-label="Existing config file content">{existingFileYaml}</pre>}
+            </CardBody>
+          </Card>
         </>
       )}
+
+      {step === 2 && selectedCluster && draft && (
+        <div className="krkn-ai-config-wizard">
+          <div className="krkn-ai-config-wizard__heading"><div><Title headingLevel="h2">Configure the exploration</Title><p>Each section edits the discovered YAML while retaining unrelated fields and comments.</p></div><span>Section {sectionIndex + 1} of {configurationSections.length}</span></div>
+          <nav aria-label="Configuration sections"><ol className="krkn-ai-config-wizard__nav">{configurationSections.map((section, index) => {
+            const Icon = section.icon;
+            const isCurrent = section.id === configurationSection;
+            return <li key={section.id} className={isCurrent ? 'is-current' : index < sectionIndex ? 'is-visited' : ''}><button type="button" aria-current={isCurrent ? 'step' : undefined} onClick={() => setConfigurationSection(section.id)}><span className="krkn-ai-config-wizard__nav-icon" aria-hidden="true"><Icon /></span><span><strong>{section.label}</strong><small>{section.summary}</small></span></button></li>;
+          })}</ol></nav>
+
+          {configurationSection === 'scenarios' && <Card><CardTitle>{configurationTitle(configurationSections[0])}</CardTitle><CardBody>
+            <Alert variant="info" title="Choose scenario families" isInline>Scenario enable flags and disabled recommendations come from the discovered YAML.</Alert>
+            <fieldset className="krkn-ai-scenario-options"><legend>Available scenario types</legend>{scenarioTypeOptions.map((option) => <Checkbox key={option.id} id={`krkn-ai-scenario-${option.id}`} label={option.label} isChecked={draft.scenarioFlags[option.id]} onChange={(_event, checked) => handleScenarioToggle(option.id, checked)} />)}</fieldset>
+            {draft.scenarioFlags['service-disruption'] && <Alert variant="danger" title="Cluster-critical scenario enabled" isInline>Service disruption may delete entire namespaces. It is enabled in YAML only after explicit confirmation. Confirmation: {dangerousConfirmed ? 'given' : 'required'}.</Alert>}
+          </CardBody></Card>}
+
+          {configurationSection === 'components' && <Card><CardTitle>{configurationTitle(configurationSections[1])}</CardTitle><CardBody>
+            <Alert variant="info" title="Limit the cluster mutation scope" isInline>Discovered services, ports, PVC metadata, node fields and VMIs are retained in the YAML. Uncheck a component to set its disabled flag.</Alert>
+            {discoveryWarnings.map((warning, index) => <Alert key={`${index}-${warning}`} variant="warning" title="Discovery warning" isInline>{warning}</Alert>)}
+            <ClusterComponentsEditor components={draft.clusterComponents} onChange={(clusterComponents) => updateDraft({ clusterComponents })} />
+          </CardBody></Card>}
+
+          {configurationSection === 'genetic' && <Card><CardTitle>{configurationTitle(configurationSections[2])}</CardTitle><CardBody>
+            <Alert variant="info" title="Control the search breadth" isInline>Population size must be at least two. The operator runner requires composition rate to remain zero.</Alert>
+            <div className="krkn-ai-config-fields">
+              <ConfigTextField id="krkn-ai-algorithm" label="Algorithm" value={draft.algorithm} onChange={(value) => updateDraft({ algorithm: value })} error={errorFor(configErrors, 'algorithm')} />
+              <ConfigNumberField id="krkn-ai-generations" label="Generations" value={draft.genetic.generations} onChange={(value) => updateGenetic('generations', value)} error={errorFor(configErrors, 'generations')} min={1} step={1} />
+              <ConfigNumberField id="krkn-ai-population" label="Population size" value={draft.genetic.populationSize} onChange={(value) => updateGenetic('populationSize', value)} error={errorFor(configErrors, 'populationSize')} min={2} step={1} />
+              <ConfigNumberField id="krkn-ai-genetic-duration" label="Genetic duration (seconds)" value={draft.genetic.duration} onChange={(value) => updateGenetic('duration', value)} error={errorFor(configErrors, 'genetic.duration')} min={1} step={1} optional />
+              <ConfigNumberField id="krkn-ai-mutation-rate" label="Mutation rate" value={draft.genetic.mutationRate} onChange={(value) => updateGenetic('mutationRate', value)} error={errorFor(configErrors, 'genetic.mutationRate')} min={0} max={1} step="any" />
+              <ConfigNumberField id="krkn-ai-scenario-mutation-rate" label="Scenario mutation rate" value={draft.genetic.scenarioMutationRate} onChange={(value) => updateGenetic('scenarioMutationRate', value)} error={errorFor(configErrors, 'genetic.scenarioMutationRate')} min={0} max={1} step="any" />
+              <ConfigNumberField id="krkn-ai-crossover-rate" label="Crossover rate" value={draft.genetic.crossoverRate} onChange={(value) => updateGenetic('crossoverRate', value)} error={errorFor(configErrors, 'genetic.crossoverRate')} min={0} max={1} step="any" />
+              <ConfigNumberField id="krkn-ai-composition-rate" label="Composition rate (operator runs)" value={draft.genetic.compositionRate} onChange={(value) => updateGenetic('compositionRate', value)} error={errorFor(configErrors, 'genetic.compositionRate')} min={0} max={0} step="any" />
+              <FormGroup label="Selection strategy" fieldId="krkn-ai-selection-strategy" isRequired>
+                <FormSelect id="krkn-ai-selection-strategy" value={draft.genetic.selectionStrategy} onChange={(_event, value) => updateGenetic('selectionStrategy', value)} validated={configErrors['genetic.selectionStrategy'] ? 'error' : 'default'}><FormSelectOption value="roulette" label="roulette" /><FormSelectOption value="tournament" label="tournament" /></FormSelect>
+                {configErrors['genetic.selectionStrategy'] && <p className="krkn-ai-field-error" role="alert">{configErrors['genetic.selectionStrategy']}</p>}
+              </FormGroup>
+              <ConfigNumberField id="krkn-ai-tournament-size" label="Tournament size" value={draft.genetic.tournamentSize} onChange={(value) => updateGenetic('tournamentSize', value)} error={errorFor(configErrors, 'genetic.tournamentSize')} min={1} step={1} />
+              <ConfigNumberField id="krkn-ai-population-injection-rate" label="Population injection rate" value={draft.genetic.populationInjectionRate} onChange={(value) => updateGenetic('populationInjectionRate', value)} error={errorFor(configErrors, 'genetic.populationInjectionRate')} min={0} max={1} step="any" />
+              <ConfigNumberField id="krkn-ai-population-injection-size" label="Population injection size" value={draft.genetic.populationInjectionSize} onChange={(value) => updateGenetic('populationInjectionSize', value)} error={errorFor(configErrors, 'genetic.populationInjectionSize')} min={1} step={1} />
+            </div>
+          </CardBody></Card>}
+
+          {configurationSection === 'fitness' && <Card><CardTitle>{configurationTitle(configurationSections[3])}</CardTitle><CardBody>
+            {discoveryWarnings.filter((warning) => /prometheus|fitness/i.test(warning)).map((warning, index) => <Alert key={`${index}-${warning}`} variant="warning" title="Fitness recommendation unavailable" isInline>{warning}</Alert>)}
+            <FitnessFunctionEditor draft={draft} errors={configErrors} onChange={updateDraft} />
+            {!draft.fitnessQuery.trim() && !draft.fitnessItems.length && <Alert variant="warning" title="Prometheus input required" isInline>Discovery supplied no Prometheus query or fitness item. Add a query or item before saving.</Alert>}
+          </CardBody></Card>}
+
+          {configurationSection === 'health' && <Card><CardTitle>{configurationTitle(configurationSections[4])}</CardTitle><CardBody>
+            <Alert variant="warning" title="Health checks run against real endpoints" isInline>These URLs are contacted from the operator environment during execution. Verify reachability and safety before launching.</Alert>
+            <HealthChecksEditor draft={draft} errors={configErrors} onChange={updateDraft} />
+          </CardBody></Card>}
+
+          {configurationSection === 'run-settings' && <Card><CardTitle>{configurationTitle(configurationSections[5])}</CardTitle><CardBody>
+            <Alert variant="info" title="Set execution defaults" isInline>The kubeconfig path and discovery fields are retained from Krkn AI. Credentials are never sent to the browser.</Alert>
+            <div className="krkn-ai-config-fields">
+              <ConfigNumberField id="krkn-ai-seed" label="Seed" value={draft.seed} onChange={(value) => updateDraft({ seed: value })} error={errorFor(configErrors, 'seed')} step={1} optional />
+              <ConfigNumberField id="krkn-ai-wait-duration" label="Wait duration (seconds)" value={draft.waitDuration} onChange={(value) => updateDraft({ waitDuration: value })} error={errorFor(configErrors, 'waitDuration')} min={0} step={1} />
+            </div>
+            <section className="krkn-ai-config-subsection" aria-labelledby="krkn-ai-baseline-heading"><h3 id="krkn-ai-baseline-heading">Baseline</h3>
+              <Checkbox id="krkn-ai-baseline-enabled" label="Enable baseline run" isChecked={draft.baselineEnabled} onChange={(_event, checked) => updateDraft({ baselineEnabled: checked })} />
+              <ConfigNumberField id="krkn-ai-baseline-duration" label="Duration (seconds)" value={draft.baselineDuration} onChange={(value) => updateDraft({ baselineDuration: value })} error={errorFor(configErrors, 'baselineDuration')} min={1} step={1} />
+            </section>
+            <section className="krkn-ai-config-subsection" aria-labelledby="krkn-ai-output-heading"><h3 id="krkn-ai-output-heading">Output formats</h3><p className="krkn-ai-muted">Each filename format must retain the <code>%s</code> scenario placeholder.</p>
+              <div className="krkn-ai-config-fields">
+                <ConfigTextField id="krkn-ai-result-name-format" label="result_name_fmt" value={draft.resultNameFormat} onChange={(value) => updateDraft({ resultNameFormat: value })} error={errorFor(configErrors, 'resultNameFormat')} />
+                <ConfigTextField id="krkn-ai-graph-name-format" label="graph_name_fmt" value={draft.graphNameFormat} onChange={(value) => updateDraft({ graphNameFormat: value })} error={errorFor(configErrors, 'graphNameFormat')} />
+                <ConfigTextField id="krkn-ai-log-name-format" label="log_name_fmt" value={draft.logNameFormat} onChange={(value) => updateDraft({ logNameFormat: value })} error={errorFor(configErrors, 'logNameFormat')} />
+              </div>
+            </section>
+          </CardBody></Card>}
+
+          {configurationSection === 'preview' && <Card><CardTitle>{configurationTitle(configurationSections[6])}</CardTitle><CardBody>
+            <Alert variant="info" title="Validate the discovered configuration" isInline>Review or edit the YAML before server-side schema validation and config creation. Any edit invalidates a previously saved config identity.</Alert>
+            <textarea className="krkn-ai-yaml" aria-label="Krkn AI configuration YAML" value={configYaml} onChange={(event) => updateYaml(event.currentTarget.value)} rows={32} />
+            {yamlError && <p className="krkn-ai-field-error" role="alert">{yamlError}</p>}
+            {Object.keys(configErrors).length > 0 && <div role="status">{Object.entries(configErrors).map(([field, message]) => <p key={field} className="krkn-ai-field-error">{field}: {message}</p>)}</div>}
+            {serverValidationErrors.map((issue, index) => <p key={`${index}-${issue.path}`} className="krkn-ai-field-error" role="alert">{issue.path}: {issue.message}</p>)}
+            {actionError && <Alert variant="danger" title="Configuration save failed" isInline>{actionError}</Alert>}
+          </CardBody></Card>}
+
+          <div className="krkn-ai-actions krkn-ai-actions-between">
+            <Button variant="secondary" onClick={() => previousSection ? setConfigurationSection(previousSection.id) : setStep(1)}>{previousSection ? 'Previous section' : 'Back to target'}</Button>
+            {nextSection ? <Button variant="primary" onClick={() => setConfigurationSection(nextSection.id)}>Continue</Button> : <Button variant="primary" isDisabled={!canSaveConfig} isLoading={actionLoading} onClick={() => void handleCreateConfig()}>{actionLoading ? 'Validating and saving…' : 'Validate and save config'}</Button>}
+          </div>
+        </div>
+      )}
+
+      {step === 3 && selectedCluster && createdConfig && <>
+        <Card><CardTitle>Review saved configuration</CardTitle><CardBody>
+          <dl className="krkn-ai-review-grid"><div><dt>Run</dt><dd>{trimmedName}</dd></div><div><dt>Provider</dt><dd>{selectedCluster.operatorName}</dd></div><div><dt>Cluster</dt><dd>{selectedCluster.clusterName}</dd></div><div><dt>Config ID</dt><dd>{createdConfig.id}</dd></div><div><dt>Expected scenarios</dt><dd>{Number(draft?.genetic.generations) * Number(draft?.genetic.populationSize)}</dd></div><div><dt>Fitness items</dt><dd>{draft?.fitnessItems.length}</dd></div><div><dt>Health checks</dt><dd>{draft?.healthChecks.length}</dd></div></dl>
+          <p className="krkn-ai-muted">Config identity is frozen as <code>{createdConfig.name}</code>. Editing YAML or settings requires validating and saving a new config.</p>
+          <pre className="krkn-ai-yaml" aria-label="Saved Krkn AI configuration YAML">{createdConfig.yaml}</pre>
+          {actionError && <Alert variant="danger" title="Run creation failed" isInline>{actionError}</Alert>}
+        </CardBody></Card>
+        <div className="krkn-ai-actions krkn-ai-actions-between"><Button variant="secondary" onClick={() => setStep(2)}>Back to configuration</Button><Button variant="primary" isDisabled={!canStart} isLoading={actionLoading} onClick={() => void handleStart()}>{actionLoading ? 'Starting run…' : 'Start run'}</Button></div>
+      </>}
     </section>
   );
 }

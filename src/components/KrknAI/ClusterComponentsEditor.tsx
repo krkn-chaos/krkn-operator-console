@@ -1,9 +1,9 @@
 import { Checkbox } from '@patternfly/react-core';
-import type { MockAiClusterComponents } from './types';
+import type { ClusterComponents } from './types';
 
 interface ClusterComponentsEditorProps {
-  components: MockAiClusterComponents;
-  onChange: (components: MockAiClusterComponents) => void;
+  components: ClusterComponents;
+  onChange: (components: ClusterComponents) => void;
 }
 
 type ComponentLocation =
@@ -14,7 +14,7 @@ type ComponentLocation =
   | { kind: 'pvc'; namespaceIndex: number; componentIndex: number }
   | { kind: 'node'; componentIndex: number };
 
-function withDisabledFlag(components: MockAiClusterComponents, location: ComponentLocation, disabled: boolean): MockAiClusterComponents {
+function withDisabledFlag(components: ClusterComponents, location: ComponentLocation, disabled: boolean): ClusterComponents {
   if (location.kind === 'node') {
     return {
       ...components,
@@ -26,29 +26,11 @@ function withDisabledFlag(components: MockAiClusterComponents, location: Compone
     ...components,
     namespaces: components.namespaces.map((namespace, namespaceIndex) => {
       if (namespaceIndex !== location.namespaceIndex) return namespace;
-      if (location.kind === 'namespace') {
-        return {
-          ...namespace,
-          disabled,
-          pods: namespace.pods.map((pod) => ({
-            ...pod,
-            disabled,
-            containers: pod.containers.map((container) => ({ ...container, disabled })),
-          })),
-          services: namespace.services.map((service) => ({ ...service, disabled })),
-          pvcs: namespace.pvcs.map((pvc) => ({ ...pvc, disabled })),
-        };
-      }
+      if (location.kind === 'namespace') return { ...namespace, disabled };
       if (location.kind === 'pod') {
         return {
           ...namespace,
-          pods: namespace.pods.map((pod, podIndex) => podIndex === location.podIndex
-            ? {
-              ...pod,
-              disabled,
-              containers: pod.containers.map((container) => ({ ...container, disabled })),
-            }
-            : pod),
+          pods: namespace.pods.map((pod, podIndex) => podIndex === location.podIndex ? { ...pod, disabled } : pod),
         };
       }
       if (location.kind === 'container') {
@@ -99,7 +81,7 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
               />
               <fieldset className="krkn-ai-component-group">
                 <legend>Pods and containers</legend>
-                {namespace.pods.length === 0 && <p className="krkn-ai-muted">No mock pods discovered.</p>}
+                {namespace.pods.length === 0 && <p className="krkn-ai-muted">No pods were returned by discovery.</p>}
                 {namespace.pods.map((pod, podIndex) => (
                   <div key={pod.name} className="krkn-ai-component-pod">
                     <Checkbox
@@ -111,7 +93,7 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
                     />
                     <div className="krkn-ai-component-children">
                       <span>Containers</span>
-                      {pod.containers.length === 0 && <p className="krkn-ai-muted">No mock containers discovered.</p>}
+                      {pod.containers.length === 0 && <p className="krkn-ai-muted">No containers were returned by discovery.</p>}
                       {pod.containers.map((container, containerIndex) => (
                         <Checkbox
                           key={containerIndex}
@@ -128,7 +110,7 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
               </fieldset>
               <fieldset className="krkn-ai-component-group">
                 <legend>Services</legend>
-                {namespace.services.length === 0 && <p className="krkn-ai-muted">No mock services discovered.</p>}
+                {namespace.services.length === 0 && <p className="krkn-ai-muted">No services were returned by discovery.</p>}
                 {namespace.services.map((service, componentIndex) => (
                   <Checkbox
                     key={service.name}
@@ -142,7 +124,7 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
               </fieldset>
               <fieldset className="krkn-ai-component-group">
                 <legend>Persistent volume claims</legend>
-                {namespace.pvcs.length === 0 && <p className="krkn-ai-muted">No mock PVCs discovered.</p>}
+                {namespace.pvcs.length === 0 && <p className="krkn-ai-muted">No PVCs were returned by discovery.</p>}
                 {namespace.pvcs.map((pvc, componentIndex) => (
                   <Checkbox
                     key={pvc.name}
@@ -160,7 +142,7 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
       </div>
       <fieldset className="krkn-ai-component-group krkn-ai-node-group">
         <legend>Nodes</legend>
-        {components.nodes.length === 0 && <p className="krkn-ai-muted">No mock nodes discovered.</p>}
+        {components.nodes.length === 0 && <p className="krkn-ai-muted">No nodes were returned by discovery.</p>}
         {components.nodes.map((node, componentIndex) => (
           <Checkbox
             key={node.name}

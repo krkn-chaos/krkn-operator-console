@@ -1,14 +1,11 @@
-import type { MockAiFitnessPoint } from './types';
+import type { KrknAIFitnessProgression } from '../../services/krknAiApi';
 
 interface FitnessChartProps {
-  points: MockAiFitnessPoint[];
+  points: KrknAIFitnessProgression[];
   runName: string;
 }
 
-
-const formatFitness = (value: number) => value.toLocaleString(undefined, {
-  maximumFractionDigits: 4,
-});
+const formatFitness = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 
 function getExpandedDomain(values: number[]) {
   const low = Math.min(...values, 0);
@@ -19,13 +16,17 @@ function getExpandedDomain(values: number[]) {
 }
 
 export function FitnessChart({ points, runName }: FitnessChartProps) {
-  const sortedPoints = [...points].sort((a, b) => a.generation - b.generation);
+  const measuredPoints = points
+    .filter((point): point is KrknAIFitnessProgression & { best: number; average: number } =>
+      point.best !== null && point.average !== null
+      && Number.isFinite(point.best) && Number.isFinite(point.average))
+    .sort((left, right) => left.generation - right.generation);
 
-  if (sortedPoints.length === 0) {
+  if (measuredPoints.length === 0) {
     return (
       <section className="krkn-ai-fitness-chart" aria-labelledby="krkn-ai-fitness-heading">
         <h2 id="krkn-ai-fitness-heading">Fitness over generations</h2>
-        <p className="krkn-ai-not-available">Not available yet</p>
+        <p className="krkn-ai-not-available">Fitness progression is not available yet.</p>
       </section>
     );
   }
@@ -35,9 +36,10 @@ export function FitnessChart({ points, runName }: FitnessChartProps) {
   const margin = { top: 24, right: 24, bottom: 64, left: 76 };
   const plotWidth = width - margin.left - margin.right;
   const plotHeight = height - margin.top - margin.bottom;
-  const generations = sortedPoints.map((point) => point.generation);
-  const [minGeneration, maxGeneration] = [Math.min(...generations), Math.max(...generations)];
-  const values = sortedPoints.flatMap((point) => [point.best, point.average]);
+  const generations = measuredPoints.map((point) => point.generation);
+  const minGeneration = Math.min(...generations);
+  const maxGeneration = Math.max(...generations);
+  const values = measuredPoints.flatMap((point) => [point.best, point.average]);
   const [minFitness, maxFitness] = getExpandedDomain(values);
   const x = (generation: number) => margin.left + (
     maxGeneration === minGeneration
@@ -45,11 +47,11 @@ export function FitnessChart({ points, runName }: FitnessChartProps) {
       : ((generation - minGeneration) / (maxGeneration - minGeneration)) * plotWidth
   );
   const y = (fitness: number) => margin.top + ((maxFitness - fitness) / (maxFitness - minFitness)) * plotHeight;
-  const bestPath = sortedPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.generation)} ${y(point.best)}`).join(' ');
-  const averagePath = sortedPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.generation)} ${y(point.average)}`).join(' ');
+  const bestPath = measuredPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.generation)} ${y(point.best)}`).join(' ');
+  const averagePath = measuredPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.generation)} ${y(point.average)}`).join(' ');
   const yTicks = Array.from({ length: 5 }, (_, index) => maxFitness - ((maxFitness - minFitness) * index) / 4);
-  const xTicks = sortedPoints.length <= 6
-    ? sortedPoints.map((point) => point.generation)
+  const xTicks = measuredPoints.length <= 6
+    ? measuredPoints.map((point) => point.generation)
     : Array.from({ length: 6 }, (_, index) => Math.round(minGeneration + ((maxGeneration - minGeneration) * index) / 5));
 
   return (
@@ -60,7 +62,7 @@ export function FitnessChart({ points, runName }: FitnessChartProps) {
           className="krkn-ai-fitness-chart__svg"
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={`Best and average fitness for ${runName} across ${sortedPoints.length} observed generations. Vertical axis is fitness score, not a percentage.`}
+          aria-label={`Measured best and average fitness for ${runName} across ${measuredPoints.length} completed generations.`}
           preserveAspectRatio="xMidYMid meet"
         >
           {yTicks.map((tick, index) => {
@@ -85,57 +87,24 @@ export function FitnessChart({ points, runName }: FitnessChartProps) {
               </text>
             </g>
           ))}
-          <line
-            className="krkn-ai-fitness-chart__axis"
-            x1={margin.left}
-            x2={margin.left}
-            y1={margin.top}
-            y2={height - margin.bottom}
-          />
-          <line
-            className="krkn-ai-fitness-chart__axis"
-            x1={margin.left}
-            x2={width - margin.right}
-            y1={height - margin.bottom}
-            y2={height - margin.bottom}
-          />
+          <line className="krkn-ai-fitness-chart__axis" x1={margin.left} x2={margin.left} y1={margin.top} y2={height - margin.bottom} />
+          <line className="krkn-ai-fitness-chart__axis" x1={margin.left} x2={width - margin.right} y1={height - margin.bottom} y2={height - margin.bottom} />
           <path className="krkn-ai-fitness-chart__line krkn-ai-fitness-chart__line--best" d={bestPath} />
           <path className="krkn-ai-fitness-chart__line krkn-ai-fitness-chart__line--average" d={averagePath} />
-          {sortedPoints.map((point) => (
+          {measuredPoints.map((point) => (
             <g key={`point-${point.generation}`}>
-              <circle
-                className="krkn-ai-fitness-chart__point krkn-ai-fitness-chart__point--best"
-                cx={x(point.generation)}
-                cy={y(point.best)}
-                r="4"
-              >
+              <circle className="krkn-ai-fitness-chart__point krkn-ai-fitness-chart__point--best" cx={x(point.generation)} cy={y(point.best)} r="4">
                 <title>Generation {point.generation + 1} best fitness: {formatFitness(point.best)}</title>
               </circle>
-              <circle
-                className="krkn-ai-fitness-chart__point krkn-ai-fitness-chart__point--average"
-                cx={x(point.generation)}
-                cy={y(point.average)}
-                r="4"
-              >
+              <circle className="krkn-ai-fitness-chart__point krkn-ai-fitness-chart__point--average" cx={x(point.generation)} cy={y(point.average)} r="4">
                 <title>Generation {point.generation + 1} average fitness: {formatFitness(point.average)}</title>
               </circle>
             </g>
           ))}
-          <text
-            className="krkn-ai-fitness-chart__axis-label"
-            x={18}
-            y={margin.top + plotHeight / 2}
-            textAnchor="middle"
-            transform={`rotate(-90 18 ${margin.top + plotHeight / 2})`}
-          >
-            Fitness score (fitness units)
+          <text className="krkn-ai-fitness-chart__axis-label" x={18} y={margin.top + plotHeight / 2} textAnchor="middle" transform={`rotate(-90 18 ${margin.top + plotHeight / 2})`}>
+            Fitness score
           </text>
-          <text
-            className="krkn-ai-fitness-chart__axis-label"
-            x={margin.left + plotWidth / 2}
-            y={height - 12}
-            textAnchor="middle"
-          >
+          <text className="krkn-ai-fitness-chart__axis-label" x={margin.left + plotWidth / 2} y={height - 12} textAnchor="middle">
             Generation (displayed 1-based)
           </text>
         </svg>
@@ -147,4 +116,3 @@ export function FitnessChart({ points, runName }: FitnessChartProps) {
     </section>
   );
 }
-

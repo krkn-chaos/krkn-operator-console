@@ -1,11 +1,11 @@
 import { Alert, Card, CardBody, CardTitle, FormGroup, TextInput } from '@patternfly/react-core';
 import { SearchIcon } from '@patternfly/react-icons';
-import type { MockDiscoveryOptions, DiscoveryOptionErrors } from './discoveryOptions';
+import type { DiscoveryOptions, DiscoveryOptionErrors } from './discoveryOptions';
 
 interface DiscoveryOptionsEditorProps {
-  options: MockDiscoveryOptions;
-  errors: Partial<DiscoveryOptionErrors>;
-  onChange: (field: keyof MockDiscoveryOptions, value: string) => void;
+  options: DiscoveryOptions;
+  errors: DiscoveryOptionErrors;
+  onChange: (field: keyof DiscoveryOptions, value: string) => void;
 }
 
 export function DiscoveryOptionsEditor({ options, errors, onChange }: DiscoveryOptionsEditorProps) {
@@ -18,8 +18,8 @@ export function DiscoveryOptionsEditor({ options, errors, onChange }: DiscoveryO
         </div>
       </CardTitle>
       <CardBody>
-        <Alert variant="info" title="Filter the local preview inventory" isInline>
-          Patterns default to <code>*</code> and support comma-separated alternatives, regular expressions, and <code>!</code> exclusions. No cluster discovery request is sent.
+        <Alert variant="info" title="Scope the live discovery request" isInline>
+          Patterns are sent to Krkn AI when discovery runs. Use comma-separated patterns and <code>!</code> exclusions; an empty namespace pattern discovers no namespaces.
         </Alert>
         <div className="krkn-ai-config-fields">
           <FormGroup label="Namespace pattern" fieldId="krkn-ai-discovery-namespace-pattern" isRequired>

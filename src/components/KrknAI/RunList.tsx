@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Card,
   CardBody,
@@ -6,35 +7,61 @@ import {
   Label,
 } from '@patternfly/react-core';
 import type { KeyboardEvent } from 'react';
-import type { MockAiRun, MockAiRunPhase } from './types';
+import type { KrknAIRunResource, KrknAIRunSummary } from '../../services/krknAiApi';
 
-interface RunListProps {
-  runs: MockAiRun[];
-  onCreate: () => void;
-  onSelect: (runId: string) => void;
+export interface KrknAIRunListEntry {
+  resource: KrknAIRunResource;
+  summary: KrknAIRunSummary | null;
+  summaryError?: string;
+  updating: boolean;
 }
 
-const phaseColors: Record<MockAiRunPhase, 'blue' | 'cyan' | 'green' | 'grey' | 'red'> = {
-  Pending: 'grey',
-  Provisioning: 'cyan',
-  Running: 'blue',
-  Succeeded: 'green',
-  Failed: 'red',
-  Cancelled: 'grey',
-};
+interface RunListProps {
+  runs: KrknAIRunListEntry[];
+  loading: boolean;
+  refreshing: boolean;
+  error: string | null;
+  onCreate: () => void;
+  onRefresh: () => void;
+  onSelect: (run: KrknAIRunResource) => void;
+}
 
+function phaseColor(phase: string): 'blue' | 'cyan' | 'green' | 'grey' | 'red' {
+  switch (phase) {
+    case 'Provisioning': return 'cyan';
+    case 'Running': return 'blue';
+    case 'Succeeded': return 'green';
+    case 'Failed': return 'red';
+    default: return 'grey';
+  }
+}
 
-const formatStartTime = (createdAt: string): string => {
+function formatStartTime(createdAt: string): string {
   const date = new Date(createdAt);
   return Number.isNaN(date.getTime()) ? createdAt : date.toLocaleString();
-};
+}
 
-export function RunList({ runs, onCreate, onSelect }: RunListProps) {
+function getClusterName(resource: KrknAIRunResource, summary: KrknAIRunSummary | null): string {
+  if (summary?.cluster) return summary.cluster;
+  return Object.values(resource.spec.targetClusters ?? {})[0]?.[0] ?? 'Not available';
+}
 
-  const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, run: MockAiRun) => {
+export function RunList({
+  runs,
+  loading,
+  refreshing,
+  error,
+  onCreate,
+  onRefresh,
+  onSelect,
+}: RunListProps) {
+  const handleRowKeyDown = (
+    event: KeyboardEvent<HTMLTableRowElement>,
+    run: KrknAIRunResource,
+  ) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      onSelect(run.runId ?? run.name);
+      onSelect(run);
     }
   };
 
@@ -43,23 +70,23 @@ export function RunList({ runs, onCreate, onSelect }: RunListProps) {
       <CardTitle>AI runs</CardTitle>
       <CardBody>
         <div className="krkn-ai-run-list__toolbar">
-          <p className="krkn-ai-run-list__mock-note">
-            Mock preview — no cluster resources will be created.
-          </p>
+          <Button variant="secondary" onClick={onRefresh} isDisabled={refreshing}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </Button>
           <Button className="krkn-ai-run-list__create" variant="primary" onClick={onCreate}>
             Create run
           </Button>
         </div>
 
-        {runs.length === 0 ? (
-          <p className="krkn-ai-run-list__empty">No mock runs yet.</p>
+        {error && <Alert variant="danger" title={error} isInline />}
+        {loading && runs.length === 0 ? (
+          <p role="status">Loading Krkn-AI runs…</p>
+        ) : runs.length === 0 ? (
+          <p className="krkn-ai-run-list__empty">No Krkn-AI runs found. Refresh to check for runs created elsewhere.</p>
         ) : (
-          <div
-            className="krkn-ai-run-list__table-wrap"
-            style={{ overflowX: 'auto' }}
-          >
+          <div className="krkn-ai-run-list__table-wrap" style={{ overflowX: 'auto' }}>
             <table className="krkn-ai-run-list__table">
-              <caption>Mock AI run progress</caption>
+              <caption>Krkn-AI run progress</caption>
               <thead>
                 <tr>
                   <th scope="col">Run</th>
@@ -68,56 +95,41 @@ export function RunList({ runs, onCreate, onSelect }: RunListProps) {
                   <th scope="col">Started</th>
                   <th scope="col">Best fitness</th>
                   <th scope="col">Generations</th>
-                  <th scope="col">Scenarios</th>
+                  <th scope="col">Scenarios completed</th>
                 </tr>
               </thead>
               <tbody>
-                {runs.map((run) => {
-                  const bestSuccessfulScore = run.scenarios.reduce<number | null>(
-                    (best, scenario) => scenario.outcome === 'Succeeded'
-                      && Number.isFinite(scenario.fitnessScore)
-                      && (best === null || scenario.fitnessScore > best)
-                      ? scenario.fitnessScore
-                      : best,
-                    null,
-                  );
-                  const hasArtifacts = run.scenarios.length > 0 || run.progression.length > 0;
-                  const failedWithoutArtifacts = run.phase === 'Failed' && !hasArtifacts;
-                  const generationsProgress = failedWithoutArtifacts || run.completedGenerations === null
-                    ? 'Not available yet'
-                    : `${run.completedGenerations} / ${run.generations}`;
-                  const scenariosProgress = failedWithoutArtifacts
-                    ? 'Not available yet'
-                    : `${run.scenarios.length} / ${run.generations * run.populationSize}`;
+                {runs.map(({ resource, summary, summaryError, updating }) => {
+                  const name = resource.metadata.name;
+                  const phase = resource.status?.phase ?? 'Pending';
+                  const createdAt = summary?.createdAt || resource.metadata.creationTimestamp;
+                  const completed = summary?.completedGenerations;
+                  const configured = summary?.configuredGenerations;
+                  const generations = completed !== null && completed !== undefined
+                    && configured !== null && configured !== undefined
+                    ? `${completed} / ${configured}`
+                    : 'Not available yet';
 
                   return (
                     <tr
-                      key={run.runId ?? run.name}
+                      key={name}
                       className="krkn-ai-run-list__row"
                       tabIndex={0}
-                      aria-label={`Open run ${run.name}, ${run.phase}, cluster ${run.cluster.clusterName}`}
-                      onClick={() => onSelect(run.runId ?? run.name)}
-                      onKeyDown={(event) => handleRowKeyDown(event, run)}
+                      aria-label={`Open run ${name}, ${phase}, cluster ${getClusterName(resource, summary)}`}
+                      onClick={() => onSelect(resource)}
+                      onKeyDown={(event) => handleRowKeyDown(event, resource)}
                     >
                       <th scope="row" className="krkn-ai-run-list__name-cell">
-                        <span className="krkn-ai-run-list__run-name">{run.name}</span>
-                        {run.phase === 'Running' && run.snapshotLabel && (
-                          <span className="krkn-ai-run-list__snapshot">
-                            <Label color="grey">Fixed snapshot</Label>
-                            <span>{run.snapshotLabel}</span>
-                          </span>
-                        )}
+                        <span className="krkn-ai-run-list__run-name">{name}</span>
+                        {updating && <span className="krkn-ai-run-list__updating" role="status">Updating committed results…</span>}
+                        {summaryError && <span className="krkn-ai-run-list__error">{summaryError}</span>}
                       </th>
-                      <td>{run.cluster.clusterName}</td>
-                      <td>
-                        <Label color={phaseColors[run.phase]}>{run.phase}</Label>
-                      </td>
-                      <td>
-                        <time dateTime={run.createdAt}>{formatStartTime(run.createdAt)}</time>
-                      </td>
-                      <td>{bestSuccessfulScore === null ? 'Not available yet' : String(Number(bestSuccessfulScore.toFixed(4)))}</td>
-                      <td>{generationsProgress}</td>
-                      <td>{scenariosProgress}</td>
+                      <td>{getClusterName(resource, summary)}</td>
+                      <td><Label color={phaseColor(phase)}>{phase}</Label></td>
+                      <td>{createdAt ? <time dateTime={createdAt}>{formatStartTime(createdAt)}</time> : 'Not available'}</td>
+                      <td>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                      <td>{generations}</td>
+                      <td>{summary?.completedScenarios ?? 'Not available yet'}</td>
                     </tr>
                   );
                 })}

@@ -246,12 +246,6 @@
   white-space: pre;
 }
 
-.krkn-ai-snapshot-label {
-  display: inline-block;
-  margin-block-start: 0.35rem;
-  color: var(--krkn-ai-muted);
-  font-size: 0.8rem;
-}
 
 .krkn-ai-fitness-chart {
   width: 100%;
@@ -296,12 +290,31 @@
   margin-block-end: 1rem;
 }
 
-.krkn-ai-run-list__mock-note,
-.krkn-ai-mock-banner {
-  margin: 0;
-  color: var(--krkn-ai-muted);
-  font-weight: 600;
+.krkn-ai-run-list__updating,
+.krkn-ai-run-list__error {
+  display: block;
+  margin-block-start: 0.25rem;
+  font-size: 0.8rem;
 }
+
+.krkn-ai-run-list__updating,
+.krkn-ai-run-detail__updating {
+  color: var(--pf-v5-global--warning-color--100, #f0ab00);
+}
+
+.krkn-ai-run-list__error,
+.krkn-ai-run-detail__error {
+  color: var(--pf-v5-global--danger-color--100, #c9190b);
+}
+
+.krkn-ai-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-block-start: 1rem;
+}
+
 
 .krkn-ai-run-list__table-wrap {
   width: 100%;
@@ -448,15 +461,15 @@
   background: var(--pf-v5-global--BackgroundColor--200, rgba(0, 0, 0, 0.04));
 }
 
-.krkn-ai-scenario-detail__running-note {
-  margin-block: 1.25rem;
-  padding: 0.85rem 1rem;
-  border-inline-start: 4px solid var(--pf-v5-global--primary-color--100, #0066cc);
-  border-radius: 4px;
-  background: var(--pf-v5-global--BackgroundColor--200, rgba(0, 102, 204, 0.08));
+.krkn-ai-run-detail__updating,
+.krkn-ai-run-detail__error,
+.krkn-ai-scenario-detail__error {
+  margin-block: 0.75rem;
+  padding: 0.75rem;
+  border-inline-start: 4px solid currentColor;
+  background: var(--pf-v5-global--BackgroundColor--200, rgba(0, 0, 0, 0.04));
 }
 
-.krkn-ai-illustrative-note,
 .krkn-ai-not-available {
   color: var(--krkn-ai-muted);
 }
@@ -717,6 +730,11 @@
   stroke: var(--krkn-ai-surface);
 }
 
+.krkn-ai-health-heatmap__unknown {
+  fill: var(--pf-v5-global--Color--200, #8a8d90);
+  stroke: var(--krkn-ai-surface);
+}
+
 .krkn-ai-health-heatmap__code {
   fill: #fff;
   font-weight: 600;
@@ -733,6 +751,12 @@
 
 .krkn-ai-health-heatmap__legend-failure::before {
   background: var(--pf-v5-global--danger-color--100, #c9190b);
+}
+.krkn-ai-health-heatmap__legend-unknown::before {
+  width: 0.75rem;
+  height: 0.75rem;
+  background: var(--pf-v5-global--Color--200, #8a8d90);
+  content: '';
 }
 
 .krkn-ai-fitness-chart__figure {

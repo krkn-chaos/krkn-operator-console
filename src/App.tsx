@@ -21,8 +21,6 @@ import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
 import { KrknAIPage } from './components/KrknAI/KrknAIPage';
-import { mockAiRuns } from './components/KrknAI/mockData';
-import type { MockAiRun } from './components/KrknAI/types';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -37,7 +35,6 @@ function App() {
     const saved = localStorage.getItem('theme');
     return saved === 'dark';
   });
-  const [krknAiRuns, setKrknAiRuns] = useState<MockAiRun[]>(mockAiRuns);
 
   // Apply theme to document root
   useEffect(() => {
@@ -249,10 +246,7 @@ function App() {
       case 'krkn_ai':
         return (
           <PageSection>
-            <KrknAIPage
-              runs={krknAiRuns}
-              onAddRun={(run) => setKrknAiRuns((currentRuns) => [run, ...currentRuns])}
-            />
+            <KrknAIPage />
           </PageSection>
         );
 

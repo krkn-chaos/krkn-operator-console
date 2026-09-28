@@ -1,10 +1,22 @@
-import type { MockAiClusterComponents, MockAiDisabledComponent, MockAiTarget } from './types';
+import { isMap, isSeq, parseDocument } from 'yaml';
+import type { Document } from 'yaml';
+import type { ClusterComponents } from './types';
 
 export const scenarioTypeOptions = [
-  { id: 'storage-throttle', label: 'Storage throttle', configKey: 'storage_throttle' },
-  { id: 'dns-outage', label: 'DNS outage', configKey: 'dns_outage' },
-  { id: 'container-scenarios', label: 'Container scenarios', configKey: 'container_scenarios' },
-  { id: 'pvc-scenarios', label: 'PVC scenarios', configKey: 'pvc_scenarios' },
+  { id: 'application-outages', label: 'Application outages', configKey: 'application-outages' },
+  { id: 'pod-scenarios', label: 'Pod scenarios', configKey: 'pod-scenarios' },
+  { id: 'container-scenarios', label: 'Container scenarios', configKey: 'container-scenarios' },
+  { id: 'node-cpu-hog', label: 'Node CPU hog', configKey: 'node-cpu-hog' },
+  { id: 'node-memory-hog', label: 'Node memory hog', configKey: 'node-memory-hog' },
+  { id: 'node-io-hog', label: 'Node I/O hog', configKey: 'node-io-hog' },
+  { id: 'time-scenarios', label: 'Time scenarios', configKey: 'time-scenarios' },
+  { id: 'network-scenarios', label: 'Network scenarios', configKey: 'network-scenarios' },
+  { id: 'dns-outage', label: 'DNS outage', configKey: 'dns-outage' },
+  { id: 'syn-flood', label: 'SYN flood', configKey: 'syn-flood' },
+  { id: 'pvc-scenarios', label: 'PVC scenarios', configKey: 'pvc-scenarios' },
+  { id: 'kubevirt-scenarios', label: 'KubeVirt scenarios', configKey: 'kubevirt-scenarios' },
+  { id: 'storage-throttle', label: 'Storage throttle', configKey: 'storage-throttle' },
+  { id: 'service-disruption', label: 'Service disruption', configKey: 'service-disruption' },
 ] as const;
 
 export type ScenarioType = (typeof scenarioTypeOptions)[number]['id'];
@@ -60,7 +72,7 @@ export interface EditableConfigDraft {
   includeHealthCheckFailure: boolean;
   includeHealthCheckResponseTime: boolean;
   fitnessItems: FitnessItemDraft[];
-  clusterComponents: MockAiClusterComponents;
+  clusterComponents: ClusterComponents;
   resultNameFormat: string;
   graphNameFormat: string;
   logNameFormat: string;
@@ -68,317 +80,285 @@ export interface EditableConfigDraft {
 
 export type ConfigValidationErrors = Record<string, string>;
 
-type FitnessItemTemplate = readonly [title: string, query: string];
-
-const fitnessItemTemplates: FitnessItemTemplate[] = [
-  ['Pod container restarts', '(sum(increase(kube_pod_container_status_restarts_total{namespace="{{namespace}}"}[$range$]))) or vector(0)'],
-  ['Pods not ready', '(sum(kube_pod_status_phase{namespace="{{namespace}}", phase=~"Pending|Failed|Unknown"})) or vector(0)'],
-  ['OOM-killed containers', '(sum(kube_pod_container_status_last_terminated_reason{namespace="{{namespace}}", reason="OOMKilled"})) or vector(0)'],
-  ['Container CPU throttling', '(max(rate(container_cpu_cfs_throttled_periods_total{namespace="{{namespace}}", container!=""}[$range$]) / rate(container_cpu_cfs_periods_total{namespace="{{namespace}}", container!=""}[$range$]))) or vector(0)'],
-  ['Node pressure conditions', '(sum(kube_node_status_condition{condition=~"MemoryPressure|DiskPressure|PIDPressure", status="true"})) or vector(0)'],
-  ['API server 5xx rate', '(sum(rate(apiserver_request_total{code=~"5.."}[$range$])) / sum(rate(apiserver_request_total[$range$]))) or vector(0)'],
-  ['API server p99 request latency', '(histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~"WATCH|CONNECT"}[$range$])) by (le))) or vector(0)'],
-  ['Unready nodes', '(sum(kube_node_status_condition{condition="Ready", status="true"} == bool 0)) or vector(0)'],
-  ['Unavailable deployment replicas', '(clamp_min(sum(kube_deployment_spec_replicas{namespace="{{namespace}}"} - kube_deployment_status_replicas_available{namespace="{{namespace}}"}), 0)) or vector(0)'],
-  ['Unavailable StatefulSet replicas', '(clamp_min(sum(kube_statefulset_status_replicas{namespace="{{namespace}}"} - kube_statefulset_status_replicas_ready{namespace="{{namespace}}"}), 0)) or vector(0)'],
-  ['CrashLoopBackOff containers', '(sum(kube_pod_container_status_waiting_reason{namespace="{{namespace}}", reason="CrashLoopBackOff"})) or vector(0)'],
-  ['Disruption budget shortfall', '(clamp_min(sum(kube_poddisruptionbudget_status_desired_healthy{namespace="{{namespace}}"} - kube_poddisruptionbudget_status_current_healthy{namespace="{{namespace}}"}), 0)) or vector(0)'],
-  ['Pending persistent volume claims', '(sum(kube_persistentvolumeclaim_status_phase{namespace="{{namespace}}", phase="Pending"})) or vector(0)'],
-  ['etcd p99 request latency', '(histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket[$range$])) by (le))) or vector(0)'],
-  ['etcd request error rate', '((sum(rate(etcd_request_errors_total[$range$])) / sum(rate(etcd_requests_total[$range$]))) and (sum(rate(etcd_requests_total[$range$])) > 0)) or vector(0)'],
-  ['API server storage size', '(max(apiserver_storage_size_bytes)) or vector(0)'],
-];
-
-function copyDisabledComponent(component: MockAiDisabledComponent): MockAiDisabledComponent {
-  return {
-    ...component,
-    ...(component.labels ? { labels: { ...component.labels } } : {}),
-  };
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-export function copyClusterComponents(components: MockAiClusterComponents): MockAiClusterComponents {
-  return {
-    namespaces: components.namespaces.map((namespace) => ({
+function documentValue(document: Document, path: Array<string | number>): unknown {
+  const value = document.getIn(path, true);
+  if (value && typeof value === 'object' && 'toJSON' in value && typeof value.toJSON === 'function') return value.toJSON();
+  return value;
+}
+
+function list(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function text(value: unknown, fallback = ''): string {
+  return value === undefined || value === null ? fallback : String(value);
+}
+
+function bool(value: unknown, fallback = false): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function numberValue(value: string, optional = false): number | null {
+  if (optional && value.trim() === '') return null;
+  return Number(value);
+}
+
+function componentData(value: unknown): ClusterComponents {
+  const components = record(value);
+  const namespaces = list(components.namespaces).map((entry) => {
+    const namespace = record(entry);
+    return {
       ...namespace,
-      ...(namespace.labels ? { labels: { ...namespace.labels } } : {}),
-      pods: namespace.pods.map((pod) => ({
-        ...pod,
-        labels: { ...pod.labels },
-        containers: pod.containers.map(copyDisabledComponent),
-      })),
-      services: namespace.services.map(copyDisabledComponent),
-      pvcs: namespace.pvcs.map(copyDisabledComponent),
-    })),
-    nodes: components.nodes.map(copyDisabledComponent),
-  };
+      name: text(namespace.name),
+      disabled: bool(namespace.disabled),
+      pods: list(namespace.pods).map((podValue) => {
+        const pod = record(podValue);
+        return {
+          ...pod,
+          name: text(pod.name),
+          disabled: bool(pod.disabled),
+          labels: record(pod.labels) as Record<string, string>,
+          containers: list(pod.containers).map((containerValue) => {
+            const container = record(containerValue);
+            return { ...container, name: text(container.name), disabled: bool(container.disabled) };
+          }),
+        };
+      }),
+      services: list(namespace.services).map((item) => {
+        const component = record(item);
+        return { ...component, name: text(component.name), disabled: bool(component.disabled) };
+      }),
+      pvcs: list(namespace.pvcs).map((item) => {
+        const component = record(item);
+        return { ...component, name: text(component.name), disabled: bool(component.disabled) };
+      }),
+    };
+  });
+  const nodes = list(components.nodes).map((nodeValue) => {
+    const node = record(nodeValue);
+    return { ...node, name: text(node.name), disabled: bool(node.disabled), labels: record(node.labels) as Record<string, string> };
+  });
+  return { ...components, namespaces, nodes } as ClusterComponents;
 }
 
-export function createDefaultConfigDraft(target: MockAiTarget): EditableConfigDraft {
-  const namespace = target.components.namespaces[0]?.name ?? 'default';
-  return {
-    seed: '',
-    waitDuration: '0',
-    baselineEnabled: true,
-    baselineDuration: '30',
-    scenarioFlags: {
-      'storage-throttle': true,
-      'dns-outage': true,
-      'container-scenarios': true,
-      'pvc-scenarios': true,
-    },
-    algorithm: 'genetic',
-    genetic: {
-      duration: '',
-      generations: '6',
-      populationSize: '4',
-      mutationRate: '0.7',
-      scenarioMutationRate: '0.6',
-      crossoverRate: '0.6',
-      compositionRate: '0.0',
-      selectionStrategy: 'tournament',
-      tournamentSize: '6',
-      populationInjectionRate: '0.0',
-      populationInjectionSize: '2',
-    },
-    healthChecks: target.healthChecks.map((healthCheck, key) => ({
+export function createEditableConfigDraft(configYaml: string): { document: Document; draft: EditableConfigDraft } {
+  const parsed = parseDocument(configYaml);
+  if (parsed.errors.length) throw new Error(parsed.errors.map((error) => error.message).join('; '));
+  if (!isMap(parsed.contents)) throw new Error('Discovered configuration must be a YAML mapping.');
+  const raw = record(parsed.toJS());
+  const baseline = record(raw.baseline);
+  const genetic = record(raw.genetic);
+  const fitness = record(raw.fitness_function);
+  const health = record(raw.health_checks);
+  const output = record(raw.output);
+  const scenario = record(raw.scenario);
+  const scenarioFlags = Object.fromEntries(scenarioTypeOptions.map((option) => {
+    const scenarioConfig = record(scenario[option.configKey]);
+    return [option.id, bool(scenarioConfig.enable)];
+  })) as ScenarioFlags;
+  const fitnessItems = list(fitness.items).map((entry, key) => {
+    const item = record(entry);
+    return {
       key,
-      name: healthCheck.name,
-      url: healthCheck.url,
-      statusCode: String(healthCheck.statusCode),
-      timeout: String(healthCheck.timeoutSeconds),
-      interval: String(healthCheck.intervalSeconds),
-    })),
-    clusterComponents: copyClusterComponents(target.components),
-    stopWatcherOnFailure: false,
-    stopTimeout: '5.0',
-    fitnessQuery: 'sum(kube_pod_container_status_restarts_total)',
-    fitnessType: 'point',
-    includeKrknFailure: true,
-    includeHealthCheckFailure: true,
-    includeHealthCheckResponseTime: true,
-    fitnessItems: fitnessItemTemplates.map(([title, query], id) => ({
-      key: id,
-      id: String(id),
-      title,
-      query: query.replace(/\{\{namespace\}\}/g, namespace),
-      type: 'range',
-      weight: '0.0625',
-    })),
-    resultNameFormat: 'scenario_%s.yaml',
-    graphNameFormat: 'scenario_%s.png',
-    logNameFormat: 'scenario_%s.log',
+      id: text(item.id, String(key)),
+      title: text(item.name ?? item.title, `Fitness item ${key + 1}`),
+      query: text(item.query),
+      type: item.type === 'range' ? 'range' as const : 'point' as const,
+      weight: text(item.weight, '0'),
+    };
+  });
+  const healthChecks = list(health.applications).map((entry, key) => {
+    const check = record(entry);
+    return {
+      key,
+      name: text(check.name, `Application ${key + 1}`),
+      url: text(check.url),
+      statusCode: text(check.status_code, '200'),
+      timeout: text(check.timeout, '5'),
+      interval: text(check.interval, '5'),
+    };
+  });
+  const draft: EditableConfigDraft = {
+    seed: text(raw.seed),
+    waitDuration: text(raw.wait_duration, '0'),
+    baselineEnabled: bool(baseline.enable, true),
+    baselineDuration: text(baseline.duration, '120'),
+    scenarioFlags,
+    algorithm: text(raw.algorithm, 'genetic'),
+    genetic: {
+      duration: text(genetic.duration),
+      generations: text(genetic.generations, '1'),
+      populationSize: text(genetic.population_size, '2'),
+      mutationRate: text(genetic.mutation_rate, '0'),
+      scenarioMutationRate: text(genetic.scenario_mutation_rate, '0'),
+      crossoverRate: text(genetic.crossover_rate, '0'),
+      compositionRate: text(genetic.composition_rate, '0'),
+      selectionStrategy: text(genetic.selection_strategy, 'tournament'),
+      tournamentSize: text(genetic.tournament_size, '2'),
+      populationInjectionRate: text(genetic.population_injection_rate, '0'),
+      populationInjectionSize: text(genetic.population_injection_size, '1'),
+    },
+    healthChecks,
+    stopWatcherOnFailure: bool(health.stop_watcher_on_failure),
+    stopTimeout: text(health.stop_timeout, '5'),
+    fitnessQuery: text(fitness.query),
+    fitnessType: fitness.type === 'range' ? 'range' : 'point',
+    includeKrknFailure: bool(fitness.include_krkn_failure, true),
+    includeHealthCheckFailure: bool(fitness.include_health_check_failure, true),
+    includeHealthCheckResponseTime: bool(fitness.include_health_check_response_time, true),
+    fitnessItems,
+    clusterComponents: componentData(raw.cluster_components),
+    resultNameFormat: text(output.result_name_fmt, 'scenario_%s.yaml'),
+    graphNameFormat: text(output.graph_name_fmt, 'scenario_%s.png'),
+    logNameFormat: text(output.log_name_fmt, 'scenario_%s.log'),
   };
+
+  // Keep every supported scenario visible even when discovery disabled it.
+  for (const option of scenarioTypeOptions) {
+    if (!parsed.hasIn(['scenario', option.configKey])) parsed.setIn(['scenario', option.configKey], parsed.createNode({ enable: false }));
+  }
+  return { document: parsed, draft };
 }
 
-function numberError(
-  value: string,
-  label: string,
-  options: { min?: number; max?: number; integer?: boolean; optional?: boolean } = {},
-): string | undefined {
+export function updateConfigDocument(document: Document, draft: EditableConfigDraft): string {
+  const set = (path: Array<string | number>, value: unknown) => document.setIn(path, value);
+  set(['seed'], numberValue(draft.seed, true));
+  set(['wait_duration'], numberValue(draft.waitDuration));
+  set(['baseline', 'enable'], draft.baselineEnabled);
+  set(['baseline', 'duration'], numberValue(draft.baselineDuration));
+  set(['algorithm'], draft.algorithm);
+  for (const option of scenarioTypeOptions) set(['scenario', option.configKey, 'enable'], draft.scenarioFlags[option.id]);
+
+  const genetic = draft.genetic;
+  const geneticFields: Array<[keyof GeneticSettingsDraft, string, boolean]> = [
+    ['duration', 'duration', true], ['generations', 'generations', false], ['populationSize', 'population_size', false],
+    ['mutationRate', 'mutation_rate', false], ['scenarioMutationRate', 'scenario_mutation_rate', false],
+    ['crossoverRate', 'crossover_rate', false], ['compositionRate', 'composition_rate', false],
+    ['selectionStrategy', 'selection_strategy', false], ['tournamentSize', 'tournament_size', false],
+    ['populationInjectionRate', 'population_injection_rate', false], ['populationInjectionSize', 'population_injection_size', false],
+  ];
+  for (const [draftKey, yamlKey, optional] of geneticFields) {
+    const value = genetic[draftKey];
+    set(['genetic', yamlKey], draftKey === 'selectionStrategy' ? value : numberValue(value, optional));
+  }
+
+  set(['health_checks', 'stop_watcher_on_failure'], draft.stopWatcherOnFailure);
+  set(['health_checks', 'stop_timeout'], numberValue(draft.stopTimeout));
+  const updateSequence = (path: Array<string | number>, rows: Array<Record<string, unknown>>) => {
+    let sequence = document.getIn(path, true);
+    if (!isSeq(sequence)) {
+      document.setIn(path, []);
+      sequence = document.getIn(path, true);
+    }
+    if (!isSeq(sequence)) return;
+    rows.forEach((row, index) => {
+      if (index < sequence.items.length) {
+        for (const [key, value] of Object.entries(row)) document.setIn([...path, index, key], value);
+      } else {
+        sequence.add(document.createNode(row));
+      }
+    });
+    while (sequence.items.length > rows.length) sequence.delete(sequence.items.length - 1);
+  };
+  const healthRows = draft.healthChecks.map((check, index) => ({
+    ...record(documentValue(document, ['health_checks', 'applications', index])),
+    name: check.name,
+    url: check.url,
+    status_code: numberValue(check.statusCode),
+    timeout: numberValue(check.timeout),
+    interval: numberValue(check.interval),
+  }));
+  updateSequence(['health_checks', 'applications'], healthRows);
+
+  set(['fitness_function', 'query'], draft.fitnessQuery.trim() ? draft.fitnessQuery : null);
+  set(['fitness_function', 'type'], draft.fitnessType);
+  set(['fitness_function', 'include_krkn_failure'], draft.includeKrknFailure);
+  set(['fitness_function', 'include_health_check_failure'], draft.includeHealthCheckFailure);
+  set(['fitness_function', 'include_health_check_response_time'], draft.includeHealthCheckResponseTime);
+  const fitnessRows = draft.fitnessItems.map((item, index) => ({
+    ...record(documentValue(document, ['fitness_function', 'items', index])),
+    id: numberValue(item.id),
+    query: item.query,
+    type: item.type,
+    weight: numberValue(item.weight),
+  }));
+  updateSequence(['fitness_function', 'items'], fitnessRows);
+  set(['output', 'result_name_fmt'], draft.resultNameFormat);
+  set(['output', 'graph_name_fmt'], draft.graphNameFormat);
+  set(['output', 'log_name_fmt'], draft.logNameFormat);
+  set(['allow_dangerous_scenarios'], draft.scenarioFlags['service-disruption']);
+
+  const edited = draft.clusterComponents;
+  const updateDisabled = (path: Array<string | number>, disabled: boolean) => set(['cluster_components', ...path, 'disabled'], disabled);
+  edited.namespaces.forEach((namespace, namespaceIndex) => {
+    updateDisabled(['namespaces', namespaceIndex], namespace.disabled ?? false);
+    namespace.pods.forEach((pod, podIndex) => {
+      updateDisabled(['namespaces', namespaceIndex, 'pods', podIndex], pod.disabled ?? false);
+      pod.containers.forEach((container, containerIndex) => updateDisabled(['namespaces', namespaceIndex, 'pods', podIndex, 'containers', containerIndex], container.disabled ?? false));
+    });
+    namespace.services.forEach((service, componentIndex) => updateDisabled(['namespaces', namespaceIndex, 'services', componentIndex], service.disabled ?? false));
+    namespace.pvcs.forEach((pvc, componentIndex) => updateDisabled(['namespaces', namespaceIndex, 'pvcs', componentIndex], pvc.disabled ?? false));
+  });
+  edited.nodes.forEach((node, index) => updateDisabled(['nodes', index], node.disabled ?? false));
+  return document.toString();
+}
+
+function numericError(value: string, label: string, options: { min?: number; integer?: boolean; optional?: boolean } = {}): string | undefined {
   if (options.optional && value.trim() === '') return undefined;
+  if (!value.trim()) return `Enter a valid ${label}.`;
   const parsed = Number(value);
-  if (value.trim() === '' || !Number.isFinite(parsed)) return `Enter a valid ${label}.`;
+  if (!Number.isFinite(parsed)) return `Enter a valid ${label}.`;
   if (options.integer && !Number.isInteger(parsed)) return `${label} must be a whole number.`;
   if (options.min !== undefined && parsed < options.min) return `${label} must be at least ${options.min}.`;
-  if (options.max !== undefined && parsed > options.max) return `${label} must be at most ${options.max}.`;
   return undefined;
 }
 
 export function validateConfigDraft(draft: EditableConfigDraft): ConfigValidationErrors {
   const errors: ConfigValidationErrors = {};
-  const addError = (field: string, error: string | undefined) => {
-    if (error) errors[field] = error;
-  };
+  const add = (field: string, error: string | undefined) => { if (error) errors[field] = error; };
   const genetic = draft.genetic;
-
-  addError('seed', numberError(draft.seed, 'Seed', { integer: true, optional: true }));
-  addError('waitDuration', numberError(draft.waitDuration, 'Wait duration', { min: 0 }));
-  addError('baselineDuration', numberError(draft.baselineDuration, 'Baseline duration', { min: 0 }));
-  addError('generations', numberError(genetic.generations, 'Generations', { min: 1, integer: true }));
-  addError('populationSize', numberError(genetic.populationSize, 'Population size', { min: 1, integer: true }));
-  addError('genetic.duration', numberError(genetic.duration, 'Genetic duration', { min: 0, optional: true }));
-  addError('genetic.mutationRate', numberError(genetic.mutationRate, 'Mutation rate', { min: 0, max: 1 }));
-  addError('genetic.scenarioMutationRate', numberError(genetic.scenarioMutationRate, 'Scenario mutation rate', { min: 0, max: 1 }));
-  addError('genetic.crossoverRate', numberError(genetic.crossoverRate, 'Crossover rate', { min: 0, max: 1 }));
-  addError('genetic.compositionRate', numberError(genetic.compositionRate, 'Composition rate', { min: 0, max: 1 }));
-  addError('genetic.tournamentSize', numberError(genetic.tournamentSize, 'Tournament size', { min: 1, integer: true }));
-  addError('genetic.populationInjectionRate', numberError(genetic.populationInjectionRate, 'Population injection rate', { min: 0, max: 1 }));
-  addError('genetic.populationInjectionSize', numberError(genetic.populationInjectionSize, 'Population injection size', { min: 0, integer: true }));
-  addError('genetic.selectionStrategy', genetic.selectionStrategy.trim() ? undefined : 'Selection strategy is required.');
-  addError('algorithm', draft.algorithm.trim() ? undefined : 'Algorithm is required.');
-  addError('stopTimeout', numberError(draft.stopTimeout, 'Health-check stop timeout', { min: 0 }));
-  addError('fitnessQuery', draft.fitnessQuery.trim() ? undefined : 'Fitness query is required.');
-
-  if (!scenarioTypeOptions.some((option) => draft.scenarioFlags[option.id])) {
-    errors.scenarioFlags = 'Enable at least one scenario type.';
+  add('seed', numericError(draft.seed, 'Seed', { integer: true, optional: true }));
+  add('waitDuration', numericError(draft.waitDuration, 'Wait duration', { min: 0, integer: true }));
+  add('baselineDuration', numericError(draft.baselineDuration, 'Baseline duration', { min: 1, integer: true }));
+  add('generations', numericError(genetic.generations, 'Generations', { min: 1, integer: true }));
+  add('populationSize', numericError(genetic.populationSize, 'Population size', { min: 2, integer: true }));
+  add('genetic.duration', numericError(genetic.duration, 'Genetic duration', { min: 1, integer: true, optional: true }));
+  for (const [field, label] of [['mutationRate', 'Mutation rate'], ['scenarioMutationRate', 'Scenario mutation rate'], ['crossoverRate', 'Crossover rate'], ['populationInjectionRate', 'Population injection rate']] as const) {
+    add(`genetic.${field}`, numericError(genetic[field], label, { min: 0 }));
+    if (Number(genetic[field]) > 1) errors[`genetic.${field}`] = `${label} must be at most 1.`;
   }
-  if (draft.fitnessItems.length === 0) errors.fitnessItems = 'Add at least one fitness function item.';
-  const fitnessIds = new Set<string>();
+  add('genetic.compositionRate', Number(genetic.compositionRate) === 0 ? undefined : 'Composition rate must be zero for operator runs.');
+  add('genetic.tournamentSize', numericError(genetic.tournamentSize, 'Tournament size', { min: 1, integer: true }));
+  add('genetic.populationInjectionSize', numericError(genetic.populationInjectionSize, 'Population injection size', { min: 1, integer: true }));
+  add('genetic.selectionStrategy', ['roulette', 'tournament'].includes(genetic.selectionStrategy) ? undefined : 'Choose roulette or tournament.');
+  add('algorithm', draft.algorithm === 'genetic' ? undefined : 'Choose the supported genetic algorithm.');
+  add('stopTimeout', numericError(draft.stopTimeout, 'Health-check stop timeout', { min: 0 }));
+  if (!draft.fitnessQuery.trim() && draft.fitnessItems.length === 0) errors.fitnessQuery = 'Provide a fitness query or at least one fitness item.';
   for (const item of draft.fitnessItems) {
-    const itemKey = `fitnessItem.${item.key}`;
-    if (!/^\d+$/.test(item.id) || Number(item.id) < 0) {
-      errors[`${itemKey}.id`] = 'Item ID must be a non-negative whole number.';
-    } else if (fitnessIds.has(item.id)) {
-      errors[`${itemKey}.id`] = 'Fitness item IDs must be unique.';
-    }
-    fitnessIds.add(item.id);
-    if (!item.query.trim()) errors[`${itemKey}.query`] = 'PromQL query is required.';
-    addError(`${itemKey}.weight`, numberError(item.weight, 'Weight', { min: 0, max: 1 }));
+    const key = `fitnessItem.${item.key}`;
+    add(`${key}.id`, numericError(item.id, 'Item ID', { integer: true }));
+    add(`${key}.weight`, numericError(item.weight, 'Weight', { min: 0 }));
   }
-
   for (const check of draft.healthChecks) {
-    const itemKey = `healthCheck.${check.key}`;
-    if (!check.name.trim()) errors[`${itemKey}.name`] = 'Health-check name is required.';
+    const key = `healthCheck.${check.key}`;
     try {
-      const url = new URL(check.url);
-      const isExampleHost = url.hostname === 'example.com' || url.hostname.endsWith('.example.com');
-      if (!['http:', 'https:'].includes(url.protocol) || !isExampleHost) {
-        errors[`${itemKey}.url`] = 'Use a complete HTTP or HTTPS URL on the reserved example.com domain.';
-      }
+      if (!['http:', 'https:'].includes(new URL(check.url).protocol)) errors[`${key}.url`] = 'Enter an HTTP or HTTPS URL.';
     } catch {
-      errors[`${itemKey}.url`] = 'Enter a complete HTTP or HTTPS URL.';
+      errors[`${key}.url`] = 'Enter a complete HTTP or HTTPS URL.';
     }
-    addError(`${itemKey}.statusCode`, numberError(check.statusCode, 'Expected status code', { min: 100, max: 599, integer: true }));
-    addError(`${itemKey}.timeout`, numberError(check.timeout, 'Health-check timeout', { min: 1 }));
-    addError(`${itemKey}.interval`, numberError(check.interval, 'Health-check interval', { min: 1 }));
+    add(`${key}.statusCode`, numericError(check.statusCode, 'Expected status code', { integer: true }));
+    add(`${key}.timeout`, numericError(check.timeout, 'Health-check timeout', { integer: true }));
+    add(`${key}.interval`, numericError(check.interval, 'Health-check interval', { integer: true }));
   }
-
-  const outputFormats: Array<[string, string, string]> = [
+  for (const [field, value, label] of [
     ['resultNameFormat', draft.resultNameFormat, 'Result filename format'],
     ['graphNameFormat', draft.graphNameFormat, 'Graph filename format'],
     ['logNameFormat', draft.logNameFormat, 'Log filename format'],
-  ];
-  for (const [field, value, label] of outputFormats) {
-    if (!value.includes('%s')) errors[field] = `${label} must include the %s scenario placeholder.`;
-  }
+  ] as const) if (!value.includes('%s')) errors[field] = `${label} must include the %s scenario placeholder.`;
   return errors;
 }
 
-function yamlString(value: string): string {
-  return JSON.stringify(value);
-}
-
-
-function yamlNumber(value: string, optional = false): string {
-  if (optional && value.trim() === '') return 'null';
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? String(parsed) : yamlString(value);
-}
-
-export function buildMockConfigYaml(target: MockAiTarget, draft: EditableConfigDraft): string {
-  const lines = [
-    '# Mock preview configuration; no credentials or live endpoints are used.',
-    `# Synthetic target cluster: ${target.cluster.clusterName}`,
-    'kubeconfig_file_path: /input/kubeconfig',
-    `seed: ${yamlNumber(draft.seed, true)}`,
-    `wait_duration: ${yamlNumber(draft.waitDuration)}`,
-    'baseline:',
-    `  enable: ${draft.baselineEnabled}`,
-    `  duration: ${yamlNumber(draft.baselineDuration)}`,
-    'health_checks:',
-    `  stop_watcher_on_failure: ${draft.stopWatcherOnFailure}`,
-    `  stop_timeout: ${yamlNumber(draft.stopTimeout)}`,
-    ...(draft.healthChecks.length === 0 ? ['  applications: []'] : ['  applications:']),
-  ];
-
-  if (draft.healthChecks.length > 0) {
-    for (const check of draft.healthChecks) {
-      lines.push(
-        `    - name: ${yamlString(check.name)}`,
-        `      url: ${yamlString(check.url)}`,
-        `      status_code: ${yamlNumber(check.statusCode)}`,
-        `      timeout: ${yamlNumber(check.timeout)}`,
-        `      interval: ${yamlNumber(check.interval)}`,
-      );
-    }
-  }
-
-  lines.push('  headers: null', 'scenario:');
-  for (const option of scenarioTypeOptions) {
-    lines.push(`  ${option.configKey}:`, `    enable: ${draft.scenarioFlags[option.id]}`);
-  }
-
-  const genetic = draft.genetic;
-  lines.push(
-    'allow_dangerous_scenarios: false',
-    `algorithm: ${yamlString(draft.algorithm)}`,
-    'genetic:',
-    `  duration: ${yamlNumber(genetic.duration, true)}`,
-    `  generations: ${yamlNumber(genetic.generations)}`,
-    `  population_size: ${yamlNumber(genetic.populationSize)}`,
-    `  mutation_rate: ${yamlNumber(genetic.mutationRate)}`,
-    `  scenario_mutation_rate: ${yamlNumber(genetic.scenarioMutationRate)}`,
-    `  crossover_rate: ${yamlNumber(genetic.crossoverRate)}`,
-    `  composition_rate: ${yamlNumber(genetic.compositionRate)}`,
-    `  selection_strategy: ${yamlString(genetic.selectionStrategy)}`,
-    `  tournament_size: ${yamlNumber(genetic.tournamentSize)}`,
-    `  population_injection_rate: ${yamlNumber(genetic.populationInjectionRate)}`,
-    `  population_injection_size: ${yamlNumber(genetic.populationInjectionSize)}`,
-    'fitness_function:',
-    `  query: ${yamlString(draft.fitnessQuery)}`,
-    `  type: ${draft.fitnessType}`,
-    `  include_krkn_failure: ${draft.includeKrknFailure}`,
-    `  include_health_check_failure: ${draft.includeHealthCheckFailure}`,
-    `  include_health_check_response_time: ${draft.includeHealthCheckResponseTime}`,
-    '  items:',
-  );
-
-  for (const item of draft.fitnessItems) {
-    lines.push(
-      `  - id: ${yamlNumber(item.id)}`,
-      `    query: ${yamlString(item.query)}`,
-      `    type: ${item.type}`,
-      `    weight: ${yamlNumber(item.weight)}`,
-    );
-  }
-
-  lines.push(
-    'output:',
-    `  result_name_fmt: ${yamlString(draft.resultNameFormat)}`,
-    `  graph_name_fmt: ${yamlString(draft.graphNameFormat)}`,
-    `  log_name_fmt: ${yamlString(draft.logNameFormat)}`,
-  );
-  const components = draft.clusterComponents;
-  lines.push('cluster_components:', '  namespaces:');
-  if (components.namespaces.length === 0) lines.push('    []');
-  for (const namespace of components.namespaces) {
-    lines.push(
-      `    - name: ${yamlString(namespace.name)}`,
-      `      disabled: ${namespace.disabled}`,
-      `      pods:${namespace.pods.length === 0 ? ' []' : ''}`,
-    );
-    for (const pod of namespace.pods) {
-      lines.push(
-        `        - name: ${yamlString(pod.name)}`,
-        `          disabled: ${pod.disabled}`,
-        `          labels:${Object.keys(pod.labels).length === 0 ? ' {}' : ''}`,
-      );
-      for (const [label, value] of Object.entries(pod.labels)) {
-        lines.push(`            ${yamlString(label)}: ${yamlString(value)}`);
-      }
-      lines.push(`          containers:${pod.containers.length === 0 ? ' []' : ''}`);
-      for (const container of pod.containers) {
-        lines.push(`            - name: ${yamlString(container.name)}`, `              disabled: ${container.disabled}`);
-      }
-    }
-    lines.push(`      services:${namespace.services.length === 0 ? ' []' : ''}`);
-    for (const service of namespace.services) {
-      lines.push(`        - name: ${yamlString(service.name)}`, `          disabled: ${service.disabled}`);
-    }
-    lines.push(`      pvcs:${namespace.pvcs.length === 0 ? ' []' : ''}`);
-    for (const pvc of namespace.pvcs) {
-      lines.push(`        - name: ${yamlString(pvc.name)}`, `          disabled: ${pvc.disabled}`);
-    }
-  }
-  lines.push(`  nodes:${components.nodes.length === 0 ? ' []' : ''}`);
-  for (const node of components.nodes) {
-    const labels = Object.entries(node.labels ?? {});
-    lines.push(
-      `    - name: ${yamlString(node.name)}`,
-      `      disabled: ${node.disabled}`,
-      `      labels:${labels.length === 0 ? ' {}' : ''}`,
-    );
-    for (const [label, value] of labels) lines.push(`        ${yamlString(label)}: ${yamlString(value)}`);
-  }
-  return lines.join('\n');
-}

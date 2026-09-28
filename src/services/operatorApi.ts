@@ -45,9 +45,10 @@ class OperatorApiClient extends BaseApiClient {
    * Initialize a new target request
    * @returns Promise with UUID
    */
-  async createTargetRequest(): Promise<CreateTargetResponse> {
+  async createTargetRequest(options: { signal?: AbortSignal } = {}): Promise<CreateTargetResponse> {
     return this.fetchJson<CreateTargetResponse>('/targets', {
       method: 'POST',
+      ...(options.signal ? { signal: options.signal } : {}),
     });
   }
 
@@ -57,8 +58,8 @@ class OperatorApiClient extends BaseApiClient {
    * @param uuid - Target request UUID
    * @returns HTTP status code (202 = Accepted/pending, 200 = OK/completed)
    */
-  async getTargetStatus(uuid: string): Promise<number> {
-    const response = await this.fetch(`/targets/${uuid}`);
+  async getTargetStatus(uuid: string, options: { signal?: AbortSignal } = {}): Promise<number> {
+    const response = await this.fetch(`/targets/${uuid}`, options.signal ? { signal: options.signal } : {});
     return response.status;
   }
 
@@ -142,8 +143,11 @@ class OperatorApiClient extends BaseApiClient {
    * @param uuid - Target request UUID
    * @returns Promise with clusters data
    */
-  async getClusters(uuid: string): Promise<ClustersResponse> {
-    return this.fetchJson<ClustersResponse>(`/clusters?id=${uuid}`);
+  async getClusters(uuid: string, options: { signal?: AbortSignal } = {}): Promise<ClustersResponse> {
+    return this.fetchJson<ClustersResponse>(
+      `/clusters?id=${encodeURIComponent(uuid)}`,
+      options.signal ? { signal: options.signal } : {},
+    );
   }
 
   /**
@@ -484,9 +488,15 @@ class OperatorApiClient extends BaseApiClient {
    * Get files available to the current user (based on groups)
    * @returns Promise with response containing minimal file info array
    */
-  async getAvailableFiles(filePurpose?: string): Promise<AvailableFilesResponse> {
+  async getAvailableFiles(
+    filePurpose?: string,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<AvailableFilesResponse> {
     const query = filePurpose ? `?filePurpose=${encodeURIComponent(filePurpose)}` : '';
-    return this.fetchJson<AvailableFilesResponse>(`/files/available${query}`);
+    return this.fetchJson<AvailableFilesResponse>(
+      `/files/available${query}`,
+      options.signal ? { signal: options.signal } : {},
+    );
   }
 
   /**
@@ -514,8 +524,11 @@ class OperatorApiClient extends BaseApiClient {
    * @param fileId - File UUID
    * @returns Promise with full file details
    */
-  async getFile(fileId: string): Promise<FileResponse> {
-    return this.fetchJson<FileResponse>(`/files/${encodeURIComponent(fileId)}`);
+  async getFile(fileId: string, options: { signal?: AbortSignal } = {}): Promise<FileResponse> {
+    return this.fetchJson<FileResponse>(
+      `/files/${encodeURIComponent(fileId)}`,
+      options.signal ? { signal: options.signal } : {},
+    );
   }
 
   /**

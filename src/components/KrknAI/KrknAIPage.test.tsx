@@ -1,416 +1,531 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useState } from 'react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { CreateRun } from './CreateRun';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { KrknAIConfigValidationError } from '../../services/krknAiApi';
+import type {
+  KrknAIRunResource,
+  KrknAIRunSummary,
+  KrknAIScenarioDetail,
+  KrknAIScenarioIndexResponse,
+  KrknAIScenarioIndexRow,
+} from '../../services/krknAiApi';
+import { operatorApi } from '../../services/operatorApi';
+import { websocketService } from '../../services/websocketService';
+import { validateConfigDraft, createEditableConfigDraft } from './configModel';
 import { KrknAIPage } from './KrknAIPage';
-import { mockAiRuns } from './mockData';
 
-function renderCreateRun(existingNames: string[] = []) {
-  const onStart = vi.fn();
-  const onCancel = vi.fn();
-  render(<CreateRun existingNames={existingNames} onStart={onStart} onCancel={onCancel} />);
-  return { onStart, onCancel };
-}
+const mocks = vi.hoisted(() => ({
+  ai: {
+    listRuns: vi.fn(),
+    getRunSummary: vi.fn(),
+    getScenarioIndex: vi.fn(),
+    getScenario: vi.fn(),
+    discover: vi.fn(),
+    validateConfig: vi.fn(),
+    createConfig: vi.fn(),
+    createRun: vi.fn(),
+  },
+  operator: {
+    createTargetRequest: vi.fn(),
+    getTargetStatus: vi.fn(),
+    getClusters: vi.fn(),
+    getAvailableFiles: vi.fn(),
+    getFile: vi.fn(),
+  },
+  useWebSocket: vi.fn((_connectionId: string, _url: string, _message?: unknown, _options?: unknown) => ({ connectionState: 'connected' as const })),
+}));
 
-interface WizardInteraction {
-  click: (element: Element) => Promise<void>;
-}
-
-async function goToConfigSection(user: WizardInteraction, section: string) {
-  await user.click(screen.getByRole('button', { name: new RegExp(section, 'i') }));
-}
-
-describe('Krkn AI mock run creation', () => {
-  it('rejects an empty or duplicate DNS-label run name', async () => {
-    const user = userEvent.setup();
-    renderCreateRun(['existing-run']);
-
-    expect(screen.getByText('Run name is required.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Discover components' })).toBeDisabled();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'existing-run');
-    expect(screen.getByText('A run with this name already exists.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Discover components' })).toBeDisabled();
-  });
-
-  it('requires positive search sizes and at least one selected scenario', async () => {
-    const user = userEvent.setup();
-    renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'scenario-check');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-    const sectionNav = screen.getByRole('navigation', { name: 'Configuration sections' });
-    expect(screen.getByText('Section 1 of 7')).toBeInTheDocument();
-    expect(within(sectionNav).getByRole('button', { name: /Scenarios/ })).toHaveAttribute('aria-current', 'step');
-    expect(screen.getByText('Choose what Krkn AI can explore')).toBeInTheDocument();
-    await goToConfigSection(user, 'Genetic algorithm');
-    const generationsInput = screen.getByRole('spinbutton', { name: 'Generations' });
-    const populationInput = screen.getByRole('spinbutton', { name: /Population size/ });
-    await user.clear(generationsInput);
-    await user.type(generationsInput, '0');
-    await user.clear(populationInput);
-    await user.type(populationInput, '0');
-    expect(screen.getByText('Generations must be at least 1.')).toBeInTheDocument();
-    expect(screen.getByText('Population size must be at least 1.')).toBeInTheDocument();
-
-    await goToConfigSection(user, 'Scenarios');
-    for (const label of ['Storage throttle', 'DNS outage', 'Container scenarios', 'PVC scenarios']) {
-      await user.click(screen.getByLabelText(label));
-    }
-
-    expect(screen.getByText('Enable at least one scenario type.')).toBeInTheDocument();
-    await goToConfigSection(user, 'Review YAML');
-    expect(screen.getByRole('button', { name: 'Create config (mock)' })).toBeDisabled();
-  }, 15_000);
-
-  it('requires a mock config before launch and emits an empty Provisioning run', async () => {
-    const user = userEvent.setup();
-    const { onStart } = renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'ai-preview-1');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-
-    expect(screen.queryByRole('button', { name: 'Start run (mock)' })).not.toBeInTheDocument();
-    await goToConfigSection(user, 'Review YAML');
-    await user.click(screen.getByRole('button', { name: 'Create config (mock)' }));
-    expect(screen.getByRole('button', { name: 'Start run (mock)' })).toBeEnabled();
-    expect(onStart).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Start run (mock)' }));
-
-    expect(onStart).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'ai-preview-1',
-      configId: 'mock-config-ai-preview-1',
-      targetRequestId: 'mock-ai-target-staging-us-east-1',
-      phase: 'Provisioning',
-      generations: 6,
-      populationSize: 4,
-      completedGenerations: 0,
-      scenarios: [],
-      progression: [],
-      mainPod: expect.objectContaining({ status: 'Pending' }),
-      configYaml: expect.stringContaining('kubeconfig_file_path: /input/kubeconfig'),
-    }));
-    const createdRun = onStart.mock.calls[0][0];
-    expect(createdRun.configYaml).toContain('  generations: 6');
-    expect(createdRun.configYaml).toContain('  population_size: 4');
-    expect(createdRun.configYaml).toContain('url: "https://robot-shop-health.staging-east.example.com/healthz"');
-    expect(createdRun.configYaml).not.toContain('https://api.staging-east.example.com:6443');
-  });
-
-  it('invalidates the frozen config when a generation setting changes', async () => {
-    const user = userEvent.setup();
-    renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'config-refresh');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-    await goToConfigSection(user, 'Review YAML');
-    await user.click(screen.getByRole('button', { name: 'Create config (mock)' }));
-    expect(screen.getByText('mock-config-config-refresh')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await goToConfigSection(user, 'Genetic algorithm');
-    const generationsInput = screen.getByRole('spinbutton', { name: 'Generations' });
-    await user.clear(generationsInput);
-    await user.type(generationsInput, '3');
-    await goToConfigSection(user, 'Review YAML');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Create config (mock)' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: 'Create config (mock)' }));
-
-    expect(screen.getByText('12', { selector: 'dd' })).toBeInTheDocument();
-    expect(screen.getByText(/generations: 3/)).toBeInTheDocument();
-  });
-  it('edits fitness items and dummy health checks into categorized YAML', async () => {
-    const user = userEvent.setup();
-    const { onStart } = renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'fitness-edit');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-    expect(screen.queryByText('Kubeconfig file path')).not.toBeInTheDocument();
-
-    await goToConfigSection(user, 'Fitness functions');
-    expect(screen.getByText('Fitness function items')).toBeInTheDocument();
-    expect(screen.getByText('Item 15')).toBeInTheDocument();
-    await user.click(screen.getByText(/Pod container restarts/));
-    const query = screen.getByRole('textbox', { name: 'Fitness item 0 query' });
-    await user.clear(query);
-    await user.type(query, 'sum(kube_pod_container_status_restarts_total) * 2');
-    const weight = screen.getByRole('spinbutton', { name: 'Fitness item 0 weight' });
-    await user.clear(weight);
-    await user.type(weight, '0.2');
-
-    await goToConfigSection(user, 'Genetic algorithm');
-    const mutationRate = screen.getByRole('spinbutton', { name: 'Mutation rate' });
-    await user.clear(mutationRate);
-    await user.type(mutationRate, '0.4');
-
-    await goToConfigSection(user, 'Health checks');
-    await user.click(screen.getByText('robot-shop', { exact: true }));
-    const healthUrl = screen.getByRole('textbox', { name: 'Health check 0 URL' });
-    await user.clear(healthUrl);
-    await user.type(healthUrl, 'https://health.live-cluster.example.org/ready');
-    expect(screen.getByText(/reserved example.com domain/)).toBeInTheDocument();
-    await goToConfigSection(user, 'Review YAML');
-    expect(screen.getByRole('button', { name: 'Create config (mock)' })).toBeDisabled();
-    await goToConfigSection(user, 'Health checks');
-    const correctedHealthUrl = screen.getByRole('textbox', { name: 'Health check 0 URL' });
-    await user.clear(correctedHealthUrl);
-    await user.type(correctedHealthUrl, 'https://health-preview.example.com/ready');
-
-    await goToConfigSection(user, 'Run settings');
-    const outputFormat = screen.getByRole('textbox', { name: 'result_name_fmt' });
-    await user.clear(outputFormat);
-    await user.type(outputFormat, 'custom_%s.yaml');
-    await goToConfigSection(user, 'Review YAML');
-    const preview = (screen.getByLabelText('Generated krkn-ai.yaml preview') as HTMLTextAreaElement).value;
-    expect(preview).toContain('query: "sum(kube_pod_container_status_restarts_total) * 2"');
-    expect(preview).toContain('weight: 0.2');
-    expect(preview).toContain('url: "https://health-preview.example.com/ready"');
-    expect(preview).not.toContain('adaptive_mutation:');
-    expect(preview).not.toContain('stopping_criteria:');
-    expect(preview).toContain('mutation_rate: 0.4');
-    expect(preview).toContain('result_name_fmt: "custom_%s.yaml"');
-    expect(screen.getByRole('button', { name: 'Create config (mock)' })).toBeEnabled();
-
-    await user.click(screen.getByRole('button', { name: 'Create config (mock)' }));
-    expect(screen.getByText('Fitness items')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Start run (mock)' }));
-    expect(onStart.mock.calls[0][0].configYaml).toContain('https://health-preview.example.com/ready');
-  }, 15_000);
-  it('shows the prod discovery warning and supports a complete dummy health URL', async () => {
-    const user = userEvent.setup();
-    renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'prod-health-preview');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Select one cluster' }), 'mock-ai-target-prod-us-central1');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-    await goToConfigSection(user, 'Health checks');
-
-    expect(screen.getByText(/No health checks configured in this mock config/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add health check (mock)' }));
-    expect(screen.getByRole('textbox', { name: 'Health check 0 URL' })).toHaveValue('https://service.example.com/healthz');
-
-    await goToConfigSection(user, 'Review YAML');
-    let preview = (screen.getByLabelText('Generated krkn-ai.yaml preview') as HTMLTextAreaElement).value;
-    expect(preview).toContain('https://service.example.com/healthz');
-    expect(preview).toContain('payments');
-    expect(preview).not.toContain('https://api.prod.example.com:6443');
-    await goToConfigSection(user, 'Health checks');
-    await user.click(screen.getByText('application-0'));
-    await user.click(screen.getByRole('button', { name: 'Remove health check application-0' }));
-    expect(screen.getByText(/No health checks configured in this mock config/)).toBeInTheDocument();
-    await goToConfigSection(user, 'Review YAML');
-    preview = (screen.getByLabelText('Generated krkn-ai.yaml preview') as HTMLTextAreaElement).value;
-    expect(preview).toContain('  applications: []');
-    expect(screen.getByRole('button', { name: 'Create config (mock)' })).toBeEnabled();
-  });
-  it('uses wildcard discovery defaults and rebinds filters to the selected cluster', async () => {
-    const user = userEvent.setup();
-    renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'west-discovery');
-    expect(screen.getByRole('textbox', { name: 'Namespace pattern' })).toHaveValue('*');
-    expect(screen.getByRole('textbox', { name: 'Pod label-key pattern' })).toHaveValue('*');
-    expect(screen.getByRole('textbox', { name: 'Node label-key pattern' })).toHaveValue('*');
-    const namespacePattern = screen.getByRole('textbox', { name: 'Namespace pattern' });
-    fireEvent.change(namespacePattern, { target: { value: '[' } });
-    expect(screen.getByText(/Namespace pattern is invalid/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Discover components' })).toBeDisabled();
-    await user.clear(namespacePattern);
-    await user.type(namespacePattern, '*');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Select one cluster' }), 'mock-ai-target-staging-eu-west-1');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-
-    await goToConfigSection(user, 'Review YAML');
-    const preview = (screen.getByLabelText('Generated krkn-ai.yaml preview') as HTMLTextAreaElement).value;
-    expect(screen.queryByText('Namespace pattern')).not.toBeInTheDocument();
-    expect(preview).toContain('name: "cart-1"');
-    expect(preview).toContain('name: "payment-1"');
-    expect(preview).toContain('shop-staging');
-    expect(preview).not.toContain('robot-shop');
-    expect(preview).toContain('https://shop-staging-health.staging-west.example.com/healthz');
-  });
-
-  it('applies namespace and label-key patterns during mock discovery', async () => {
-    const user = userEvent.setup();
-    renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'filtered-discovery');
-    const namespacePattern = screen.getByRole('textbox', { name: 'Namespace pattern' });
-    const podLabelPattern = screen.getByRole('textbox', { name: 'Pod label-key pattern' });
-    const nodeLabelPattern = screen.getByRole('textbox', { name: 'Node label-key pattern' });
-    await user.clear(namespacePattern);
-    await user.type(namespacePattern, 'robot-shop');
-    await user.clear(podLabelPattern);
-    await user.type(podLabelPattern, 'service');
-    await user.clear(nodeLabelPattern);
-    await user.type(nodeLabelPattern, 'node-role.*');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-
-    await goToConfigSection(user, 'Review YAML');
-    const preview = (screen.getByLabelText('Generated krkn-ai.yaml preview') as HTMLTextAreaElement).value;
-    expect(preview).toContain('name: "cart-1"');
-    expect(preview).toContain('name: "payment-1"');
-    expect(preview).toContain('"service": "payment"');
-    expect(preview).toContain('"node-role.kubernetes.io/worker"');
-    expect(preview).toContain('"kubernetes.io/hostname"');
-  }, 15_000);
-
-  it('cascades namespace enable changes to all descendants', async () => {
-    const user = userEvent.setup();
-    renderCreateRun();
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'component-flags');
-    await user.click(screen.getByRole('button', { name: 'Discover components' }));
-    await goToConfigSection(user, 'Cluster components');
-
-    const namespaceToggle = screen.getByRole('checkbox', { name: 'Enable namespace robot-shop' });
-    expect(namespaceToggle).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Enable pod cart-1' })).toBeChecked();
-    await user.click(namespaceToggle);
-
-    await goToConfigSection(user, 'Review YAML');
-    let preview = (screen.getByLabelText('Generated krkn-ai.yaml preview') as HTMLTextAreaElement).value;
-    expect(preview).toMatch(/name: "robot-shop"\s+disabled: true/);
-    expect(preview).toMatch(/name: "cart-1"\s+disabled: true/);
-    expect(preview).toMatch(/containers:\s+- name: "cart"\s+disabled: true/);
-    expect(preview).toMatch(/services:\s+- name: "cart"\s+disabled: true/);
-    expect(preview).toMatch(/name: "data-redis-0"\s+disabled: true/);
-
-    await goToConfigSection(user, 'Cluster components');
-    expect(screen.getByRole('checkbox', { name: 'Enable pod cart-1' })).toBeDisabled();
-    await user.click(screen.getByRole('checkbox', { name: 'Enable namespace robot-shop' }));
-    const podToggle = screen.getByRole('checkbox', { name: 'Enable pod cart-1' });
-    expect(podToggle).toBeEnabled();
-    expect(podToggle).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Enable container cart in cart-1' })).toBeChecked();
-    await user.click(screen.getByRole('checkbox', { name: 'Enable node worker-1' }));
-    await goToConfigSection(user, 'Review YAML');
-    preview = (screen.getByLabelText('Generated krkn-ai.yaml preview') as HTMLTextAreaElement).value;
-    expect((preview.match(/disabled: true/g) ?? [])).toHaveLength(1);
-    expect(preview).toMatch(/name: "robot-shop"\s+disabled: false/);
-    expect(preview).toMatch(/name: "cart-1"\s+disabled: false/);
-    expect(preview).toMatch(/containers:\s+- name: "cart"\s+disabled: false/);
-    expect(preview).toMatch(/name: "worker-1"\s+disabled: true/);
-  }, 15_000);
+vi.mock('../../services/krknAiApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/krknAiApi')>();
+  return { ...actual, krknAiApi: mocks.ai };
 });
+vi.mock('../../services/operatorApi', () => ({ operatorApi: mocks.operator }));
+vi.mock('../../hooks/useWebSocket', () => ({ useWebSocket: mocks.useWebSocket }));
 
-function StatefulMockPage() {
-  const [runs, setRuns] = useState(mockAiRuns);
-  return <KrknAIPage runs={runs} onAddRun={(run) => setRuns((current) => [run, ...current])} />;
+const DISCOVERED_YAML = `# Preserve this discovery comment.
+kubeconfig_file_path: /input/kubeconfig
+site_extension:
+  preserve: discovery-value
+fitness_function:
+  query: up
+  items: []
+scenario:
+  pod-scenarios:
+    enable: false
+baseline:
+  enable: true
+  duration: 120
+genetic:
+  generations: 2
+  population_size: 2
+  composition_rate: 0
+health_checks:
+  applications: []
+cluster_components:
+  namespaces:
+    - name: shop
+      pods:
+        - name: web
+          labels:
+            app: web
+          containers:
+            - name: web
+              disabled: false
+      services:
+        - name: web
+          ports:
+            - name: http
+              port: 8080
+              target_port: 8080
+      pvcs:
+        - name: data
+          capacity: 5Gi
+          storage_class: fast
+      vmis:
+        - name: guest
+          labels:
+            app: vm
+  nodes:
+    - name: worker-a
+      labels:
+        node-role: worker
+      free_cpu: 4
+      schedulable: true
+output:
+  result_name_fmt: scenario_%s.yaml
+  graph_name_fmt: scenario_%s.png
+  log_name_fmt: scenario_%s.log
+`;
+
+const originalHiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+
+function makeRun(name: string, phase = 'Running'): KrknAIRunResource {
+  return {
+    apiVersion: 'krkn.dev/v1alpha1',
+    kind: 'KrknAIRun',
+    metadata: {
+      name,
+      uid: `uid-${name}`,
+      creationTimestamp: '2026-09-01T12:00:00Z',
+    },
+    spec: {
+      targetRequestId: 'target-request-1',
+      targetClusters: { 'krkn-operator': ['staging'] },
+      configMapName: 'saved-ai-config',
+      configMapKey: 'krkn-ai.yaml',
+    },
+    status: {
+      phase,
+      orchestratorPodName: `orchestrator-${name}`,
+      failureReason: '',
+    },
+  };
 }
 
-describe('Krkn AI run inspection', () => {
-  it('sorts and filters scenario rows and opens detailed health telemetry', async () => {
-    const user = userEvent.setup();
-    render(<KrknAIPage runs={mockAiRuns} onAddRun={vi.fn()} />);
+function makeSummary(name: string, phase = 'Running', values: Partial<KrknAIRunSummary> = {}): KrknAIRunSummary {
+  return {
+    name,
+    phase,
+    createdAt: '2026-09-01T12:00:00Z',
+    cluster: 'staging',
+    orchestratorPodName: `orchestrator-${name}`,
+    failureReason: '',
+    artifactStatus: phase === 'Succeeded' ? 'succeeded' : 'in_progress',
+    completedGenerations: 0,
+    completedScenarios: 0,
+    configuredGenerations: 2,
+    populationSize: 2,
+    bestFitness: null,
+    averageFitness: null,
+    baselineFitness: null,
+    fitnessProgression: [],
+    ...values,
+  };
+}
 
-    const completedRow = screen.getByRole('row', { name: /Open run robot-shop-exploration/ });
-    expect(completedRow).toHaveTextContent('6 / 6');
-    expect(completedRow).toHaveTextContent('24 / 24');
-    expect(screen.getByRole('row', { name: /Open run staging-preview-in-progress/ })).toHaveTextContent('2 / 6');
-    expect(screen.getByRole('row', { name: /Open run staging-preview-in-progress/ })).toHaveTextContent('9 / 24');
+function makeIndex(rows: KrknAIScenarioIndexRow[] = [], page = 1): KrknAIScenarioIndexResponse {
+  return {
+    scenarios: rows,
+    pagination: { page, limit: 500, total: rows.length, totalPages: rows.length > 0 ? 1 : 0 },
+  };
+}
 
-    await user.click(completedRow);
-    expect(screen.getByText('Scenarios executed').nextSibling).toHaveTextContent('24');
-    const mainPodOutput = screen.getByLabelText('Main pod output');
-    expect(within(mainPodOutput).getByText(/Krkn-AI run UUID: 90715e34-b0ff-40cd-b96f-9b6cdd59a033/)).toBeInTheDocument();
-    expect(within(mainPodOutput).getByText(/Generation 1 — 4 scenarios/)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Uploader' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Orchestrator' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('table', { name: /Numeric fitness values/ })).not.toBeInTheDocument();
+function makeScenarioRow(overrides: Partial<KrknAIScenarioIndexRow> = {}): KrknAIScenarioIndexRow {
+  return {
+    generation: 0,
+    scenarioId: '9',
+    scenarioType: 'pod-scenarios',
+    outcome: 'succeeded',
+    durationSeconds: 12,
+    fitnessScore: 3,
+    fitnessState: 'provisional',
+    childRunName: 'child-run-9',
+    phase: 'Running',
+    jobId: 'real-job-9',
+    podName: 'scenario-pod-9',
+    ...overrides,
+  };
+}
 
-    await user.click(screen.getByText('View krkn-ai.yaml used for this run'));
-    expect(screen.getByText(/kubeconfig_file_path: \/input\/kubeconfig/)).toBeInTheDocument();
+function makeScenarioDetail(score: number, fitnessState: 'provisional' | 'final' = 'provisional'): KrknAIScenarioDetail {
+  return {
+    generation: 0,
+    scenarioId: '9',
+    scenarioType: 'pod-scenarios',
+    parameters: [{ name: 'namespace', value: 'shop' }],
+    command: 'krkn --scenario pod-scenarios',
+    origin: 'initial',
+    parentIds: [],
+    durationSeconds: 12,
+    returnCode: 0,
+    fitnessResult: {
+      fitnessScore: score,
+      scores: [{ id: 1, fitnessScore: score, weightedScore: score / 2, normalizedScore: fitnessState === 'final' ? 1 : null }],
+      healthCheckFailureScore: 0.25,
+      healthCheckResponseTimeScore: 0.5,
+      krknFailureScore: 0.75,
+    },
+    healthChecks: [
+      { application: 'shop', timestamp: '2026-09-01T12:00:02Z', elapsedSeconds: 2, responseTimeSeconds: 0.12, statusCode: 200, success: true },
+      { application: 'shop', timestamp: '2026-09-01T12:00:05Z', elapsedSeconds: 5, responseTimeSeconds: 0.2, statusCode: 503, success: false, error: 'unhealthy' },
+    ],
+    logPath: 'logs/scenario_9.log',
+    fitnessState,
+  };
+}
 
-    const scenarioTable = screen.getByRole('table', { name: 'Scenario executions' });
-    expect(within(scenarioTable).getAllByRole('row')).toHaveLength(25);
-    expect(within(scenarioTable).queryByRole('columnheader', { name: 'Health checks' })).not.toBeInTheDocument();
-    expect(within(scenarioTable).queryByRole('columnheader', { name: 'Origin' })).not.toBeInTheDocument();
-    await user.click(within(scenarioTable).getByRole('button', { name: 'Fitness score' }));
-    await user.click(within(scenarioTable).getByRole('button', { name: /Fitness score/ }));
-    expect(within(scenarioTable).getAllByRole('row')[1]).toHaveTextContent('30.4453');
-    expect(within(scenarioTable).getAllByRole('row')[1]).toHaveTextContent('storage-throttle');
+async function flushReact(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
 
-    const search = screen.getByRole('searchbox', { name: 'Search scenarios' });
-    await user.type(search, 'storage-throttle');
-    expect(screen.getByText('8 of 24 scenarios')).toBeInTheDocument();
-    await user.clear(search);
-    await user.type(search, 'scenario-name-that-does-not-exist');
-    expect(screen.getByText('No scenarios match the current filters.')).toBeInTheDocument();
-    await user.clear(search);
+async function advance(ms: number): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+  await flushReact();
+}
 
-    await user.click(screen.getByRole('row', { name: 'Open scenario 1 details' }));
-    const dialog = screen.getByRole('dialog', { name: 'Scenario 1: storage-throttle' });
-    expect(within(dialog).queryByText('Health: Degraded')).not.toBeInTheDocument();
-    expect(within(dialog).queryByText('Origin')).not.toBeInTheDocument();
-    expect(within(dialog).queryByText('Parent scenarios')).not.toBeInTheDocument();
-    expect(within(dialog).getByText('500')).toBeInTheDocument();
-    expect(within(dialog).getByText('58')).toBeInTheDocument();
-    expect(within(dialog).getByText('11.6%')).toBeInTheDocument();
-    expect(within(dialog).getByRole('img', { name: /Health-check response time by application/ })).toBeInTheDocument();
-    expect(within(dialog).getByRole('img', { name: /Health-check success heatmap by application/ })).toBeInTheDocument();
-    expect(within(dialog).getByText(/krknctl run storage-throttle --telemetry-prometheus-backup False/)).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: /^Copy scenario command/ })).toBeInTheDocument();
-    expect(within(dialog).getByText(/Running StorageThrottleScenarioPlugin/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/I\/O throttle removed/)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+function setDocumentHidden(hidden: boolean): void {
+  act(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+}
 
-    await user.click(screen.getByRole('row', { name: 'Open scenario 17 details' }));
-    expect(screen.getByText(/scenario failed; the overall run phase is Succeeded/)).toBeInTheDocument();
-    expect(screen.getAllByText('-1 fitness units').length).toBeGreaterThan(0);
+async function openWizardToPreview(user: ReturnType<typeof userEvent.setup>, name: string): Promise<void> {
+  await user.click(screen.getByRole('button', { name: 'Create run' }));
+  await user.type(screen.getByRole('textbox', { name: 'Run name' }), name);
+  await user.click(screen.getByRole('button', { name: 'Request authorized clusters' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Discover components' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: 'Discover components' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /Review YAML/ })).toBeInTheDocument());
+  await user.click(screen.getByRole('button', { name: /Review YAML/ }));
+}
+
+describe('Krkn-AI real run lifecycle', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.ai.listRuns.mockResolvedValue([]);
+    mocks.ai.getRunSummary.mockImplementation(async (name: string) => makeSummary(name));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex());
+    mocks.ai.getScenario.mockResolvedValue(makeScenarioDetail(3));
+    mocks.ai.discover.mockResolvedValue({ configYaml: DISCOVERED_YAML, warnings: [] });
+    mocks.ai.validateConfig.mockResolvedValue({ valid: true });
+    mocks.ai.createConfig.mockResolvedValue({ configId: 'saved-config-uuid' });
+    mocks.ai.createRun.mockImplementation(async (request: { name: string }) => makeRun(request.name, 'Pending'));
+    mocks.operator.createTargetRequest.mockResolvedValue({ uuid: 'target-request-1' });
+    mocks.operator.getTargetStatus.mockResolvedValue(200);
+    mocks.operator.getClusters.mockResolvedValue({
+      status: 'Completed',
+      targetData: {
+        'krkn-operator': [
+          { 'cluster-name': 'staging', 'cluster-api-url': 'https://api.staging.example.test' },
+          { 'cluster-name': 'staging-west', 'cluster-api-url': 'https://api.west.example.test' },
+        ],
+      },
+    });
+    mocks.operator.getAvailableFiles.mockResolvedValue({ files: [] });
+    mocks.operator.getFile.mockResolvedValue({ fileId: 'config-file', fileName: 'saved-ai-config', content: DISCOVERED_YAML, availableToAll: false });
+    mocks.useWebSocket.mockReturnValue({ connectionState: 'connected' });
   });
 
-  it('shows one active scenario with pending fitness and log-only live details', async () => {
-    const user = userEvent.setup();
-    render(<KrknAIPage runs={mockAiRuns} onAddRun={vi.fn()} />);
-
-    await user.click(screen.getByRole('row', { name: /Open run staging-preview-in-progress/ }));
-    expect(screen.getByRole('img', { name: /across 2 observed generations/ })).toBeInTheDocument();
-    expect(screen.getByText(/chart of completed generations.*refresh when generation 3 completes/i)).toBeInTheDocument();
-
-    const scenarioTable = screen.getByRole('table', { name: 'Scenario executions' });
-    expect(within(scenarioTable).getAllByRole('row')).toHaveLength(10);
-    expect(within(scenarioTable).getAllByText('Running')).toHaveLength(1);
-    const activeRow = within(scenarioTable).getByRole('row', { name: 'Open scenario 9 details' });
-    expect(activeRow).toHaveTextContent('Pending');
-    expect(activeRow).toHaveTextContent('38.42s elapsed');
-
-    await user.click(activeRow);
-    const dialog = screen.getByRole('dialog', { name: 'Scenario 9: container-scenarios' });
-    expect(within(dialog).getByText('Running')).toBeInTheDocument();
-    expect(within(dialog).getByText('Elapsed')).toBeInTheDocument();
-    expect(within(dialog).queryByRole('heading', { name: 'Scenario run configuration' })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole('heading', { name: 'Fitness function result' })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole('heading', { name: 'Health-check telemetry' })).not.toBeInTheDocument();
-    expect(within(dialog).getByText(/Running ContainerScenarioPlugin/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/Scenario is still running/)).toBeInTheDocument();
-    expect(within(dialog).queryByText(/successfully injected/)).not.toBeInTheDocument();
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    if (originalHiddenDescriptor) Object.defineProperty(document, 'hidden', originalHiddenDescriptor);
+    else Reflect.deleteProperty(document, 'hidden');
   });
 
-  it('adds a newly launched run to the session list with zero observed progress', async () => {
+  it('waits through target 202, loads authorized clusters once, preserves discovery YAML, and launches the returned CR', async () => {
     const user = userEvent.setup();
-    render(<StatefulMockPage />);
+    mocks.operator.getTargetStatus.mockResolvedValueOnce(202).mockResolvedValueOnce(200);
+    mocks.ai.createRun.mockResolvedValue(makeRun('real-run-1', 'Pending'));
+    render(<KrknAIPage />);
+    await flushReact();
+    expect(operatorApi.createTargetRequest).toBe(mocks.operator.createTargetRequest);
+
     await user.click(screen.getByRole('button', { name: 'Create run' }));
-    await user.type(screen.getByRole('textbox', { name: /Run name/ }), 'ai-preview-1');
+    await user.type(screen.getByRole('textbox', { name: 'Run name' }), 'real-run-1');
+    expect(screen.getByRole('button', { name: 'Request authorized clusters' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Request authorized clusters' }));
+    await waitFor(() => expect(mocks.operator.createTargetRequest).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.operator.getTargetStatus).toHaveBeenCalledTimes(1));
+    expect(mocks.operator.getClusters).not.toHaveBeenCalled();
+    await waitFor(() => expect(mocks.operator.getTargetStatus).toHaveBeenCalledTimes(2), { timeout: 5_000 });
+    await waitFor(() => expect(mocks.operator.getClusters).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveValue('krkn-operator');
+    expect(screen.getByRole('combobox', { name: 'Cluster' })).toHaveValue('staging');
     await user.click(screen.getByRole('button', { name: 'Discover components' }));
-    await goToConfigSection(user, 'Genetic algorithm');
-    const generations = screen.getByRole('spinbutton', { name: 'Generations' });
-    await user.clear(generations);
-    await user.type(generations, '3');
-    await goToConfigSection(user, 'Review YAML');
-    await user.click(screen.getByRole('button', { name: 'Create config (mock)' }));
-    await user.click(screen.getByRole('button', { name: 'Start run (mock)' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Review YAML/ })).toBeInTheDocument());
+    expect(screen.getAllByRole('checkbox')).toHaveLength(14);
 
-    expect(screen.getByText('Provisioning')).toBeInTheDocument();
-    expect(screen.getByText('No generations yet')).toBeInTheDocument();
-    expect(screen.getByText('No scenario pods yet')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Back to runs' }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const dangerous = screen.getByRole('checkbox', { name: 'Service disruption' });
+    await user.click(dangerous);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(dangerous).not.toBeChecked();
+    confirm.mockReturnValue(true);
+    await user.click(dangerous);
+    expect(dangerous).toBeChecked();
+    expect(mocks.ai.discover).toHaveBeenCalledWith(expect.objectContaining({
+      targetRequestId: 'target-request-1',
+      targetClusters: { 'krkn-operator': ['staging'] },
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
-    const newRunRow = screen.getByRole('row', { name: /Open run ai-preview-1/ });
-    expect(newRunRow).toHaveTextContent('0 / 3');
-    expect(newRunRow).toHaveTextContent('0 / 12');
-    expect(newRunRow).toHaveTextContent('Not available yet');
+    await user.click(screen.getByRole('button', { name: /Review YAML/ }));
+    const yamlEditor = screen.getByRole('textbox', { name: 'Krkn AI configuration YAML' });
+    const yamlText = (yamlEditor as HTMLTextAreaElement).value;
+    expect(yamlText).toContain('# Preserve this discovery comment.');
+    expect(yamlText).toContain('preserve: discovery-value');
+    expect(yamlText).toContain('port: 8080');
+    expect(yamlText).toContain('capacity: 5Gi');
+    expect(yamlText).toContain('name: guest');
+    expect(yamlText).toContain('schedulable: true');
+    expect(yamlText).toContain('kubeconfig_file_path: /input/kubeconfig');
+    expect(yamlText).toContain('allow_dangerous_scenarios: true');
+
+    await user.click(screen.getByRole('button', { name: 'Validate and save config' }));
+    await waitFor(() => expect(mocks.ai.createConfig).toHaveBeenCalledTimes(1));
+    expect(mocks.ai.validateConfig).toHaveBeenCalledWith(expect.stringContaining('site_extension:'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(mocks.ai.createConfig).toHaveBeenCalledWith(expect.objectContaining({
+      name: expect.stringMatching(/^ai-real-run-1-[a-f0-9]{8}$/),
+      targetRequestId: 'target-request-1',
+      targetClusters: { 'krkn-operator': ['staging'] },
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(screen.getByText('saved-config-uuid')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+    await waitFor(() => expect(mocks.ai.createRun).toHaveBeenCalledTimes(1));
+    expect(mocks.ai.createRun).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'real-run-1',
+      configId: 'saved-config-uuid',
+      targetRequestId: 'target-request-1',
+      targetClusters: { 'krkn-operator': ['staging'] },
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(await screen.findByRole('heading', { name: 'real-run-1' })).toBeInTheDocument();
+  }, 15_000);
+
+  it('passes server validation errors through and never launches an invalid config', async () => {
+    const user = userEvent.setup();
+    mocks.ai.validateConfig.mockRejectedValue(new KrknAIConfigValidationError([
+      { path: 'genetic.population_size', message: 'Invalid value' },
+    ]));
+    render(<KrknAIPage />);
+    await flushReact();
+    await openWizardToPreview(user, 'invalid-run');
+
+    await user.click(screen.getByRole('button', { name: 'Validate and save config' }));
+    expect(await screen.findByText('genetic.population_size: Invalid value')).toBeInTheDocument();
+    expect(mocks.ai.createConfig).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument();
   });
 
-  it('keeps failed runs without artifacts free of fabricated charts or scores', async () => {
+  it('reviews saved Krkn-AI configs only through the permission-filtered file APIs', async () => {
     const user = userEvent.setup();
-    render(<KrknAIPage runs={mockAiRuns} onAddRun={vi.fn()} />);
-    await user.click(screen.getByRole('row', { name: /Open run failed-preview/ }));
+    mocks.operator.getAvailableFiles.mockResolvedValue({
+      files: [{ fileId: 'visible-config-id', fileName: 'shared-ai-config', filePurpose: 'krkn-ai-config', availableToAll: true }],
+    });
+    mocks.operator.getFile.mockResolvedValue({
+      fileId: 'visible-config-id',
+      fileName: 'shared-ai-config',
+      content: DISCOVERED_YAML,
+      availableToAll: true,
+    });
+    render(<KrknAIPage />);
+    await flushReact();
+    await user.click(screen.getByRole('button', { name: 'Create run' }));
+    await user.click(screen.getByRole('button', { name: 'Load available configs' }));
+    await flushReact();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Saved config' }), 'visible-config-id');
+    await flushReact();
 
-    expect(screen.getByText('Illustrative orchestrator pod exited non-zero')).toBeInTheDocument();
-    expect(screen.getAllByText('Not available yet').length).toBeGreaterThan(0);
-    expect(screen.queryByRole('img', { name: /Best and average fitness/ })).not.toBeInTheDocument();
+    expect(mocks.operator.getAvailableFiles).toHaveBeenCalledWith('krkn-ai-config', expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(mocks.operator.getFile).toHaveBeenCalledWith('visible-config-id', expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(screen.getByLabelText('Existing config file content')).toHaveTextContent('site_extension');
+  });
+
+  it('keeps the last successful summary and retries transient artifact updates', async () => {
+    vi.useFakeTimers();
+    const run = makeRun('retry-run', 'Running');
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.ai.getRunSummary
+      .mockResolvedValueOnce(makeSummary(run.metadata.name, 'Running', { bestFitness: 2.5, completedScenarios: 1 }))
+      .mockRejectedValueOnce(Object.assign(new Error('artifact_updating'), { status: 503, statusText: 'Service Unavailable' }))
+      .mockResolvedValueOnce(makeSummary(run.metadata.name, 'Running', { bestFitness: 4.5, completedScenarios: 2 }));
+    render(<KrknAIPage />);
+    await flushReact();
+    const row = screen.getByRole('row', { name: /Open run retry-run/ });
+    expect(row).toHaveTextContent('2.5');
+
+    await advance(10_000);
+    expect(row).toHaveTextContent('2.5');
+    expect(screen.getByText('Updating committed results…')).toBeInTheDocument();
+    await advance(10_000);
+    expect(screen.getByRole('row', { name: /Open run retry-run/ })).toHaveTextContent('4.5');
+    expect(screen.queryByText('Updating committed results…')).not.toBeInTheDocument();
+  });
+
+  it('does not overlap ten-second refreshes and stops after the run becomes terminal', async () => {
+    vi.useFakeTimers();
+    const running = makeRun('terminal-run', 'Running');
+    const succeeded = makeRun('terminal-run', 'Succeeded');
+    let resolveSecondList!: (runs: KrknAIRunResource[]) => void;
+    const secondList = new Promise<KrknAIRunResource[]>((resolve) => { resolveSecondList = resolve; });
+    mocks.ai.listRuns.mockResolvedValueOnce([running]).mockReturnValueOnce(secondList);
+    mocks.ai.getRunSummary
+      .mockResolvedValueOnce(makeSummary('terminal-run', 'Running'))
+      .mockResolvedValueOnce(makeSummary('terminal-run', 'Succeeded', { artifactStatus: 'succeeded' }));
+    render(<KrknAIPage />);
+    await flushReact();
+
+    await advance(10_000);
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
+    await advance(30_000);
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
+    await act(async () => { resolveSecondList([succeeded]); });
+    await flushReact();
+    expect(screen.getByRole('row', { name: /Open run terminal-run/ })).toHaveTextContent('Succeeded');
+    await advance(30_000);
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
+    expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(2);
+  });
+
+  it('manual refresh discovers terminal runs without restarting a stopped timer', async () => {
+    vi.useFakeTimers();
+    const externalRun = makeRun('external-run', 'Succeeded');
+    render(<KrknAIPage />);
+    await flushReact();
+    await advance(20_000);
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(1);
+
+    mocks.ai.listRuns.mockResolvedValueOnce([externalRun]);
+    mocks.ai.getRunSummary.mockResolvedValueOnce(makeSummary('external-run', 'Succeeded', { artifactStatus: 'succeeded' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await flushReact();
+    expect(screen.getByRole('row', { name: /Open run external-run/ })).toBeInTheDocument();
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
+
+    await advance(20_000);
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
+  });
+
+  it('pauses list polling while hidden and resumes once when visible', async () => {
+    vi.useFakeTimers();
+    const run = makeRun('visibility-run', 'Running');
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    render(<KrknAIPage />);
+    await flushReact();
+
+    setDocumentHidden(true);
+    await advance(20_000);
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(1);
+    setDocumentHidden(false);
+    await flushReact();
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
+
+    cleanup();
+    await advance(20_000);
+    expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads measured scenario fitness and health, refreshes normalization, and separates the two log streams', async () => {
+    vi.useFakeTimers();
+    const run = makeRun('measured-run', 'Running');
+    const provisional = makeScenarioRow({ fitnessScore: 3, fitnessState: 'provisional' });
+    const finalized = makeScenarioRow({ fitnessScore: 75, fitnessState: 'final' });
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.ai.getRunSummary
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Running', { bestFitness: 3, baselineFitness: 12 }))
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Running', { bestFitness: 3, baselineFitness: 12 }))
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Running', { bestFitness: 3, baselineFitness: 12 }))
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Succeeded', { bestFitness: 75, baselineFitness: 12, artifactStatus: 'succeeded' }));
+    mocks.ai.getScenarioIndex.mockResolvedValueOnce(makeIndex([provisional])).mockResolvedValue(makeIndex([finalized]));
+    mocks.ai.getScenario
+      .mockResolvedValueOnce(makeScenarioDetail(3, 'provisional'))
+      .mockRejectedValueOnce(Object.assign(new Error('artifact_updating'), { status: 503, statusText: 'Service Unavailable' }))
+      .mockResolvedValueOnce(makeScenarioDetail(75, 'final'));
+    const orchestratorUrl = vi.spyOn(websocketService, 'buildAiRunLogsUrl');
+    const childUrl = vi.spyOn(websocketService, 'buildJobLogsUrl');
+    render(<KrknAIPage />);
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open run measured-run/ }));
+    await flushReact();
+    expect(screen.getByText('Baseline fitness')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
+    await flushReact();
+    expect(screen.getByText('3 fitness units')).toBeInTheDocument();
+    expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', true, 200, true);
+    expect(childUrl).toHaveBeenCalledWith('child-run-9', 'real-job-9', true);
+    const openedPaths = [...new Set(mocks.useWebSocket.mock.calls.map((call) => new URL(String(call[1])).pathname))];
+    expect(openedPaths).toHaveLength(2);
+    expect(openedPaths).toContain('/api/v2/ws/krkn-ai/runs/measured-run/logs');
+    expect(openedPaths).toContain('/api/v2/ws/scenarios/run/child-run-9/jobs/real-job-9/logs');
+
+    await advance(10_000);
+    expect(screen.getByText('Result upload is updating. Showing the last committed scenario result.')).toBeInTheDocument();
+    expect(screen.getByText('3 fitness units')).toBeInTheDocument();
+    await advance(10_000);
+    expect(screen.getByText('75 fitness units')).toBeInTheDocument();
+    expect(screen.getByText('Fitness final')).toBeInTheDocument();
+    expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', false, 200, true);
+    await advance(20_000);
+    expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(4);
+    expect(mocks.ai.getScenarioIndex).toHaveBeenCalledTimes(3);
+    expect(mocks.ai.getScenario).toHaveBeenCalledTimes(3);
+  });
+
+  it('accepts real health URLs and unrestricted nonnegative weights but rejects invalid local bounds', () => {
+    const { draft } = createEditableConfigDraft(DISCOVERED_YAML);
+    const validDraft = {
+      ...draft,
+      genetic: {
+        ...draft.genetic,
+        populationSize: '2',
+        selectionStrategy: 'roulette',
+        compositionRate: '0',
+        duration: '',
+      },
+      fitnessQuery: '',
+      fitnessItems: [{ key: 1, id: '9', title: 'custom', query: 'up', type: 'point' as const, weight: '12' }],
+      healthChecks: [{ key: 1, name: 'service', url: 'https://10.1.2.3/ready', statusCode: '200', timeout: '4', interval: '2' }],
+    };
+    expect(validateConfigDraft(validDraft)).toEqual({});
+    const invalidDraft = {
+      ...validDraft,
+      genetic: { ...validDraft.genetic, populationSize: '1', compositionRate: '0.1' },
+      fitnessItems: [{ ...validDraft.fitnessItems[0], weight: '-1' }],
+    };
+    expect(validateConfigDraft(invalidDraft)).toMatchObject({
+      populationSize: expect.any(String),
+      'genetic.compositionRate': expect.any(String),
+      'fitnessItem.1.weight': expect.any(String),
+    });
   });
 });

@@ -23,6 +23,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const isFirstMessageRef = useRef<boolean>(true);
+  const hasConnectedRef = useRef(false);
 
   const isPending = status === 'Pending';
   const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
@@ -56,10 +57,26 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
     });
   }, []);
 
-  useWebSocket(connectionId, wsUrl, handleRawMessage, {
+  const { connectionState } = useWebSocket(connectionId, wsUrl, handleRawMessage, {
     disabled: isPending,
     subscriptionMode: false,
   });
+
+  useEffect(() => {
+    if (connectionState === 'reconnecting' ||
+      (connectionState === 'connecting' && hasConnectedRef.current)) {
+      isFirstMessageRef.current = true;
+      setLogs(['Reconnecting to log stream...']);
+      return;
+    }
+    if (connectionState === 'connected') {
+      if (hasConnectedRef.current) {
+        isFirstMessageRef.current = true;
+        setLogs([]);
+      }
+      hasConnectedRef.current = true;
+    }
+  }, [connectionState]);
 
 
   const triggerDownload = (content: string, filename: string, mimeType: string) => {

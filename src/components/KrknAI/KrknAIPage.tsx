@@ -1,58 +1,255 @@
-import { useState } from 'react';
-import { Alert, Button, Card, CardBody, CardTitle, Title } from '@patternfly/react-core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { krknAiApi } from '../../services/krknAiApi';
+import type { KrknAIRunResource } from '../../services/krknAiApi';
 import { CreateRun } from './CreateRun';
 import { RunDetail } from './RunDetail';
 import { RunList } from './RunList';
-import type { MockAiRun } from './types';
+import type { KrknAIRunListEntry } from './RunList';
 import './KrknAI.css';
 
-interface KrknAIPageProps {
-  runs: MockAiRun[];
-  onAddRun: (run: MockAiRun) => void;
+const ACTIVE_PHASES: Record<string, true> = { Pending: true, Provisioning: true, Running: true };
+const TERMINAL_PHASES: Record<string, true> = { Succeeded: true, Failed: true, Cancelled: true };
+const POLL_INTERVAL_MS = 10_000;
+
+type RefreshReason = 'entry' | 'tick' | 'manual' | 'visibility';
+
+function phaseOf(run: KrknAIRunResource): string {
+  return run.status?.phase ?? 'Pending';
 }
 
-export function KrknAIPage({ runs, onAddRun }: KrknAIPageProps) {
-  const [isCreating, setIsCreating] = useState(false);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const selectedRun = runs.find((run) => (run.runId ?? run.name) === selectedRunId);
+function isActive(run: KrknAIRunResource): boolean {
+  return ACTIVE_PHASES[phaseOf(run)] === true;
+}
 
-  const handleStart = (run: MockAiRun) => {
-    onAddRun(run);
-    setIsCreating(false);
-    setSelectedRunId(run.runId ?? run.name);
+function isTerminal(phase: string): boolean {
+  return TERMINAL_PHASES[phase] === true;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unable to load Krkn-AI runs.';
+}
+
+function errorStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null || !('status' in error)) return undefined;
+  const status = error.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+function mergeSummaryIntoRun(run: KrknAIRunResource, summary: KrknAIRunListEntry['summary']): KrknAIRunResource {
+  if (!summary) return run;
+  const currentPhase = phaseOf(run);
+  const phase = isTerminal(currentPhase) ? currentPhase : summary.phase || currentPhase;
+  return {
+    ...run,
+    metadata: {
+      ...run.metadata,
+      creationTimestamp: run.metadata.creationTimestamp || summary.createdAt,
+    },
+    status: {
+      ...run.status,
+      phase,
+      orchestratorPodName: summary.orchestratorPodName || run.status?.orchestratorPodName,
+      failureReason: summary.failureReason || run.status?.failureReason,
+    },
   };
+}
 
-  return (
-    <div className="krkn-ai">
-      {isCreating ? (
+export function KrknAIPage() {
+  const [runs, setRuns] = useState<KrknAIRunListEntry[]>([]);
+  const runsRef = useRef(runs);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<KrknAIRunResource | null>(null);
+  const refreshRef = useRef<(reason: RefreshReason) => void>(() => undefined);
+
+  const updateRuns = useCallback((next: KrknAIRunListEntry[]) => {
+    runsRef.current = next;
+    setRuns(next);
+  }, []);
+
+  const listVisible = !isCreating && selectedRun === null;
+
+  useEffect(() => {
+    if (!listVisible) return undefined;
+
+    let disposed = false;
+    let inFlight = false;
+    let refreshWhenVisible = false;
+    let pausedForActiveRuns = false;
+    let initialLoadCompleted = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let controller: AbortController | null = null;
+
+    const clearTimer = () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const scheduleNext = () => {
+      if (disposed || timer !== null) return;
+      const shouldPoll = runsRef.current.some((entry) => isActive(entry.resource) || entry.updating);
+      if (document.hidden) {
+        pausedForActiveRuns ||= shouldPoll;
+        return;
+      }
+      if (shouldPoll) timer = setTimeout(() => {
+        timer = null;
+        void refresh('tick');
+      }, POLL_INTERVAL_MS);
+    };
+
+    const refresh = async (reason: RefreshReason) => {
+      if (disposed || document.hidden) return;
+      if (inFlight) {
+        if (reason === 'visibility') refreshWhenVisible = true;
+        return;
+      }
+      clearTimer();
+      inFlight = true;
+      controller = new AbortController();
+      setRefreshing(true);
+      if (runsRef.current.length === 0) setLoading(true);
+
+      try {
+        const resources = await krknAiApi.listRuns({ signal: controller.signal });
+        if (disposed) return;
+        setError(null);
+
+        const previousByName = new Map(runsRef.current.map((entry) => [entry.resource.metadata.name, entry]));
+        const fetchAllSummaries = reason === 'entry' || reason === 'manual' || reason === 'visibility';
+        const nextEntries = await Promise.all(resources.map(async (resource): Promise<KrknAIRunListEntry> => {
+          const name = resource.metadata.name;
+          const previous = previousByName.get(name);
+          const previousPhase = previous ? phaseOf(previous.resource) : '';
+          const currentPhase = phaseOf(resource);
+          const transitionedTerminal = ACTIVE_PHASES[previousPhase] === true && isTerminal(currentPhase);
+          const shouldFetchSummary = fetchAllSummaries
+            || isActive(resource)
+            || transitionedTerminal
+            || Boolean(previous?.updating);
+
+          if (!shouldFetchSummary) {
+            return {
+              resource,
+              summary: previous?.summary ?? null,
+              summaryError: previous?.summaryError,
+              updating: previous?.updating ?? false,
+            };
+          }
+
+          try {
+            const summary = await krknAiApi.getRunSummary(name, { signal: controller?.signal });
+            return {
+              resource: mergeSummaryIntoRun(resource, summary),
+              summary,
+              updating: false,
+            };
+          } catch (summaryError) {
+            const status = errorStatus(summaryError);
+            return {
+              resource,
+              summary: previous?.summary ?? null,
+              summaryError: errorText(summaryError),
+              updating: status === 503,
+            };
+          }
+        }));
+
+        if (!disposed) updateRuns(nextEntries);
+        initialLoadCompleted = true;
+      } catch (listError) {
+        if (!disposed && !(listError instanceof Error && listError.name === 'AbortError')) {
+          setError(errorText(listError));
+        }
+      } finally {
+        inFlight = false;
+        controller = null;
+        if (!disposed) {
+          setLoading(false);
+          setRefreshing(false);
+          if (refreshWhenVisible && !document.hidden) {
+            refreshWhenVisible = false;
+            void refresh('visibility');
+          } else {
+            scheduleNext();
+          }
+        }
+      }
+    };
+
+    refreshRef.current = (reason) => { void refresh(reason); };
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        pausedForActiveRuns = runsRef.current.some((entry) => isActive(entry.resource) || entry.updating);
+        clearTimer();
+        return;
+      }
+      if (!initialLoadCompleted) {
+        void refresh('entry');
+        return;
+      }
+      if (pausedForActiveRuns && runsRef.current.some((entry) => isActive(entry.resource) || entry.updating)) {
+        pausedForActiveRuns = false;
+        if (inFlight) refreshWhenVisible = true;
+        else void refresh('visibility');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    void refresh('entry');
+
+    return () => {
+      disposed = true;
+      clearTimer();
+      controller?.abort();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      refreshRef.current = () => undefined;
+    };
+  }, [listVisible, updateRuns]);
+
+  const handleRefresh = useCallback(() => refreshRef.current('manual'), []);
+
+  const handleStart = useCallback((run: KrknAIRunResource) => {
+    const existing = runsRef.current.filter((entry) => entry.resource.metadata.name !== run.metadata.name);
+    updateRuns([{ resource: run, summary: null, updating: false }, ...existing]);
+    setIsCreating(false);
+    setSelectedRun(run);
+  }, [updateRuns]);
+
+  if (isCreating) {
+    return (
+      <div className="krkn-ai">
         <CreateRun
-          existingNames={runs.map((run) => run.name)}
+          existingNames={runs.map((entry) => entry.resource.metadata.name)}
           onStart={handleStart}
           onCancel={() => setIsCreating(false)}
         />
-      ) : selectedRunId ? (
-        selectedRun ? (
-          <RunDetail run={selectedRun} onBack={() => setSelectedRunId(null)} />
-        ) : (
-          <section className="krkn-ai-unknown-run" aria-labelledby="krkn-ai-unknown-title">
-            <Title id="krkn-ai-unknown-title" headingLevel="h1">Run not found</Title>
-            <Alert variant="info" title="Mock preview — no cluster resources will be created" isInline />
-            <Card>
-              <CardTitle>Unknown mock run ID</CardTitle>
-              <CardBody>
-                <Alert variant="warning" title="This run is not in the current session list" isInline />
-                <Button variant="secondary" onClick={() => setSelectedRunId(null)}>Return to Krkn AI runs</Button>
-              </CardBody>
-            </Card>
-          </section>
-        )
-      ) : (
-        <RunList
-          runs={runs}
-          onCreate={() => setIsCreating(true)}
-          onSelect={setSelectedRunId}
-        />
-      )}
+      </div>
+    );
+  }
+
+  if (selectedRun) {
+    return (
+      <div className="krkn-ai">
+        <RunDetail run={selectedRun} onBack={() => setSelectedRun(null)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="krkn-ai">
+      <RunList
+        runs={runs}
+        loading={loading}
+        refreshing={refreshing}
+        error={error}
+        onCreate={() => setIsCreating(true)}
+        onRefresh={handleRefresh}
+        onSelect={setSelectedRun}
+      />
     </div>
   );
 }

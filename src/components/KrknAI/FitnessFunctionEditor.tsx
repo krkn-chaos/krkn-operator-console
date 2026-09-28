@@ -23,7 +23,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
 
   const addItem = () => {
     const nextKey = draft.fitnessItems.reduce((maximum, item) => Math.max(maximum, item.key), -1) + 1;
-    const nextId = draft.fitnessItems.reduce((maximum, item) => Math.max(maximum, Number(item.id) || -1), -1) + 1;
+    const nextId = draft.fitnessItems.reduce((maximum, item) => Math.max(maximum, Number.isFinite(Number(item.id)) ? Number(item.id) : -1), -1) + 1;
     onChange({
       fitnessItems: [...draft.fitnessItems, {
         key: nextKey,
@@ -38,9 +38,9 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
 
   return (
     <div className="krkn-ai-fitness-editor">
-      <p className="krkn-ai-muted">PromQL values are preview text only; no monitoring query is sent. Item weights are emitted as entered and are not auto-normalized.</p>
+      <p className="krkn-ai-muted">Fitness queries are evaluated by the configured Prometheus service during execution. Item weights are finite non-negative coefficients and are not auto-normalized.</p>
       <div className="krkn-ai-config-fields">
-        <FormGroup label="Fitness query" fieldId="krkn-ai-fitness-query" isRequired>
+        <FormGroup label="Fitness query" fieldId="krkn-ai-fitness-query">
           <TextInput
             id="krkn-ai-fitness-query"
             value={draft.fitnessQuery}
@@ -105,7 +105,6 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
                   <TextInput
                     id={`krkn-ai-fitness-item-${item.key}-id`}
                     type="number"
-                    min={0}
                     step={1}
                     value={item.id}
                     onChange={(_event, value) => updateItem(item.key, { id: value })}
@@ -125,12 +124,11 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
                     <FormSelectOption value="point" label="point" />
                   </FormSelect>
                 </FormGroup>
-                <FormGroup label="Weight (0–1)" fieldId={`krkn-ai-fitness-item-${item.key}-weight`} isRequired>
+                <FormGroup label="Weight (finite, non-negative)" fieldId={`krkn-ai-fitness-item-${item.key}-weight`} isRequired>
                   <TextInput
                     id={`krkn-ai-fitness-item-${item.key}-weight`}
                     type="number"
                     min={0}
-                    max={1}
                     step="any"
                     value={item.weight}
                     onChange={(_event, value) => updateItem(item.key, { weight: value })}
@@ -153,7 +151,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
                 </FormGroup>
                 <Button
                   variant="secondary"
-                  isDisabled={draft.fitnessItems.length === 1}
+                  isDisabled={draft.fitnessItems.length === 1 && !draft.fitnessQuery.trim()}
                   onClick={() => onChange({ fitnessItems: draft.fitnessItems.filter((candidate) => candidate.key !== item.key) })}
                   aria-label={`Remove fitness item ${item.id}`}
                 >

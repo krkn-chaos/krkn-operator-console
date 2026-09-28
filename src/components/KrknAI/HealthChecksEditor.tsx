@@ -25,7 +25,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
       healthChecks: [...draft.healthChecks, {
         key: nextKey,
         name: `application-${nextKey}`,
-        url: 'https://service.example.com/healthz',
+        url: '',
         statusCode: '200',
         timeout: '4',
         interval: '2',
@@ -35,7 +35,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
 
   return (
     <div className="krkn-ai-health-check-editor">
-      <p className="krkn-ai-muted">These full URLs are mock YAML examples only. The preview never sends health checks or contacts these hosts; only reserved <code>example.com</code> URLs are accepted.</p>
+      <p className="krkn-ai-muted">Health checks request these URLs during the run. Use only endpoints that are safe to contact from the operator environment.</p>
       <div className="krkn-ai-health-check-options">
         <Checkbox
           id="krkn-ai-stop-watcher-on-failure"
@@ -59,7 +59,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
       </div>
 
       {draft.healthChecks.length === 0 ? (
-        <p className="krkn-ai-muted">No health checks configured in this mock config. Add a dummy check to include one in the preview.</p>
+        <p className="krkn-ai-muted">No health checks are configured. Add a real endpoint if this run needs availability monitoring.</p>
       ) : (
         <div className="krkn-ai-health-check-list">
           {draft.healthChecks.map((check) => {
@@ -95,8 +95,6 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
                     <TextInput
                       id={`krkn-ai-health-check-${check.key}-status`}
                       type="number"
-                      min={100}
-                      max={599}
                       step={1}
                       value={check.statusCode}
                       onChange={(_event, value) => updateHealthCheck(check.key, { statusCode: value })}
@@ -109,8 +107,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
                     <TextInput
                       id={`krkn-ai-health-check-${check.key}-timeout`}
                       type="number"
-                      min={1}
-                      step="any"
+                      step={1}
                       value={check.timeout}
                       onChange={(_event, value) => updateHealthCheck(check.key, { timeout: value })}
                       validated={errors[`${itemKey}.timeout`] ? 'error' : 'default'}
@@ -122,8 +119,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
                     <TextInput
                       id={`krkn-ai-health-check-${check.key}-interval`}
                       type="number"
-                      min={1}
-                      step="any"
+                      step={1}
                       value={check.interval}
                       onChange={(_event, value) => updateHealthCheck(check.key, { interval: value })}
                       validated={errors[`${itemKey}.interval`] ? 'error' : 'default'}
@@ -144,7 +140,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
           })}
         </div>
       )}
-      <Button variant="secondary" onClick={addHealthCheck}>Add health check (mock)</Button>
+      <Button variant="secondary" onClick={addHealthCheck}>Add health check</Button>
     </div>
   );
 }

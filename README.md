@@ -52,17 +52,31 @@ cp .env.example .env.local
 | `VITE_POLL_TIMEOUT`  | `60000`   | Poll timeout (ms)         |
 | `VITE_DEBUG_MODE`    | `false`   | Enable debug logging      |
 
-### Krkn AI mock preview
+### Krkn-AI run integration
 
-Run the client-only Krkn AI prototype with preview mode enabled:
+The Krkn-AI console uses the authenticated operator API; it no longer creates
+client-only runs or synthetic discovery data. Enable `krknAI.enabled: true` in
+the operator chart and deploy matching Krkn-AI service, orchestrator, and
+operator images before using the workflow.
 
-```bash
-VITE_PREVIEW_MODE=true npm run dev -- --host 127.0.0.1
-```
+The wizard creates the legacy operator target request, waits for completion,
+loads permission-filtered clusters, and requests Krkn-AI discovery without
+sending kubeconfig or service credentials to the browser. It edits the returned
+YAML, validates it against the Krkn-AI schema, saves a target-bound config, and
+launches only after the operator returns a `201` `KrknAIRun`.
 
-Open `http://127.0.0.1:3000/app` and choose **Krkn AI** in the sidebar. Run creation starts with target and local discovery filters, then guides users through scenarios, cluster components, genetic algorithm, fitness functions, health checks, run settings (including baseline and output formats), and a generated YAML review. Each focused section has an icon and guidance tip; section navigation preserves edits. Discovery filters default to `*`; per-resource enable toggles serialize unchecked items with `disabled: true`. Run details provide a sortable, filterable, fixed-height scenario table; selecting a completed row opens styled metadata and health metrics, the complete copyable command persisted in the supplied scenario logs, and the health response plots. One active mock scenario exposes live-style logs without premature fitness details.
+Run lists and details read persisted operator resources and typed artifact
+results. While a visible list or detail contains an active run, the console
+refreshes status and partial results on a non-overlapping 10-second timer; it
+stops when runs become terminal or the page is hidden. A `503
+artifact_updating` preserves the last good result and retries on the next active
+poll. The result-uploader sidecar commits artifacts every 10 seconds.
 
-Discovery data, seeded runs, and health-check URLs on the reserved `example.com` domain are illustrative. Creating a run updates only browser-session memory; the flow sends no Krkn AI or target API requests, never requests health-check URLs, and never creates Kubernetes resources.
+Scenario child-job logs use
+`/api/v2/ws/scenarios/run/{scenarioRunName}/jobs/{jobID}/logs`; orchestrator
+logs use `/api/v2/ws/krkn-ai/runs/{name}/logs`. Both authenticate the WebSocket
+handshake with `Sec-WebSocket-Protocol: access_token.<JWT>`. No status
+WebSocket is used for Krkn-AI runs.
 
 ### Temporary GitHub Pages preview
 

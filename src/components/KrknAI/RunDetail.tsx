@@ -1,120 +1,446 @@
-import { Button, Card, CardBody, CardTitle, Label, Title } from '@patternfly/react-core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Button, Card, CardBody, CardTitle, Label, Title } from '@patternfly/react-core';
+import { operatorApi } from '../../services/operatorApi';
+import { krknAiApi } from '../../services/krknAiApi';
+import type {
+  KrknAIRunResource,
+  KrknAIRunSummary,
+  KrknAIScenarioDetail,
+  KrknAIScenarioIndexResponse,
+  KrknAIScenarioIndexRow,
+} from '../../services/krknAiApi';
+import { isApiError } from '../../utils/apiClient';
+import { websocketService } from '../../services/websocketService';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { LogTerminal } from '../LogTerminal';
 import { FitnessChart } from './FitnessChart';
 import { ScenarioExplorer } from './ScenarioExplorer';
-import { StaticLogText } from './StaticLogText';
-import type { MockAiRun } from './types';
 
 interface RunDetailProps {
-  run: MockAiRun;
+  run: KrknAIRunResource;
   onBack: () => void;
 }
 
-interface MockLogPanelProps {
-  title: string;
-  description: string;
-  logText: string;
+const ACTIVE_PHASES: Record<string, true> = { Pending: true, Provisioning: true, Running: true };
+const TERMINAL_PHASES: Record<string, true> = { Succeeded: true, Failed: true, Cancelled: true };
+const POLL_INTERVAL_MS = 10_000;
+const SCENARIO_PAGE_LIMIT = 500;
+
+type ConfigState = 'loading' | 'available' | 'unavailable';
+
+
+function errorStatus(error: unknown): number | undefined {
+  return isApiError(error) ? error.status : undefined;
 }
 
-const formatFitness = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unable to load Krkn-AI results.';
+}
 
-function MockLogPanel({ title, logText, description }: MockLogPanelProps) {
+function scenarioKey(generation: number, scenarioId: string): string {
+  return `${generation}:${scenarioId}`;
+}
+
+function fitnessChanged(previous: KrknAIScenarioIndexRow | undefined, next: KrknAIScenarioIndexRow): boolean {
+  return !previous
+    || previous.fitnessScore !== next.fitnessScore
+    || previous.fitnessState !== next.fitnessState;
+}
+
+function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; podName: string; phase: string }) {
+  const [logs, setLogs] = useState<string[]>(['Connecting to orchestrator log stream…']);
+  const [hasConnected, setHasConnected] = useState(false);
+  const everConnectedRef = useRef(false);
+  const follow = TERMINAL_PHASES[phase] !== true;
+  const connectionId = `krkn-ai-orchestrator-${runName}`;
+  const url = websocketService.buildAiRunLogsUrl(runName, follow, 200, true);
+  const handleMessage = useCallback((message: string) => {
+    setLogs((current) => {
+      if (current.length === 0 || current[0].startsWith('Connecting') || current[0].startsWith('Reconnecting')) {
+        return [message];
+      }
+      return [...current, message];
+    });
+  }, []);
+  const { connectionState } = useWebSocket(connectionId, url, handleMessage, {
+    disabled: !podName,
+    subscriptionMode: false,
+  });
+
+  useEffect(() => {
+    if (connectionState === 'reconnecting' || (connectionState === 'connecting' && everConnectedRef.current)) {
+      setLogs(['Reconnecting to orchestrator log stream…']);
+      setHasConnected(false);
+      return;
+    }
+    if (connectionState === 'connected') {
+      if (everConnectedRef.current) setLogs([]);
+      everConnectedRef.current = true;
+      setHasConnected(true);
+    }
+  }, [connectionState]);
+
   return (
-    <section className="krkn-ai-log-panel" aria-label={title}>
-      <h4>{title}</h4>
-      <p className="krkn-ai-illustrative-note">{description}</p>
-      <StaticLogText logText={logText} />
-    </section>
+    <Card className="krkn-ai-run-detail__main-logs">
+      <CardTitle><Title headingLevel="h2" size="lg">Orchestrator pod log</Title></CardTitle>
+      <CardBody>
+        <dl className="krkn-ai-main-pod__metadata">
+          <div><dt>Pod</dt><dd>{podName || 'Waiting for orchestrator Pod'}</dd></div>
+          <div><dt>Connection</dt><dd>{podName ? connectionState : 'waiting'}</dd></div>
+        </dl>
+        {!podName ? (
+          <p className="krkn-ai-not-available">Orchestrator logs will connect when the operator records the Pod name.</p>
+        ) : !hasConnected && logs.length === 0 ? (
+          <p className="krkn-ai-not-available">Connecting to the operator-authorized orchestrator log stream…</p>
+        ) : (
+          <LogTerminal logs={logs} ariaLabel="Orchestrator log output" />
+        )}
+      </CardBody>
+    </Card>
   );
 }
-
 
 export function RunDetail({ run, onBack }: RunDetailProps) {
-  const completedGenerationCount = run.completedGenerations ?? 0;
-  const completedScenarios = run.scenarios.filter(
-    (scenario) => scenario.generation < completedGenerationCount && scenario.outcome !== 'Running',
-  );
-  const bestFitness = run.progression.length > 0
-    ? Math.max(...run.progression.map((point) => point.best))
-    : null;
-  const averageFitness = completedScenarios.length > 0
-    ? completedScenarios.reduce((total, scenario) => total + scenario.fitnessScore, 0) / completedScenarios.length
-    : null;
+  const name = run.metadata.name;
+  const [summary, setSummary] = useState<KrknAIRunSummary | null>(null);
+  const [scenarioIndex, setScenarioIndex] = useState<KrknAIScenarioIndexResponse | null>(null);
+  const [page, setPage] = useState(1);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [indexError, setIndexError] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<KrknAIScenarioIndexRow | null>(null);
+  const [scenarioDetails, setScenarioDetails] = useState<Record<string, KrknAIScenarioDetail>>({});
+  const [scenarioLoading, setScenarioLoading] = useState<Record<string, boolean>>({});
+  const [scenarioUpdating, setScenarioUpdating] = useState<Record<string, boolean>>({});
+  const [scenarioErrors, setScenarioErrors] = useState<Record<string, string>>({});
+  const [configYaml, setConfigYaml] = useState<string | null>(null);
+  const [configState, setConfigState] = useState<ConfigState>('loading');
+  const summaryRef = useRef(summary);
+  const indexRef = useRef(scenarioIndex);
+  const phaseRef = useRef(run.status?.phase ?? 'Pending');
+  const selectedScenarioRef = useRef(selectedScenario);
+  const scenarioDetailsRef = useRef(scenarioDetails);
+  const scenarioUpdatingRef = useRef(scenarioUpdating);
+  const detailControllers = useRef(new Map<string, AbortController>());
+  const missingRunCount = useRef(0);
+  summaryRef.current = summary;
+  indexRef.current = scenarioIndex;
+  phaseRef.current = summary?.phase ?? run.status?.phase ?? 'Pending';
+  selectedScenarioRef.current = selectedScenario;
+  scenarioDetailsRef.current = scenarioDetails;
+  scenarioUpdatingRef.current = scenarioUpdating;
+
+  const fetchScenarioDetail = useCallback(async (row: KrknAIScenarioIndexRow, force = false) => {
+    const key = scenarioKey(row.generation, row.scenarioId);
+    const pending = detailControllers.current.get(key);
+    if (pending && !force) return;
+    if (pending && force) pending.abort();
+    if (!force && scenarioDetailsRef.current[key]) return;
+
+    const controller = new AbortController();
+    detailControllers.current.set(key, controller);
+    setScenarioLoading((current) => ({ ...current, [key]: true }));
+    setScenarioErrors((current) => ({ ...current, [key]: '' }));
+    try {
+      const detail = await krknAiApi.getScenario(name, row.generation, row.scenarioId, { signal: controller.signal });
+      scenarioDetailsRef.current = { ...scenarioDetailsRef.current, [key]: detail };
+      setScenarioDetails((current) => ({ ...current, [key]: detail }));
+      scenarioUpdatingRef.current = { ...scenarioUpdatingRef.current, [key]: false };
+      setScenarioUpdating((current) => ({ ...current, [key]: false }));
+    } catch (detailError) {
+      if (!controller.signal.aborted) {
+        const isUpdating = errorStatus(detailError) === 503;
+        scenarioUpdatingRef.current = { ...scenarioUpdatingRef.current, [key]: isUpdating };
+        setScenarioUpdating((current) => ({ ...current, [key]: isUpdating }));
+        setScenarioErrors((current) => ({ ...current, [key]: errorText(detailError) }));
+      }
+    } finally {
+      if (detailControllers.current.get(key) === controller) detailControllers.current.delete(key);
+      if (!controller.signal.aborted) setScenarioLoading((current) => ({ ...current, [key]: false }));
+    }
+  }, [name]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setConfigState('loading');
+    setConfigYaml(null);
+    if (!run.spec.configMapName) {
+      setConfigState('unavailable');
+      return () => controller.abort();
+    }
+    const loadConfig = async () => {
+      try {
+        const available = await operatorApi.getAvailableFiles('krkn-ai-config', { signal: controller.signal });
+        const configFile = available.files.find((file) => file.fileName === run.spec.configMapName);
+        if (!configFile) {
+          setConfigState('unavailable');
+          return;
+        }
+        const file = await operatorApi.getFile(configFile.fileId, { signal: controller.signal });
+        setConfigYaml(file.content);
+        setConfigState('available');
+      } catch {
+        if (!controller.signal.aborted) setConfigState('unavailable');
+      }
+    };
+    void loadConfig();
+    return () => controller.abort();
+  }, [name, run.spec.configMapName]);
+
+  useEffect(() => {
+    let disposed = false;
+    let inFlight = false;
+    let pausedForActiveRuns = false;
+    let initialLoadCompleted = false;
+    let refreshWhenVisible = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let controller: AbortController | null = null;
+
+    const clearTimer = () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const scheduleNext = () => {
+      if (disposed || timer !== null || deleted) return;
+      const shouldPoll = ACTIVE_PHASES[phaseRef.current] === true;
+      if (document.hidden) {
+        pausedForActiveRuns ||= shouldPoll;
+        return;
+      }
+      if (shouldPoll) {
+        timer = setTimeout(() => {
+          timer = null;
+          void refresh();
+        }, POLL_INTERVAL_MS);
+      }
+    };
+
+    const refresh = async () => {
+      if (disposed || document.hidden || deleted) return;
+      if (inFlight) return;
+      clearTimer();
+      inFlight = true;
+      controller = new AbortController();
+      const [summaryResult, indexResult] = await Promise.allSettled([
+        krknAiApi.getRunSummary(name, { signal: controller.signal }),
+        krknAiApi.getScenarioIndex(name, { page, limit: SCENARIO_PAGE_LIMIT }, { signal: controller.signal }),
+      ]);
+      if (disposed) return;
+      initialLoadCompleted = true;
+
+      const summaryStatus = summaryResult.status === 'rejected' ? errorStatus(summaryResult.reason) : undefined;
+      const indexStatus = indexResult.status === 'rejected' ? errorStatus(indexResult.reason) : undefined;
+      const nextPhase = summaryResult.status === 'fulfilled' ? summaryResult.value.phase : phaseRef.current;
+      phaseRef.current = nextPhase || 'Pending';
+
+      if (summaryResult.status === 'fulfilled') {
+        missingRunCount.current = 0;
+        setSummary(summaryResult.value);
+        summaryRef.current = summaryResult.value;
+        setSummaryError(null);
+        setDeleted(false);
+      } else {
+        const failure = summaryResult.reason;
+        setSummaryError(errorText(failure));
+        if (summaryStatus === 404) {
+          missingRunCount.current += 1;
+          if (missingRunCount.current >= 2 || TERMINAL_PHASES[phaseRef.current] === true) {
+            setDeleted(true);
+          }
+        }
+      }
+
+      if (indexResult.status === 'fulfilled') {
+        const nextIndex = indexResult.value;
+        const oldIndex = indexRef.current;
+        const selected = selectedScenarioRef.current;
+        if (selected) {
+          const key = scenarioKey(selected.generation, selected.scenarioId);
+          const oldRow = oldIndex?.scenarios.find((row) => scenarioKey(row.generation, row.scenarioId) === key);
+          const newRow = nextIndex.scenarios.find((row) => scenarioKey(row.generation, row.scenarioId) === key);
+          if (newRow) {
+            selectedScenarioRef.current = newRow;
+            setSelectedScenario(newRow);
+            if (fitnessChanged(oldRow, newRow) || scenarioUpdatingRef.current[key]) {
+              void fetchScenarioDetail(newRow, true);
+            }
+          }
+        }
+        setScenarioIndex(nextIndex);
+        indexRef.current = nextIndex;
+        setIndexError(null);
+      } else {
+        setIndexError(errorText(indexResult.reason));
+      }
+
+      const transientFailure = summaryStatus === 503 || indexStatus === 503;
+      setUpdating(transientFailure);
+      setInitialLoading(false);
+      inFlight = false;
+      controller = null;
+
+      if (refreshWhenVisible && !document.hidden && ACTIVE_PHASES[phaseRef.current] === true) {
+        refreshWhenVisible = false;
+        void refresh();
+      } else {
+        refreshWhenVisible = false;
+        scheduleNext();
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        pausedForActiveRuns = ACTIVE_PHASES[phaseRef.current] === true;
+        clearTimer();
+        return;
+      }
+      if (!initialLoadCompleted) {
+        void refresh();
+        return;
+      }
+      if (pausedForActiveRuns && ACTIVE_PHASES[phaseRef.current] === true) {
+        pausedForActiveRuns = false;
+        if (inFlight) refreshWhenVisible = true;
+        else void refresh();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    if (!document.hidden) void refresh();
+
+    return () => {
+      disposed = true;
+      clearTimer();
+      controller?.abort();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [deleted, fetchScenarioDetail, name, page]);
+
+  useEffect(() => () => {
+    detailControllers.current.forEach((request) => request.abort());
+    detailControllers.current.clear();
+  }, [name]);
+
+  const selectScenario = useCallback((row: KrknAIScenarioIndexRow) => {
+    selectedScenarioRef.current = row;
+    setSelectedScenario(row);
+    void fetchScenarioDetail(row);
+  }, [fetchScenarioDetail]);
+
+  const closeScenario = useCallback(() => {
+    const selected = selectedScenarioRef.current;
+    if (selected) {
+      const key = scenarioKey(selected.generation, selected.scenarioId);
+      detailControllers.current.get(key)?.abort();
+      detailControllers.current.delete(key);
+    }
+    selectedScenarioRef.current = null;
+    setSelectedScenario(null);
+  }, []);
+
+  const phase = summary?.phase ?? run.status?.phase ?? 'Pending';
+  const cluster = summary?.cluster || Object.values(run.spec.targetClusters ?? {})[0]?.[0] || 'Not available';
+  const podName = summary?.orchestratorPodName || run.status?.orchestratorPodName || '';
+  const createdAt = summary?.createdAt || run.metadata.creationTimestamp;
+  const generationProgress = summary?.completedGenerations != null && summary.configuredGenerations != null
+    ? `${summary.completedGenerations} / ${summary.configuredGenerations}`
+    : 'Not available yet';
+  const selectedKey = selectedScenario ? scenarioKey(selectedScenario.generation, selectedScenario.scenarioId) : '';
+  const detail = selectedKey ? scenarioDetails[selectedKey] ?? null : null;
+  const detailLoading = selectedKey ? scenarioLoading[selectedKey] ?? false : false;
+  const detailUpdating = selectedKey ? scenarioUpdating[selectedKey] ?? false : false;
+  const detailError = selectedKey ? scenarioErrors[selectedKey] ?? null : null;
+
+  if (deleted) {
+    return (
+      <section className="krkn-ai-run-detail" aria-labelledby="krkn-ai-deleted-title">
+        <Button variant="secondary" onClick={onBack}>Back to runs</Button>
+        <Title id="krkn-ai-deleted-title" headingLevel="h1">Run is no longer available</Title>
+        <p>The operator no longer returns {name}. Refresh the run list to discover current runs.</p>
+      </section>
+    );
+  }
 
   return (
     <main className="krkn-ai-run-detail">
       <header className="krkn-ai-run-detail__header">
         <Button variant="secondary" onClick={onBack} className="krkn-ai-run-detail__back">Back to runs</Button>
-        <p className="krkn-ai-mock-banner">Mock preview — no cluster resources will be created.</p>
         <div className="krkn-ai-run-detail__title-row">
           <div>
-            <Title headingLevel="h1" size="2xl">{run.name}</Title>
-            <p className="krkn-ai-run-detail__cluster">Cluster: {run.cluster.clusterName}</p>
+            <Title headingLevel="h1" size="2xl">{name}</Title>
+            <p className="krkn-ai-run-detail__cluster">Cluster: {cluster}</p>
           </div>
-          <Label color={run.phase === 'Succeeded' ? 'green' : run.phase === 'Failed' ? 'red' : run.phase === 'Running' ? 'blue' : 'grey'}>
-            {run.phase}
+          <Label color={phase === 'Succeeded' ? 'green' : phase === 'Failed' ? 'red' : phase === 'Running' ? 'blue' : 'grey'}>
+            {phase}
           </Label>
         </div>
         <dl className="krkn-ai-run-detail__metadata">
-          <div><dt>Started</dt><dd><time dateTime={run.createdAt}>{new Date(run.createdAt).toLocaleString()}</time></dd></div>
-          <div><dt>Scenarios executed</dt><dd>{run.scenarios.length}</dd></div>
-          <div><dt>Best fitness</dt><dd>{bestFitness === null ? 'Not available yet' : `${formatFitness(bestFitness)} fitness units`}</dd></div>
-          <div><dt>Average fitness</dt><dd>{averageFitness === null ? 'Not available yet' : `${formatFitness(averageFitness)} fitness units`}</dd></div>
+          <div><dt>Created</dt><dd>{createdAt ? <time dateTime={createdAt}>{new Date(createdAt).toLocaleString()}</time> : 'Not available'}</dd></div>
+          <div><dt>Generations completed</dt><dd>{generationProgress}</dd></div>
+          <div><dt>Population size</dt><dd>{summary?.populationSize ?? 'Not available yet'}</dd></div>
+          <div><dt>Scenarios completed</dt><dd>{summary?.completedScenarios ?? 'Not available yet'}</dd></div>
+          <div><dt>Best fitness</dt><dd>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd></div>
+          <div><dt>Average fitness</dt><dd>{summary?.averageFitness == null ? 'Not available yet' : summary.averageFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd></div>
+          <div><dt>Baseline fitness</dt><dd>{summary?.baselineFitness == null ? 'Not available yet' : summary.baselineFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd></div>
+          <div><dt>Artifact status</dt><dd>{summary?.artifactStatus ?? 'not_available'}</dd></div>
         </dl>
-        {run.failureReason && <p className="krkn-ai-run-detail__failure">{run.failureReason}</p>}
-        {run.snapshotLabel && <p className="krkn-ai-snapshot-label">{run.snapshotLabel}</p>}
+        {summary?.failureReason && <p className="krkn-ai-run-detail__failure">{summary.failureReason}</p>}
+        {initialLoading && <p role="status">Loading committed run results…</p>}
+        {updating && <Alert variant="warning" title="Results are updating" isInline>Showing the last committed summary and scenario results while the next artifact sync completes.</Alert>}
+        {summaryError && <p className="krkn-ai-run-detail__error">{summaryError}</p>}
+        {indexError && <p className="krkn-ai-run-detail__error">{indexError}</p>}
       </header>
 
       <Card className="krkn-ai-run-detail__config">
         <CardTitle><Title headingLevel="h2" size="lg">Run configuration</Title></CardTitle>
         <CardBody>
-          <p>Config ID: <code>{run.configId}</code></p>
+          <p>Config: <code>{run.spec.configMapName || 'Not available'}</code></p>
           <details>
             <summary>View krkn-ai.yaml used for this run</summary>
-            {run.configYaml
-              ? <pre className="krkn-ai-run-detail__yaml">{run.configYaml}</pre>
-              : <p className="krkn-ai-not-available">Not available yet</p>}
+            {configState === 'loading' ? (
+              <p role="status">Loading saved configuration…</p>
+            ) : configYaml ? (
+              <pre className="krkn-ai-run-detail__yaml">{configYaml}</pre>
+            ) : (
+              <p className="krkn-ai-not-available">Saved configuration is not available to this account.</p>
+            )}
           </details>
         </CardBody>
       </Card>
 
-      <Card className="krkn-ai-run-detail__main-logs">
-        <CardTitle><Title headingLevel="h2" size="lg">Main pod log</Title></CardTitle>
-        <CardBody>
-          <dl className="krkn-ai-main-pod__metadata">
-            <div><dt>Pod</dt><dd>{run.mainPod.podName ?? 'Not available yet'}</dd></div>
-            <div><dt>Status</dt><dd>{run.mainPod.status}</dd></div>
-          </dl>
-          <MockLogPanel
-            title="Main pod output"
-            logText={run.mainPod.logText}
-            description={run.runId === '90715e34-b0ff-40cd-b96f-9b6cdd59a033'
-              ? 'Static copy of the supplied run.log with ANSI formatting rendered — no live pod was queried.'
-              : 'Illustrative static log fixture — no live pod was queried.'}
-          />
-        </CardBody>
-      </Card>
+      {podName ? (
+        <OrchestratorLogPanel runName={name} podName={podName} phase={phase} />
+      ) : (
+        <Card className="krkn-ai-run-detail__main-logs">
+          <CardTitle><Title headingLevel="h2" size="lg">Orchestrator pod log</Title></CardTitle>
+          <CardBody><p className="krkn-ai-not-available">Waiting for the operator to record the orchestrator Pod name.</p></CardBody>
+        </Card>
+      )}
 
       <Card className="krkn-ai-run-detail__fitness">
         <CardBody>
-          <FitnessChart points={run.progression} runName={run.name} />
-          {run.phase === 'Running' && (
-            <p className="krkn-ai-snapshot-label">
-              Static mock chart of completed generations. A live view would refresh when generation {run.completedGenerations === null ? 1 : run.completedGenerations + 1} completes.
-            </p>
-          )}
-          {run.baselineFitness !== undefined && (
-            <p className="krkn-ai-baseline-fitness">
-              Illustrative baseline fitness: {formatFitness(run.baselineFitness)} fitness units
-            </p>
-          )}
+          <FitnessChart points={summary?.fitnessProgression ?? []} runName={name} />
         </CardBody>
       </Card>
 
       <ScenarioExplorer
-        key={run.runId ?? run.name}
-        scenarios={run.scenarios}
-        runPhase={run.phase}
-        completedGenerations={run.completedGenerations}
+        scenarios={scenarioIndex?.scenarios ?? []}
+        pagination={scenarioIndex?.pagination ?? { page: 1, limit: SCENARIO_PAGE_LIMIT, total: 0, totalPages: 0 }}
+        page={page}
+        onPageChange={setPage}
+        selectedScenario={selectedScenario}
+        onSelect={selectScenario}
+        onClose={closeScenario}
+        detail={detail}
+        detailLoading={detailLoading}
+        detailUpdating={detailUpdating}
+        detailError={detailError}
+        onRetryDetail={() => selectedScenario && void fetchScenarioDetail(selectedScenario, true)}
+        clusterName={cluster}
       />
     </main>
   );
