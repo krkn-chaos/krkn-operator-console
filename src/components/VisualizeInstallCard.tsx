@@ -33,11 +33,13 @@ import { visualizeApi } from '../services/visualizeApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { targetsApi } from '../services/targetsApi';
 import { useNotifications } from '../hooks';
+import { ErrorDisplay } from './ErrorDisplay';
 import type {
   VisualizeConfig,
   CreateVisualizeRequest,
   ElasticsearchConfig,
   TargetResponse,
+  AppError,
 } from '../types/api';
 
 interface VisualizeInstallFormProps {
@@ -102,9 +104,8 @@ function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, target
     }
   };
 
-  // Filter out targets that already have krkn-visualize installed (if needed)
-  // TODO: Remove this comment after debugging - showing all targets for now
-  const availableTargets = targets; // targets.filter((t) => t.ready);
+  const availableTargets = targets.filter((target) => target.ready);
+  const unreadyTargets = targets.filter((target) => !target.ready);
 
   // Debug logging without exposing sensitive data
   if (process.env.NODE_ENV === 'development') {
@@ -130,11 +131,14 @@ function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, target
       <FormGroup label="Target Clusters" isRequired fieldId="visualize-targets">
         <FormSelect
           id="visualize-targets"
-          value={selectedTargets[0] || ''}
-          onChange={(_e, value) => setSelectedTargets([value as string])}
+          multiple
+          value={selectedTargets}
+          onChange={(event) => {
+            const select = event.currentTarget;
+            setSelectedTargets(Array.from(select.selectedOptions, (option) => option.value));
+          }}
           isRequired
         >
-          <FormSelectOption key="placeholder" value="" label="Select a target cluster" isDisabled />
           {availableTargets.map((target) => (
             <FormSelectOption
               key={target.uuid}
@@ -143,15 +147,20 @@ function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, target
             />
           ))}
         </FormSelect>
-        {availableTargets.length === 0 && (
+        {targets.length === 0 && (
           <Alert variant="warning" title="No target clusters" isInline style={{ marginTop: '0.5rem' }}>
             No target clusters found. Please add a target cluster in the{' '}
             <strong>Settings → Cluster Targets</strong> tab first, then return here to install krkn-visualize.
           </Alert>
         )}
-        {availableTargets.length > 0 && targets.some(t => !t.ready) && (
-          <Alert variant="info" title="Target validation in progress" isInline style={{ marginTop: '0.5rem' }}>
-            Some targets are still being validated. If a target isn't ready yet, wait a few moments and refresh the page.
+        {unreadyTargets.length > 0 && (
+          <Alert
+            variant="info"
+            title={availableTargets.length > 0 ? 'Some targets are not ready' : 'No ready target clusters'}
+            isInline
+            style={{ marginTop: '0.5rem' }}
+          >
+            Waiting for validation: {unreadyTargets.map((target) => target.clusterName).join(', ')}. These targets cannot be selected until they are ready.
           </Alert>
         )}
       </FormGroup>
@@ -281,6 +290,7 @@ export function VisualizeInstallCard() {
   const [instances, setInstances] = useState<VisualizeConfig[]>([]);
   const [esConfigs, setEsConfigs] = useState<ElasticsearchConfig[]>([]);
   const [targets, setTargets] = useState<TargetResponse[]>([]);
+  const [instancesError, setInstancesError] = useState<AppError | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInstallModal, setShowInstallModal] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
@@ -291,11 +301,7 @@ export function VisualizeInstallCard() {
   const fetchData = useCallback(async () => {
     try {
       const [instancesData, esConfigsData, targetsData] = await Promise.all([
-        visualizeApi.listInstances().catch(err => {
-          console.error('Visualize API error:', err);
-          // If visualize endpoint fails, continue with empty array
-          return [];
-        }),
+        visualizeApi.listInstances(),
         elasticsearchApi.listConfigs(),
         targetsApi.listTargets(),
       ]);
@@ -308,10 +314,15 @@ export function VisualizeInstallCard() {
       );
 
       setInstances(instancesData);
+      setInstancesError(null);
       setEsConfigs(esConfigsData);
       setTargets(targetsData || []);
     } catch (err) {
       console.error('Failed to load data:', err);
+      setInstancesError({
+        type: 'api_error',
+        message: err instanceof Error ? err.message : 'Unable to load krkn-visualize instances',
+      });
       showError('Failed to load data', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
@@ -406,7 +417,15 @@ export function VisualizeInstallCard() {
           </Flex>
         </CardTitle>
         <CardBody>
-          {instances.length === 0 ? (
+          {instancesError && instances.length > 0 && (
+            <Alert variant="danger" title="Failed to load krkn-visualize instances" isInline>
+              {instancesError.message}{' '}
+              <Button variant="link" onClick={fetchData}>Retry</Button>
+            </Alert>
+          )}
+          {instancesError && instances.length === 0 ? (
+            <ErrorDisplay error={instancesError} onRetry={fetchData} />
+          ) : instances.length === 0 ? (
             <EmptyState>
               <EmptyStateIcon icon={ChartLineIcon} />
               <Title headingLevel="h3" size="lg">No krkn-visualize Instances</Title>
