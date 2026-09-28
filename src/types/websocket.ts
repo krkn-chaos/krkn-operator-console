@@ -25,6 +25,8 @@ export interface SubscribeMessage {
   page?: number;
   limit?: number;
   categories?: string[];
+  /** Correlates snapshots to the subscription that requested them. */
+  subscriptionId?: string;
 }
 
 export interface UnsubscribeMessage {
@@ -45,6 +47,8 @@ export interface ServerMessage<T = unknown> {
   data: T;
   pagination?: PaginationMeta;
   stats?: import('./api').JobStatsSummary;
+  /** Present on jobs snapshots so clients can discard stale subscription responses. */
+  subscriptionId?: string;
 }
 
 // Event handlers
@@ -59,6 +63,7 @@ export interface Subscription {
   page?: number;
   limit?: number;
   categories?: string[];
+  subscriptionId?: string;
 }
 
 // Connection configuration

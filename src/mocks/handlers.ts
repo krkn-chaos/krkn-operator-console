@@ -10,6 +10,7 @@ const V2_BASE = config.apiV2BaseUrl;
 const mockScenarioRuns = [
   {
     scenarioRunName: 'pod-disruption-run-01',
+    categories: [] as string[],
     scenarioName: 'pod-disruption',
     phase: 'Succeeded',
     totalTargets: 2,
@@ -44,6 +45,7 @@ const mockScenarioRuns = [
   },
   {
     scenarioRunName: 'node-cpu-hog-run-02',
+    categories: [] as string[],
     scenarioName: 'node-cpu-hog',
     phase: 'Failed',
     totalTargets: 1,
@@ -69,6 +71,7 @@ const mockScenarioRuns = [
   },
   {
     scenarioRunName: 'network-chaos-run-03',
+    categories: [] as string[],
     scenarioName: 'network-chaos',
     phase: 'Running',
     totalTargets: 1,
@@ -97,6 +100,7 @@ const mockScenarioRuns = [
 const mockGraphRuns = [
   {
     name: 'chaos-workflow-daily',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T08:00:00Z',
     phase: 'Completed',
@@ -120,6 +124,7 @@ const mockGraphRuns = [
   },
   {
     name: 'resilience-test-staging',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T10:05:00Z',
     phase: 'Running',
@@ -135,6 +140,7 @@ const mockGraphRuns = [
   },
   {
     name: 'multi-cluster-resilience',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T11:00:00Z',
     phase: 'Completed',
@@ -152,6 +158,7 @@ const mockGraphRuns = [
   },
   {
     name: 'large-fleet-resilience',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T12:00:00Z',
     phase: 'Completed',
@@ -411,6 +418,33 @@ const mockCategories: CategoryResponse[] = [
   { name: 'cluster-reliability', color: '#0066CC', availableToAll: true, createdBy: 'admin@preview.local' },
   { name: 'network-chaos', color: '#CB7832', groups: ['chaos-engineers'], availableToAll: false, createdBy: 'admin@preview.local' },
 ];
+
+function updateMockCategoryAssociation(
+  categoryName: string,
+  entityType: string,
+  entityName: string,
+  associated: boolean,
+) {
+  if (!mockCategories.some((category) => category.name === categoryName)) {
+    return HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
+  }
+
+  const entity = entityType === 'scenario-runs'
+    ? mockScenarioRuns.find((run) => run.scenarioRunName === entityName)
+    : entityType === 'graph-runs'
+      ? mockGraphRuns.find((run) => run.name === entityName)
+      : undefined;
+  if (!entity) {
+    return HttpResponse.json({ error: 'not_found', message: 'Run not found' }, { status: 404 });
+  }
+
+  const currentCategories = entity.categories || [];
+  entity.categories = associated
+    ? Array.from(new Set([...currentCategories, categoryName])).sort()
+    : currentCategories.filter((name) => name !== categoryName);
+
+  return HttpResponse.json({ category: categoryName, entityType, entityName, associated });
+}
 
 // ─── WORKFLOWS (WorkflowInfo for listings) ───
 
@@ -828,9 +862,18 @@ export const handlers = [
     if (index < 0) {
       return HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
     }
+    [...mockScenarioRuns, ...mockGraphRuns].forEach((run) => {
+      run.categories = (run.categories || []).filter((category) => category !== params.name);
+    });
     mockCategories.splice(index, 1);
     return HttpResponse.json({ message: 'Category deleted successfully' });
   }),
+  http.put(`${V2_BASE}/categories/:category/entities/:entityType/:entityName`, ({ params }) =>
+    updateMockCategoryAssociation(params.category as string, params.entityType as string, params.entityName as string, true),
+  ),
+  http.delete(`${V2_BASE}/categories/:category/entities/:entityType/:entityName`, ({ params }) =>
+    updateMockCategoryAssociation(params.category as string, params.entityType as string, params.entityName as string, false),
+  ),
 
   // ─── WORKFLOWS (CRUD) ───
   http.get(`${BASE}/workflows/available`, () =>

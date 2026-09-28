@@ -31,7 +31,20 @@ interface CategoriesTableProps {
   onRefresh: () => void;
 }
 
-/** Searchable category list with visibility and creator-aware actions. */
+/**
+ * Searchable category list with visibility and creator-aware actions.
+ *
+ * @example
+ * <CategoriesTable
+ *   categories={categories}
+ *   currentUserId={currentUserId}
+ *   isAdmin={isAdmin}
+ *   onCreateClick={openCreateCategory}
+ *   onEditClick={openEditCategory}
+ *   onDeleteClick={deleteCategory}
+ *   onRefresh={reloadCategories}
+ * />
+ */
 export function CategoriesTable({
   categories,
   currentUserId,

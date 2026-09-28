@@ -34,7 +34,12 @@ const CATEGORY_NAME_PATTERN = /^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$/;
 const CATEGORY_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 const DEFAULT_CATEGORY_COLOR = '#6c757d';
 
-/** Form for creating a category or changing its color and visibility. */
+/**
+ * Form for creating a category or changing its color and visibility.
+ *
+ * @example
+ * <CategoryForm mode="create" onSuccess={reloadCategories} onCancel={closeModal} />
+ */
 export function CategoryForm({ mode, initialData, onSuccess, onCancel }: CategoryFormProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [color, setColor] = useState(initialData?.color || '');
@@ -54,7 +59,11 @@ export function CategoryForm({ mode, initialData, onSuccess, onCancel }: Categor
     let isCurrent = true;
     operatorApi.getGroups()
       .then((response) => {
-        if (isCurrent) setAvailableGroups(response.groups || []);
+        if (isCurrent) {
+          const groups = response.groups || [];
+          setAvailableGroups(groups);
+          setSelectedGroup((current) => groups.find((group) => group.id === current || group.name === current)?.id || current);
+        }
       })
       .catch((err: unknown) => {
         if (isCurrent) {
@@ -137,7 +146,7 @@ export function CategoryForm({ mode, initialData, onSuccess, onCancel }: Categor
   const categoryGroups = initialData?.groups || [];
   const missingCurrentGroup = accessType === 'group'
     && selectedGroup
-    && !availableGroups.some((group) => (group.id || group.name) === selectedGroup);
+    && !availableGroups.some((group) => group.id === selectedGroup || group.name === selectedGroup);
 
   return (
     <Form onSubmit={handleSubmit}>

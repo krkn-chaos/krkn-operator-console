@@ -5,7 +5,7 @@
  * No tabs, just the form
  */
 
-import { Modal, ModalVariant } from '@patternfly/react-core';
+import { FormModal } from '../FormModal';
 import { FileForm } from './FileForm';
 import type { FileInfo } from '../../types/api';
 
@@ -25,8 +25,7 @@ export function FileFormModal({
   onSuccess,
 }: FileFormModalProps) {
   return (
-    <Modal
-      variant={ModalVariant.medium}
+    <FormModal
       title={mode === 'create' ? 'Create File' : 'Edit File'}
       isOpen={isOpen}
       onClose={onClose}
@@ -38,6 +37,6 @@ export function FileFormModal({
         onSuccess={onSuccess}
         onCancel={onClose}
       />
-    </Modal>
+    </FormModal>
   );
 }

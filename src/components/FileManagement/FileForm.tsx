@@ -56,6 +56,7 @@ export function FileForm({
   const [fileName, setFileName] = useState('');
   const [content, setContent] = useState('');
   const [description, setDescription] = useState('');
+  const [legacyFileType, setLegacyFileType] = useState(initialData?.fileType);
   const [accessType, setAccessType] = useState<'public' | 'group'>('public');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
@@ -87,6 +88,7 @@ export function FileForm({
         setFileName(file.fileName);
         setContent(file.content);
         setDescription(file.description || '');
+        setLegacyFileType(file.fileType || initialData?.fileType);
         setAccessType(file.availableToAll ? 'public' : 'group');
         setSelectedGroup(file.groups?.[0] || '');
       } catch (err) {
@@ -187,6 +189,7 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
+          fileType: legacyFileType,
         };
 
         await operatorApi.updateFile(initialData!.fileId, request);

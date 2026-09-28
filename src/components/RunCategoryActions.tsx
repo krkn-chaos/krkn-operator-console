@@ -32,7 +32,18 @@ interface RunCategoryActionsProps {
  * Actions menu for a scenario or graph run, including category assignment.
  *
  * @example
- * <RunCategoryActions runName="run-123" categories={categories} onDelete={deleteRun} />
+ * <RunCategoryActions
+ *   runName="run-123"
+ *   categories={categories}
+ *   assignedCategoryNames={['resilience']}
+ *   isCategoriesLoading={false}
+ *   categoriesError={null}
+ *   isCategoryUpdating={false}
+ *   isDeleting={false}
+ *   onOpenCategories={loadCategories}
+ *   onToggleCategory={(category) => toggleCategory('scenario-runs', 'run-123', category)}
+ *   onDelete={() => deleteRun('run-123')}
+ * />
  */
 export function RunCategoryActions({
   runName,

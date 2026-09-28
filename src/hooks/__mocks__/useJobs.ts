@@ -7,6 +7,8 @@ const state = {
   stats: { totalJobs: 0, succeededJobs: 0, failedJobs: 0 } as JobStatsSummary,
   hasReceivedStats: true,
   isLoading: false,
+  snapshotVersion: 0,
+  refresh: vi.fn(),
   setPage: vi.fn(),
   setLimit: vi.fn(),
 };
@@ -22,6 +24,8 @@ export function useJobs() {
     limit: state.pagination.limit,
     setLimit: state.setLimit,
     isLoading: state.isLoading,
+    snapshotVersion: state.snapshotVersion,
+    refresh: state.refresh,
   };
 }
 
@@ -48,8 +52,14 @@ export function resetJobsMock() {
   state.stats = { totalJobs: 0, succeededJobs: 0, failedJobs: 0 };
   state.hasReceivedStats = true;
   state.isLoading = false;
+  state.snapshotVersion = 0;
+  state.refresh.mockClear();
   state.setPage.mockClear();
   state.setLimit.mockClear();
+}
+
+export function setMockSnapshotVersion(snapshotVersion: number) {
+  state.snapshotVersion = snapshotVersion;
 }
 
 export { state as _mockState };

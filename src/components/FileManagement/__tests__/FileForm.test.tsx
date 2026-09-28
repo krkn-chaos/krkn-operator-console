@@ -111,4 +111,32 @@ describe('FileForm error handling', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('preserves legacy file type metadata when editing a file', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      fileId: 'legacy-file',
+      fileName: 'legacy-config.yaml',
+      content: 'key: value',
+      availableToAll: true,
+      fileType: 'config',
+    });
+    (operatorApi.updateFile as ReturnType<typeof vi.fn>).mockResolvedValue({ fileId: 'legacy-file' });
+
+    render(
+      <FileForm
+        mode="edit"
+        initialData={{ fileId: 'legacy-file', fileName: 'legacy-config.yaml', availableToAll: true }}
+        onSuccess={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('legacy-config.yaml');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(operatorApi.updateFile).toHaveBeenCalledWith('legacy-file', expect.objectContaining({ fileType: 'config' }));
+    });
+  });
 });

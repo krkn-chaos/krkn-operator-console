@@ -1,4 +1,4 @@
-import { Modal, ModalVariant } from '@patternfly/react-core';
+import { FormModal } from '../FormModal';
 import { CategoryForm } from './CategoryForm';
 import type { CategoryResponse } from '../../types/api';
 
@@ -19,8 +19,7 @@ export function CategoryFormModal({
   onSuccess,
 }: CategoryFormModalProps) {
   return (
-    <Modal
-      variant={ModalVariant.medium}
+    <FormModal
       title={mode === 'create' ? 'Create Category' : 'Edit Category'}
       description="Category name cannot be changed after creation."
       isOpen={isOpen}
@@ -33,6 +32,6 @@ export function CategoryFormModal({
         onSuccess={onSuccess}
         onCancel={onClose}
       />
-    </Modal>
+    </FormModal>
   );
 }

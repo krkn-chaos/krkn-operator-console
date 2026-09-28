@@ -183,7 +183,19 @@ export function JobsList({
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [isCategorySelectOpen, setIsCategorySelectOpen] = useState(false);
-  const { jobs, pagination, stats, hasReceivedStats, page, setPage, limit, setLimit, isLoading } = useJobs(categoryFilters);
+  const {
+    jobs,
+    pagination,
+    stats,
+    hasReceivedStats,
+    page,
+    setPage,
+    limit,
+    setLimit,
+    isLoading,
+    snapshotVersion,
+    refresh: refreshJobs,
+  } = useJobs(categoryFilters);
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -198,7 +210,26 @@ export function JobsList({
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string[]>>({});
+  const [categoryOverrideSnapshotVersions, setCategoryOverrideSnapshotVersions] = useState<Record<string, number>>({});
   const [categoryUpdateKeys, setCategoryUpdateKeys] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    const reconciledKeys = Object.entries(categoryOverrideSnapshotVersions)
+      .filter(([, version]) => snapshotVersion > version)
+      .map(([key]) => key);
+    if (reconciledKeys.length === 0) return;
+
+    setCategoryOverrides((current) => {
+      const next = { ...current };
+      reconciledKeys.forEach((key) => delete next[key]);
+      return next;
+    });
+    setCategoryOverrideSnapshotVersions((current) => {
+      const next = { ...current };
+      reconciledKeys.forEach((key) => delete next[key]);
+      return next;
+    });
+  }, [categoryOverrideSnapshotVersions, snapshotVersion]);
 
   const loadCategories = useCallback(async () => {
     setIsCategoriesLoading(true);
@@ -319,6 +350,8 @@ export function JobsList({
     setCategoryOverrides((current) => ({ ...current, [key]: nextCategoryNames }));
     try {
       await operatorApi.updateCategoryAssociation(category.name, runType, runName, !isCurrentlyAssigned);
+      setCategoryOverrideSnapshotVersions((current) => ({ ...current, [key]: snapshotVersion }));
+      refreshJobs();
     } catch (error) {
       setCategoryOverrides((current) => ({ ...current, [key]: currentCategoryNames }));
       setCategoryError(error instanceof Error ? error.message : 'Failed to update category assignment');
