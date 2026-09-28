@@ -597,6 +597,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
             phase: 'jobs_list',
           };
 
+        case 'categories':
+          // From categories → back to jobs list
+          return {
+            ...state,
+            phase: 'jobs_list',
+          };
+
         case 'elasticsearch_data':
           // From Elasticsearch telemetry data view → back to jobs list
           return {
@@ -700,6 +707,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'files',
+      };
+
+    case 'NAVIGATE_TO_CATEGORIES':
+      return {
+        ...state,
+        phase: 'categories',
       };
 
     case 'NAVIGATE_TO_ELASTICSEARCH_DATA':

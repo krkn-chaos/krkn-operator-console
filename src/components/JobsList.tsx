@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Card,
   CardTitle,
@@ -34,6 +34,8 @@ import {
   TextInput,
   Pagination,
   PaginationVariant,
+  Alert,
+  AlertActionCloseButton,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -57,12 +59,15 @@ import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
+import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
+import { operatorApi } from '../services/operatorApi';
 
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
+import type { CategoryResponse, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
 
 export type UnifiedRunItem =
   | {
       type: 'graph';
+      categories: string[];
       graphRunName: string;
       nodes: ScenarioRunState[];
       phase: ScenarioRunPhase;
@@ -73,7 +78,7 @@ export type UnifiedRunItem =
       resiliencyScoreBaseline?: number;
       resiliencyScores?: GraphClusterScore[];
     }
-  | { type: 'scenario'; run: ScenarioRunState };
+  | { type: 'scenario'; run: ScenarioRunState; categories: string[] };
 
 function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
   if (item.type === 'graphRun') {
@@ -86,6 +91,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
       }
       return {
         type: 'graph',
+        categories: item.categories || [],
         graphRunName: item.name,
         nodes: [],
         phase,
@@ -99,6 +105,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
     }
     return {
       type: 'graph',
+      categories: item.categories || [],
       graphRunName: item.name,
       nodes: [],
       phase: 'Pending',
@@ -110,6 +117,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
   if (sr) {
     return {
       type: 'scenario',
+      categories: item.categories || [],
       run: {
         scenarioRunName: sr.scenarioRunName,
         scenarioName: sr.scenarioName || '',
@@ -129,6 +137,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
   }
   return {
     type: 'scenario',
+    categories: item.categories || [],
     run: {
       scenarioRunName: item.name,
       scenarioName: '',
@@ -172,7 +181,9 @@ export function JobsList({
 }: JobsListProps) {
   const { isAdmin } = useRole();
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
-  const { jobs, pagination, stats, hasReceivedStats, page, setPage, limit, setLimit, isLoading } = useJobs();
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [isCategorySelectOpen, setIsCategorySelectOpen] = useState(false);
+  const { jobs, pagination, stats, hasReceivedStats, page, setPage, limit, setLimit, isLoading } = useJobs(categoryFilters);
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -183,6 +194,29 @@ export function JobsList({
   const [timeRangeError, setTimeRangeError] = useState('');
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string[]>>({});
+  const [categoryUpdateKeys, setCategoryUpdateKeys] = useState<Set<string>>(() => new Set());
+
+  const loadCategories = useCallback(async () => {
+    setIsCategoriesLoading(true);
+    setCategoryError(null);
+    try {
+      const response = await operatorApi.getCategories();
+      setCategories(response.categories || []);
+    } catch (error) {
+      setCategories([]);
+      setCategoryError(error instanceof Error ? error.message : 'Failed to load categories');
+    } finally {
+      setIsCategoriesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCategories();
+  }, [loadCategories]);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -262,6 +296,44 @@ export function JobsList({
     } finally {
       setDeletingJob(null);
     }
+  };
+
+  const runCategoryKey = (runType: 'scenario-runs' | 'graph-runs', runName: string) => `${runType}/${runName}`;
+
+  const handleToggleRunCategory = async (
+    runType: 'scenario-runs' | 'graph-runs',
+    runName: string,
+    currentCategoryNames: string[],
+    category: CategoryResponse,
+  ) => {
+    const key = runCategoryKey(runType, runName);
+    if (categoryUpdateKeys.has(key)) return;
+
+    const isCurrentlyAssigned = currentCategoryNames.includes(category.name);
+    const nextCategoryNames = isCurrentlyAssigned
+      ? currentCategoryNames.filter((name) => name !== category.name)
+      : [...currentCategoryNames, category.name].sort();
+
+    setCategoryUpdateKeys((current) => new Set(current).add(key));
+    setCategoryError(null);
+    setCategoryOverrides((current) => ({ ...current, [key]: nextCategoryNames }));
+    try {
+      await operatorApi.updateCategoryAssociation(category.name, runType, runName, !isCurrentlyAssigned);
+    } catch (error) {
+      setCategoryOverrides((current) => ({ ...current, [key]: currentCategoryNames }));
+      setCategoryError(error instanceof Error ? error.message : 'Failed to update category assignment');
+    } finally {
+      setCategoryUpdateKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const getRunCategories = (runType: 'scenario-runs' | 'graph-runs', runName: string, names: string[]) => {
+    const assignedNames = categoryOverrides[runCategoryKey(runType, runName)] ?? names;
+    return categories.filter((category) => assignedNames.includes(category.name));
   };
 
   const toTimeValue = (date: Date | undefined): string => {
@@ -386,6 +458,11 @@ export function JobsList({
         if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return false;
       }
 
+      const runName = item.type === 'graph' ? item.graphRunName : item.run.scenarioRunName;
+      const runType = item.type === 'graph' ? 'graph-runs' : 'scenario-runs';
+      const assignedCategories = categoryOverrides[runCategoryKey(runType, runName)] ?? item.categories;
+      if (categoryFilters.length > 0 && !categoryFilters.some((name) => assignedCategories.includes(name))) return false;
+
       if (customRunNameFilter) {
         const needle = customRunNameFilter.toLowerCase();
         const haystacks = item.type === 'graph'
@@ -396,7 +473,9 @@ export function JobsList({
 
       return true;
     });
-  }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter]);
+  }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter, categoryFilters, categoryOverrides]);
+
+  const hasActiveFilters = Boolean(ownerFilter || isValidDate(dateTimeFrom) || isValidDate(dateTimeTo) || customRunNameFilter || categoryFilters.length > 0);
 
   return (
     <Card>
@@ -416,9 +495,20 @@ export function JobsList({
           loading={activeRunsLoading}
           error={activeRunsError}
         />
+        {categoryError && (
+          <Alert
+            variant="danger"
+            title="Category action failed"
+            isInline
+            style={{ marginTop: '1rem' }}
+            actionClose={<AlertActionCloseButton onClose={() => setCategoryError(null)} />}
+          >
+            {categoryError}
+          </Alert>
+        )}
 
         {/* Filters Box */}
-        {jobs.length > 0 && (
+        {(jobs.length > 0 || categoryFilters.length > 0) && (
           <Card
             isCompact
             style={{
@@ -439,6 +529,55 @@ export function JobsList({
                 }
               `}</style>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                {/* Category Filter */}
+                <div>
+                  <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
+                    Filter by Category:
+                  </div>
+                  <Select
+                    isOpen={isCategorySelectOpen}
+                    onOpenChange={setIsCategorySelectOpen}
+                    onSelect={(_event, value) => {
+                      const categoryName = value as string;
+                      setCategoryFilters((current) => current.includes(categoryName)
+                        ? current.filter((name) => name !== categoryName)
+                        : [...current, categoryName].sort());
+                      setPage(1);
+                    }}
+                    toggle={(toggleRef) => (
+                      <MenuToggle
+                        ref={toggleRef}
+                        onClick={() => setIsCategorySelectOpen((open) => !open)}
+                        isExpanded={isCategorySelectOpen}
+                        style={{ width: '222px' }}
+                        className="custom-select-toggle"
+                        aria-label="Filter by category"
+                      >
+                        {categoryFilters.length === 0
+                          ? 'All categories'
+                          : `${categoryFilters.length} ${categoryFilters.length === 1 ? 'category' : 'categories'} selected`}
+                      </MenuToggle>
+                    )}
+                  >
+                    <SelectList>
+                      {categories.map((category) => (
+                        <SelectOption
+                          key={category.name}
+                          value={category.name}
+                          hasCheckbox
+                          isSelected={categoryFilters.includes(category.name)}
+                          icon={<span aria-hidden="true" style={{ display: 'inline-block', width: '0.75rem', height: '0.75rem', borderRadius: '50%', backgroundColor: category.color }} />}
+                        >
+                          {category.name}
+                        </SelectOption>
+                      ))}
+                      {categories.length === 0 && (
+                        <SelectOption value="no-categories" isDisabled>{isCategoriesLoading ? 'Loading categories…' : 'No categories available'}</SelectOption>
+                      )}
+                    </SelectList>
+                  </Select>
+                </div>
+
                 {/* Run Name Filter */}
                 <div>
                   <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
@@ -577,7 +716,7 @@ export function JobsList({
               )}
 
               {/* Clear filters button */}
-              {(ownerFilter || isValidDate(dateTimeFrom) || isValidDate(dateTimeTo) || customRunNameFilter) && (
+              {hasActiveFilters && (
                 <div style={{ marginTop: '1rem' }}>
                   <Button
                     variant="link"
@@ -587,6 +726,8 @@ export function JobsList({
                       setDateTimeFrom(undefined);
                       setDateTimeTo(undefined);
                       setCustomRunNameFilter('');
+                      setCategoryFilters([]);
+                      setPage(1);
                       setTimeRangeError('');
                     }}
                   >
@@ -606,7 +747,7 @@ export function JobsList({
             </Title>
             <EmptyStateBody>Fetching scenario runs...</EmptyStateBody>
           </EmptyState>
-        ) : filteredUnifiedRuns.length === 0 && jobs.length > 0 ? (
+        ) : filteredUnifiedRuns.length === 0 && (jobs.length > 0 || hasActiveFilters) ? (
           <EmptyState>
             <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
@@ -633,17 +774,21 @@ export function JobsList({
               if (item.type === 'graph') {
                 const isGraphExpanded = expandedGraphRunIds.has(item.graphRunName);
                 const phaseDisplay = getRunPhaseDisplay(item.phase);
+                const graphCategoryKey = runCategoryKey('graph-runs', item.graphRunName);
+                const graphCategoryNames = categoryOverrides[graphCategoryKey] ?? item.categories;
+                const graphCategories = getRunCategories('graph-runs', item.graphRunName, item.categories);
 
                 return (
                   <DataListItem key={item.graphRunName} isExpanded={isGraphExpanded}>
                     {/* GraphRun Summary Row */}
-                    <DataListItemRow>
+                    <DataListItemRow style={{ position: 'relative' }}>
+                      <RunCategoryStripe categories={graphCategories} />
                       <DataListToggle
                         onClick={() => onToggleGraphRunAccordion(item.graphRunName)}
                         isExpanded={isGraphExpanded}
                         id={`toggle-graph-${item.graphRunName}`}
                         aria-controls={`expand-graph-${item.graphRunName}`}
-                        style={{ display: 'flex', alignItems: 'center' }}
+                        style={{ display: 'flex', alignItems: 'center', marginLeft: graphCategories.length > 0 ? '0.35rem' : undefined }}
                       />
                       <DataListItemCells
                         dataListCells={[
@@ -750,13 +895,19 @@ export function JobsList({
                           </DataListCell>,
                           <DataListCell key="actions" width={1}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                              <Button
-                                variant="plain"
-                                aria-label="Delete graph run"
-                                onClick={() => setConfirmDeleteRun(item.graphRunName)}
-                                isDisabled={deletingRun === item.graphRunName}
-                                icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
-                                style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                              <RunCategoryActions
+                                runName={item.graphRunName}
+                categories={categories}
+                assignedCategoryNames={graphCategoryNames}
+                isCategoriesLoading={isCategoriesLoading}
+                categoriesError={categoryError}
+                isCategoryUpdating={categoryUpdateKeys.has(graphCategoryKey)}
+                isDeleting={deletingRun === item.graphRunName}
+                onOpenCategories={() => { void loadCategories(); }}
+                onToggleCategory={(category) => {
+                                  void handleToggleRunCategory('graph-runs', item.graphRunName, graphCategoryNames, category);
+                                }}
+                                onDelete={() => setConfirmDeleteRun(item.graphRunName)}
                               />
                             </div>
                           </DataListCell>,
@@ -782,17 +933,21 @@ export function JobsList({
               const run = item.run;
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
+              const scenarioCategoryKey = runCategoryKey('scenario-runs', run.scenarioRunName);
+              const scenarioCategoryNames = categoryOverrides[scenarioCategoryKey] ?? item.categories;
+              const scenarioCategories = getRunCategories('scenario-runs', run.scenarioRunName, item.categories);
 
               return (
                 <DataListItem key={run.scenarioRunName} isExpanded={isRunExpanded}>
                   {/* Scenario Run Summary Row */}
-                  <DataListItemRow>
+                  <DataListItemRow style={{ position: 'relative' }}>
+                    <RunCategoryStripe categories={scenarioCategories} />
                     <DataListToggle
                       onClick={() => onToggleRunAccordion(run.scenarioRunName)}
                       isExpanded={isRunExpanded}
                       id={`toggle-run-${run.scenarioRunName}`}
                       aria-controls={`expand-run-${run.scenarioRunName}`}
-                      style={{ display: 'flex', alignItems: 'center' }}
+                      style={{ display: 'flex', alignItems: 'center', marginLeft: scenarioCategories.length > 0 ? '0.35rem' : undefined }}
                     />
                     <DataListItemCells
                       dataListCells={[
@@ -961,13 +1116,19 @@ export function JobsList({
                         </DataListCell>,
                         <DataListCell key="actions" width={1}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                            <Button
-                              variant="plain"
-                              aria-label="Delete scenario run"
-                              onClick={() => setConfirmDeleteRun(run.scenarioRunName)}
-                              isDisabled={deletingRun === run.scenarioRunName}
-                              icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
-                              style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
+                            <RunCategoryActions
+                              runName={run.scenarioRunName}
+                              categories={categories}
+                              assignedCategoryNames={scenarioCategoryNames}
+                              isCategoriesLoading={isCategoriesLoading}
+                              categoriesError={categoryError}
+                              isCategoryUpdating={categoryUpdateKeys.has(scenarioCategoryKey)}
+                              isDeleting={deletingRun === run.scenarioRunName}
+                              onOpenCategories={() => { void loadCategories(); }}
+                              onToggleCategory={(category) => {
+                                void handleToggleRunCategory('scenario-runs', run.scenarioRunName, scenarioCategoryNames, category);
+                              }}
+                              onDelete={() => setConfirmDeleteRun(run.scenarioRunName)}
                             />
                           </div>
                         </DataListCell>,

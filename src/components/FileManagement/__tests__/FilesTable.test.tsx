@@ -15,7 +15,6 @@ function makeFile(overrides: Partial<FileInfo> & Pick<FileInfo, 'fileId' | 'file
 }
 
 const defaultProps = {
-  fileTypes: [{ name: 'yaml', color: '#3498db' }],
   onCreateClick: vi.fn(),
   onEditClick: vi.fn(),
   onDeleteClick: vi.fn(),
@@ -251,26 +250,23 @@ describe('FilesTable permission-based edit/delete buttons', () => {
   });
 
   describe('filtering and pagination', () => {
-    it('filters files by multiple types and access', async () => {
+    it('filters files by access', async () => {
       const user = userEvent.setup();
       const files = [
-        makeFile({ fileId: 'yaml-public', fileName: 'public.yaml', fileType: 'yaml', availableToAll: true }),
-        makeFile({ fileId: 'json-private', fileName: 'private.json', fileType: 'json', availableToAll: false }),
-        makeFile({ fileId: 'yaml-private', fileName: 'private.yaml', fileType: 'yaml', availableToAll: false }),
+        makeFile({ fileId: 'yaml-public', fileName: 'public.yaml', availableToAll: true }),
+        makeFile({ fileId: 'json-private', fileName: 'private.json', availableToAll: false }),
+        makeFile({ fileId: 'yaml-private', fileName: 'private.yaml', availableToAll: false }),
       ];
 
       render(
         <FilesTable
           {...defaultProps}
           files={files}
-          fileTypes={[{ name: 'yaml', color: '#357edd' }, { name: 'json', color: '#357edd' }]}
           isAdmin={true}
           userGroups={[]}
         />,
       );
 
-      await user.click(screen.getByRole('button', { name: 'Filter by type' }));
-      await user.click(screen.getByRole('checkbox', { name: 'yaml' }));
       await user.click(screen.getByRole('button', { name: 'Filter by access' }));
       await user.click(screen.getByRole('checkbox', { name: 'Public' }));
 

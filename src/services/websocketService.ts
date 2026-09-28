@@ -126,6 +126,7 @@ class WebSocketService {
    * @param ids - Optional array of specific resource IDs to watch
    * @param page - Optional page number for paginated snapshots
    * @param limit - Optional page size for paginated snapshots
+   * @param categories - Optional category names; jobs match any selected category
    *
    * @example
    * ```ts
@@ -139,11 +140,11 @@ class WebSocketService {
    * websocketService.subscribe('jobs', 'jobs', undefined, 2, 20);
    * ```
    */
-  subscribe(connectionId: string, resource: string, ids?: string[], page?: number, limit?: number): void {
+  subscribe(connectionId: string, resource: string, ids?: string[], page?: number, limit?: number, categories?: string[]): void {
     const conn = this.connections.get(connectionId);
     if (!conn) return;
 
-    const sub: Subscription = { resource, ids, page, limit };
+    const sub: Subscription = { resource, ids, page, limit, categories };
     const existingIdx = conn.subscriptions.findIndex(
       s => s.resource === resource && JSON.stringify(s.ids) === JSON.stringify(ids)
     );
@@ -154,7 +155,7 @@ class WebSocketService {
     }
 
     if (conn.ws?.readyState === WebSocket.OPEN) {
-      this.sendClientMessage(conn, { action: 'subscribe', resource, ids, page, limit });
+      this.sendClientMessage(conn, { action: 'subscribe', resource, ids, page, limit, categories });
     }
   }
 
@@ -345,7 +346,7 @@ class WebSocketService {
   private resubscribeAll(conn: ManagedConnection): void {
     if (!conn.options.subscriptionMode) return;
     for (const sub of conn.subscriptions) {
-      this.sendClientMessage(conn, { action: 'subscribe', resource: sub.resource, ids: sub.ids, page: sub.page, limit: sub.limit });
+      this.sendClientMessage(conn, { action: 'subscribe', resource: sub.resource, ids: sub.ids, page: sub.page, limit: sub.limit, categories: sub.categories });
     }
   }
 

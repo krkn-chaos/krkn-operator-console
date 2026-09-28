@@ -23,6 +23,8 @@ export interface SidebarNavProps {
   onRunScenario: () => void;
   onNavigateStudio: () => void;
   onOpenFiles: () => void;
+  /** Called when Categories is selected. Optional for consumers that render a reduced sidebar. */
+  onNavigateCategories?: () => void;
   onNavigateTerminal: () => void;
   onNavigateElasticsearchData: () => void;
   onNavigateSettings: () => void;

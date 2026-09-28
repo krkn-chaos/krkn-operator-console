@@ -24,6 +24,7 @@ export interface SubscribeMessage {
   ids?: string[];
   page?: number;
   limit?: number;
+  categories?: string[];
 }
 
 export interface UnsubscribeMessage {
@@ -57,6 +58,7 @@ export interface Subscription {
   ids?: string[];
   page?: number;
   limit?: number;
+  categories?: string[];
 }
 
 // Connection configuration

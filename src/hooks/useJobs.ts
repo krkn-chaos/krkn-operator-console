@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { websocketService } from '../services/websocketService';
 import type { ServerMessage, PaginationMeta } from '../types/websocket';
@@ -8,6 +8,7 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const EMPTY_PAGINATION: PaginationMeta = { page: 0, limit: 0, total: 0, totalPages: 0 };
 const EMPTY_STATS: JobStatsSummary = { totalJobs: 0, succeededJobs: 0, failedJobs: 0 };
+const EMPTY_CATEGORIES: string[] = [];
 
 interface UseJobsReturn {
   jobs: UnifiedJobItem[];
@@ -24,11 +25,11 @@ interface UseJobsReturn {
 /**
  * Hook providing a unified paginated jobs list via WebSocket.
  *
- * Subscribes to WS resource 'jobs' with page/limit.
+ * Subscribes to WS resource 'jobs' with page/limit and optional category filters.
  * Backend sends a snapshot automatically on subscribe and on every change.
  * When page or limit changes, re-subscribes to get the new page.
  */
-export function useJobs(): UseJobsReturn {
+export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsReturn {
   const [jobs, setJobs] = useState<UnifiedJobItem[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta>(EMPTY_PAGINATION);
   const [stats, setStats] = useState<JobStatsSummary>(EMPTY_STATS);
@@ -38,6 +39,8 @@ export function useJobs(): UseJobsReturn {
   const [hasReceivedStats, setHasReceivedStats] = useState(false);
 
   const lastSubscribedRef = useRef<string | null>(null);
+  const categories = useMemo(() => [...new Set(categoryFilters)].sort(), [categoryFilters]);
+  const categoriesKey = categories.join('\u0000');
 
   const handleMessage = useCallback((message: ServerMessage) => {
     if (message.resource !== 'jobs') return;
@@ -67,13 +70,13 @@ export function useJobs(): UseJobsReturn {
       return;
     }
 
-    const key = `${page}:${limit}`;
+    const key = `${page}:${limit}:${categoriesKey}`;
     if (lastSubscribedRef.current === key) return;
     lastSubscribedRef.current = key;
 
     setIsLoading(true);
-    websocketService.subscribe('jobs', 'jobs', undefined, page, limit);
-  }, [connectionState, page, limit]);
+    websocketService.subscribe('jobs', 'jobs', undefined, page, limit, categories);
+  }, [connectionState, page, limit, categoriesKey, categories]);
 
   return { jobs, pagination, stats, hasReceivedStats, page, setPage, limit, setLimit, isLoading };
 }

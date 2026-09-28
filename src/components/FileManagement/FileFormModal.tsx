@@ -7,26 +7,22 @@
 
 import { Modal, ModalVariant } from '@patternfly/react-core';
 import { FileForm } from './FileForm';
-import type { FileInfo, FileTypeResponse } from '../../types/api';
+import type { FileInfo } from '../../types/api';
 
 interface FileFormModalProps {
   isOpen: boolean;
   mode: 'create' | 'edit';
   initialData?: FileInfo;
-  availableFileTypes: FileTypeResponse[];
   onClose: () => void;
   onSuccess: () => void;
-  onRequestNewFileType: () => void;
 }
 
 export function FileFormModal({
   isOpen,
   mode,
   initialData,
-  availableFileTypes,
   onClose,
   onSuccess,
-  onRequestNewFileType,
 }: FileFormModalProps) {
   return (
     <Modal
@@ -39,10 +35,8 @@ export function FileFormModal({
       <FileForm
         mode={mode}
         initialData={initialData}
-        availableFileTypes={availableFileTypes}
         onSuccess={onSuccess}
         onCancel={onClose}
-        onRequestNewFileType={onRequestNewFileType}
       />
     </Modal>
   );

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FileForm } from '../FileForm';
-import type { FileTypeResponse } from '../../../types/api';
 
 // Mock operatorApi
 vi.mock('../../../services/operatorApi', () => ({
@@ -31,10 +30,8 @@ function createApiError(message: string, status: number, statusText: string): Er
 
 const defaultProps = {
   mode: 'create' as const,
-  availableFileTypes: [] as FileTypeResponse[],
   onSuccess: vi.fn(),
   onCancel: vi.fn(),
-  onRequestNewFileType: vi.fn(),
 };
 
 describe('FileForm error handling', () => {

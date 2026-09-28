@@ -1,8 +1,8 @@
 /**
- * FileManagementPage - Main page for file and file types management.
+ * FileManagementPage - Main page for file management.
  *
- * Full-page view with Files and File Types tabs. Create and edit actions open
- * focused child modals while the management surface remains a full page.
+ * File create and edit actions open focused child modals while the management
+ * surface remains a full page.
  *
  * @example
  * import { PageSection } from '@patternfly/react-core';
@@ -26,15 +26,10 @@ import {
   Flex,
   FlexItem,
   Spinner,
-  Tab,
-  Tabs,
-  TabTitleText,
   Title,
 } from '@patternfly/react-core';
 import { FilesTable } from './FilesTable';
 import { FileFormModal } from './FileFormModal';
-import { FileTypesTable } from '../FileTypesManagement/FileTypesTable';
-import { FileTypeFormModal } from '../FileTypesManagement/FileTypeFormModal';
 import { useFileManagementPage } from './useFileManagementPage';
 
 export function FileManagementPage() {
@@ -52,7 +47,7 @@ export function FileManagementPage() {
         </CardTitle>
         <CardBody>
           <p style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
-            Manage ConfigMap-based files and file types
+            Manage ConfigMap-based files
           </p>
           {page.error && (
             <Alert
@@ -70,33 +65,17 @@ export function FileManagementPage() {
               <Spinner size="lg" aria-label="Loading" />
             </div>
           ) : (
-            <Tabs activeKey={page.activeTab} onSelect={page.selectTab} aria-label="File management tabs">
-              <Tab eventKey="files-list" title={<TabTitleText>Files</TabTitleText>} aria-label="Files list">
-                <div style={{ marginTop: '1.5rem' }}>
-                  <FilesTable
-                    files={page.files}
-                    fileTypes={page.fileTypes}
-                    isAdmin={page.isAdmin}
-                    userGroups={page.userGroups}
-                    onCreateClick={page.openCreateFile}
-                    onEditClick={page.openEditFile}
-                    onDeleteClick={page.handleDeleteFile}
-                    onRefresh={page.loadFiles}
-                  />
-                </div>
-              </Tab>
-              <Tab eventKey="file-types" title={<TabTitleText>File Types</TabTitleText>} aria-label="File types management">
-                <div style={{ marginTop: '1.5rem' }}>
-                  <FileTypesTable
-                    fileTypes={page.fileTypes}
-                    onCreateClick={page.openCreateFileType}
-                    onEditClick={page.openEditFileType}
-                    onDeleteClick={page.handleDeleteFileType}
-                    onRefresh={page.loadFileTypes}
-                  />
-                </div>
-              </Tab>
-            </Tabs>
+            <div style={{ marginTop: '1.5rem' }}>
+              <FilesTable
+                files={page.files}
+                isAdmin={page.isAdmin}
+                userGroups={page.userGroups}
+                onCreateClick={page.openCreateFile}
+                onEditClick={page.openEditFile}
+                onDeleteClick={page.handleDeleteFile}
+                onRefresh={page.loadFiles}
+              />
+            </div>
           )}
         </CardBody>
       </Card>
@@ -104,17 +83,8 @@ export function FileManagementPage() {
         isOpen={page.fileFormOpen}
         mode={page.fileFormMode}
         initialData={page.selectedFile || undefined}
-        availableFileTypes={page.fileTypes}
         onClose={page.closeFileForm}
         onSuccess={page.handleFileFormSuccess}
-        onRequestNewFileType={page.handleRequestNewFileType}
-      />
-      <FileTypeFormModal
-        isOpen={page.fileTypeFormOpen}
-        mode={page.fileTypeFormMode}
-        initialData={page.selectedFileType || undefined}
-        onClose={page.closeFileTypeForm}
-        onSuccess={page.handleFileTypeFormSuccess}
       />
     </>
   );

@@ -1,5 +1,5 @@
 import { Nav, NavItem, NavList, NavExpandable } from '@patternfly/react-core';
-import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon } from '@patternfly/react-icons';
+import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon, TagsIcon } from '@patternfly/react-icons';
 import { MdWork } from 'react-icons/md';
 import type { ReactNode } from 'react';
 import type { SidebarNavProps } from './types';
@@ -25,6 +25,7 @@ import './SidebarPFNav.css';
  * @param onRunScenario - Called when Run Scenario menu item is clicked
  * @param onNavigateStudio - Called when Chaos Studio menu item is clicked
  * @param onOpenFiles - Called when Files menu item is clicked
+ * @param onNavigateCategories - Called when Categories menu item is clicked
  * @param onNavigateTerminal - Called when Terminal menu item is clicked
  * @param onNavigateElasticsearchData - Called when Elasticsearch Data menu item is clicked
  * @param onNavigateSettings - Called when Settings menu item is clicked
@@ -64,6 +65,7 @@ export function SidebarPFNav({
   onRunScenario,
   onNavigateStudio,
   onOpenFiles,
+  onNavigateCategories,
   onNavigateTerminal,
   onNavigateElasticsearchData,
   onNavigateSettings,
@@ -90,7 +92,10 @@ export function SidebarPFNav({
           <NavItem isActive={activePhase === 'studio'} onClick={onNavigateStudio} aria-label="Chaos Studio">
             {item(<TopologyIcon />, 'Chaos Studio')}
           </NavItem>
-          <NavItem onClick={onOpenFiles} aria-label="Files">{item(<FolderIcon />, 'Files')}</NavItem>
+          <NavItem isActive={activePhase === 'files'} onClick={onOpenFiles} aria-label="Files">{item(<FolderIcon />, 'Files')}</NavItem>
+          <NavItem isActive={activePhase === 'categories'} onClick={onNavigateCategories} aria-label="Categories">
+            {item(<TagsIcon />, 'Categories')}
+          </NavItem>
           <NavItem isActive={activePhase === 'terminal'} onClick={onNavigateTerminal} aria-label="Terminal">
             {item(<TerminalIcon />, 'Terminal')}
           </NavItem>

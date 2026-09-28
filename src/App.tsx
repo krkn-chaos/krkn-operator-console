@@ -9,6 +9,7 @@ import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio, ElasticsearchDataView } from './components';
 import { FileManagementPage } from './components/FileManagement';
+import { CategoryManagementPage } from './components/CategoryManagement';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
 import { useRole } from './hooks/useRole';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
@@ -268,6 +269,13 @@ function App() {
           </PageSection>
         );
 
+      case 'categories':
+        return (
+          <PageSection isFilled>
+            <CategoryManagementPage />
+          </PageSection>
+        );
+
       case 'studio':
         return (
           <PageSection>
@@ -358,6 +366,12 @@ function App() {
     proceed();
   };
 
+  const handleNavigateToCategories = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_CATEGORIES' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
   const handleNavigateToElasticsearchData = () => {
     const proceed = () => dispatch({ type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' });
     if (!checkStudioGuard(proceed)) return;
@@ -424,6 +438,7 @@ function App() {
       onRunScenario={handleCreateJob}
       onNavigateStudio={handleNavigateToStudio}
       onOpenFiles={handleNavigateToFiles}
+      onNavigateCategories={handleNavigateToCategories}
       onNavigateTerminal={handleNavigateToTerminal}
       onNavigateElasticsearchData={handleNavigateToElasticsearchData}
       onNavigateSettings={handleNavigateToSettings}

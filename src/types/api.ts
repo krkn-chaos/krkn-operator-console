@@ -415,6 +415,7 @@ export type AppPhase =
   | 'studio' // Chaos Scenario Studio page
   | 'terminal' // Full-screen cluster terminal page
   | 'files' // File management page
+  | 'categories' // Category management page
   | 'elasticsearch_data' // Elasticsearch telemetry data table page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
@@ -571,6 +572,7 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_STUDIO' }
   | { type: 'NAVIGATE_TO_TERMINAL' }
   | { type: 'NAVIGATE_TO_FILES' }
+  | { type: 'NAVIGATE_TO_CATEGORIES' }
   | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
 
   // Notifications
@@ -992,6 +994,8 @@ export interface UnifiedJobItem {
   type: 'scenarioRun' | 'graphRun';
   name: string;
   createdAt: string;
+  /** Category names visible to the current user and associated with this run. */
+  categories?: string[];
   scenarioRun?: ScenarioRunStatusResponse;
   graphRun?: GraphRunListItem;
 }
@@ -1114,8 +1118,6 @@ export interface FileResponse {
   groups?: string[];
   /** If true, available to all users */
   availableToAll: boolean;
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
 }
@@ -1135,8 +1137,6 @@ export interface CreateFileRequest {
   groups?: string[];
   /** If true, available to all users */
   availableToAll: boolean;
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
 }
@@ -1165,8 +1165,6 @@ export interface UpdateFileRequest {
   groups?: string[];
   /** If true, available to all users */
   availableToAll: boolean;
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
 }
@@ -1197,8 +1195,6 @@ export interface FileInfo {
   availableToAll: boolean;
   /** Groups that can access this file */
   groups?: string[];
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
 }
@@ -1236,7 +1232,6 @@ export interface WorkflowInfo {
   workflowId: string;
   workflowName: string;
   description?: string;
-  fileType?: string;
   nodeCount?: number;
 }
 
@@ -1252,7 +1247,6 @@ export interface WorkflowResponse {
   description?: string;
   availableToAll: boolean;
   groups?: string[];
-  fileType?: string;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -1266,7 +1260,6 @@ export interface CreateWorkflowRequest {
   description?: string;
   availableToAll: boolean;
   groups?: string[];
-  fileType?: string;
 }
 
 export interface CreateWorkflowResponse {
@@ -1281,7 +1274,6 @@ export interface UpdateWorkflowRequest {
   description?: string;
   availableToAll: boolean;
   groups?: string[];
-  fileType?: string;
 }
 
 export interface UpdateWorkflowResponse {
@@ -1317,56 +1309,52 @@ export interface GroupsListResponse {
   groups: GroupResponse[];
 }
 
-// ============================================================================
-// File Types API Types
-// ============================================================================
-
-/**
- * FileTypeResponse - File type metadata with usage statistics
- */
-export interface FileTypeResponse {
-  /** Type name (unique identifier) */
+/** Public category data returned by the operator API. */
+export interface CategoryResponse {
+  /** Immutable Kubernetes-safe category name. */
   name: string;
-  /** Hex color for badge (e.g., #FF5733) - empty string means use UI default */
-  color: string;
-  /** Icon name/identifier - empty string means use UI default */
-  icon: string;
-  /** Number of files using this type */
-  usageCount: number;
-  /** When this type was created */
-  createdAt: string;
-}
-
-/**
- * FileTypesListResponse - Response containing list of file types
- */
-export interface FileTypesListResponse {
-  /** Array of file types */
-  fileTypes: FileTypeResponse[];
-}
-
-/**
- * CreateFileTypeRequest - Request to create a new file type
- */
-export interface CreateFileTypeRequest {
-  /** Type name (Kubernetes label-compatible) */
-  name: string;
-  /** Hex color (optional - empty string for default) */
+  /** Optional hex color used to display the category. */
   color?: string;
-  /** Icon name (optional - empty string for default) */
-  icon?: string;
+  /** The group that can view this category, when it is group-scoped. */
+  groups?: string[];
+  /** Whether the category is visible to all users. */
+  availableToAll: boolean;
+  /** User ID of the creator, used to show management actions. */
+  createdBy?: string;
 }
 
-/**
- * UpdateFileTypeRequest - Request to update file type metadata
- */
-export interface UpdateFileTypeRequest {
-  /** Type name (must match URL param, immutable) */
+/** Response containing categories visible to the caller. */
+export interface CategoriesListResponse {
+  categories: CategoryResponse[];
+  total: number;
+}
+
+/** Request to create a category. */
+export interface CreateCategoryRequest {
   name: string;
-  /** Hex color (empty string resets to default) */
-  color: string;
-  /** Icon name (empty string resets to default) */
-  icon: string;
+  color?: string;
+  groups?: string[];
+  availableToAll: boolean;
+}
+
+/** Mutable category fields. Visibility fields must be sent together. */
+export interface UpdateCategoryRequest {
+  color?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+}
+
+/** Response from deleting a category. */
+export interface DeleteCategoryResponse {
+  message: string;
+}
+
+/** Response from associating or disassociating a run with a category. */
+export interface CategoryEntityAssociationResponse {
+  category: string;
+  entityType: 'KrknScenarioRun' | 'KrknGraphRun';
+  entityName: string;
+  associated: boolean;
 }
 
 // Elasticsearch Config Types

@@ -1,7 +1,9 @@
 import { http, HttpResponse } from 'msw';
 import { config } from '../config';
+import type { CategoryResponse } from '../types/api';
 
 const BASE = config.apiBaseUrl;
+const V2_BASE = config.apiV2BaseUrl;
 
 // ─── SCENARIO RUNS ───
 
@@ -399,17 +401,15 @@ const mockScenarios = [
 // ─── FILES (FileInfo for listings) ───
 
 const mockFiles = [
-  { fileId: 'file-001', fileName: 'kubeconfig-staging', availableToAll: false, groups: ['chaos-engineers'], fileType: 'kubeconfig', filePurpose: 'file' },
-  { fileId: 'file-002', fileName: 'metrics.yaml', description: 'Prometheus metrics config', availableToAll: true, fileType: 'yaml', filePurpose: 'file' },
+  { fileId: 'file-001', fileName: 'kubeconfig-staging', availableToAll: false, groups: ['chaos-engineers'], filePurpose: 'file' },
+  { fileId: 'file-002', fileName: 'metrics.yaml', description: 'Prometheus metrics config', availableToAll: true, filePurpose: 'file' },
   { fileId: 'file-003', fileName: 'workflow.json', workflowName: 'chaos-daily-suite', description: 'Daily chaos workflow', availableToAll: true, filePurpose: 'workflow-template' },
-  { fileId: 'file-004', fileName: 'alerts-custom.yaml', description: 'Custom alerting rules', availableToAll: false, groups: ['platform-team'], fileType: 'yaml', filePurpose: 'file' },
+  { fileId: 'file-004', fileName: 'alerts-custom.yaml', description: 'Custom alerting rules', availableToAll: false, groups: ['platform-team'], filePurpose: 'file' },
 ];
 
-// ─── FILE TYPES (FileTypeResponse) ───
-
-const mockFileTypes = [
-  { name: 'kubeconfig', color: '#0066CC', icon: '', usageCount: 1, createdAt: '2026-06-01T00:00:00Z' },
-  { name: 'yaml', color: '#CB7832', icon: '', usageCount: 2, createdAt: '2026-06-01T00:00:00Z' },
+const mockCategories: CategoryResponse[] = [
+  { name: 'cluster-reliability', color: '#0066CC', availableToAll: true, createdBy: 'admin@preview.local' },
+  { name: 'network-chaos', color: '#CB7832', groups: ['chaos-engineers'], availableToAll: false, createdBy: 'admin@preview.local' },
 ];
 
 // ─── WORKFLOWS (WorkflowInfo for listings) ───
@@ -786,23 +786,51 @@ export const handlers = [
     HttpResponse.json({ message: 'File deleted' }),
   ),
 
-  // ─── FILE TYPES (CRUD) ───
-  http.get(`${BASE}/file-types`, () =>
-    HttpResponse.json({ fileTypes: mockFileTypes }),
+  // ─── CATEGORIES (v2 CRUD) ───
+  http.get(`${V2_BASE}/categories`, () =>
+    HttpResponse.json({ categories: mockCategories, total: mockCategories.length }),
   ),
-  http.get(`${BASE}/file-types/:name`, ({ params }) => {
-    const ft = mockFileTypes.find((x) => x.name === params.name);
-    return HttpResponse.json(ft || mockFileTypes[0]);
+  http.get(`${V2_BASE}/categories/:name`, ({ params }) => {
+    const category = mockCategories.find((item) => item.name === params.name);
+    return category
+      ? HttpResponse.json(category)
+      : HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
   }),
-  http.post(`${BASE}/file-types`, () =>
-    HttpResponse.json({ message: 'File type created', name: 'new-type' }),
-  ),
-  http.put(`${BASE}/file-types/:name`, () =>
-    HttpResponse.json({ message: 'File type updated' }),
-  ),
-  http.delete(`${BASE}/file-types/:name`, () =>
-    HttpResponse.json({ message: 'File type deleted' }),
-  ),
+  http.post(`${V2_BASE}/categories`, async ({ request }) => {
+    const body = await request.json() as {
+      name: string;
+      color?: string;
+      groups?: string[];
+      availableToAll: boolean;
+    };
+    if (mockCategories.some((item) => item.name === body.name)) {
+      return HttpResponse.json({ error: 'conflict', message: 'Category already exists' }, { status: 409 });
+    }
+    const category = { ...body, createdBy: 'admin@preview.local' };
+    mockCategories.push(category);
+    return HttpResponse.json(category, { status: 201 });
+  }),
+  http.put(`${V2_BASE}/categories/:name`, async ({ params, request }) => {
+    const index = mockCategories.findIndex((item) => item.name === params.name);
+    if (index < 0) {
+      return HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
+    }
+    const body = await request.json() as {
+      color?: string;
+      groups?: string[];
+      availableToAll?: boolean;
+    };
+    mockCategories[index] = { ...mockCategories[index], ...body };
+    return HttpResponse.json(mockCategories[index]);
+  }),
+  http.delete(`${V2_BASE}/categories/:name`, ({ params }) => {
+    const index = mockCategories.findIndex((item) => item.name === params.name);
+    if (index < 0) {
+      return HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
+    }
+    mockCategories.splice(index, 1);
+    return HttpResponse.json({ message: 'Category deleted successfully' });
+  }),
 
   // ─── WORKFLOWS (CRUD) ───
   http.get(`${BASE}/workflows/available`, () =>
