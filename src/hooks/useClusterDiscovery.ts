@@ -65,6 +65,36 @@ interface UseClusterDiscoveryResult {
 }
 
 /**
+ * Flatten the operator response while preserving liveness metadata.
+ * Kept separate from the hook so the API contract is directly testable.
+ */
+export function transformDiscoveredClusters(
+  targetData: { [operatorName: string]: Cluster[] }
+): TargetResponse[] {
+  const discovered: TargetResponse[] = [];
+
+  for (const [operatorName, clusterList] of Object.entries(targetData)) {
+    clusterList.forEach((cluster) => {
+      const generatedUuid = `${operatorName}-${cluster['cluster-name']}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      discovered.push({
+        uuid: generatedUuid,
+        clusterName: cluster['cluster-name'],
+        clusterAPIURL: cluster['cluster-api-url'],
+        ready: true,
+        operatorSource: operatorName,
+        online: cluster.online,
+        checkedAt: cluster['checked-at'],
+        secretType: 'kubeconfig',
+        createdAt: new Date().toISOString(),
+      });
+    });
+  }
+
+  return discovered;
+}
+
+/**
  * Custom hook for cluster discovery workflow
  *
  * Encapsulates the complete async flow used in cluster selection,
@@ -95,36 +125,6 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
    *   ...
    * ]
    */
-  const transformClusters = useCallback(
-    (targetData: { [operatorName: string]: Cluster[] }): TargetResponse[] => {
-      const discovered: TargetResponse[] = [];
-
-      for (const [operatorName, clusterList] of Object.entries(targetData)) {
-        clusterList.forEach((cluster: Cluster) => {
-          // Generate a unique UUID for each cluster
-          // Format: operatorName-clusterName-timestamp
-          const generatedUuid = `${operatorName}-${cluster['cluster-name']}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-          discovered.push({
-            uuid: generatedUuid,
-            clusterName: cluster['cluster-name'],
-            clusterAPIURL: cluster['cluster-api-url'],
-            ready: true,
-            operatorSource: operatorName, // Source operator for grouping
-            online: cluster.online,
-            checkedAt: cluster['checked-at'],
-            // Optional fields
-            secretType: 'kubeconfig',
-            createdAt: new Date().toISOString(),
-          });
-        });
-      }
-
-      return discovered;
-    },
-    []
-  );
-
   /**
    * Cleanup polling interval
    */
@@ -167,7 +167,7 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
 
             try {
               const response = await operatorApi.getClusters(discoveryUuid);
-              const transformed = transformClusters(response.targetData);
+              const transformed = transformDiscoveredClusters(response.targetData);
 
               if (config.debugMode) {
                 console.log('[useClusterDiscovery] Discovered clusters:', transformed);
@@ -224,7 +224,7 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
         pollIntervalRef.current = window.setInterval(poll, config.pollInterval);
       }
     },
-    [cleanup, transformClusters]
+    [cleanup]
   );
 
   /**
