@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { VisualizeInstallCard } from './VisualizeInstallCard';
@@ -82,6 +82,46 @@ describe('VisualizeInstallCard', () => {
         expect(screen.getByText('No krkn-visualize Instances')).toBeInTheDocument();
       });
     });
+
+    it('should display an error instead of the empty state when instances fail to load', async () => {
+      vi.mocked(visualizeApi.listInstances).mockRejectedValue(new Error('Server unavailable'));
+
+      render(<VisualizeInstallCard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('API Error')).toBeInTheDocument();
+        expect(screen.getByText('Server unavailable')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('No krkn-visualize Instances')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    });
+
+    it('should not offer targets that are not ready', async () => {
+      vi.mocked(visualizeApi.listInstances).mockResolvedValue([]);
+      vi.mocked(targetsApi.listTargets).mockResolvedValue([
+        ...mockTargets,
+        {
+          uuid: 'target-3',
+          clusterName: 'cluster3',
+          clusterAPIURL: 'https://api.cluster3.example.com:6443',
+          secretType: 'kubeconfig',
+          ready: false,
+        },
+      ]);
+
+      const user = userEvent.setup();
+      render(<VisualizeInstallCard />);
+
+      const installButton = (await screen.findAllByRole('button', { name: /Install krkn-visualize/i }))[0];
+      await user.click(installButton);
+      const dialog = await screen.findByRole('dialog');
+      const clusterSelect = dialog.querySelector<HTMLSelectElement>('#visualize-targets')!;
+
+      expect(clusterSelect?.querySelector('option[value="cluster1"]')).toBeInTheDocument();
+      expect(clusterSelect?.querySelector('option[value="cluster3"]')).not.toBeInTheDocument();
+      expect(within(dialog).getByText(/Waiting for validation: cluster3/)).toBeInTheDocument();
+    });
   });
 
   describe('Install form submission', () => {
@@ -107,29 +147,26 @@ describe('VisualizeInstallCard', () => {
       // Open install modal
       const installButton = await screen.findByRole('button', { name: /Install krkn-visualize/i });
       await user.click(installButton);
+      const dialog = await screen.findByRole('dialog');
 
       // Fill form
-      const nameInput = screen.getByLabelText('Instance Name');
+      const nameInput = dialog.querySelector<HTMLInputElement>('#visualize-name')!;
       await user.type(nameInput, 'my-visualize');
 
-      // Select target cluster
-      const clusterSelect = screen.getByLabelText('Target Clusters');
-      await user.click(clusterSelect);
-      const clusterOption = screen.getByText('cluster1');
-      await user.click(clusterOption);
+      // Select multiple target clusters
+      const clusterSelect = dialog.querySelector<HTMLSelectElement>('#visualize-targets')!;
+      await user.selectOptions(clusterSelect, ['cluster1', 'cluster2']);
 
       // Select ES config
-      const esSelect = screen.getByLabelText('Elasticsearch Configuration');
-      await user.click(esSelect);
-      const esOption = screen.getByText(/prod-es/);
-      await user.click(esOption);
+      const esSelect = dialog.querySelector<HTMLSelectElement>('#visualize-es-config')!;
+      await user.selectOptions(esSelect, 'prod-es');
 
       // Enter password
-      const passwordInput = screen.getByLabelText('Grafana Admin Password');
+      const passwordInput = dialog.querySelector<HTMLInputElement>('#visualize-grafana-password')!;
       await user.type(passwordInput, 'securePassword123');
 
       // Submit
-      const submitButton = screen.getByRole('button', { name: /Install krkn-visualize/i });
+      const submitButton = within(dialog).getByRole('button', { name: /Install krkn-visualize/i });
       await user.click(submitButton);
 
       // Verify API call
@@ -137,7 +174,7 @@ describe('VisualizeInstallCard', () => {
         expect(visualizeApi.createInstance).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'my-visualize',
-            targetClusters: ['cluster1'],
+            targetClusters: ['cluster1', 'cluster2'],
             elasticsearchConfigName: 'prod-es',
             grafanaPassword: 'securePassword123',
           })
