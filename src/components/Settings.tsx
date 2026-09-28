@@ -37,6 +37,7 @@ import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
 import { CloudCredentialsCard } from './CloudCredentialsCard';
 import { BackupRestoreCard } from './BackupRestoreCard';
+import { VisualizeInstallCard } from './VisualizeInstallCard';
 import { SignatureVerificationSettings } from './SignatureVerificationSettings';
 
 export function Settings() {
@@ -234,6 +235,15 @@ export function Settings() {
               <Tab eventKey={5} title={<TabTitleText>Cloud Credentials</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <CloudCredentialsCard />
+                </div>
+              </Tab>
+            )}
+
+            {/* krkn-visualize Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={7} title={<TabTitleText>krkn-visualize</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <VisualizeInstallCard />
                 </div>
               </Tab>
             )}

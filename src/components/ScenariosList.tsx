@@ -47,6 +47,7 @@ export function ScenariosList() {
   const [searchValue, setSearchValue] = useState('');
   const [copiedDigest, setCopiedDigest] = useState<string | null>(null);
   const [pendingScenario, setPendingScenario] = useState<ScenarioTag | null>(null);
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
 
   if (!state.scenarios || state.scenarios.length === 0) {
     return (
@@ -71,6 +72,20 @@ export function ScenariosList() {
   };
 
   const proceedToConfigureScenario = (scenarioName: string) => {
+  const handleCancelClick = () => {
+    setShowCancelConfirmation(true);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowCancelConfirmation(false);
+    dispatch({ type: 'CANCEL_WORKFLOW' });
+  };
+
+  const handleCancelDismiss = () => {
+    setShowCancelConfirmation(false);
+  };
+
+  const handleConfigureScenario = (scenario: ScenarioTag) => {
     dispatch({
       type: 'SELECT_SCENARIO_FOR_DETAIL',
       payload: { scenarioName },
@@ -160,6 +175,7 @@ export function ScenariosList() {
     });
 
   return (
+    <>
     <Card>
       <CardTitle>
         <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -169,9 +185,18 @@ export function ScenariosList() {
             </Title>
           </FlexItem>
           <FlexItem>
-            <Button variant="link" onClick={handleBack}>
-              ← Back to Registry Config
-            </Button>
+            <Flex gap={{ default: 'gapSm' }}>
+              <FlexItem>
+                <Button variant="link" onClick={handleBack}>
+                  ← Back to Registry Config
+                </Button>
+              </FlexItem>
+              <FlexItem>
+                <Button variant="secondary" onClick={handleCancelClick}>
+                  Cancel
+                </Button>
+              </FlexItem>
+            </Flex>
           </FlexItem>
         </Flex>
       </CardTitle>
@@ -376,5 +401,26 @@ export function ScenariosList() {
         {pendingScenario?.name}: this image is not signed. Signature verification is currently disabled, so the image may run without a valid signature.
       </Modal>
     </Card>
+
+    {/* Cancel Confirmation Modal */}
+    <Modal
+      variant={ModalVariant.small}
+      title="Cancel scenario selection?"
+      isOpen={showCancelConfirmation}
+      onClose={handleCancelDismiss}
+      actions={[
+        <Button key="confirm" variant="danger" onClick={handleCancelConfirm}>
+          Yes, cancel
+        </Button>,
+        <Button key="dismiss" variant="link" onClick={handleCancelDismiss}>
+          No, continue browsing
+        </Button>,
+      ]}
+    >
+      <p>
+        Are you sure you want to cancel? All progress will be lost and you will return to the scenario runs list.
+      </p>
+    </Modal>
+    </>
   );
 }
