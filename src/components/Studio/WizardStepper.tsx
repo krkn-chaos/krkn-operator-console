@@ -5,7 +5,7 @@
  * Provides a simple multi-step form with navigation controls.
  */
 
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, ReactNode, KeyboardEvent } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -16,6 +16,7 @@ import {
   ProgressStep,
   Alert,
 } from '@patternfly/react-core';
+import { runOnEnterFromFormControl } from '../../utils/keyboard';
 
 export interface WizardStepConfig {
   id: string;
@@ -60,11 +61,16 @@ export function WizardStepper({
   }, [isOpen]);
 
   const handleNext = () => {
+    if (currentStep.isNextDisabled) return;
     if (!isLastStep) {
       setActiveStepIndex(prev => prev + 1);
     } else {
       onSave();
     }
+  };
+
+  const handleContentKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    runOnEnterFromFormControl(event, handleNext);
   };
 
   const handleBack = () => {
@@ -138,7 +144,7 @@ export function WizardStepper({
           flex: 1,
           overflowY: 'auto',
           padding: '1.5rem'
-        }}>
+        }} onKeyDown={handleContentKeyDown}>
           {/* Validation Warnings */}
           {validationWarnings.length > 0 && (
             <Alert
