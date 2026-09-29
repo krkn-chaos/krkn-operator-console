@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { RunCategoryStripe } from './RunCategoryActions';
 
 describe('RunCategoryStripe', () => {
-  it('uses the sidebar marker width and waits for the proportional expansion before showing its tooltip', async () => {
+  it('uses the sidebar marker width and visibly expands before showing its tooltip', async () => {
     render(
       <RunCategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />,
     );
@@ -13,7 +13,7 @@ describe('RunCategoryStripe', () => {
     expect(stripe.style.borderRadius).toBe('0px');
 
     fireEvent.mouseEnter(stripe);
-    expect(stripe.style.width).toBe('4.61px');
+    expect(stripe.style.width).toBe('3.23mm');
     expect(stripe.style.transition).toBe('width 180ms ease-out');
     await screen.findByRole('tooltip');
   });
