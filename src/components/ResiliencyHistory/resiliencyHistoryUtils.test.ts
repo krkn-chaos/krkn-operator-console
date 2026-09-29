@@ -89,13 +89,13 @@ describe('resiliency history chart data', () => {
     const zeroPoint = separate.find((chart) => chart.configurationGroupId === 'shared')!.series[0].data[0];
     const failingPoint = separate.find((chart) => chart.configurationGroupId === 'alpha-only')!.series[0].data[0];
     expect(zeroPoint.baseline).toBe(0);
-    expect(zeroPoint.tooltip).toContain('Baseline: 0');
-    expect(zeroPoint.tooltip).toContain('Score-baseline delta: +0');
-    expect(zeroPoint.tooltip).toContain('Result: Met baseline');
+    expect(zeroPoint.tooltip).toContain('Baseline 0');
+    expect(zeroPoint.tooltip).toContain('Δ +0');
+    expect(zeroPoint.tooltip).toContain('Met baseline');
     expect(separate.find((chart) => chart.configurationGroupId === 'shared')!.series[1].data[0].baseline).toBe(70);
     expect(failingPoint.baseline).toBe(75);
-    expect(failingPoint.tooltip).toContain('Score-baseline delta: -15');
-    expect(failingPoint.tooltip).toContain('Result: Below baseline');
+    expect(failingPoint.tooltip).toContain('Δ −15');
+    expect(failingPoint.tooltip).toContain('Below baseline');
 
     const collapsed = buildResiliencyHistoryCharts(baselineHistory, ['alpha'], ['cluster-a'], 'collapsed');
     expect(collapsed[0].series[0].data.map((item) => item.baseline)).toEqual([0, 75]);
@@ -112,8 +112,8 @@ describe('resiliency history chart data', () => {
     const [chart] = buildResiliencyHistoryCharts(history, ['beta'], ['cluster-a'], 'separate');
     const [betaPoint] = chart.series[0].data;
     expect(betaPoint).not.toHaveProperty('baseline');
-    expect(betaPoint.tooltip).not.toContain('Baseline:');
-    expect(betaPoint.tooltip).not.toContain('Result:');
+    expect(betaPoint.tooltip).not.toContain('Baseline');
+    expect(betaPoint.tooltip).not.toContain('baseline');
   });
 
   it('creates a visible empty chart model for selected categories with no history', () => {
@@ -129,7 +129,7 @@ describe('resiliency history chart data', () => {
     expect(charts[0].series).toEqual([{ clusterName: 'cluster-a', data: [] }]);
   });
 
-  it('formats tooltips with score, run, provider, category, and configuration details', () => {
+  it('keeps point tooltips compact while identifying the cluster, date, and run', () => {
     const label = formatResiliencyHistoryTooltip(
       point({
         runId: 'run-1',
@@ -138,31 +138,25 @@ describe('resiliency history chart data', () => {
         providerName: 'aws',
       }),
       'cluster-a',
-      'alpha',
-      { runType: 'scenario-runs', representativeRunId: 'run-1', scenarioNames: ['pod-kill'] },
     );
 
-    expect(label).toContain('Score: 0');
-    expect(label).toContain('Cluster: cluster-a');
-    expect(label).toContain('Category: alpha');
-    expect(label).toContain('Run: run-1');
-    expect(label).toContain('Run type: scenario-runs');
-    expect(label).toContain('Provider: aws');
-    expect(label).toContain('Configuration group: config-1');
-    expect(label).toContain('Scenarios: pod-kill');
+    expect(label).toContain('Score 0');
+    expect(label).toContain('cluster-a');
+    expect(label).toContain('run-1');
+    expect(label).not.toContain('Provider');
+    expect(label).not.toContain('Configuration group');
   });
 
   it('formats a baseline tooltip without dropping run metadata', () => {
     const label = formatResiliencyHistoryTooltip(
       point({ runId: 'run-with-baseline', configurationGroupId: 'config-1', score: 70, baseline: 80 }),
       'cluster-a',
-      'alpha',
     );
 
-    expect(label).toContain('Baseline: 80');
-    expect(label).toContain('Score-baseline delta: -10');
-    expect(label).toContain('Result: Below baseline');
-    expect(label).toContain('Run: run-with-baseline');
-    expect(label).toContain('Configuration group: config-1');
+    expect(label).toContain('Baseline 80');
+    expect(label).toContain('Δ −10');
+    expect(label).toContain('Below baseline');
+    expect(label).toContain('run-with-baseline');
+    expect(label.split(' · ').length).toBe(7);
   });
 });
