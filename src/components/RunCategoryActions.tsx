@@ -167,9 +167,16 @@ interface RunCategoryStripeProps {
   categories: CategoryResponse[];
 }
 
-const CATEGORY_STRIPE_NARROW_WIDTH = '2.8mm';
+// PatternFly's active sidebar marker uses BorderWidth--xl (4px by default).
+const CATEGORY_STRIPE_NARROW_WIDTH = 'var(--pf-v5-global--BorderWidth--xl, 4px)';
+const SIDEBAR_MARKER_NARROW_WIDTH_PX = 4;
+const SIDEBAR_MARKER_NARROW_REFERENCE_MM = 2.8;
 const CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM = 3.8;
-const CATEGORY_STRIPE_WIDE_WIDTH = (CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM * 0.85).toFixed(2) + 'mm';
+const CATEGORY_STRIPE_WIDE_WIDTH = (
+  SIDEBAR_MARKER_NARROW_WIDTH_PX
+  * (CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM / SIDEBAR_MARKER_NARROW_REFERENCE_MM)
+  * 0.85
+).toFixed(2) + 'px';
 const CATEGORY_STRIPE_TRANSITION_MS = 180;
 
 /** Renders equal-height category color segments at the left of a run row. */
