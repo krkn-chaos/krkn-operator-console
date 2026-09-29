@@ -230,13 +230,26 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
           left: 0,
           top: 0,
           bottom: 0,
-          width: isHovered ? CATEGORY_STRIPE_WIDE_WIDTH : CATEGORY_STRIPE_NARROW_WIDTH,
-          transition: 'width ' + CATEGORY_STRIPE_TRANSITION_MS + 'ms ease-out',
-          overflow: 'hidden',
-          borderRadius: 0,
-          backgroundImage: getCategoryStripeGradient(categories),
+          // Keep the Popper reference fixed at the expanded edge while the color bar animates inside it.
+          width: CATEGORY_STRIPE_WIDE_WIDTH,
         }}
-      />
+      >
+        <div
+          data-testid="category-stripe-visual"
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: isHovered ? CATEGORY_STRIPE_WIDE_WIDTH : CATEGORY_STRIPE_NARROW_WIDTH,
+            transition: 'width ' + CATEGORY_STRIPE_TRANSITION_MS + 'ms ease-out',
+            overflow: 'hidden',
+            borderRadius: 0,
+            backgroundImage: getCategoryStripeGradient(categories),
+          }}
+        />
+      </div>
     </Tooltip>
   );
 }

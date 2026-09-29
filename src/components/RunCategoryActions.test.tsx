@@ -9,12 +9,15 @@ describe('RunCategoryStripe', () => {
     );
 
     const stripe = screen.getByRole('img', { name: 'Categories: resilience' });
-    expect(stripe.style.width).toBe('var(--pf-v5-global--BorderWidth--xl, 4px)');
-    expect(stripe.style.borderRadius).toBe('0px');
+    const visualStripe = screen.getByTestId('category-stripe-visual');
+    expect(stripe.style.width).toBe('3.23mm');
+    expect(visualStripe.style.width).toBe('var(--pf-v5-global--BorderWidth--xl, 4px)');
+    expect(visualStripe.style.borderRadius).toBe('0px');
 
     fireEvent.mouseEnter(stripe);
     expect(stripe.style.width).toBe('3.23mm');
-    expect(stripe.style.transition).toBe('width 180ms ease-out');
+    expect(visualStripe.style.width).toBe('3.23mm');
+    expect(visualStripe.style.transition).toBe('width 180ms ease-out');
     await screen.findByRole('tooltip');
   });
 
@@ -29,8 +32,7 @@ describe('RunCategoryStripe', () => {
       />,
     );
 
-    const stripe = screen.getByRole('img', { name: 'Categories: first, second, third' });
-    const gradient = stripe.style.backgroundImage;
+    const gradient = screen.getByTestId('category-stripe-visual').style.backgroundImage;
     expect(gradient).toContain('rgb(204, 0, 102) 0.0000%');
     expect(gradient).toContain('rgb(204, 0, 102) 33.3333%');
     expect(gradient).toContain('rgb(0, 170, 102) 33.3333%');
