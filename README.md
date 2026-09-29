@@ -65,6 +65,8 @@ sending kubeconfig or service credentials to the browser. It edits the returned
 YAML, validates it against the Krkn-AI schema, saves a target-bound config, and
 launches only after the operator returns a `201` `KrknAIRun`.
 
+Cancel remains in the action row on each target, configuration, and review step.
+
 The wizard's Components section provides Select all and Disable all controls for
 namespaces. Each namespace toggle sits beside its accordion title and applies
 the disabled state to all of that namespace's descendants.

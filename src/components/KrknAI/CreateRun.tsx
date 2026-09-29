@@ -383,7 +383,6 @@ export function CreateRun({
     <section className="krkn-ai-create" aria-labelledby="krkn-ai-create-title">
       <div className="krkn-ai-page-heading">
         <div><Title id="krkn-ai-create-title" headingLevel="h1">Create Krkn AI run</Title><p>Discover an authorized cluster and save its real Krkn AI configuration.</p></div>
-        <Button variant="link" onClick={cancel}>Cancel</Button>
       </div>
       <ol className="krkn-ai-steps" aria-label="Run creation steps">
         <li aria-current={step === 1 ? 'step' : undefined} className={step === 1 ? 'is-current' : ''}>1. Select target</li>
@@ -427,7 +426,7 @@ export function CreateRun({
           </Card>
           <DiscoveryOptionsEditor options={discoveryOptions} errors={discoveryOptionErrors} onChange={(field, value) => { abortActiveRequest(); setDiscoveryOptions((current) => ({ ...current, [field]: value })); setCreatedConfig(null); }} />
           {discoveryError && <Alert variant="danger" title="Krkn AI discovery failed" isInline>{discoveryError}</Alert>}
-          <div className="krkn-ai-actions"><Button variant="primary" isDisabled={!canDiscover} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>
+          <div className="krkn-ai-actions"><Button variant="secondary" onClick={cancel}>Cancel</Button><Button variant="primary" isDisabled={!canDiscover} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>
 
         </>
       )}
@@ -514,7 +513,10 @@ export function CreateRun({
           </CardBody></Card>}
 
           <div className="krkn-ai-actions krkn-ai-actions-between">
-            <Button variant="secondary" onClick={() => previousSection ? setConfigurationSection(previousSection.id) : setStep(1)}>{previousSection ? 'Previous section' : 'Back to target'}</Button>
+            <div className="krkn-ai-action-group">
+              <Button variant="secondary" onClick={() => previousSection ? setConfigurationSection(previousSection.id) : setStep(1)}>{previousSection ? 'Previous section' : 'Back to target'}</Button>
+              <Button variant="secondary" onClick={cancel}>Cancel</Button>
+            </div>
             {nextSection ? <Button variant="primary" onClick={() => setConfigurationSection(nextSection.id)}>Continue</Button> : <Button variant="primary" isDisabled={!canSaveConfig} isLoading={actionLoading} onClick={() => void handleCreateConfig()}>{actionLoading ? 'Validating and saving…' : 'Validate and save config'}</Button>}
           </div>
         </div>
@@ -527,7 +529,13 @@ export function CreateRun({
           <pre className="krkn-ai-yaml" aria-label="Saved Krkn AI configuration YAML">{createdConfig.yaml}</pre>
           {actionError && <Alert variant="danger" title="Run creation failed" isInline>{actionError}</Alert>}
         </CardBody></Card>
-        <div className="krkn-ai-actions krkn-ai-actions-between"><Button variant="secondary" onClick={() => setStep(2)}>Back to configuration</Button><Button variant="primary" isDisabled={!canStart} isLoading={actionLoading} onClick={() => void handleStart()}>{actionLoading ? 'Starting run…' : 'Start run'}</Button></div>
+        <div className="krkn-ai-actions krkn-ai-actions-between">
+          <div className="krkn-ai-action-group">
+            <Button variant="secondary" onClick={() => setStep(2)}>Back to configuration</Button>
+            <Button variant="secondary" onClick={cancel}>Cancel</Button>
+          </div>
+          <Button variant="primary" isDisabled={!canStart} isLoading={actionLoading} onClick={() => void handleStart()}>{actionLoading ? 'Starting run…' : 'Start run'}</Button>
+        </div>
       </>}
     </section>
   );

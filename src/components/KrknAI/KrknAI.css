@@ -229,6 +229,12 @@
 .krkn-ai-actions-between {
   justify-content: space-between;
 }
+.krkn-ai-action-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
 
 .krkn-ai-yaml {
   display: block;

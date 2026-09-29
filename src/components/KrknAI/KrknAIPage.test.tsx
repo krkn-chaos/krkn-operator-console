@@ -276,6 +276,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create run' }));
     await user.type(screen.getByRole('textbox', { name: 'Run name' }), 'real-run-1');
+    expect(screen.getByRole('button', { name: 'Cancel' }).closest('.krkn-ai-actions')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Request authorized clusters' })).not.toBeInTheDocument();
     await waitFor(() => expect(mocks.operator.createTargetRequest).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mocks.operator.getTargetStatus).toHaveBeenCalledTimes(1));
@@ -289,6 +290,7 @@ describe('Krkn-AI real run lifecycle', () => {
     await user.selectOptions(clusterSelect, screen.getByRole('option', { name: 'prod (krkn-operator-acm)' }));
     await user.click(screen.getByRole('button', { name: 'Discover components' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /Review YAML/ })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Cancel' }).closest('.krkn-ai-actions')).toBeInTheDocument();
     expect(screen.getAllByRole('checkbox')).toHaveLength(14);
 
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -306,6 +308,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     await user.click(screen.getByRole('button', { name: /Review YAML/ }));
     const yamlEditor = screen.getByRole('textbox', { name: 'Krkn AI configuration YAML' });
+    expect(screen.getByRole('button', { name: 'Cancel' }).closest('.krkn-ai-actions')).toBeInTheDocument();
     const yamlText = (yamlEditor as HTMLTextAreaElement).value;
     expect(yamlText).toContain('# Preserve this discovery comment.');
     expect(yamlText).toContain('preserve: discovery-value');
