@@ -88,6 +88,8 @@ describe('resiliency history PDF report', () => {
     expect(pdfText).toContain('DURATION');
     expect(pdfText).toContain('Workflow nodes');
     expect(pdfText).toContain('[redacted]');
+    expect(pdfText).toContain('0.8 0. 0.');
+    expect(pdfText).not.toContain('0. 0.4 0.8');
     expect(pdfText).not.toContain('report-secret');
     expect(pdfText).not.toContain('graph-secret');
   });

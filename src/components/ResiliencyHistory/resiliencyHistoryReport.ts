@@ -49,25 +49,25 @@ const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
 const CONTENT_BOTTOM = 198;
 const SENSITIVE_FIELD = /PASSWORD|SECRET|TOKEN|KEY|CREDENTIAL|AUTH/i;
 const COLORS = {
-  ink: [23, 35, 52] as PdfColor,
-  muted: [94, 108, 128] as PdfColor,
-  blue: [0, 102, 204] as PdfColor,
-  blueLight: [235, 244, 253] as PdfColor,
-  border: [215, 223, 233] as PdfColor,
-  grid: [231, 236, 243] as PdfColor,
-  panel: [247, 249, 252] as PdfColor,
-  green: [21, 128, 61] as PdfColor,
-  red: [194, 65, 12] as PdfColor,
+  ink: [26, 26, 26] as PdfColor,
+  muted: [102, 102, 102] as PdfColor,
+  accent: [204, 0, 0] as PdfColor,
+  neutralFill: [232, 232, 232] as PdfColor,
+  border: [204, 204, 204] as PdfColor,
+  grid: [232, 232, 232] as PdfColor,
+  panel: [247, 247, 247] as PdfColor,
+  green: [26, 127, 55] as PdfColor,
+  red: [207, 34, 46] as PdfColor,
   white: [255, 255, 255] as PdfColor,
 };
 const SERIES_COLORS: PdfColor[] = [
-  [0, 102, 204],
-  [21, 128, 61],
-  [147, 51, 234],
-  [217, 119, 6],
-  [8, 145, 178],
-  [190, 24, 93],
-  [71, 85, 105],
+  [204, 0, 0],
+  [26, 127, 55],
+  [26, 26, 26],
+  [207, 34, 46],
+  [102, 102, 102],
+  [51, 51, 51],
+  [0, 0, 0],
 ];
 
 function normalizeRunType(value: string | undefined): ConfigurationRunType | undefined {
@@ -218,7 +218,7 @@ function drawRule(pdf: jsPDF, y: number, color: PdfColor = COLORS.border): void 
 }
 
 function drawPageHeader(pdf: jsPDF, section: string): void {
-  drawText(pdf, 'KRKN / OPERATOR CONSOLE', PAGE_MARGIN, 9, { size: 7.2, color: COLORS.blue, bold: true });
+  drawText(pdf, 'KRKN / OPERATOR CONSOLE', PAGE_MARGIN, 9, { size: 7.2, color: COLORS.accent, bold: true });
   drawText(pdf, section.toUpperCase(), PAGE_WIDTH - PAGE_MARGIN, 9, {
     size: 7.2,
     color: COLORS.muted,
@@ -289,9 +289,9 @@ function drawScopeCard(pdf: jsPDF, title: string, items: string[], x: number, y:
   const joined = items.length > 0 ? items.join(', ') : 'None';
   const lines = wrappedLines(pdf, joined, width - 8, 7.5);
   const height = Math.max(18, 9 + lines.length * 3.7);
-  setColor(pdf, COLORS.blueLight, 'fill');
+  setColor(pdf, COLORS.neutralFill, 'fill');
   pdf.roundedRect(x, y, width, height, 1, 1, 'F');
-  drawText(pdf, title.toUpperCase(), x + 4, y + 5.5, { size: 6.3, color: COLORS.blue, bold: true });
+  drawText(pdf, title.toUpperCase(), x + 4, y + 5.5, { size: 6.3, color: COLORS.accent, bold: true });
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7.5);
   setColor(pdf, COLORS.ink, 'text');
@@ -345,7 +345,7 @@ function drawSnapshotRow(pdf: jsPDF, row: ScoreSnapshotRow, y: number, columnWid
 
 function drawOverview(pdf: jsPDF, input: ReportInput, reportTitle: string): void {
   drawPageHeader(pdf, 'Executive overview');
-  drawText(pdf, 'HISTORICAL SCORE REPORT', PAGE_MARGIN, 22, { size: 7, color: COLORS.blue, bold: true });
+  drawText(pdf, 'HISTORICAL SCORE REPORT', PAGE_MARGIN, 22, { size: 7, color: COLORS.accent, bold: true });
   drawText(pdf, reportTitle, PAGE_MARGIN, 32, { size: 22, bold: true });
   drawWrappedText(
     pdf,
@@ -586,7 +586,7 @@ function drawCharts(pdf: jsPDF, input: ReportInput): void {
 
 function drawSubsectionTitle(pdf: jsPDF, title: string, y: number): number {
   drawText(pdf, title, PAGE_MARGIN, y + 4, { size: 9, bold: true });
-  setColor(pdf, COLORS.blue, 'draw');
+  setColor(pdf, COLORS.accent, 'draw');
   pdf.setLineWidth(0.7);
   pdf.line(PAGE_MARGIN, y + 6, PAGE_MARGIN + 11, y + 6);
   return y + 10;
@@ -623,7 +623,7 @@ function drawValueGrid(
       setColor(pdf, COLORS.border, 'draw');
       pdf.setLineWidth(0.2);
       pdf.roundedRect(x, y, columnWidth, rowHeight - 1, 0.8, 0.8, 'FD');
-      drawText(pdf, formatted[pairIndex].key, x + 3, y + 4, { size: 6.2, color: COLORS.blue, bold: true });
+      drawText(pdf, formatted[pairIndex].key, x + 3, y + 4, { size: 6.2, color: COLORS.accent, bold: true });
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.2);
       setColor(pdf, COLORS.ink, 'text');
@@ -673,9 +673,9 @@ function drawGraphNode(
 ): number {
   const scenarioName = node.scenario?.name || node.name || node.image || 'Scenario';
   let y = ensureSpace(startY, 24);
-  setColor(pdf, COLORS.blueLight, 'fill');
+  setColor(pdf, COLORS.neutralFill, 'fill');
   pdf.roundedRect(PAGE_MARGIN, y, CONTENT_WIDTH, 13, 1, 1, 'F');
-  drawText(pdf, nodeId, PAGE_MARGIN + 3, y + 5, { size: 8, color: COLORS.blue, bold: true });
+  drawText(pdf, nodeId, PAGE_MARGIN + 3, y + 5, { size: 8, color: COLORS.accent, bold: true });
   drawText(pdf, scenarioName, PAGE_MARGIN + 48, y + 5, { size: 8, bold: true });
   if (node.depends_on) {
     drawText(pdf, 'Runs after ' + node.depends_on, PAGE_MARGIN + 48, y + 10, { size: 6.4, color: COLORS.muted });
@@ -711,9 +711,9 @@ function drawConfiguration(
   const typeLabel = configuration.runType === 'graph-runs'
     ? 'GRAPH RUN'
     : configuration.runType === 'scenario-runs' ? 'SCENARIO RUN' : 'RUN DETAILS';
-  setColor(pdf, COLORS.blueLight, 'fill');
+  setColor(pdf, COLORS.neutralFill, 'fill');
   pdf.roundedRect(PAGE_MARGIN, y, 35, 8, 1, 1, 'F');
-  drawText(pdf, typeLabel, PAGE_MARGIN + 3, y + 5.2, { size: 6, color: COLORS.blue, bold: true });
+  drawText(pdf, typeLabel, PAGE_MARGIN + 3, y + 5.2, { size: 6, color: COLORS.accent, bold: true });
   y += 12;
 
   const ensureSpace = (cursorY: number, height: number): number => {
