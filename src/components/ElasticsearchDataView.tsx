@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -28,6 +28,9 @@ import {
   HelperTextItem,
   Grid,
   GridItem,
+  Tabs,
+  Tab,
+  TabTitleText,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td, ExpandableRowContent } from '@patternfly/react-table';
 import { Chart, ChartAxis, ChartBar, ChartGroup, ChartLegend, ChartThreshold } from '@patternfly/react-charts';
@@ -36,6 +39,8 @@ import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications, useRole } from '../hooks';
 import { ElasticsearchConfigForm } from './ElasticsearchConfigsCard';
 import { JobStatsSummary } from './JobStatsSummary';
+import { ElasticsearchAlertsTab } from './ElasticsearchAlertsTab';
+import { ElasticsearchFilterControls } from './ElasticsearchFilterControls';
 import type {
   ElasticsearchConfig,
   ClusterMetadata,
@@ -49,6 +54,7 @@ import type {
   InlineElasticsearchConnection,
   QueryTelemetryResponse,
 } from '../types/api';
+import { matchesFieldFilters } from '../utils/elasticsearchFieldFilters';
 
 /**
  * Formats an epoch-seconds timestamp as "MMM DD, YYYY, h:mm:ss AM/PM".
@@ -72,11 +78,10 @@ function isoDate(daysAgo = 0): string {
   return `${year}-${month}-${day}`;
 }
 
-// Bounds for the "Max results" limit. The query is capped server-side, so the
-// UI enforces a sane positive-integer range rather than forwarding arbitrary
-// input.
+// Keep this aligned with the server-side query cap. Results are paginated in
+// the browser after one request, so allowing a larger value would hide data.
 const MIN_SIZE = 1;
-const MAX_SIZE = 10000;
+const MAX_SIZE = 500;
 
 /**
  * Validates the raw "Max results" input. An empty value is allowed and means
@@ -456,11 +461,19 @@ export function ElasticsearchDataView() {
 
   // Per-row expansion state, keyed by run_uuid (or row index fallback).
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [telemetryFilters, setTelemetryFilters] = useState<Array<{ key: string; value: string }>>([]);
+  const [telemetryDraftFilter, setTelemetryDraftFilter] = useState({ key: '', value: '' });
+  const [activeTab, setActiveTab] = useState<string | number>(0);
 
   // Monotonic id identifying the most recent query. Each run captures the id it
   // started with; a response only updates the table if its id still matches, so
   // stale responses (from criteria that have since changed) are discarded.
   const latestRequestId = useRef(0);
+
+  const filteredTelemetryDocuments = useMemo(
+    () => documents.filter(document => matchesFieldFilters(document, telemetryFilters)),
+    [documents, telemetryFilters],
+  );
 
   // Clears any displayed results and invalidates in-flight requests. Called
   // whenever the query criteria change so the table never shows telemetry that
@@ -478,8 +491,11 @@ export function ElasticsearchDataView() {
     try {
       const data = await elasticsearchApi.listConfigs();
       setConfigs(data);
-    } catch {
-      showError('Failed to load Elasticsearch configs', 'Could not retrieve configs from the server');
+    } catch (error) {
+      showError(
+        'Failed to load Elasticsearch configs',
+        error instanceof Error ? error.message : 'Could not retrieve configs from the server',
+      );
     } finally {
       setLoadingConfigs(false);
     }
@@ -536,6 +552,8 @@ export function ElasticsearchDataView() {
       // Ignore responses superseded by a newer run or by a criteria change.
       if (latestRequestId.current !== requestId) return;
       setDocuments(result.documents || []);
+      setTelemetryFilters([]);
+      setTelemetryDraftFilter({ key: '', value: '' });
       setStats(result.stats ?? null);
       setHasQueried(true);
       // Fresh results: start with all rows collapsed.
@@ -653,10 +671,10 @@ export function ElasticsearchDataView() {
             isInline
             title="Run a query to view telemetry data."
           />
-        ) : documents.length === 0 ? (
+        ) : filteredTelemetryDocuments.length === 0 ? (
           <EmptyState>
             <EmptyStateIcon icon={DatabaseIcon} />
-            <Title headingLevel="h3" size="md">No telemetry documents found</Title>
+            <Title headingLevel="h3" size="md">{documents.length === 0 ? 'No telemetry documents found' : 'No telemetry documents match the filters'}</Title>
             <EmptyStateBody>
               The telemetry index returned no results.
             </EmptyStateBody>
@@ -674,7 +692,7 @@ export function ElasticsearchDataView() {
                 <Th>Status</Th>
               </Tr>
             </Thead>
-            {documents.map((doc, rowIndex) => {
+              {filteredTelemetryDocuments.map((doc, rowIndex) => {
               const rowKey = doc.run_uuid || String(rowIndex);
               const isExpanded = !!expandedRows[rowKey];
               const hasMetadata = doc.metadata !== undefined && doc.metadata !== null;
@@ -812,18 +830,80 @@ export function ElasticsearchDataView() {
     </>
   );
 
+  const telemetryFilterControls = (
+    <ElasticsearchFilterControls
+      draftFilter={telemetryDraftFilter}
+      options={[
+        { key: 'scenario_type', label: 'Scenario Type' },
+        { key: 'run_uuid', label: 'UUID' },
+        { key: 'namespace', label: 'Namespace' },
+      ]}
+      idPrefix="es-telemetry"
+      onDraftChange={setTelemetryDraftFilter}
+      onAddFilter={() => { setTelemetryFilters(current => [...current, telemetryDraftFilter]); setTelemetryDraftFilter({ key: '', value: '' }); }}
+    />
+  );
+
+  const telemetryFilterChips = (
+    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+      {telemetryFilters.filter(filter => filter.key).map((filter, index) => (
+        <Label
+          key={`${filter.key}-${index}`}
+          color="blue"
+          onClose={() => setTelemetryFilters(current => current.filter((_, filterIndex) => filterIndex !== index))}
+        >
+          {filter.key === 'scenario_type' ? 'Scenario Type' : filter.key === 'run_uuid' ? 'UUID' : 'Namespace'}: {filter.value || '(any)'}
+        </Label>
+      ))}
+    </div>
+  );
+
   return (
     <>
       <Card>
         <CardTitle>
-          <Title headingLevel="h2" size="lg">Elasticsearch Telemetry Data</Title>
+          <Title headingLevel="h2" size="lg">Elasticsearch Data</Title>
         </CardTitle>
         <CardBody>
           {loadingConfigs ? (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
               <Spinner size="xl" />
             </div>
-          ) : configs.length === 0 ? (
+          ) : (
+            <>
+              {configs.length > 0 && (
+              <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }} style={{ marginBottom: '1rem' }}>
+                <FlexItem>
+                  <FormGroup label="Elasticsearch Config" fieldId="es-data-config" style={{ width: '30em' }}>
+                    <FormSelect
+                      id="es-data-config"
+                      value={selectedConfig}
+                      onChange={(_e, v) => { setSelectedConfig(v); invalidateResults(); }}
+                      aria-label="Select an Elasticsearch config"
+                    >
+                      <FormSelectOption value="" label="Select a saved Elasticsearch config…" isDisabled />
+                      {configs.map((cfg) => (
+                        <FormSelectOption key={cfg.name} value={cfg.name} label={cfg.name} />
+                      ))}
+                    </FormSelect>
+                  </FormGroup>
+                </FlexItem>
+                {isAdmin && (
+                  <FlexItem>
+                    <Button variant="link" icon={<PlusCircleIcon />} onClick={() => setShowCreateModal(true)}>
+                      Add new config
+                    </Button>
+                  </FlexItem>
+                )}
+              </Flex>
+              )}
+            <Tabs
+              activeKey={activeTab}
+              onSelect={(_event, key) => setActiveTab(key)}
+              mountOnEnter
+            >
+              <Tab eventKey={0} title={<TabTitleText>Telemetry</TabTitleText>}>
+              {configs.length === 0 ? (
             <>
               <EmptyState>
                 <EmptyStateIcon icon={DatabaseIcon} />
@@ -898,8 +978,9 @@ export function ElasticsearchDataView() {
                     aria-label="Telemetry index"
                   />
                 </FormGroup>
-                <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }}>
+                <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }} style={{ marginTop: '1rem' }}>
                   {dateAndSizeControls}
+                  {telemetryFilterControls}
                   <FlexItem>
                     <FormGroup label="" fieldId="run-inline-query-btn">
                       <Button
@@ -913,30 +994,17 @@ export function ElasticsearchDataView() {
                     </FormGroup>
                   </FlexItem>
                 </Flex>
+                {telemetryFilterChips}
               </Form>
 
               {resultsSection}
             </>
-          ) : (
+              ) : (
             <>
-              <Flex alignItems={{ default: 'alignItemsFlexEnd' }}
-              spaceItems={{ default: 'spaceItemsMd' }}>
-                <FlexItem >
-                  <FormGroup label="Elasticsearch Config" fieldId="es-data-config"  style={{ width: '30em' }}>
-                    <FormSelect
-                      id="es-data-config"
-                      value={selectedConfig}
-                      onChange={(_e, v) => { setSelectedConfig(v); invalidateResults(); }}
-                      aria-label="Select an Elasticsearch config"
-                    >
-                      <FormSelectOption value="" label="Select a saved Elasticsearch config…" isDisabled />
-                      {configs.map((cfg) => (
-                        <FormSelectOption key={cfg.name} value={cfg.name} label={cfg.name} />
-                      ))}
-                    </FormSelect>
-                  </FormGroup>
-                </FlexItem>
+                <Flex alignItems={{ default: 'alignItemsFlexEnd' }}
+              spaceItems={{ default: 'spaceItemsMd' }} style={{ marginTop: '1rem' }}>
                 {dateAndSizeControls}
+                {telemetryFilterControls}
                 <FlexItem>
                     <FormGroup label="" fieldId="run-query-btn">
                   <Button
@@ -949,16 +1017,26 @@ export function ElasticsearchDataView() {
                   </Button>
                   </FormGroup>
                 </FlexItem>
-                {isAdmin && (
-                  <FlexItem>
-                    <Button variant="link" icon={<PlusCircleIcon />} onClick={() => setShowCreateModal(true)}>
-                      Add new config
-                    </Button>
-                  </FlexItem>
-                )}
               </Flex>
+              {telemetryFilterChips}
 
               {resultsSection}
+            </>
+          )}
+              </Tab>
+              <Tab eventKey={1} title={<TabTitleText>Alerts</TabTitleText>}>
+                <ElasticsearchAlertsTab
+                  configs={configs}
+                  selectedConfig={selectedConfig}
+                  startDate={startDate}
+                  onStartDateChange={(value) => { setStartDate(value); invalidateResults(); }}
+                  endDate={endDate}
+                  onEndDateChange={(value) => { setEndDate(value); invalidateResults(); }}
+                  size={size}
+                  onSizeChange={(value) => { setSize(value); invalidateResults(); }}
+                />
+              </Tab>
+            </Tabs>
             </>
           )}
         </CardBody>

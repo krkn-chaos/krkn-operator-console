@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ElasticsearchDataView } from './ElasticsearchDataView';
 import { elasticsearchApi } from '../services/elasticsearchApi';
-import type { ElasticsearchConfig, QueryTelemetryResponse } from '../types/api';
+import type { ElasticsearchConfig, QueryAlertsResponse, QueryTelemetryResponse } from '../types/api';
 
 vi.mock('../services/elasticsearchApi');
 
@@ -22,7 +22,7 @@ vi.mock('../hooks', () => ({
 }));
 
 const mockConfigs: ElasticsearchConfig[] = [
-  { name: 'prod-es', host: 'https://es.example.com', port: 9200, telemetryIndex: 'krkn-telemetry' },
+  { name: 'prod-es', host: 'https://es.example.com', port: 9200, telemetryIndex: 'krkn-telemetry', alertsIndex: 'krkn-alerts' },
 ];
 
 const mockQueryResult: QueryTelemetryResponse = {
@@ -40,6 +40,20 @@ const mockQueryResult: QueryTelemetryResponse = {
   stats: { pass: 1, fail: 0, pass_percent: 100 },
 };
 
+const mockAlertsResult: QueryAlertsResponse = {
+  documents: [{
+    id: 'alert-1',
+    source: {
+      run_uuid: 'run-1',
+      phase: 'Running',
+      created_at: '2026-09-25T14:32:18Z',
+      severity: 'critical',
+      alertname: 'KubeAPIServerLatencyHigh',
+    },
+  }],
+  total: 1,
+};
+
 describe('ElasticsearchDataView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,6 +67,25 @@ describe('ElasticsearchDataView', () => {
     await waitFor(() => {
       expect(screen.getByText('prod-es')).toBeInTheDocument();
     });
+  });
+
+  it('selects the Alerts tab and queries alert documents', async () => {
+    const user = userEvent.setup();
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);
+    vi.mocked(elasticsearchApi.queryAlerts).mockResolvedValue(mockAlertsResult);
+    render(<ElasticsearchDataView />);
+
+    await waitFor(() => expect(screen.getByText('prod-es')).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText('Select an Elasticsearch config'), 'prod-es');
+    await user.click(screen.getByRole('tab', { name: 'Alerts' }));
+    await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
+
+    await waitFor(() => expect(elasticsearchApi.queryAlerts).toHaveBeenCalledWith(
+      'prod-es',
+      50,
+      expect.any(String),
+      expect.any(String),
+    ));
   });
 
   it('does not render configs excluded by the access-controlled API response', async () => {
@@ -249,9 +282,9 @@ describe('ElasticsearchDataView', () => {
 
     const sizeInput = screen.getByLabelText('Max results');
     await userEvent.clear(sizeInput);
-    await userEvent.type(sizeInput, '999999');
+    await userEvent.type(sizeInput, '501');
 
-    expect(screen.getByText('Max results must be between 1 and 10000')).toBeInTheDocument();
+    expect(screen.getByText('Max results must be between 1 and 500')).toBeInTheDocument();
 
     const runButton = screen.getByRole('button', { name: 'Run Query' });
     expect(runButton).toBeDisabled();
