@@ -53,7 +53,6 @@ import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
 import { JobStatsSummary } from './JobStatsSummary';
-import { ReportDownloadButton } from './ReportDownloadButton';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
@@ -1164,17 +1163,12 @@ export function JobsList({
                             </code>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="reports" width={3}>
-                          <ReportDownloadButton
-                            runId={run.scenarioRunName}
-                            runName={run.scenarioRunName}
-                            runPhase={run.phase}
-                          />
-                        </DataListCell>,
                         <DataListCell key="actions" width={1}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                             <RunCategoryActions
                               runName={run.scenarioRunName}
+                              runId={run.scenarioRunName}
+                              runPhase={run.phase}
                               categories={categories}
                               assignedCategoryNames={scenarioCategoryNames}
                               isCategoriesLoading={isCategoriesLoading}

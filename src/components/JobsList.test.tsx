@@ -32,10 +32,22 @@ vi.mock('./FileManagement', () => ({
   FileManagementModal: () => null,
 }));
 
-vi.mock('./ReportDownloadButton', () => ({
-  ReportDownloadButton: ({ runId }: { runId: string }) => (
-    <div data-testid={`report-download-${runId}`}>Report controls</div>
-  ),
+vi.mock('../hooks/useReportActions', () => ({
+  useReportActions: () => ({
+    reportStatus: null,
+    isLoading: false,
+    error: null,
+    hasHtml: false,
+    hasPdf: false,
+    hasReports: false,
+    preview: null,
+    isDownloading: null,
+    isPreviewing: null,
+    handleDownload: vi.fn(),
+    handlePreview: vi.fn(),
+    closePreview: vi.fn(),
+    retry: vi.fn(),
+  }),
 }));
 
 vi.mock('react-icons/hi2', () => ({
@@ -237,14 +249,14 @@ describe('JobsList', () => {
   });
 });
 
-describe('JobsList - Report controls', () => {
-  it('shows report controls in the outer run row', () => {
+describe('JobsList - Run actions menu', () => {
+  it('shows the actions kebab menu in the outer run row', () => {
     const runName = 'report-run-001';
     setMockJobs([makeScenarioJobItem(runName, 'Succeeded')]);
 
     render(<JobsList {...defaultProps} />);
 
-    expect(screen.getByTestId(`report-download-${runName}`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Actions for run ${runName}` })).toBeInTheDocument();
   });
 });
 

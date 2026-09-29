@@ -9,10 +9,13 @@ import {
   MenuList,
   MenuToggle,
   MenuToggleElement,
+  Modal,
+  ModalVariant,
   Spinner,
   Tooltip,
 } from '@patternfly/react-core';
-import { EllipsisVIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
+import { DownloadIcon, EllipsisVIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
+import { useReportActions } from '../hooks/useReportActions';
 import type { CategoryResponse } from '../types/api';
 
 interface RunCategoryActionsProps {
@@ -26,6 +29,10 @@ interface RunCategoryActionsProps {
   onOpenCategories: () => void;
   onToggleCategory: (category: CategoryResponse) => void;
   onDelete: () => void;
+  /** When set, report actions (preview/download) are shown in the menu. */
+  runId?: string;
+  /** Used to stop polling once the run completes. */
+  runPhase?: string;
 }
 
 /**
@@ -56,9 +63,13 @@ export function RunCategoryActions({
   onOpenCategories,
   onToggleCategory,
   onDelete,
+  runId,
+  runPhase,
 }: RunCategoryActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
+
+  const report = useReportActions({ runId, runName, runPhase });
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -74,92 +85,156 @@ export function RunCategoryActions({
   };
 
   return (
-    <Dropdown
-      containsFlyout
-      isOpen={isOpen}
-      onOpenChange={handleOpenChange}
-      toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-        <MenuToggle
-          ref={toggleRef}
-          variant="plain"
-          aria-label={`Actions for run ${runName}`}
-          isExpanded={isOpen}
-          isDisabled={isDeleting || isCategoryUpdating}
-          onClick={() => handleOpenChange(!isOpen)}
-        >
-          <EllipsisVIcon />
-        </MenuToggle>
-      )}
-    >
-      <DropdownList aria-label={`Run actions for ${runName}`}>
-        <DropdownItem
-          key="category"
-          icon={<TagIcon />}
-          onShowFlyout={handleCategoryFlyout}
-          flyoutMenu={(
-            <Menu id={`categories-${runName}`}>
-              <MenuContent>
-                <MenuList aria-label={`Categories for run ${runName}`} aria-busy={isCategoriesLoading}>
-                  {categories.length > 0 ? categories.map((category) => {
-                    const isAssigned = assignedCategoryNames.includes(category.name);
-                    return (
-                      <MenuItem
-                        key={category.name}
-                        hasCheckbox
-                        isSelected={isAssigned}
-                        isDisabled={isCategoryUpdating}
-                        aria-label={`${isAssigned ? 'Remove' : 'Add'} category ${category.name}`}
-                        icon={(
-                          <span
-                            aria-hidden="true"
-                            style={{
-                              width: '0.75rem',
-                              height: '0.75rem',
-                              borderRadius: '50%',
-                              backgroundColor: category.color || '#6c757d',
-                              display: 'inline-block',
-                            }}
-                          />
-                        )}
-                        onClick={() => onToggleCategory(category)}
-                      >
-                        {category.name}
-                      </MenuItem>
-                    );
-                  }) : isCategoriesLoading ? (
-                    <MenuItem key="categories-loading" isDisabled icon={<Spinner size="sm" />}>
-                      Loading categories…
-                    </MenuItem>
-                  ) : categoriesError ? (
-                    <MenuItem key="categories-error" isDisabled>
-                      Categories could not be loaded
-                    </MenuItem>
-                  ) : (
-                    <MenuItem key="categories-empty" isDisabled>
-                      No categories available
-                    </MenuItem>
-                  )}
-                </MenuList>
-              </MenuContent>
-            </Menu>
+    <>
+      <Dropdown
+        containsFlyout
+        isOpen={isOpen}
+        onOpenChange={handleOpenChange}
+        popperProps={{ position: 'right' }}
+        toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+          <MenuToggle
+            ref={toggleRef}
+            variant="plain"
+            aria-label={`Actions for run ${runName}`}
+            isExpanded={isOpen}
+            isDisabled={isDeleting || isCategoryUpdating}
+            onClick={() => handleOpenChange(!isOpen)}
+          >
+            <EllipsisVIcon />
+          </MenuToggle>
+        )}
+      >
+        <DropdownList aria-label={`Run actions for ${runName}`}>
+          {runId && report.error && (
+            <DropdownItem
+              key="report-error"
+              icon={<ExclamationCircleIcon color="var(--pf-v5-global--danger-color--100)" />}
+              onClick={() => { handleOpenChange(false); report.retry(); }}
+            >
+              Reports failed — Retry
+            </DropdownItem>
           )}
+          {runId && !report.error && (
+            <DropdownItem
+              key="reports"
+              icon={report.isLoading ? <Spinner size="sm" /> : <FileAltIcon />}
+              isDisabled={report.isLoading || !report.hasReports || report.isDownloading !== null || report.isPreviewing !== null}
+              flyoutMenu={report.hasReports ? (
+                <Menu id={`reports-${runName}`}>
+                  <MenuContent>
+                    <MenuList aria-label={`Reports for run ${runName}`}>
+                      {report.hasHtml && (
+                        <>
+                          <MenuItem key="preview-html" icon={<SearchIcon />} onClick={() => { handleOpenChange(false); void report.handlePreview('html'); }}>
+                            Preview HTML
+                          </MenuItem>
+                          <MenuItem key="download-html" icon={<FileCodeIcon />} onClick={() => { handleOpenChange(false); void report.handleDownload('html'); }}>
+                            Download HTML
+                          </MenuItem>
+                        </>
+                      )}
+                      {report.hasPdf && (
+                        <>
+                          <MenuItem key="preview-pdf" icon={<FilePdfIcon />} onClick={() => { handleOpenChange(false); void report.handlePreview('pdf'); }}>
+                            Preview PDF
+                          </MenuItem>
+                          <MenuItem key="download-pdf" icon={<DownloadIcon />} onClick={() => { handleOpenChange(false); void report.handleDownload('pdf'); }}>
+                            Download PDF
+                          </MenuItem>
+                        </>
+                      )}
+                    </MenuList>
+                  </MenuContent>
+                </Menu>
+              ) : undefined}
+            >
+              {report.isLoading ? 'Checking reports…' : 'Reports'}
+            </DropdownItem>
+          )}
+          <DropdownItem
+            key="category"
+            icon={<TagIcon />}
+            onShowFlyout={handleCategoryFlyout}
+            flyoutMenu={(
+              <Menu id={`categories-${runName}`}>
+                <MenuContent>
+                  <MenuList aria-label={`Categories for run ${runName}`} aria-busy={isCategoriesLoading}>
+                    {categories.length > 0 ? categories.map((category) => {
+                      const isAssigned = assignedCategoryNames.includes(category.name);
+                      return (
+                        <MenuItem
+                          key={category.name}
+                          hasCheckbox
+                          isSelected={isAssigned}
+                          isDisabled={isCategoryUpdating}
+                          aria-label={`${isAssigned ? 'Remove' : 'Add'} category ${category.name}`}
+                          icon={(
+                            <span
+                              aria-hidden="true"
+                              style={{
+                                width: '0.75rem',
+                                height: '0.75rem',
+                                borderRadius: '50%',
+                                backgroundColor: category.color || '#6c757d',
+                                display: 'inline-block',
+                              }}
+                            />
+                          )}
+                          onClick={() => onToggleCategory(category)}
+                        >
+                          {category.name}
+                        </MenuItem>
+                      );
+                    }) : isCategoriesLoading ? (
+                      <MenuItem key="categories-loading" isDisabled icon={<Spinner size="sm" />}>
+                        Loading categories…
+                      </MenuItem>
+                    ) : categoriesError ? (
+                      <MenuItem key="categories-error" isDisabled>
+                        Categories could not be loaded
+                      </MenuItem>
+                    ) : (
+                      <MenuItem key="categories-empty" isDisabled>
+                        No categories available
+                      </MenuItem>
+                    )}
+                  </MenuList>
+                </MenuContent>
+              </Menu>
+            )}
+          >
+            Category
+          </DropdownItem>
+          <DropdownItem
+            key="delete"
+            icon={<TrashIcon />}
+            isDanger
+            isDisabled={isDeleting}
+            onClick={() => {
+              handleOpenChange(false);
+              onDelete();
+            }}
+          >
+            Delete
+          </DropdownItem>
+        </DropdownList>
+      </Dropdown>
+      {report.preview && (
+        <Modal
+          title={report.preview.format.toUpperCase() + ' report preview'}
+          variant={ModalVariant.large}
+          isOpen
+          onClose={report.closePreview}
         >
-          Category
-        </DropdownItem>
-        <DropdownItem
-          key="delete"
-          icon={<TrashIcon />}
-          isDanger
-          isDisabled={isDeleting}
-          onClick={() => {
-            handleOpenChange(false);
-            onDelete();
-          }}
-        >
-          Delete
-        </DropdownItem>
-      </DropdownList>
-    </Dropdown>
+          <iframe
+            src={report.preview.url}
+            title={report.preview.format.toUpperCase() + ' report preview'}
+            style={{ width: '100%', height: '70vh', border: 0 }}
+            sandbox={report.preview.format === 'html' ? '' : undefined}
+          />
+        </Modal>
+      )}
+    </>
   );
 }
 
