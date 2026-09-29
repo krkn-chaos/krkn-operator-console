@@ -57,6 +57,10 @@ function scenarioKey(row: KrknAIScenarioIndexRow): string {
   return `${row.generation}:${row.scenarioId}`;
 }
 
+function isBaselineScenario(scenario: KrknAIScenarioIndexRow): boolean {
+  return scenario.scenarioId === 'baseline';
+}
+
 function sortValue(row: KrknAIScenarioIndexRow, key: ScenarioSortKey): string | number | null {
   switch (key) {
     case 'generation': return row.generation;
@@ -143,7 +147,7 @@ function ScenarioDetail({
       {detail && (
         <>
           <dl className="krkn-ai-scenario-detail__summary">
-            <div><dt>Generation</dt><dd>{detail.generation + 1}</dd></div>
+            <div><dt>{isBaselineScenario(row) ? 'Run type' : 'Generation'}</dt><dd>{isBaselineScenario(row) ? 'Baseline' : detail.generation + 1}</dd></div>
             <div><dt>Scenario ID</dt><dd>{detail.scenarioId}</dd></div>
             <div><dt>Scenario type</dt><dd>{detail.scenarioType || row.scenarioType || 'Not available'}</dd></div>
             <div><dt>Duration</dt><dd>{detail.durationSeconds == null ? 'Not available' : `${detail.durationSeconds.toLocaleString(undefined, { maximumFractionDigits: 2 })} seconds`}</dd></div>
@@ -340,7 +344,7 @@ export function ScenarioExplorer({
                       key={scenarioKey(scenario)}
                       className={status === 'Running' ? 'krkn-ai-scenario-table__row--running' : undefined}
                       tabIndex={0}
-                      aria-label={`Open generation ${scenario.generation + 1} scenario ${scenario.scenarioId} details`}
+                      aria-label={isBaselineScenario(scenario) ? 'Open baseline scenario details' : `Open generation ${scenario.generation + 1} scenario ${scenario.scenarioId} details`}
                       onClick={() => onSelect(scenario)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
@@ -349,7 +353,7 @@ export function ScenarioExplorer({
                         }
                       }}
                     >
-                      <td>{scenario.generation + 1}</td>
+                      <td>{isBaselineScenario(scenario) ? 'Baseline' : scenario.generation + 1}</td>
                       <th scope="row">{scenario.scenarioId}</th>
                       <td>{scenario.scenarioType ?? 'Not available yet'}</td>
                       <td>
@@ -378,7 +382,13 @@ export function ScenarioExplorer({
 
       <Modal
         variant={ModalVariant.large}
-        title={selectedScenario ? `Generation ${selectedScenario.generation + 1}, scenario ${selectedScenario.scenarioId}: ${selectedScenario.scenarioType ?? 'result pending'}` : 'Scenario details'}
+        title={
+          selectedScenario
+            ? isBaselineScenario(selectedScenario)
+              ? `Baseline scenario: ${selectedScenario.scenarioId}`
+              : `Generation ${selectedScenario.generation + 1}, scenario ${selectedScenario.scenarioId}: ${selectedScenario.scenarioType ?? 'result pending'}`
+            : 'Scenario details'
+        }
         isOpen={selectedScenario !== null}
         onClose={onClose}
       >

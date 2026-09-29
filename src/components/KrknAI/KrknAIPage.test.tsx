@@ -340,6 +340,42 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(await screen.findByRole('heading', { name: 'real-run-1' })).toBeInTheDocument();
   }, 15_000);
 
+  it('shows the baseline artifact as a selectable scenario result', async () => {
+    const run = makeRun('baseline-run', 'Succeeded');
+    const baseline = makeScenarioRow({
+      generation: 0,
+      scenarioId: 'baseline',
+      scenarioType: 'baseline',
+      outcome: 'succeeded',
+      fitnessScore: 12,
+      fitnessState: 'final',
+      durationSeconds: 120,
+      childRunName: 'baseline-child-run',
+      jobId: 'baseline-job',
+      phase: 'Succeeded',
+    });
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Succeeded', {
+      baselineFitness: 12,
+      artifactStatus: 'succeeded',
+    }));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([baseline]));
+    mocks.ai.getScenario.mockResolvedValue(makeScenarioDetail(12, 'final'));
+    render(<KrknAIPage />);
+    await flushReact();
+
+    fireEvent.click(screen.getByRole('row', { name: /Open run baseline-run/ }));
+    await flushReact();
+    expect(screen.getByText('Baseline fitness')).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Baseline' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('row', { name: 'Open baseline scenario details' }));
+    await flushReact();
+    expect(screen.getByText('12 fitness units')).toBeInTheDocument();
+    expect(screen.getByText('Run type')).toBeInTheDocument();
+    expect(screen.getByText('baseline-child-run')).toBeInTheDocument();
+  });
+
   it('passes server validation errors through and never launches an invalid config', async () => {
     const user = userEvent.setup();
     mocks.ai.validateConfig.mockRejectedValue(new KrknAIConfigValidationError([
