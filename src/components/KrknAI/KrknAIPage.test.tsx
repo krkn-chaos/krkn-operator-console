@@ -352,29 +352,6 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument();
   });
 
-  it('reviews saved Krkn-AI configs only through the permission-filtered file APIs', async () => {
-    const user = userEvent.setup();
-    mocks.operator.getAvailableFiles.mockResolvedValue({
-      files: [{ fileId: 'visible-config-id', fileName: 'shared-ai-config', filePurpose: 'krkn-ai-config', availableToAll: true }],
-    });
-    mocks.operator.getFile.mockResolvedValue({
-      fileId: 'visible-config-id',
-      fileName: 'shared-ai-config',
-      content: DISCOVERED_YAML,
-      availableToAll: true,
-    });
-    render(<KrknAIPage />);
-    await flushReact();
-    await user.click(screen.getByRole('button', { name: 'Create run' }));
-    await user.click(screen.getByRole('button', { name: 'Load available configs' }));
-    await flushReact();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Saved config' }), 'visible-config-id');
-    await flushReact();
-
-    expect(mocks.operator.getAvailableFiles).toHaveBeenCalledWith('krkn-ai-config', expect.objectContaining({ signal: expect.any(AbortSignal) }));
-    expect(mocks.operator.getFile).toHaveBeenCalledWith('visible-config-id', expect.objectContaining({ signal: expect.any(AbortSignal) }));
-    expect(screen.getByLabelText('Existing config file content')).toHaveTextContent('site_extension');
-  });
 
   it('loads the run config through the permission-filtered file ID', async () => {
     const run = makeRun('config-review-run', 'Running');

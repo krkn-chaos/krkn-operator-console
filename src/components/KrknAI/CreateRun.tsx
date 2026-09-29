@@ -25,8 +25,7 @@ import {
 import { krknAiApi, KrknAIConfigValidationError } from '../../services/krknAiApi';
 import type { KrknAIRunResource, KrknAIConfigValidationIssue } from '../../services/krknAiApi';
 import { isApiError } from '../../utils/apiClient';
-import { operatorApi } from '../../services/operatorApi';
-import type { FileInfo, SelectedCluster, TargetResponse } from '../../types/api';
+import type { SelectedCluster, TargetResponse } from '../../types/api';
 import { FitnessFunctionEditor } from './FitnessFunctionEditor';
 import { HealthChecksEditor } from './HealthChecksEditor';
 import { DiscoveryOptionsEditor } from './DiscoveryOptionsEditor';
@@ -160,12 +159,6 @@ export function CreateRun({
   const [actionError, setActionError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [dangerousConfirmed, setDangerousConfirmed] = useState(false);
-  const [fileList, setFileList] = useState<FileInfo[]>([]);
-  const [filesUnavailable, setFilesUnavailable] = useState(false);
-  const [fileLoading, setFileLoading] = useState(false);
-  const [selectedFileId, setSelectedFileId] = useState('');
-  const [existingFileYaml, setExistingFileYaml] = useState('');
-  const [existingFileError, setExistingFileError] = useState('');
   const documentRef = useRef<Document | null>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
 
@@ -370,45 +363,6 @@ export function CreateRun({
     setStep(1);
   };
 
-  const loadSavedConfigFiles = async () => {
-    requestControllerRef.current?.abort();
-    const controller = startRequest();
-    setFileLoading(true);
-    setFilesUnavailable(false);
-    setExistingFileError('');
-    try {
-      const response = await operatorApi.getAvailableFiles('krkn-ai-config', { signal: controller.signal });
-      if (controller.signal.aborted) return;
-      setFileList(response.files);
-      if (!response.files.length) setFilesUnavailable(true);
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        setFilesUnavailable(true);
-        setFileList([]);
-        setExistingFileError(apiErrorMessage(error));
-      }
-    } finally {
-      if (requestControllerRef.current === controller) requestControllerRef.current = null;
-      if (!controller.signal.aborted) setFileLoading(false);
-    }
-  };
-
-  const handleSavedFileChange = async (fileId: string) => {
-    requestControllerRef.current?.abort();
-    setSelectedFileId(fileId);
-    setExistingFileYaml('');
-    setExistingFileError('');
-    if (!fileId) return;
-    const controller = startRequest();
-    try {
-      const file = await operatorApi.getFile(fileId, { signal: controller.signal });
-      if (!controller.signal.aborted) setExistingFileYaml(file.content);
-    } catch (error) {
-      if (!controller.signal.aborted) setExistingFileError(apiErrorMessage(error));
-    } finally {
-      if (requestControllerRef.current === controller) requestControllerRef.current = null;
-    }
-  };
 
   const cancel = () => {
     requestControllerRef.current?.abort();
@@ -475,22 +429,6 @@ export function CreateRun({
           {discoveryError && <Alert variant="danger" title="Krkn AI discovery failed" isInline>{discoveryError}</Alert>}
           <div className="krkn-ai-actions"><Button variant="primary" isDisabled={!canDiscover} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>
 
-          <Card>
-            <CardTitle>Review an available configuration file</CardTitle>
-            <CardBody>
-              <p className="krkn-ai-muted">Available files are permission-filtered by the operator. This review does not expose cluster credentials.</p>
-              <Button variant="secondary" isLoading={fileLoading} onClick={() => void loadSavedConfigFiles()}>Load available configs</Button>
-              {filesUnavailable && <Alert variant="info" title="Configuration files unavailable" isInline>No accessible Krkn AI config files are available for review.</Alert>}
-              {fileList.length > 0 && <FormGroup label="Saved config" fieldId="krkn-ai-existing-config">
-                <FormSelect id="krkn-ai-existing-config" value={selectedFileId} onChange={(_event, value) => void handleSavedFileChange(value)}>
-                  <FormSelectOption value="" label="Select a config file" />
-                  {fileList.map((file) => <FormSelectOption key={file.fileId} value={file.fileId} label={file.fileName} />)}
-                </FormSelect>
-              </FormGroup>}
-              {existingFileError && <Alert variant="warning" title="Configuration file unavailable" isInline>{existingFileError}</Alert>}
-              {existingFileYaml && <pre className="krkn-ai-yaml" aria-label="Existing config file content">{existingFileYaml}</pre>}
-            </CardBody>
-          </Card>
         </>
       )}
 
