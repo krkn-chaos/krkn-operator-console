@@ -31,8 +31,35 @@ describe('ResiliencyHistoryChart', () => {
     expect(screen.getByRole('heading', { name: 'resilience — pod-kill (configuration config-1)' })).toBeInTheDocument();
     expect(screen.getByText('cluster-a')).toBeInTheDocument();
     expect(document.querySelector('svg')).not.toBeNull();
-    expect(document.querySelector('svg')).toHaveAttribute('data-y-max', '130');
-    expect(screen.getByText('125')).toBeInTheDocument();
+    expect(document.querySelector('svg')).toHaveAttribute('data-y-min', '-30');
+    expect(document.querySelector('svg')).toHaveAttribute('data-y-max', '30');
+    expect(screen.getByText('-30')).toBeInTheDocument();
+    expect(screen.getByText('30')).toBeInTheDocument();
+  });
+
+  it('adds thirty points of space above and below the observed score and baseline range', () => {
+    const chartHistory = {
+      ...history,
+      clusters: {
+        'cluster-a': {
+          resilience: [
+            ...history.clusters['cluster-a'].resilience,
+            {
+              ...history.clusters['cluster-a'].resilience[0],
+              date: '2026-09-30T10:00:00Z',
+              runId: 'run-2',
+              score: 100,
+              baseline: 100,
+            },
+          ],
+        },
+      },
+    };
+    const [chart] = buildResiliencyHistoryCharts(chartHistory, ['resilience'], ['cluster-a'], 'separate');
+    const { container } = render(<ResiliencyHistoryChart chart={chart} />);
+
+    expect(container.querySelector('svg')).toHaveAttribute('data-y-min', '-30');
+    expect(container.querySelector('svg')).toHaveAttribute('data-y-max', '130');
   });
 
   it('renders an empty chart state when no points match a group', () => {
