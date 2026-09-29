@@ -376,18 +376,22 @@
   padding: 0.25rem 0.55rem;
   border: 1px solid var(--pf-v5-global--primary-color--100);
   border-radius: 999px;
-  background: var(--pf-v5-global--primary-color--light-100, rgba(0, 102, 204, 0.08));
-  color: var(--pf-v5-global--primary-color--100);
+  background: var(--pf-v5-global--BackgroundColor--200);
+  color: var(--pf-v5-global--Color--100);
   cursor: help;
-  font: 600 var(--pf-v5-global--FontSize--sm) var(--pf-v5-global--FontFamily--monospace);
+  font-family: var(--pf-v5-global--FontFamily--monospace);
+  font-size: var(--pf-v5-global--FontSize--sm);
+  font-weight: 600;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .resiliency-history__config-badge:hover,
 .resiliency-history__config-badge:focus-visible {
-  background: var(--pf-v5-global--primary-color--100);
-  color: var(--pf-v5-global--Color--light-100, #fff);
+  background: var(--pf-v5-global--BackgroundColor--100);
+  color: var(--pf-v5-global--Color--100);
+  box-shadow: 0 0 0 1px var(--pf-v5-global--primary-color--100);
 }
 
 .resiliency-history__config-badge:focus-visible {
@@ -397,7 +401,7 @@
 
 .resiliency-history__config-tooltip {
   position: absolute;
-  top: calc(100% + 0.6rem);
+  top: calc(100% - 1px);
   right: 0;
   z-index: 20;
   width: min(34rem, calc(100vw - 2rem));
