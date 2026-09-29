@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { RunCategoryStripe } from './RunCategoryActions';
 
 describe('RunCategoryStripe', () => {
@@ -20,10 +20,19 @@ describe('RunCategoryStripe', () => {
     expect(visualStripe.style.transition).toBe('width 180ms ease-out');
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
 
+    vi.spyOn(stripe, 'getBoundingClientRect').mockReturnValue({
+      left: 10, right: 22, top: 30, bottom: 54, width: 12, height: 24,
+      x: 10, y: 30, toJSON: () => ({}),
+    });
+    vi.spyOn(visualStripe, 'getBoundingClientRect').mockReturnValue({
+      left: 10, right: 19, top: 32, bottom: 52, width: 9, height: 20,
+      x: 10, y: 32, toJSON: () => ({}),
+    });
+
     fireEvent.transitionEnd(visualStripe, { propertyName: 'width' });
     const tooltip = screen.getByRole('tooltip');
-    expect(tooltip.style.left).toBe('100%');
-    expect(tooltip.style.top).toBe('50%');
+    expect(tooltip.style.left).toBe('9px');
+    expect(tooltip.style.top).toBe('12px');
     expect(tooltip.style.width).toBe('max-content');
     expect(tooltip.style.maxWidth).toBe('18.75rem');
     expect(tooltip.parentElement).toBe(stripe);
