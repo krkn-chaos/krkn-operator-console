@@ -370,9 +370,16 @@ describe('Krkn-AI real run lifecycle', () => {
     mocks.ai.getScenario.mockResolvedValue(makeScenarioDetail(12, 'final'));
     render(<KrknAIPage />);
     await flushReact();
+    const expectedRunTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      .format(new Date(run.metadata.creationTimestamp));
+    expect(screen.getByText(expectedRunTime)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('row', { name: /Open run baseline-run/ }));
     await flushReact();
+    expect(screen.getByRole('heading', { name: 'Run', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Progress', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fitness', level: 2 })).toBeInTheDocument();
+    expect(screen.getByText(expectedRunTime)).toBeInTheDocument();
     const scenarioTable = screen.getByRole('table', { name: 'Scenario executions' });
     const visibleScenarioIds = () => Array.from(
       scenarioTable.querySelectorAll('tbody tr'),
@@ -597,6 +604,15 @@ describe('Krkn-AI real run lifecycle', () => {
 
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
+    const expectedSampleTime = new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(new Date('2026-09-01T12:00:02Z'));
+    expect(screen.getByText(expectedSampleTime)).toBeInTheDocument();
     expect(screen.getByText('3 fitness units')).toBeInTheDocument();
     expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', true, 200, true);
     expect(childUrl).toHaveBeenCalledWith('child-run-9', 'real-job-9', true);

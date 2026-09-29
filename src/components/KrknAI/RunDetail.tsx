@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, CardBody, CardTitle, Label, Title } from '@patternfly/react-core';
+import {
+  CalendarAltIcon,
+  ChartLineIcon,
+  ClipboardListIcon,
+  CubesIcon,
+  DnaIcon,
+  FileCodeIcon,
+  HeartbeatIcon,
+  TopologyIcon,
+} from '@patternfly/react-icons';
 import { operatorApi } from '../../services/operatorApi';
 import { krknAiApi } from '../../services/krknAiApi';
 import type {
@@ -15,6 +25,7 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { LogTerminal } from '../LogTerminal';
 import { FitnessChart } from './FitnessChart';
 import { ScenarioExplorer } from './ScenarioExplorer';
+import { formatDateTime } from '../../utils/dateTime';
 
 interface RunDetailProps {
   run: KrknAIRunResource;
@@ -414,22 +425,69 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         <div className="krkn-ai-run-detail__title-row">
           <div>
             <Title headingLevel="h1" size="2xl">{name}</Title>
-            <p className="krkn-ai-run-detail__cluster">Cluster: {cluster}</p>
+            <p className="krkn-ai-run-detail__cluster"><TopologyIcon aria-hidden="true" />Cluster: {cluster}</p>
           </div>
           <Label color={phase === 'Succeeded' ? 'green' : phase === 'Failed' ? 'red' : phase === 'Running' ? 'blue' : 'grey'}>
             {phase}
           </Label>
         </div>
-        <dl className="krkn-ai-run-detail__metadata">
-          <div><dt>Created</dt><dd>{createdAt ? <time dateTime={createdAt}>{new Date(createdAt).toLocaleString()}</time> : 'Not available'}</dd></div>
-          <div><dt>Generations completed</dt><dd>{generationProgress}</dd></div>
-          <div><dt>Population size</dt><dd>{summary?.populationSize ?? 'Not available yet'}</dd></div>
-          <div><dt>Scenarios completed</dt><dd>{summary?.completedScenarios ?? 'Not available yet'}</dd></div>
-          <div><dt>Best fitness</dt><dd>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd></div>
-          <div><dt>Average fitness</dt><dd>{summary?.averageFitness == null ? 'Not available yet' : summary.averageFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd></div>
-          <div><dt>Baseline fitness</dt><dd>{summary?.baselineFitness == null ? 'Not available yet' : summary.baselineFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd></div>
-          <div><dt>Artifact status</dt><dd>{summary?.artifactStatus ?? 'not_available'}</dd></div>
-        </dl>
+        <div className="krkn-ai-run-detail__metadata-groups">
+          <section className="krkn-ai-run-detail__metadata-group" aria-labelledby="krkn-ai-run-overview">
+            <h2 id="krkn-ai-run-overview" className="krkn-ai-run-detail__metadata-heading">
+              <CalendarAltIcon aria-hidden="true" />Run
+            </h2>
+            <dl className="krkn-ai-run-detail__metadata">
+              <div>
+                <dt><CalendarAltIcon aria-hidden="true" />Created</dt>
+                <dd>{createdAt ? <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> : 'Not available'}</dd>
+              </div>
+              <div>
+                <dt><FileCodeIcon aria-hidden="true" />Artifact status</dt>
+                <dd>{summary?.artifactStatus ?? 'not_available'}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="krkn-ai-run-detail__metadata-group" aria-labelledby="krkn-ai-run-progress">
+            <h2 id="krkn-ai-run-progress" className="krkn-ai-run-detail__metadata-heading">
+              <ClipboardListIcon aria-hidden="true" />Progress
+            </h2>
+            <dl className="krkn-ai-run-detail__metadata">
+              <div>
+                <dt><DnaIcon aria-hidden="true" />Generations completed</dt>
+                <dd>{generationProgress}</dd>
+              </div>
+              <div>
+                <dt><CubesIcon aria-hidden="true" />Population size</dt>
+                <dd>{summary?.populationSize ?? 'Not available yet'}</dd>
+              </div>
+              <div>
+                <dt><ClipboardListIcon aria-hidden="true" />Scenarios completed</dt>
+                <dd>{summary?.completedScenarios ?? 'Not available yet'}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="krkn-ai-run-detail__metadata-group" aria-labelledby="krkn-ai-run-fitness">
+            <h2 id="krkn-ai-run-fitness" className="krkn-ai-run-detail__metadata-heading">
+              <ChartLineIcon aria-hidden="true" />Fitness
+            </h2>
+            <dl className="krkn-ai-run-detail__metadata">
+              <div>
+                <dt><ChartLineIcon aria-hidden="true" />Best fitness</dt>
+                <dd>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
+              </div>
+              <div>
+                <dt><ChartLineIcon aria-hidden="true" />Average fitness</dt>
+                <dd>{summary?.averageFitness == null ? 'Not available yet' : summary.averageFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
+              </div>
+              <div>
+                <dt><HeartbeatIcon aria-hidden="true" />Baseline fitness</dt>
+                <dd>{summary?.baselineFitness == null ? 'Not available yet' : summary.baselineFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
         {summary?.failureReason && <p className="krkn-ai-run-detail__failure">{summary.failureReason}</p>}
         {initialLoading && <p role="status">Loading committed run results…</p>}
         {updating && <Alert variant="warning" title="Results are updating" isInline>Showing the last committed summary and scenario results while the next artifact sync completes.</Alert>}

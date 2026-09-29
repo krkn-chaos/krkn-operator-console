@@ -7,6 +7,7 @@ import type {
   KrknAIScenarioIndexRow,
   KrknAIScenarioPagination,
 } from '../../services/krknAiApi';
+import { formatDateTime } from '../../utils/dateTime';
 
 interface ScenarioExplorerProps {
   scenarios: KrknAIScenarioIndexRow[];
@@ -207,7 +208,7 @@ function ScenarioDetail({
                   <tbody>{detail.healthChecks.map((sample, index) => (
                     <tr key={`${sample.application}-${sample.timestamp}-${index}`}>
                       <td>{sample.application}</td>
-                      <td>{sample.timestamp}</td>
+                      <td><time dateTime={sample.timestamp}>{formatDateTime(sample.timestamp, true)}</time></td>
                       <td>{sample.elapsedSeconds == null ? 'Not available' : `${sample.elapsedSeconds.toLocaleString()}s`}</td>
                       <td>{sample.responseTimeSeconds == null ? 'Not available' : `${sample.responseTimeSeconds.toLocaleString()}s`}</td>
                       <td>{sample.statusCode ?? 'Not recorded'}</td>

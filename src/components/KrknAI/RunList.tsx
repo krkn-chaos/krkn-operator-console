@@ -8,6 +8,7 @@ import {
 } from '@patternfly/react-core';
 import type { KeyboardEvent } from 'react';
 import type { KrknAIRunResource, KrknAIRunSummary } from '../../services/krknAiApi';
+import { formatDateTime } from '../../utils/dateTime';
 
 export interface KrknAIRunListEntry {
   resource: KrknAIRunResource;
@@ -34,11 +35,6 @@ function phaseColor(phase: string): 'blue' | 'cyan' | 'green' | 'grey' | 'red' {
     case 'Failed': return 'red';
     default: return 'grey';
   }
-}
-
-function formatStartTime(createdAt: string): string {
-  const date = new Date(createdAt);
-  return Number.isNaN(date.getTime()) ? createdAt : date.toLocaleString();
 }
 
 function getClusterName(resource: KrknAIRunResource, summary: KrknAIRunSummary | null): string {
@@ -126,7 +122,7 @@ export function RunList({
                       </th>
                       <td>{getClusterName(resource, summary)}</td>
                       <td><Label color={phaseColor(phase)}>{phase}</Label></td>
-                      <td>{createdAt ? <time dateTime={createdAt}>{formatStartTime(createdAt)}</time> : 'Not available'}</td>
+                      <td>{createdAt ? <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> : 'Not available'}</td>
                       <td>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
                       <td>{generations}</td>
                       <td>{summary?.completedScenarios ?? 'Not available yet'}</td>
