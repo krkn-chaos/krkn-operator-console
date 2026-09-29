@@ -260,6 +260,8 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
             left: '100%',
             top: '50%',
             transform: 'translateY(-50%)',
+            width: 'max-content',
+            maxWidth: '18.75rem',
             zIndex: 9999,
           }}
         >

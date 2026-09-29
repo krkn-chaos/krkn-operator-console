@@ -24,6 +24,8 @@ describe('RunCategoryStripe', () => {
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip.style.left).toBe('100%');
     expect(tooltip.style.top).toBe('50%');
+    expect(tooltip.style.width).toBe('max-content');
+    expect(tooltip.style.maxWidth).toBe('18.75rem');
     expect(tooltip.parentElement).toBe(stripe);
   });
 
