@@ -65,6 +65,9 @@ vi.mock('./components', () => ({
   ElasticsearchDataView: () => <div data-testid="elasticsearch-data-view">ElasticsearchDataView</div>,
 }));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
+vi.mock('./components/ResiliencyHistory', () => ({
+  ResiliencyHistoryPage: () => <div data-testid="resiliency-history-page">ResiliencyHistoryPage</div>,
+}));
 vi.mock('./components/ScenarioDetail', () => ({ ScenarioDetail: () => <div>ScenarioDetail</div> }));
 vi.mock('./components/UserForm', () => ({ UserForm: () => <div>UserForm</div> }));
 vi.mock('./components/ChangePasswordForm', () => ({ ChangePasswordForm: () => <div>ChangePasswordForm</div> }));
@@ -103,6 +106,28 @@ describe('App Elasticsearch navigation', () => {
     await waitFor(() => {
       expect(screen.getByTestId('elasticsearch-data-view')).toBeInTheDocument();
     });
+  });
+});
+
+describe('App Resiliency History navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    });
+  });
+
+  it('renders ResiliencyHistoryPage after choosing its sidebar destination', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    expect(screen.queryByTestId('resiliency-history-page')).not.toBeInTheDocument();
+    await user.click(screen.getByText('Resiliency History'));
+    await waitFor(() => expect(screen.getByTestId('resiliency-history-page')).toBeInTheDocument());
   });
 });
 

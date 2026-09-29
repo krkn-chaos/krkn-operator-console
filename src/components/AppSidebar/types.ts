@@ -27,6 +27,7 @@ export interface SidebarNavProps {
   onNavigateCategories?: () => void;
   onNavigateTerminal: () => void;
   onNavigateElasticsearchData: () => void;
+  onNavigateResiliencyHistory: () => void;
   onNavigateSettings: () => void;
   onEditProfile: () => void;
   onChangePassword: () => void;

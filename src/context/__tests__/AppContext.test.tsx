@@ -248,6 +248,18 @@ describe('AppContext reducer', () => {
     });
   });
 
+  describe('NAVIGATE_TO_RESILIENCY_HISTORY', () => {
+    it('transitions to resiliency history and GO_BACK returns to jobs', () => {
+      renderWithProvider();
+
+      act(() => capturedDispatch({ type: 'NAVIGATE_TO_RESILIENCY_HISTORY' }));
+      expect(capturedState.phase).toBe('resiliency_history');
+
+      act(() => capturedDispatch({ type: 'GO_BACK' }));
+      expect(capturedState.phase).toBe('jobs_list');
+    });
+  });
+
   describe('GO_BACK from terminal', () => {
     it('navigates from terminal back to jobs_list', () => {
       renderWithProvider();
