@@ -1,14 +1,12 @@
-import type {
-  ResiliencyHistoryConfigurationGroup,
-  ResiliencyHistoryDataPoint,
-  ResiliencyHistoryQueryResponse,
-} from '../../types/api';
+import type { ResiliencyHistoryDataPoint, ResiliencyHistoryQueryResponse } from '../../types/api';
 
 export type ResiliencyHistoryChartMode = 'separate' | 'collapsed';
 
 export interface ResiliencyHistoryChartPoint {
   x: number;
   y: number;
+  date: string;
+  runId: string;
   baseline?: number;
   tooltip: string;
 }
@@ -30,36 +28,25 @@ export interface ResiliencyHistoryChartModel {
 
 function formatDate(value: string): string {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
 }
 
-/** Builds the complete, accessible point label used by chart tooltips. */
+/** Builds a compact point label; the chart title and legend provide shared context. */
 export function formatResiliencyHistoryTooltip(
   point: ResiliencyHistoryDataPoint,
   clusterName: string,
-  categoryName: string,
-  configurationGroup?: ResiliencyHistoryConfigurationGroup,
 ): string {
-  const details = [
-    `Date: ${formatDate(point.date)}`,
-    `Score: ${point.score}`,
-    `Cluster: ${clusterName}`,
-    `Category: ${categoryName}`,
-    `Run: ${point.runId}`,
-    `Run type: ${point.runType}`,
-  ];
-  if (point.providerName) details.push(`Provider: ${point.providerName}`);
+  const details = [`Score ${point.score}`];
   if (typeof point.baseline === 'number' && Number.isFinite(point.baseline)) {
     const delta = point.score - point.baseline;
-    const signedDelta = delta >= 0 ? `+${delta}` : String(delta);
-    details.push(`Baseline: ${point.baseline}`);
-    details.push(`Score-baseline delta: ${signedDelta}`);
-    details.push(`Result: ${delta >= 0 ? 'Met baseline' : 'Below baseline'}`);
+    const signedDelta = delta === 0 ? '+0' : delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`;
+    details.push(`Baseline ${point.baseline}`);
+    details.push(`Δ ${signedDelta}`);
+    details.push(delta >= 0 ? 'Met baseline' : 'Below baseline');
   }
-  details.push(`Configuration group: ${point.configurationGroupId}`);
-  if (configurationGroup?.scenarioNames?.length) {
-    details.push(`Scenarios: ${configurationGroup.scenarioNames.join(', ')}`);
-  }
+  details.push(clusterName, formatDate(point.date), point.runId);
   return details.join(' · ');
 }
 
@@ -81,13 +68,10 @@ function buildSeries(
       .map((point) => ({
         x: new Date(point.date).getTime(),
         y: point.score,
+        date: point.date,
+        runId: point.runId,
         ...(point.baseline !== undefined ? { baseline: point.baseline } : {}),
-        tooltip: formatResiliencyHistoryTooltip(
-          point,
-          clusterName,
-          categoryName,
-          response.configurationGroups[categoryName]?.[point.configurationGroupId],
-        ),
+        tooltip: formatResiliencyHistoryTooltip(point, clusterName),
       }));
 
     return { clusterName, data };
