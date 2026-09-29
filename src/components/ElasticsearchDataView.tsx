@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -35,6 +35,9 @@ import {
   Badge,
   Pagination,
   PaginationVariant,
+  Tabs,
+  Tab,
+  TabTitleText,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td, ExpandableRowContent } from '@patternfly/react-table';
 import { Chart, ChartAxis, ChartBar, ChartGroup, ChartLegend, ChartThreshold } from '@patternfly/react-charts';
@@ -43,6 +46,7 @@ import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications, useRole } from '../hooks';
 import { ElasticsearchConfigForm } from './ElasticsearchConfigsCard';
 import { JobStatsSummary } from './JobStatsSummary';
+import { ElasticsearchAlertsTab } from './ElasticsearchAlertsTab';
 import type {
   ElasticsearchConfig,
   ClusterMetadata,
@@ -57,6 +61,7 @@ import type {
   InlineElasticsearchConnection,
   QueryTelemetryResponse,
 } from '../types/api';
+import { matchesFieldFilters } from '../utils/elasticsearchFieldFilters';
 
 // Filter categories shown in the single-select category dropdown. Each key must
 // match a facet key returned by the backend (see facetFields in the operator's
@@ -259,9 +264,9 @@ const NODE_SUMMARY_COLUMNS: { label: string; key: keyof NodeSummaryInfo }[] = [
   { label: 'Count', key: 'count' },
   { label: 'Architecture', key: 'architecture' },
   { label: 'Instance Type', key: 'instance_type' },
-//  { label: 'Kernel Version', key: 'kernel_version' },
+  //  { label: 'Kernel Version', key: 'kernel_version' },
   { label: 'Kubelet Version', key: 'kubelet_version' },
-//  { label: 'OS Version', key: 'os_version' },
+  //  { label: 'OS Version', key: 'os_version' },
 ];
 
 /**
@@ -455,7 +460,7 @@ export function ElasticsearchDataView() {
   const [querying, setQuerying] = useState(false);
   const [hasQueried, setHasQueried] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const {isAdmin} = useRole();
+  const { isAdmin } = useRole();
 
   // Ephemeral (not saved) connection fields, used when no saved config exists.
   // These values are held only in component state and are cleared on unmount;
@@ -468,6 +473,8 @@ export function ElasticsearchDataView() {
 
   // Per-row expansion state, keyed by run_uuid (or row index fallback).
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [telemetryFilters, setTelemetryFilters] = useState<Array<{ key: string; value: string }>>([]);
+  const [activeTab, setActiveTab] = useState<string | number>(0);
 
   // Faceted filtering: `filterCategory` is the category currently being edited in
   // the value dropdown; `activeFilters` accumulates the selected values across
@@ -498,6 +505,10 @@ export function ElasticsearchDataView() {
   const lastRunnerRef = useRef<
     ((size: number, pageNum: number, filters?: Record<string, string[]>) => Promise<QueryTelemetryResponse>) | null
   >(null);
+  const filteredTelemetryDocuments = useMemo(
+    () => documents.filter(document => matchesFieldFilters(document, telemetryFilters)),
+    [documents, telemetryFilters],
+  );
 
   // Clears any displayed results and invalidates in-flight requests. Called
   // whenever the query criteria change so the table never shows telemetry that
@@ -524,8 +535,11 @@ export function ElasticsearchDataView() {
     try {
       const data = await elasticsearchApi.listConfigs();
       setConfigs(data);
-    } catch {
-      showError('Failed to load Elasticsearch configs', 'Could not retrieve configs from the server');
+    } catch (error) {
+      showError(
+        'Failed to load Elasticsearch configs',
+        error instanceof Error ? error.message : 'Could not retrieve configs from the server',
+      );
     } finally {
       setLoadingConfigs(false);
     }
@@ -592,6 +606,7 @@ export function ElasticsearchDataView() {
       // Ignore responses superseded by a newer run or by a criteria change.
       if (latestRequestId.current !== requestId) return;
       setDocuments(result.documents || []);
+      setTelemetryFilters([]);
       setStats(result.stats ?? null);
       setTotal(result.total ?? 0);
       setFacets(result.facets ?? {});
@@ -961,10 +976,10 @@ export function ElasticsearchDataView() {
             isInline
             title="Run a query to view telemetry data."
           />
-        ) : documents.length === 0 ? (
+        ) : filteredTelemetryDocuments.length === 0 ? (
           <EmptyState>
             <EmptyStateIcon icon={DatabaseIcon} />
-            <Title headingLevel="h3" size="md">No telemetry documents found</Title>
+            <Title headingLevel="h3" size="md">{documents.length === 0 ? 'No telemetry documents found' : 'No telemetry documents match the filters'}</Title>
             <EmptyStateBody>
               The telemetry index returned no results.
             </EmptyStateBody>
@@ -1103,157 +1118,208 @@ export function ElasticsearchDataView() {
     </>
   );
 
+  const telemetryFilterChips = (
+    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+      {telemetryFilters.filter(filter => filter.key).map((filter, index) => (
+        <Label
+          key={`${filter.key}-${index}`}
+          color="blue"
+          onClose={() => setTelemetryFilters(current => current.filter((_, filterIndex) => filterIndex !== index))}
+        >
+          {filter.key === 'scenario_type' ? 'Scenario Type' : filter.key === 'run_uuid' ? 'UUID' : 'Namespace'}: {filter.value || '(any)'}
+        </Label>
+      ))}
+    </div>
+  );
+
   return (
     <>
       <Card>
         <CardTitle>
-          <Title headingLevel="h2" size="lg">Elasticsearch Telemetry Data</Title>
+          <Title headingLevel="h2" size="lg">Elasticsearch Data</Title>
         </CardTitle>
         <CardBody>
           {loadingConfigs ? (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
               <Spinner size="xl" />
             </div>
-          ) : configs.length === 0 ? (
-            <>
-              <EmptyState>
-                <EmptyStateIcon icon={DatabaseIcon} />
-                <Title headingLevel="h3" size="lg">No Saved Elasticsearch Configs</Title>
-                <EmptyStateBody>
-                  {isAdmin ? (
-                    <p>Add a saved Elasticsearch configuration, or connect below without saving to query telemetry data.</p>
-                  ) : (
-                    <p>No saved configuration is available. Enter connection details below to connect without saving and query telemetry data.</p>
-                  )}
-                </EmptyStateBody>
-                {isAdmin && (
-                  <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => setShowCreateModal(true)}>
-                    Add Config
-                  </Button>
-                )}
-              </EmptyState>
-
-              <Title headingLevel="h3" size="md" style={{ marginTop: '1.5rem' }}>
-                Connect without saving
-              </Title>
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem>
-                    These connection details are used only for this session and are not stored on the server.
-                  </HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-
-              <Form style={{ marginTop: '1rem', maxWidth: '40em' }}>
-                <FormGroup label="Host" fieldId="es-inline-host" isRequired>
-                  <TextInput
-                    id="es-inline-host"
-                    value={inlineHost}
-                    onChange={(_e, v) => { setInlineHost(v); invalidateResults(); }}
-                    placeholder="https://elasticsearch.example.com"
-                    aria-label="Elasticsearch host"
-                  />
-                </FormGroup>
-                <FormGroup label="Port" fieldId="es-inline-port">
-                  <TextInput
-                    id="es-inline-port"
-                    type="number"
-                    value={inlinePort}
-                    onChange={(_e, v) => { setInlinePort(v); invalidateResults(); }}
-                    placeholder="9200"
-                    aria-label="Elasticsearch port"
-                  />
-                </FormGroup>
-                <FormGroup label="Username" fieldId="es-inline-username">
-                  <TextInput
-                    id="es-inline-username"
-                    value={inlineUsername}
-                    onChange={(_e, v) => { setInlineUsername(v); invalidateResults(); }}
-                    aria-label="Elasticsearch username"
-                  />
-                </FormGroup>
-                <FormGroup label="Password" fieldId="es-inline-password">
-                  <TextInput
-                    id="es-inline-password"
-                    type="password"
-                    value={inlinePassword}
-                    onChange={(_e, v) => { setInlinePassword(v); invalidateResults(); }}
-                    aria-label="Elasticsearch password"
-                  />
-                </FormGroup>
-                <FormGroup label="Telemetry Index" fieldId="es-inline-index" isRequired>
-                  <TextInput
-                    id="es-inline-index"
-                    value={inlineIndex}
-                    onChange={(_e, v) => { setInlineIndex(v); invalidateResults(); }}
-                    aria-label="Telemetry index"
-                  />
-                </FormGroup>
-                <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }}>
-                  {dateControls}
-                  <FlexItem>
-                    <FormGroup label="" fieldId="run-inline-query-btn">
-                      <Button
-                        variant="primary"
-                        onClick={handleRunInlineQuery}
-                        isDisabled={querying || !inlineComplete || invalidDateRange}
-                        isLoading={querying}
-                      >
-                        Run Query
-                      </Button>
-                    </FormGroup>
-                  </FlexItem>
-                </Flex>
-              </Form>
-
-              {resultsSection}
-            </>
           ) : (
             <>
-              <Flex alignItems={{ default: 'alignItemsFlexEnd' }}
-              spaceItems={{ default: 'spaceItemsMd' }}>
-                <FlexItem >
-                  <FormGroup label="Elasticsearch Config" fieldId="es-data-config"  style={{ width: '30em' }}>
-                    <FormSelect
-                      id="es-data-config"
-                      value={selectedConfig}
-                      onChange={(_e, v) => { setSelectedConfig(v); invalidateResults(); }}
-                      aria-label="Select an Elasticsearch config"
-                    >
-                      <FormSelectOption value="" label="Select a saved Elasticsearch config…" isDisabled />
-                      {configs.map((cfg) => (
-                        <FormSelectOption key={cfg.name} value={cfg.name} label={cfg.name} />
-                      ))}
-                    </FormSelect>
-                  </FormGroup>
-                </FlexItem>
-                {dateControls}
-                <FlexItem>
-                    <FormGroup label="" fieldId="run-query-btn">
-                  <Button
-                    variant="primary"
-                    onClick={handleRunQuery}
-                    isDisabled={querying || !selectedConfig || invalidDateRange}
-                    isLoading={querying}
-                  >
-                    Run Query
-                  </Button>
-                  </FormGroup>
-                </FlexItem>
-                {isAdmin && (
+              {configs.length > 0 && (
+                <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }} style={{ marginBottom: '1rem' }}>
                   <FlexItem>
-                    <Button variant="link" icon={<PlusCircleIcon />} onClick={() => setShowCreateModal(true)}>
-                      Add new config
-                    </Button>
+                    <FormGroup label="Elasticsearch Config" fieldId="es-data-config" style={{ width: '30em' }}>
+                      <FormSelect
+                        id="es-data-config"
+                        value={selectedConfig}
+                        onChange={(_e, v) => { setSelectedConfig(v); invalidateResults(); }}
+                        aria-label="Select an Elasticsearch config"
+                      >
+                        <FormSelectOption value="" label="Select a saved Elasticsearch config…" isDisabled />
+                        {configs.map((cfg) => (
+                          <FormSelectOption key={cfg.name} value={cfg.name} label={cfg.name} />
+                        ))}
+                      </FormSelect>
+                    </FormGroup>
                   </FlexItem>
-                )}
-              </Flex>
+                  {isAdmin && (
+                    <FlexItem>
+                      <Button variant="link" icon={<PlusCircleIcon />} onClick={() => setShowCreateModal(true)}>
+                        Add new config
+                      </Button>
+                    </FlexItem>
+                  )}
+                </Flex>
+              )}
+              <Tabs
+                activeKey={activeTab}
+                onSelect={(_event, key) => setActiveTab(key)}
+                mountOnEnter
+              >
+                <Tab eventKey={0} title={<TabTitleText>Telemetry</TabTitleText>}>
+                  {configs.length === 0 ? (
+                    <>
+                      <EmptyState>
+                        <EmptyStateIcon icon={DatabaseIcon} />
+                        <Title headingLevel="h3" size="lg">No Saved Elasticsearch Configs</Title>
+                        <EmptyStateBody>
+                          {isAdmin ? (
+                            <p>Add a saved Elasticsearch configuration, or connect below without saving to query telemetry data.</p>
+                          ) : (
+                            <p>No saved configuration is available. Enter connection details below to connect without saving and query telemetry data.</p>
+                          )}
+                        </EmptyStateBody>
+                        {isAdmin && (
+                          <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => setShowCreateModal(true)}>
+                            Add Config
+                          </Button>
+                        )}
+                      </EmptyState>
 
-              {resultsSection}
+                      <Title headingLevel="h3" size="md" style={{ marginTop: '1.5rem' }}>
+                        Connect without saving
+                      </Title>
+                      <FormHelperText>
+                        <HelperText>
+                          <HelperTextItem>
+                            These connection details are used only for this session and are not stored on the server.
+                          </HelperTextItem>
+                        </HelperText>
+                      </FormHelperText>
+
+                      <Form style={{ marginTop: '1rem', maxWidth: '40em' }}>
+                        <FormGroup label="Host" fieldId="es-inline-host" isRequired>
+                          <TextInput
+                            id="es-inline-host"
+                            value={inlineHost}
+                            onChange={(_e, v) => { setInlineHost(v); invalidateResults(); }}
+                            placeholder="https://elasticsearch.example.com"
+                            aria-label="Elasticsearch host"
+                          />
+                        </FormGroup>
+                        <FormGroup label="Port" fieldId="es-inline-port">
+                          <TextInput
+                            id="es-inline-port"
+                            type="number"
+                            value={inlinePort}
+                            onChange={(_e, v) => { setInlinePort(v); invalidateResults(); }}
+                            placeholder="9200"
+                            aria-label="Elasticsearch port"
+                          />
+                        </FormGroup>
+                        <FormGroup label="Username" fieldId="es-inline-username">
+                          <TextInput
+                            id="es-inline-username"
+                            value={inlineUsername}
+                            onChange={(_e, v) => { setInlineUsername(v); invalidateResults(); }}
+                            aria-label="Elasticsearch username"
+                          />
+                        </FormGroup>
+                        <FormGroup label="Password" fieldId="es-inline-password">
+                          <TextInput
+                            id="es-inline-password"
+                            type="password"
+                            value={inlinePassword}
+                            onChange={(_e, v) => { setInlinePassword(v); invalidateResults(); }}
+                            aria-label="Elasticsearch password"
+                          />
+                        </FormGroup>
+                        <FormGroup label="Telemetry Index" fieldId="es-inline-index" isRequired>
+                          <TextInput
+                            id="es-inline-index"
+                            value={inlineIndex}
+                            onChange={(_e, v) => { setInlineIndex(v); invalidateResults(); }}
+                            aria-label="Telemetry index"
+                          />
+                        </FormGroup>
+                        <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }}>
+                          {dateControls}
+                          <FlexItem>
+                            <FormGroup label="" fieldId="run-inline-query-btn">
+                              <Button
+                                variant="primary"
+                                onClick={handleRunInlineQuery}
+                                isDisabled={querying || !inlineComplete || invalidDateRange}
+                                isLoading={querying}
+                              >
+                                Run Query
+                              </Button>
+                            </FormGroup>
+                          </FlexItem>
+                        </Flex>
+                        {telemetryFilterChips}
+                      </Form>
+
+                      {resultsSection}
+                    </>
+                  ) : (
+                    <>
+                      <Flex alignItems={{ default: 'alignItemsFlexEnd' }}
+                        spaceItems={{ default: 'spaceItemsMd' }}>
+                        {dateControls}
+                        <FlexItem>
+                          <FormGroup label="" fieldId="run-query-btn">
+                            <Button
+                              variant="primary"
+                              onClick={handleRunQuery}
+                              isDisabled={querying || !selectedConfig || invalidDateRange}
+                              isLoading={querying}
+                            >
+                              Run Query
+                            </Button>
+                          </FormGroup>
+                        </FlexItem>
+                      </Flex>
+                      {telemetryFilterChips}
+
+                      {resultsSection}
+                    </>
+                  )
+                  }
+                </Tab >
+                <Tab eventKey={1} title={<TabTitleText>Alerts</TabTitleText>}>
+                  <ElasticsearchAlertsTab
+                    configs={configs}
+                    selectedConfig={selectedConfig}
+                    startDate={startDate}
+                    onStartDateChange={(value) => { setStartDate(value); invalidateResults(); }}
+                    endDate={endDate}
+                    onEndDateChange={(value) => { setEndDate(value); invalidateResults(); }}
+                    size={String(perPage)}
+                    onSizeChange={(value) => {
+                      const nextPerPage = Number(value);
+                      if (Number.isInteger(nextPerPage) && nextPerPage > 0) {
+                        setPerPage(nextPerPage);
+                        invalidateResults();
+                      }
+                    }}
+                  />
+                </Tab>
+              </Tabs >
             </>
           )}
-        </CardBody>
-      </Card>
+        </CardBody >
+      </Card >
 
       {isAdmin && (
         <Modal

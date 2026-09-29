@@ -1658,6 +1658,23 @@ export interface QueryTelemetryResponse {
   facets?: Record<string, FacetOption[]>;
 }
 
+export interface AlertDocument {
+  id?: string;
+  source: unknown;
+}
+
+export interface QueryAlertsResponse {
+  documents: AlertDocument[];
+  total: number;
+}
+
+export interface QueryAlertsRequest {
+  configName: string;
+  size?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
 // Cloud Credential Types
 
 export type CloudCredentialProvider = 'aws' | 'gcp' | 'azure' | 'openstack' | 'baremetal' | 'vmware' | 'ibmcloud';
