@@ -354,18 +354,39 @@ describe('Krkn-AI real run lifecycle', () => {
       jobId: 'baseline-job',
       phase: 'Succeeded',
     });
+    const generatedScenario = makeScenarioRow({
+      generation: 0,
+      scenarioId: '9',
+      scenarioType: 'pod-delete',
+      fitnessScore: 8,
+      phase: 'Succeeded',
+    });
     mocks.ai.listRuns.mockResolvedValue([run]);
     mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Succeeded', {
       baselineFitness: 12,
       artifactStatus: 'succeeded',
     }));
-    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([baseline]));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([generatedScenario, baseline]));
     mocks.ai.getScenario.mockResolvedValue(makeScenarioDetail(12, 'final'));
     render(<KrknAIPage />);
     await flushReact();
 
     fireEvent.click(screen.getByRole('row', { name: /Open run baseline-run/ }));
     await flushReact();
+    const scenarioTable = screen.getByRole('table', { name: 'Scenario executions' });
+    const visibleScenarioIds = () => Array.from(
+      scenarioTable.querySelectorAll('tbody tr'),
+      (row) => row.getAttribute('aria-label'),
+    );
+    expect(visibleScenarioIds()).toEqual([
+      'Open baseline scenario details',
+      'Open generation 1 scenario 9 details',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: /Scenario ID/ }));
+    expect(visibleScenarioIds()).toEqual([
+      'Open baseline scenario details',
+      'Open generation 1 scenario 9 details',
+    ]);
     expect(screen.getByText('Baseline fitness')).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Baseline' })).toBeInTheDocument();
 

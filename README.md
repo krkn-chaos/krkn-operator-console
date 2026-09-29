@@ -69,7 +69,7 @@ Cancel remains in the action row on each target, configuration, and review step.
 
 The run list, creation wizard, and result views expand to the available page width.
 
-Scenario executions include the baseline artifact and open its standard result details.
+Baseline appears first among generation-0 scenario results and in ascending scenario-ID order; its row opens standard result details.
 
 The wizard's Components section provides Select all and Disable all controls for
 namespaces. Each namespace toggle sits beside its accordion title and applies

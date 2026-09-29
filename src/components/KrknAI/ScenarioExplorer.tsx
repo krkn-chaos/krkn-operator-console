@@ -64,7 +64,7 @@ function isBaselineScenario(scenario: KrknAIScenarioIndexRow): boolean {
 function sortValue(row: KrknAIScenarioIndexRow, key: ScenarioSortKey): string | number | null {
   switch (key) {
     case 'generation': return row.generation;
-    case 'scenarioId': return row.scenarioId;
+    case 'scenarioId': return row.scenarioId === 'baseline' ? '' : row.scenarioId;
     case 'scenarioType': return row.scenarioType ?? null;
     case 'fitnessScore': return row.fitnessScore ?? null;
     case 'outcome': return rowStatus(row);
@@ -284,6 +284,10 @@ export function ScenarioExplorer({
             ? leftValue - rightValue
             : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true });
       if (comparison !== 0) return sortDirection === 'asc' ? comparison : -comparison;
+      if (sortKey === 'generation' && (left.scenarioId === 'baseline') !== (right.scenarioId === 'baseline')) {
+        const baselineFirst = left.scenarioId === 'baseline';
+        return sortDirection === 'asc' ? (baselineFirst ? -1 : 1) : (baselineFirst ? 1 : -1);
+      }
       return left.generation - right.generation || left.scenarioId.localeCompare(right.scenarioId, undefined, { numeric: true });
     });
   }, [generationFilter, scenarios, search, sortDirection, sortKey, typeFilter]);
