@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ResiliencyHistoryDataPoint, ResiliencyHistoryQueryResponse } from '../../types/api';
 import {
   buildResiliencyHistoryCharts,
+  calculateBaselineTickHalfWidth,
   formatResiliencyHistoryTooltip,
 } from './resiliencyHistoryUtils';
 
@@ -41,6 +42,12 @@ const history: ResiliencyHistoryQueryResponse = {
 };
 
 describe('resiliency history chart data', () => {
+  it('widens baseline ticks by 20% while preserving the compact width limits', () => {
+    expect(calculateBaselineTickHalfWidth()).toBe(6);
+    expect(calculateBaselineTickHalfWidth(200)).toBeCloseTo(9.6);
+    expect(calculateBaselineTickHalfWidth(20)).toBeCloseTo(3.6);
+  });
+
   it('creates one chart for each category-scoped configuration group in separate mode', () => {
     const charts = buildResiliencyHistoryCharts(history, ['alpha', 'beta'], ['cluster-a', 'cluster-b'], 'separate');
 

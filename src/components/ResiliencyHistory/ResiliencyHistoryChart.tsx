@@ -1,7 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FocusEvent, MouseEvent, PointerEvent, WheelEvent } from 'react';
 import { Alert, Button, Card, CardBody, CardTitle, Title } from '@patternfly/react-core';
-import type { ResiliencyHistoryChartModel, ResiliencyHistoryChartPoint } from './resiliencyHistoryUtils';
+import {
+  calculateBaselineTickHalfWidth,
+  type ResiliencyHistoryChartModel,
+  type ResiliencyHistoryChartPoint,
+} from './resiliencyHistoryUtils';
 
 const CLUSTER_COLORS = [
   '#2563eb', '#7c3aed', '#0f766e', '#c2410c', '#be185d',
@@ -133,8 +137,7 @@ function getTickHalfWidth(
     .map((neighbor) => Math.abs(toX(neighbor.x) - toX(point.x)))
     .filter((distance) => distance > 0 && Number.isFinite(distance));
 
-  // Half of the previous tick width: keep targets compact in dense histories.
-  return nearby.length > 0 ? Math.max(3, Math.min(8, Math.min(...nearby) * 0.06)) : 5;
+  return calculateBaselineTickHalfWidth(nearby.length > 0 ? Math.min(...nearby) : undefined);
 }
 
 /** Draws an interactive, responsive score history chart with native SVG. */
