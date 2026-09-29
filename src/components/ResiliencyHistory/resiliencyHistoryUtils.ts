@@ -50,6 +50,16 @@ export function formatResiliencyHistoryTooltip(
   return details.join(' · ');
 }
 
+/** Returns the current compact marker half-width, increased by 20%. */
+export function calculateBaselineTickHalfWidth(nearestNeighborDistance?: number): number {
+  const previousWidth = typeof nearestNeighborDistance === 'number'
+    && Number.isFinite(nearestNeighborDistance)
+    && nearestNeighborDistance > 0
+    ? Math.max(3, Math.min(8, nearestNeighborDistance * 0.06))
+    : 5;
+  return previousWidth * 1.2;
+}
+
 function buildSeries(
   response: ResiliencyHistoryQueryResponse,
   categoryName: string,
