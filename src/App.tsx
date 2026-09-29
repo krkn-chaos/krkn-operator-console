@@ -10,6 +10,7 @@ import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio, ElasticsearchDataView } from './components';
 import { FileManagementPage } from './components/FileManagement';
 import { CategoryManagementPage } from './components/CategoryManagement';
+import { ResiliencyHistoryPage } from './components/ResiliencyHistory';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
 import { useRole } from './hooks/useRole';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
@@ -260,6 +261,13 @@ function App() {
           </PageSection>
         );
 
+      case 'resiliency_history':
+        return (
+          <PageSection isFilled>
+            <ResiliencyHistoryPage />
+          </PageSection>
+        );
+
       case 'terminal':
         return (
           <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: '100%' }}>
@@ -385,6 +393,12 @@ function App() {
     proceed();
   };
 
+  const handleNavigateToResiliencyHistory = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_RESILIENCY_HISTORY' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
   const handleNavigateToHome = () => {
     const proceed = () => dispatch({ type: 'JOBS_LIST_READY' });
     if (!checkStudioGuard(proceed)) return;
@@ -448,6 +462,7 @@ function App() {
       onNavigateCategories={handleNavigateToCategories}
       onNavigateTerminal={handleNavigateToTerminal}
       onNavigateElasticsearchData={handleNavigateToElasticsearchData}
+      onNavigateResiliencyHistory={handleNavigateToResiliencyHistory}
       onNavigateSettings={handleNavigateToSettings}
       onEditProfile={handleEditProfile}
       onChangePassword={handleChangePassword}

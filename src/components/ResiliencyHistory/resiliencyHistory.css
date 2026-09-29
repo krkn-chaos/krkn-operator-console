@@ -1,0 +1,214 @@
+.resiliency-history {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.resiliency-history__page-header p {
+  margin: 0.5rem 0 0;
+  color: var(--pf-v5-global--Color--200);
+}
+
+.resiliency-history__filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1.25rem;
+}
+
+.resiliency-history__filter-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.resiliency-history__filter-group legend {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.resiliency-history__options {
+  display: flex;
+  max-height: 18rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--pf-v5-global--BorderColor--100);
+  border-radius: 3px;
+}
+
+.resiliency-history__option-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.resiliency-history__category-color {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.resiliency-history__option-detail {
+  color: var(--pf-v5-global--Color--200);
+}
+
+.resiliency-history__loading {
+  display: flex;
+  min-height: 5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.resiliency-history__apply-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.resiliency-history__apply-row > span,
+.resiliency-history__export-help {
+  color: var(--pf-v5-global--Color--200);
+  font-size: 0.875rem;
+}
+
+.resiliency-history__results {
+  min-width: 0;
+}
+
+.resiliency-history__query-loading {
+  justify-content: flex-start;
+}
+
+.resiliency-history__result-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.resiliency-history__applied-filters {
+  margin: 0.5rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.resiliency-history__export-help {
+  margin: -0.5rem 0 1rem;
+}
+
+.resiliency-history__mode-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 0.75rem 0;
+}
+
+.resiliency-history__print-summary {
+  display: none;
+}
+
+.resiliency-history__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 32rem), 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+
+.resiliency-history__chart-card {
+  min-width: 0;
+}
+
+.resiliency-history__chart-container {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+@media (max-width: 600px) {
+  .resiliency-history__result-header {
+    align-items: stretch;
+  }
+
+  .resiliency-history__export-button {
+    align-self: flex-start;
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  .app-sidebar,
+  .pf-v5-c-masthead,
+  .pf-v5-c-page__header,
+  .resiliency-history__controls,
+  .resiliency-history__export-button,
+  .resiliency-history__export-help,
+  .resiliency-history__mode-controls {
+    display: none !important;
+  }
+
+  .app-content--with-sidebar {
+    display: block !important;
+    height: auto !important;
+    padding-left: 0 !important;
+  }
+
+  body,
+  #root,
+  .pf-v5-c-page,
+  .pf-v5-c-page__main-container,
+  .pf-v5-c-page__main-section {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .resiliency-history {
+    color: #111 !important;
+  }
+
+  .resiliency-history__print-summary {
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .resiliency-history__charts {
+    display: block;
+  }
+
+  .resiliency-history__chart-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 0.5rem;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .resiliency-history__chart-container,
+  .resiliency-history__chart-container svg {
+    max-width: 100% !important;
+  }
+
+  .resiliency-history__page-header p,
+  .resiliency-history__applied-filters {
+    color: #333 !important;
+  }
+
+  .resiliency-history__chart-container svg text {
+    fill: #111 !important;
+  }
+}

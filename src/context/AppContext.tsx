@@ -634,6 +634,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
             phase: 'jobs_list',
           };
 
+        case 'resiliency_history':
+          // From resiliency history → back to jobs list
+          return {
+            ...state,
+            phase: 'jobs_list',
+          };
+
         case 'selecting_clusters':
           // From cluster selection → cancel workflow, back to jobs list
           return {
@@ -742,6 +749,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'elasticsearch_data',
+      };
+
+    case 'NAVIGATE_TO_RESILIENCY_HISTORY':
+      return {
+        ...state,
+        phase: 'resiliency_history',
       };
 
     // Notifications

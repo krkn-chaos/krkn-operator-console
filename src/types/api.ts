@@ -442,6 +442,7 @@ export type AppPhase =
   | 'files' // File management page
   | 'categories' // Category management page
   | 'elasticsearch_data' // Elasticsearch telemetry data table page
+  | 'resiliency_history' // Resiliency history analytics page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -601,6 +602,7 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_FILES' }
   | { type: 'NAVIGATE_TO_CATEGORIES' }
   | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
+  | { type: 'NAVIGATE_TO_RESILIENCY_HISTORY' }
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
@@ -1370,6 +1372,35 @@ export interface CategoryResponse {
 export interface CategoriesListResponse {
   categories: CategoryResponse[];
   total: number;
+}
+
+/** Filters used to query score history across visible categories and clusters. */
+export interface ResiliencyHistoryQueryRequest {
+  categories: string[];
+  clusters: string[];
+}
+
+/** One scored scenario run returned by the resiliency history query. */
+export interface ResiliencyHistoryDataPoint {
+  date: string;
+  runId: string;
+  runType: string;
+  score: number;
+  configurationGroupId: string;
+  providerName?: string;
+}
+
+/** Run metadata shared by score points in a category configuration group. */
+export interface ResiliencyHistoryConfigurationGroup {
+  runType: string;
+  representativeRunId: string;
+  scenarioNames?: string[];
+}
+
+/** Query result nested by cluster, category, then score datapoint. */
+export interface ResiliencyHistoryQueryResponse {
+  clusters: Record<string, Record<string, ResiliencyHistoryDataPoint[]>>;
+  configurationGroups: Record<string, Record<string, ResiliencyHistoryConfigurationGroup>>;
 }
 
 /** Request to create a category. */

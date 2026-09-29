@@ -31,6 +31,8 @@ import type {
   UpdateCategoryRequest,
   DeleteCategoryResponse,
   CategoryEntityAssociationResponse,
+  ResiliencyHistoryQueryRequest,
+  ResiliencyHistoryQueryResponse,
   JobConfigResponse,
   UnifiedJobsResponse,
   ScenarioRunListResponse,
@@ -542,6 +544,16 @@ class OperatorApiClient extends BaseApiClient {
       `/categories/${encodeURIComponent(category)}/entities/${entityType}/${encodeURIComponent(entityName)}`,
       { method },
     );
+  }
+
+  /** Query score history across selected visible categories and clusters. */
+  async queryResiliencyHistory(
+    request: ResiliencyHistoryQueryRequest,
+  ): Promise<ResiliencyHistoryQueryResponse> {
+    return this.fetchV2Json<ResiliencyHistoryQueryResponse>('/resiliency-history', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
   }
 
   // ============================================================================

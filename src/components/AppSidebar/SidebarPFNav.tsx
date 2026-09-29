@@ -1,6 +1,7 @@
 import { Nav, NavItem, NavList, NavExpandable } from '@patternfly/react-core';
 import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon, TagsIcon } from '@patternfly/react-icons';
 import { MdWork } from 'react-icons/md';
+import { FiBarChart2 } from 'react-icons/fi';
 import type { ReactNode } from 'react';
 import type { SidebarNavProps } from './types';
 import './SidebarPFNav.css';
@@ -28,6 +29,7 @@ import './SidebarPFNav.css';
  * @param onNavigateCategories - Called when Categories menu item is clicked
  * @param onNavigateTerminal - Called when Terminal menu item is clicked
  * @param onNavigateElasticsearchData - Called when Elasticsearch Data menu item is clicked
+ * @param onNavigateResiliencyHistory - Called when Resiliency History is selected
  * @param onNavigateSettings - Called when Settings menu item is clicked
  * @param onEditProfile - Called when Edit Profile menu item is clicked
  * @param onChangePassword - Called when Change Password menu item is clicked
@@ -68,6 +70,7 @@ export function SidebarPFNav({
   onNavigateCategories,
   onNavigateTerminal,
   onNavigateElasticsearchData,
+  onNavigateResiliencyHistory,
   onNavigateSettings,
   onEditProfile,
   onChangePassword,
@@ -101,6 +104,9 @@ export function SidebarPFNav({
           </NavItem>
           <NavItem isActive={activePhase === 'elasticsearch_data'} onClick={onNavigateElasticsearchData} aria-label="Elasticsearch Data">
             {item(<DatabaseIcon />, 'ES Data')}
+          </NavItem>
+          <NavItem isActive={activePhase === 'resiliency_history'} onClick={onNavigateResiliencyHistory} aria-label="Resiliency History">
+            {item(<FiBarChart2 />, 'Resiliency History')}
           </NavItem>
           {isAdmin && (
             <NavItem isActive={activePhase === 'settings'} onClick={onNavigateSettings} aria-label="Settings">
