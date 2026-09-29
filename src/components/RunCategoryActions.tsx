@@ -171,6 +171,8 @@ const CATEGORY_STRIPE_NARROW_WIDTH = 'var(--pf-v5-global--BorderWidth--xl, 4px)'
 const CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM = 3.8;
 const CATEGORY_STRIPE_WIDE_WIDTH = (CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM * 0.85).toFixed(2) + 'mm';
 const CATEGORY_STRIPE_TRANSITION_MS = 180;
+// PatternFly's 0.9375rem arrow is a rotated square; its tip projects half its diagonal past the tooltip box.
+const CATEGORY_TOOLTIP_ARROW_OUTSET = '0.6629rem';
 
 function getCategoryStripeGradient(categories: CategoryResponse[]): string {
   const stops = categories.flatMap((category, index) => {
@@ -280,7 +282,7 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
           className="pf-v5-c-tooltip pf-m-right"
           style={{
             position: 'absolute',
-            left: tooltipPosition?.left ?? 0,
+            left: `calc(${tooltipPosition?.left ?? 0}px + ${CATEGORY_TOOLTIP_ARROW_OUTSET})`,
             top: tooltipPosition?.top ?? 0,
             transform: 'translateY(-50%)',
             width: 'max-content',

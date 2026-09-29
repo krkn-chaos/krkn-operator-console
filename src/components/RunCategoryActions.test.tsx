@@ -31,7 +31,7 @@ describe('RunCategoryStripe', () => {
 
     fireEvent.transitionEnd(visualStripe, { propertyName: 'width' });
     const tooltip = screen.getByRole('tooltip');
-    expect(tooltip.style.left).toBe('9px');
+    expect(tooltip.style.left).toBe('calc(9px + 0.6629rem)');
     expect(tooltip.style.top).toBe('12px');
     expect(tooltip.style.width).toBe('max-content');
     expect(tooltip.style.maxWidth).toBe('18.75rem');
