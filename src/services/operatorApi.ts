@@ -94,8 +94,14 @@ class OperatorApiClient extends BaseApiClient {
 
     // Handle HTTP error status codes with custom messages
     if (response.status === 404) {
-      // Command not found
-      throw new Error(`TERMINAL_ERROR:404:${request.command}`);
+      let message: string | undefined;
+      try {
+        const payload = await response.json() as { message?: unknown };
+        if (typeof payload.message === 'string' && payload.message.trim()) message = payload.message.trim();
+      } catch {
+        // Non-JSON 404 responses (e.g., a missing route) retain the generic message.
+      }
+      throw new Error(message ?? `TERMINAL_ERROR:404:${request.command}`);
     }
     if (response.status === 403) {
       // Forbidden - user not authorized to execute this command
@@ -113,8 +119,14 @@ class OperatorApiClient extends BaseApiClient {
       throw new Error(`HTTP error ${response.status}`);
     }
 
-    const data = await response.json() as TerminalResponse;
-
+    const payload = await response.json() as Record<string, unknown>;
+    if (response.status === 400 && typeof payload.exit_code !== 'number') {
+      const message = typeof payload.message === 'string' && payload.message.trim()
+        ? payload.message.trim()
+        : 'The terminal request was rejected.';
+      throw new Error(message);
+    }
+    const data = payload as unknown as TerminalResponse;
     // Decode base64 stdout and stderr
     const stdout = data.stdout_base64 ? atob(data.stdout_base64) : '';
     const stderr = data.stderr_base64 ? atob(data.stderr_base64) : '';
@@ -151,14 +163,17 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
-   * GET /nodes?id={uuid}&cluster-name={clusterName}
+   * GET /nodes?id={uuid}&cluster-name={clusterName}&operator-name={operatorName}
    * Get nodes from selected cluster
    * @param uuid - Target request UUID
    * @param clusterName - Cluster name
+   * @param operatorName - Optional provider name for multi-provider targets
    * @returns Promise with nodes data
    */
-  async getNodes(uuid: string, clusterName: string): Promise<NodesResponse> {
-    return this.fetchJson<NodesResponse>(`/nodes?id=${uuid}&cluster-name=${encodeURIComponent(clusterName)}`);
+  async getNodes(uuid: string, clusterName: string, operatorName?: string): Promise<NodesResponse> {
+    const query = new URLSearchParams({ id: uuid, 'cluster-name': clusterName });
+    if (operatorName) query.set('operator-name', operatorName);
+    return this.fetchJson<NodesResponse>(`/nodes?${query.toString()}`);
   }
 
   /**

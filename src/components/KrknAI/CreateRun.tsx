@@ -239,6 +239,7 @@ export function CreateRun({
     setNamespaceLoading(true);
     void operatorApi.executeTerminalCommand({
       cluster_id: namespaceClusterName,
+      operator_name: namespaceProviderName,
       uuid: targetRequestId,
       command: 'kubectl get namespaces -o json',
     }).then(({ stdout, stderr, exitCode }) => {

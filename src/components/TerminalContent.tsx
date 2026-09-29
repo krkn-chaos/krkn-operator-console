@@ -57,7 +57,7 @@ interface TerminalContentProps {
  *    - Command is in allowed list (fetched from GET /api/v1/terminal/available-commands)
  *    - Subcommand is whitelisted (prevents destructive operations)
  *    - No streaming flags (--watch, --follow) that require WebSocket
- * 5. Command sent to backend (POST /api/v1/terminal) with cluster_id and uuid
+ * 5. Command sent to backend (POST /api/v1/terminal) with cluster_id, operator_name, and uuid
  * 6. Backend executes command in isolated container with cluster kubeconfig
  * 7. Response includes base64-encoded stdout/stderr and exit code
  * 8. Terminal displays output with:
@@ -258,7 +258,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
 
   // Execute command on selected cluster
   const executeCommand = async (command: string) => {
-    if (!selectedCluster || !discoveryUuid) return;
+    if (!selectedCluster || !selectedCluster.operatorSource || !discoveryUuid) return;
 
     setIsExecuting(true);
 
@@ -277,6 +277,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     try {
       const result = await operatorApi.executeTerminalCommand({
         cluster_id: selectedCluster.clusterName,
+        operator_name: selectedCluster.operatorSource,
         uuid: discoveryUuid,
         command,
       });

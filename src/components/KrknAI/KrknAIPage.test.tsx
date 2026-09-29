@@ -302,6 +302,12 @@ describe('Krkn-AI real run lifecycle', () => {
     await waitFor(() => expect(mocks.operator.getTargetStatus).toHaveBeenCalledTimes(2), { timeout: 5_000 });
     await waitFor(() => expect(mocks.operator.getClusters).toHaveBeenCalledTimes(1));
     const stagingNamespace = await screen.findByRole('checkbox', { name: 'shop' });
+    expect(mocks.operator.executeTerminalCommand).toHaveBeenLastCalledWith({
+      cluster_id: 'staging',
+      operator_name: 'krkn-operator',
+      uuid: 'target-request-1',
+      command: 'kubectl get namespaces -o json',
+    });
     expect(stagingNamespace).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Discover components' })).toBeDisabled();
     await user.click(stagingNamespace);
@@ -311,6 +317,12 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(clusterSelect).toHaveDisplayValue('staging (krkn-operator)');
     await user.selectOptions(clusterSelect, screen.getByRole('option', { name: 'prod (krkn-operator-acm)' }));
     const prodNamespace = await screen.findByRole('checkbox', { name: 'prod.cluster' });
+    expect(mocks.operator.executeTerminalCommand).toHaveBeenLastCalledWith({
+      cluster_id: 'prod',
+      operator_name: 'krkn-operator-acm',
+      uuid: 'target-request-1',
+      command: 'kubectl get namespaces -o json',
+    });
     const kubeSystemNamespace = screen.getByRole('checkbox', { name: 'kube-system' });
     expect(prodNamespace).not.toBeChecked();
     expect(screen.queryByRole('checkbox', { name: 'shop' })).not.toBeInTheDocument();
