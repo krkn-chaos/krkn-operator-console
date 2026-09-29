@@ -173,6 +173,17 @@ const CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM = 3.8;
 const CATEGORY_STRIPE_WIDE_WIDTH = (CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM * 0.85).toFixed(2) + 'mm';
 const CATEGORY_STRIPE_TRANSITION_MS = 180;
 
+function getCategoryStripeGradient(categories: CategoryResponse[]): string {
+  const stops = categories.flatMap((category, index) => {
+    const start = ((index / categories.length) * 100).toFixed(4);
+    const end = (((index + 1) / categories.length) * 100).toFixed(4);
+    const color = category.color || '#6c757d';
+    return [`${color} ${start}%`, `${color} ${end}%`];
+  });
+
+  return `linear-gradient(to bottom, ${stops.join(', ')})`;
+}
+
 /** Renders equal-height category color segments at the left of a run row. */
 export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -221,23 +232,11 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
           bottom: 0,
           width: isHovered ? CATEGORY_STRIPE_WIDE_WIDTH : CATEGORY_STRIPE_NARROW_WIDTH,
           transition: 'width ' + CATEGORY_STRIPE_TRANSITION_MS + 'ms ease-out',
-          display: 'flex',
-          flexDirection: 'column',
           overflow: 'hidden',
           borderRadius: 0,
+          backgroundImage: getCategoryStripeGradient(categories),
         }}
-      >
-        {categories.map((category) => (
-          <span
-            key={category.name}
-            style={{
-              flex: 1,
-              minHeight: 0,
-              backgroundColor: category.color || '#6c757d',
-            }}
-          />
-        ))}
-      </div>
+      />
     </Tooltip>
   );
 }

@@ -17,4 +17,25 @@ describe('RunCategoryStripe', () => {
     expect(stripe.style.transition).toBe('width 180ms ease-out');
     await screen.findByRole('tooltip');
   });
+
+  it('renders category colors as contiguous equal-height gradient stops', () => {
+    render(
+      <RunCategoryStripe
+        categories={[
+          { name: 'first', color: '#cc0066', availableToAll: true },
+          { name: 'second', color: '#00aa66', availableToAll: true },
+          { name: 'third', color: '#0066cc', availableToAll: true },
+        ]}
+      />,
+    );
+
+    const stripe = screen.getByRole('img', { name: 'Categories: first, second, third' });
+    const gradient = stripe.style.backgroundImage;
+    expect(gradient).toContain('rgb(204, 0, 102) 0.0000%');
+    expect(gradient).toContain('rgb(204, 0, 102) 33.3333%');
+    expect(gradient).toContain('rgb(0, 170, 102) 33.3333%');
+    expect(gradient).toContain('rgb(0, 170, 102) 66.6667%');
+    expect(gradient).toContain('rgb(0, 102, 204) 66.6667%');
+    expect(gradient).toContain('rgb(0, 102, 204) 100.0000%');
+  });
 });
