@@ -9,6 +9,7 @@ export type ResiliencyHistoryChartMode = 'separate' | 'collapsed';
 export interface ResiliencyHistoryChartPoint {
   x: number;
   y: number;
+  baseline?: number;
   tooltip: string;
 }
 
@@ -48,6 +49,13 @@ export function formatResiliencyHistoryTooltip(
     `Run type: ${point.runType}`,
   ];
   if (point.providerName) details.push(`Provider: ${point.providerName}`);
+  if (typeof point.baseline === 'number' && Number.isFinite(point.baseline)) {
+    const delta = point.score - point.baseline;
+    const signedDelta = delta >= 0 ? `+${delta}` : String(delta);
+    details.push(`Baseline: ${point.baseline}`);
+    details.push(`Score-baseline delta: ${signedDelta}`);
+    details.push(`Result: ${delta >= 0 ? 'Met baseline' : 'Below baseline'}`);
+  }
   details.push(`Configuration group: ${point.configurationGroupId}`);
   if (configurationGroup?.scenarioNames?.length) {
     details.push(`Scenarios: ${configurationGroup.scenarioNames.join(', ')}`);
@@ -73,6 +81,7 @@ function buildSeries(
       .map((point) => ({
         x: new Date(point.date).getTime(),
         y: point.score,
+        ...(point.baseline !== undefined ? { baseline: point.baseline } : {}),
         tooltip: formatResiliencyHistoryTooltip(
           point,
           clusterName,

@@ -30,8 +30,8 @@ vi.mock('../../hooks/useClusterDiscovery', () => ({
 }));
 
 vi.mock('./ResiliencyHistoryChart', () => ({
-  ResiliencyHistoryChart: ({ chart }: { chart: ResiliencyHistoryChartModel }) => (
-    <div data-testid="history-chart">{chart.title}</div>
+  ResiliencyHistoryChart: ({ chart, showBaselines }: { chart: ResiliencyHistoryChartModel; showBaselines: boolean }) => (
+    <div data-testid="history-chart" data-show-baselines={showBaselines}>{chart.title}</div>
   ),
 }));
 
@@ -44,6 +44,7 @@ const populatedHistory = {
         runId: 'run-1',
         runType: 'scenario-runs',
         score: 87,
+        baseline: 85,
         configurationGroupId: 'config-1',
       }],
     },
@@ -55,7 +56,7 @@ const populatedHistory = {
 const multiHistory = {
   clusters: {
     'cluster-a': {
-      resilience: [{ date: '2026-09-29T10:00:00Z', runId: 'a-1', runType: 'scenario-runs', score: 87, configurationGroupId: 'cfg-a' }],
+      resilience: [{ date: '2026-09-29T10:00:00Z', runId: 'a-1', runType: 'scenario-runs', score: 87, baseline: 85, configurationGroupId: 'cfg-a' }],
       reliability: [{ date: '2026-09-29T11:00:00Z', runId: 'a-2', runType: 'graph-runs', score: 91, configurationGroupId: 'cfg-b' }],
     },
     'cluster-b': {
@@ -154,6 +155,10 @@ describe('ResiliencyHistoryPage', () => {
     }));
     expect(await screen.findByText('Score history')).toBeInTheDocument();
     expect(screen.getByTestId('history-chart')).toHaveTextContent('resilience — pod-kill');
+    expect(screen.getByTestId('history-chart')).toHaveAttribute('data-show-baselines', 'true');
+    await user.click(screen.getByRole('checkbox', { name: 'Show baseline comparisons' }));
+    expect(screen.getByTestId('history-chart')).toHaveAttribute('data-show-baselines', 'false');
+    expect(document.querySelector('.resiliency-history__print-summary')).toHaveTextContent('Baseline comparisons: Hidden');
   });
 
   it('shows an empty state when the query returns no scored runs', async () => {
@@ -277,6 +282,7 @@ describe('ResiliencyHistoryPage', () => {
     expect(printSummary).toHaveTextContent('Categories: resilience, reliability');
     expect(printSummary).toHaveTextContent('Clusters: cluster-a, cluster-b');
     expect(screen.getByText('Mixed configurations by category')).toBeInTheDocument();
+    expect(printSummary).toHaveTextContent('Baseline comparisons: Shown');
 
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
     expect(print).toHaveBeenCalledTimes(1);
