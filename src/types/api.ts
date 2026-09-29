@@ -1391,6 +1391,7 @@ export interface ResiliencyHistoryDataPoint {
   runId: string;
   runType: string;
   score: number;
+  baseline?: number;
   configurationGroupId: string;
   providerName?: string;
 }

@@ -64,6 +64,7 @@ export function ResiliencyHistoryPage() {
   const [queryResult, setQueryResult] = useState<ResiliencyHistoryQueryResponse | null>(null);
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters | null>(null);
   const [chartMode, setChartMode] = useState<ResiliencyHistoryChartMode>('separate');
+  const [showBaselines, setShowBaselines] = useState(true);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const categoryRequestId = useRef(0);
@@ -344,15 +345,24 @@ export function ResiliencyHistoryPage() {
                     onChange={() => setChartMode('collapsed')}
                   />
                 </div>
+                <div className="resiliency-history__baseline-controls">
+                  <Checkbox
+                    id="history-show-baselines"
+                    label="Show baseline comparisons"
+                    isChecked={showBaselines}
+                    onChange={(_event, checked) => setShowBaselines(checked)}
+                  />
+                </div>
                 <div className="resiliency-history__print-summary">
                   <p><strong>Categories:</strong> {appliedFilters.categories.join(', ')}</p>
                   <p><strong>Clusters:</strong> {appliedFilters.clusters.join(', ')}</p>
                   <p><strong>Configuration mode:</strong> {chartMode === 'separate' ? 'Separate configuration groups' : 'Mixed configurations by category'}</p>
+                  <p><strong>Baseline comparisons:</strong> {showBaselines ? 'Shown' : 'Hidden'}</p>
                   <p><strong>Generated at:</strong> {generatedAt}</p>
                 </div>
                 <div className="resiliency-history__charts" aria-label="Resiliency history charts">
                   {charts.map((chart) => (
-                    <ResiliencyHistoryChart key={chart.key} chart={chart} />
+                    <ResiliencyHistoryChart key={chart.key} chart={chart} showBaselines={showBaselines} />
                   ))}
                 </div>
               </>

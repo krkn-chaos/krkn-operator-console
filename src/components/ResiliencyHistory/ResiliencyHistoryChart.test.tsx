@@ -12,6 +12,7 @@ const history: ResiliencyHistoryQueryResponse = {
         runId: 'run-1',
         runType: 'scenario-runs',
         score: 0,
+        baseline: 0,
         configurationGroupId: 'config-1',
       }],
     },
@@ -42,5 +43,22 @@ describe('ResiliencyHistoryChart', () => {
 
     expect(screen.getByText('No scores for this selection')).toBeInTheDocument();
     expect(document.querySelector('.resiliency-history__chart-container')).toBeNull();
+  });
+
+  it('shows an accessible baseline key, including for a zero baseline', () => {
+    const [chart] = buildResiliencyHistoryCharts(history, ['resilience'], ['cluster-a'], 'separate');
+    render(<ResiliencyHistoryChart chart={chart} />);
+
+    expect(screen.getByRole('list', { name: 'Baseline marker key' })).toBeInTheDocument();
+    expect(screen.getByText('Met baseline: solid tick and connector')).toBeInTheDocument();
+    expect(screen.getByText('Below baseline: dashed tick and connector')).toBeInTheDocument();
+  });
+
+  it('can hide baseline markers while keeping their tooltip in the chart data', () => {
+    const [chart] = buildResiliencyHistoryCharts(history, ['resilience'], ['cluster-a'], 'separate');
+    render(<ResiliencyHistoryChart chart={chart} showBaselines={false} />);
+
+    expect(screen.queryByRole('list', { name: 'Baseline marker key' })).not.toBeInTheDocument();
+    expect(chart.series[0].data[0].tooltip).toContain('Baseline: 0');
   });
 });
