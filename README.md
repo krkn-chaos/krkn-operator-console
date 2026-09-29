@@ -67,6 +67,8 @@ launches only after the operator returns a `201` `KrknAIRun`.
 
 Cancel remains in the action row on each target, configuration, and review step.
 
+The run list, creation wizard, and result views expand to the available page width.
+
 The wizard's Components section provides Select all and Disable all controls for
 namespaces. Each namespace toggle sits beside its accordion title and applies
 the disabled state to all of that namespace's descendants.

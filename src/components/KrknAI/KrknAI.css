@@ -6,8 +6,6 @@
   --krkn-ai-average: #b58100;
   display: grid;
   gap: 1rem;
-  max-width: 1440px;
-  margin-inline: auto;
   color: var(--pf-v5-global--Color--100, #151515);
 }
 

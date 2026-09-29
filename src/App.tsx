@@ -244,11 +244,7 @@ function App() {
       }
 
       case 'krkn_ai':
-        return (
-          <PageSection>
-            <KrknAIPage />
-          </PageSection>
-        );
+        return <KrknAIPage />;
 
       case 'settings':
         return <Settings />;
