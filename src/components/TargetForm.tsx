@@ -13,6 +13,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import type { CreateTargetRequest, SecretType, TargetResponse } from '../types/api';
+import { isValidKubernetesLabelValue } from '../utils/kubernetes';
 
 /**
  * Form for creating or editing a cluster target.
@@ -87,6 +88,8 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
 
     if (!clusterName.trim()) {
       newErrors.clusterName = 'Cluster name is required';
+    } else if (!isValidKubernetesLabelValue(clusterName.trim())) {
+      newErrors.clusterName = 'Use 1–63 letters, numbers, hyphens, underscores, or periods; start and end with a letter or number.';
     }
 
     switch (secretType) {
@@ -195,7 +198,15 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
         <TextInput
           id="cluster-name"
           value={clusterName}
-          onChange={(_event, value) => setClusterName(value)}
+          onChange={(_event, value) => {
+            setClusterName(value);
+            setErrors((currentErrors) => {
+              if (!currentErrors.clusterName) return currentErrors;
+              const nextErrors = { ...currentErrors };
+              delete nextErrors.clusterName;
+              return nextErrors;
+            });
+          }}
           isRequired
           validated={errors.clusterName ? 'error' : 'default'}
         />

@@ -29,6 +29,37 @@ describe('TargetForm', () => {
     });
   });
 
+  describe('cluster name validation', () => {
+    it.each(['cluster with spaces', 'cluster/name', '-cluster', 'cluster.', 'a'.repeat(64)])(
+      'rejects the invalid cluster name %s',
+      async (clusterName) => {
+        const user = userEvent.setup();
+        const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+        await user.type(screen.getByRole('textbox', { name: /cluster name/i }), clusterName);
+        await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+        await user.click(screen.getByRole('button', { name: /create/i }));
+
+        expect(await screen.findByText(/use 1–63 letters, numbers/i)).toBeInTheDocument();
+        expect(mockOnSubmit).not.toHaveBeenCalled();
+      }
+    );
+
+    it('accepts Kubernetes label characters and the 63-character limit', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const validName = `A${'a'.repeat(59)}_.1`;
+      expect(validName).toHaveLength(63);
+
+      await user.type(screen.getByRole('textbox', { name: /cluster name/i }), validName);
+      await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ clusterName: validName }));
+      });
+    });
+  });
+
   describe('kubeconfig file selection', () => {
     it('loads the selected file into the kubeconfig field', async () => {
       const user = userEvent.setup();
