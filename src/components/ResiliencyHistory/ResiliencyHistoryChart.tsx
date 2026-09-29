@@ -9,7 +9,7 @@ const CLUSTER_COLORS = [
 ];
 const SVG_HEIGHT = 390;
 const MARGIN = { top: 24, right: 24, bottom: 62, left: 62 };
-const SCORE_DOMAIN: [number, number] = [0, 130];
+const SCORE_PADDING = 30;
 const DATE_TICK_COUNT = 5;
 
 interface ChartDomain {
@@ -27,8 +27,17 @@ interface ActiveTooltip {
 
 function getFullDomain(chart: ResiliencyHistoryChartModel): ChartDomain {
   const dates = chart.series.flatMap((series) => series.data.map((point) => point.x));
+  if (dates.length === 0) return { x: [0, 1], y: [-SCORE_PADDING, SCORE_PADDING] };
+
   const start = Math.min(...dates);
   const end = Math.max(...dates);
+  const scoresAndBaselines = chart.series.flatMap((series) => series.data.flatMap((point) => (
+    typeof point.baseline === 'number' && Number.isFinite(point.baseline)
+      ? [point.y, point.baseline]
+      : [point.y]
+  )));
+  const minScore = Math.min(...scoresAndBaselines);
+  const maxScore = Math.max(...scoresAndBaselines);
   const intervals = chart.series.flatMap((series) => series.data.slice(1).map((point, index) => (
     point.x - series.data[index].x
   ))).filter((interval) => interval > 0 && Number.isFinite(interval));
@@ -36,7 +45,7 @@ function getFullDomain(chart: ResiliencyHistoryChartModel): ChartDomain {
 
   return {
     x: [start - padding, end + padding],
-    y: SCORE_DOMAIN,
+    y: [minScore - SCORE_PADDING, maxScore + SCORE_PADDING],
   };
 }
 
@@ -106,7 +115,7 @@ function getScoreTicks(domain: [number, number]): number[] {
   const rawStep = (domain[1] - domain[0]) / 6;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
   const normalizedStep = rawStep / magnitude;
-  const step = (normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 2.5 ? 2.5 : normalizedStep <= 5 ? 5 : 10) * magnitude;
+  const step = (normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 3 ? 2.5 : normalizedStep <= 5 ? 5 : 10) * magnitude;
   const firstTick = Math.ceil(domain[0] / step) * step;
   const ticks: number[] = [];
   for (let tick = firstTick; tick <= domain[1]; tick += step) ticks.push(Number(tick.toFixed(3)));
@@ -295,6 +304,7 @@ export function ResiliencyHistoryChart({
                 role="group"
                 aria-labelledby={`${id}-title ${id}-description`}
                 data-zoomed={chartIsZoomed}
+                data-y-min={domain.y[0]}
                 data-y-max={domain.y[1]}
                 onWheel={handleWheel}
                 onPointerDown={handlePointerDown}
