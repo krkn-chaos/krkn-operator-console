@@ -19,6 +19,7 @@ import { useClusterDiscovery } from '../../hooks/useClusterDiscovery';
 import type { CategoryResponse, ResiliencyHistoryQueryResponse, TargetResponse } from '../../types/api';
 import { buildResiliencyHistoryCharts, type ResiliencyHistoryChartMode } from './resiliencyHistoryUtils';
 import { ResiliencyHistoryChart } from './ResiliencyHistoryChart';
+import { captureResiliencyHistoryChartVisuals, prepareResiliencyHistoryReport } from './resiliencyHistoryReport';
 import './resiliencyHistory.css';
 
 interface ClusterOption {
@@ -67,6 +68,7 @@ export function ResiliencyHistoryPage() {
   const [showBaselines, setShowBaselines] = useState(true);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
   const categoryRequestId = useRef(0);
   const queryRequestId = useRef(0);
   const clusterDiscoveryStarted = useRef(false);
@@ -117,6 +119,7 @@ export function ResiliencyHistoryPage() {
     setAppliedFilters(null);
     setGeneratedAt(null);
     setExportError(null);
+    setExportLoading(false);
   };
 
   const toggleCategory = (name: string) => {
@@ -147,6 +150,7 @@ export function ResiliencyHistoryPage() {
     setAppliedFilters(null);
     setGeneratedAt(null);
     setExportError(null);
+    setExportLoading(false);
 
     try {
       const response = await operatorApi.queryResiliencyHistory(filters);
@@ -170,10 +174,54 @@ export function ResiliencyHistoryPage() {
       return;
     }
     setExportError(null);
+    let reportWindow: Window | null = null;
     try {
-      if (typeof window.print !== 'function') throw new Error('PDF export is unavailable in this browser.');
-      window.print();
+      reportWindow = window.open('', '_blank');
+      if (!reportWindow) throw new Error('Allow pop-ups to open the PDF report.');
+
+      const loadingPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Preparing resiliency report</title><style>body{margin:0;padding:4rem 1rem;color:#202b3a;background:#f4f7fb;font:16px Arial,sans-serif;text-align:center}.card{max-width:32rem;margin:4rem auto;padding:2rem;border:1px solid #d8dee8;border-radius:8px;background:#fff}h1{font-size:1.35rem}p{color:#627086}</style></head><body><div class="card"><h1>Preparing your resiliency report</h1><p>Collecting chart data and effective run configurations…</p></div></body></html>`;
+      reportWindow.document.open();
+      reportWindow.document.write(loadingPage);
+      reportWindow.document.close();
+
+      setExportLoading(true);
+      const reportWindowRef = reportWindow;
+      void prepareResiliencyHistoryReport({
+        queryResult,
+        categories: appliedFilters?.categories ?? [],
+        clusters: appliedFilters?.clusters ?? [],
+        charts,
+        chartMode,
+        showBaselines,
+        queriedAt: generatedAt,
+        reportGeneratedAt: new Date().toLocaleString(),
+        chartVisuals: captureResiliencyHistoryChartVisuals(charts),
+      }).then((html) => {
+        if (reportWindowRef.closed) return;
+        reportWindowRef.document.open();
+        reportWindowRef.document.write(html);
+        reportWindowRef.document.close();
+        reportWindowRef.document.getElementById('report-print')?.addEventListener('click', () => {
+          reportWindowRef.focus();
+          reportWindowRef.print();
+        });
+        reportWindowRef.document.getElementById('report-close')?.addEventListener('click', () => reportWindowRef.close());
+        reportWindowRef.setTimeout(() => {
+          try {
+            if (reportWindowRef.closed) return;
+            reportWindowRef.focus();
+            reportWindowRef.print();
+          } catch (error) {
+            setExportError(error instanceof Error ? error.message : 'Unable to open the PDF print dialog.');
+          }
+        }, 120);
+      }).catch((error: unknown) => {
+        if (!reportWindowRef.closed) reportWindowRef.close();
+        setExportError(error instanceof Error ? error.message : 'Unable to prepare the PDF report.');
+      }).finally(() => setExportLoading(false));
     } catch (error) {
+      reportWindow?.close();
+      setExportLoading(false);
       setExportError(error instanceof Error ? error.message : 'Unable to open the PDF export dialog.');
     }
   };
@@ -312,9 +360,10 @@ export function ResiliencyHistoryPage() {
                 className="resiliency-history__export-button"
                 variant="secondary"
                 onClick={exportPdf}
-                isDisabled={!hasResults}
+                isDisabled={!hasResults || exportLoading}
+                isLoading={exportLoading}
               >
-                Export PDF
+                {exportLoading ? 'Preparing report…' : 'Export PDF'}
               </Button>
             </div>
             {!hasResults && (
@@ -327,7 +376,7 @@ export function ResiliencyHistoryPage() {
             {hasResults && (
               <>
                 <p id="resiliency-history-export-help" className="resiliency-history__export-help">
-                  Export the currently displayed charts using your browser’s Save as PDF option.
+                  Opens a print-ready report with score summaries, vector charts and effective configurations.
                 </p>
                 <div className="resiliency-history__mode-controls" role="group" aria-label="Chart configuration mode">
                   <Radio
@@ -352,13 +401,6 @@ export function ResiliencyHistoryPage() {
                     isChecked={showBaselines}
                     onChange={(_event, checked) => setShowBaselines(checked)}
                   />
-                </div>
-                <div className="resiliency-history__print-summary">
-                  <p><strong>Categories:</strong> {appliedFilters.categories.join(', ')}</p>
-                  <p><strong>Clusters:</strong> {appliedFilters.clusters.join(', ')}</p>
-                  <p><strong>Configuration mode:</strong> {chartMode === 'separate' ? 'Separate configuration groups' : 'Mixed configurations by category'}</p>
-                  <p><strong>Baseline comparisons:</strong> {showBaselines ? 'Shown' : 'Hidden'}</p>
-                  <p><strong>Generated at:</strong> {generatedAt}</p>
                 </div>
                 <div className="resiliency-history__charts" aria-label="Resiliency history charts">
                   {charts.map((chart) => (
