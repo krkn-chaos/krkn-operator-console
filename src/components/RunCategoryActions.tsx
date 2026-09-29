@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   Dropdown,
   DropdownItem,
@@ -187,22 +187,44 @@ function getCategoryStripeGradient(categories: CategoryResponse[]): string {
 export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
   const tooltipId = useId();
+  const stripeRef = useRef<HTMLDivElement>(null);
+  const visualStripeRef = useRef<HTMLDivElement>(null);
+
+  const updateTooltipPosition = useCallback(() => {
+    const stripeElement = stripeRef.current;
+    const visualStripeElement = visualStripeRef.current;
+    if (!stripeElement || !visualStripeElement) return;
+
+    const stripeRect = stripeElement.getBoundingClientRect();
+    const visualStripeRect = visualStripeElement.getBoundingClientRect();
+    setTooltipPosition({
+      left: visualStripeRect.right - stripeRect.left,
+      top: visualStripeRect.top + visualStripeRect.height / 2 - stripeRect.top,
+    });
+  }, []);
+
+  const revealTooltip = useCallback(() => {
+    updateTooltipPosition();
+    setIsTooltipVisible(true);
+  }, [updateTooltipPosition]);
 
   useEffect(() => {
     if (!isHovered) return;
 
     const fallbackTimer = window.setTimeout(
-      () => setIsTooltipVisible(true),
+      revealTooltip,
       CATEGORY_STRIPE_TRANSITION_MS + 50,
     );
     return () => window.clearTimeout(fallbackTimer);
-  }, [isHovered]);
+  }, [isHovered, revealTooltip]);
 
   if (categories.length === 0) return null;
 
   return (
     <div
+      ref={stripeRef}
       role="group"
       tabIndex={0}
       aria-label={`Categories: ${categories.map((category) => category.name).join(', ')}`}
@@ -228,15 +250,16 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
         left: 0,
         top: 0,
         bottom: 0,
-        // This fixed anchor makes the tooltip start exactly at the expanded stripe edge.
+        // Keep the hit area stable while only the visible stripe animates.
         width: CATEGORY_STRIPE_WIDE_WIDTH,
       }}
     >
       <div
+        ref={visualStripeRef}
         data-testid="category-stripe-visual"
         aria-hidden="true"
         onTransitionEnd={(event) => {
-          if (event.propertyName === 'width' && isHovered) setIsTooltipVisible(true);
+          if (event.propertyName === 'width' && isHovered) revealTooltip();
         }}
         style={{
           position: 'absolute',
@@ -257,8 +280,8 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
           className="pf-v5-c-tooltip pf-m-right"
           style={{
             position: 'absolute',
-            left: '100%',
-            top: '50%',
+            left: tooltipPosition?.left ?? 0,
+            top: tooltipPosition?.top ?? 0,
             transform: 'translateY(-50%)',
             width: 'max-content',
             maxWidth: '18.75rem',
