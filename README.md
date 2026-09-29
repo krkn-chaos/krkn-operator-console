@@ -65,6 +65,10 @@ sending kubeconfig or service credentials to the browser. It edits the returned
 YAML, validates it against the Krkn-AI schema, saves a target-bound config, and
 launches only after the operator returns a `201` `KrknAIRun`.
 
+The discovery step lists namespaces from the selected cluster and starts with none selected. Selected names are escaped and joined into Krkn AI's comma-separated namespace pattern; pod and node label-key filters are not exposed.
+
+Genetic settings use the Krkn-AI model defaults and grouped descriptions. The algorithm is fixed to `genetic`; population injection values remain at their model defaults, and tournament size appears only for tournament selection. A legacy single fitness query is migrated into the fitness item list.
+
 Cancel remains in the action row on each target, configuration, and review step.
 
 The run list, creation wizard, and result views expand to the available page width.

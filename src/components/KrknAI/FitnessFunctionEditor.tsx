@@ -29,39 +29,16 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
         key: nextKey,
         id: String(nextId),
         title: 'Custom fitness item',
-        query: draft.fitnessQuery,
-        type: 'range',
-        weight: '0',
+        query: '',
+        type: 'point',
+        weight: '1',
       }],
     });
   };
 
   return (
     <div className="krkn-ai-fitness-editor">
-      <p className="krkn-ai-muted">Fitness queries are evaluated by the configured Prometheus service during execution. Item weights are finite non-negative coefficients and are not auto-normalized.</p>
-      <div className="krkn-ai-config-fields">
-        <FormGroup label="Fitness query" fieldId="krkn-ai-fitness-query">
-          <TextInput
-            id="krkn-ai-fitness-query"
-            value={draft.fitnessQuery}
-            onChange={(_event, value) => onChange({ fitnessQuery: value })}
-            validated={errors.fitnessQuery ? 'error' : 'default'}
-            aria-invalid={!!errors.fitnessQuery}
-          />
-          {errors.fitnessQuery && <p className="krkn-ai-field-error" role="alert">{errors.fitnessQuery}</p>}
-        </FormGroup>
-        <FormGroup label="Fitness query type" fieldId="krkn-ai-fitness-type" isRequired>
-          <FormSelect
-            id="krkn-ai-fitness-type"
-            value={draft.fitnessType}
-            onChange={(_event, value) => onChange({ fitnessType: value as EditableConfigDraft['fitnessType'] })}
-          >
-            <FormSelectOption value="point" label="point" />
-            <FormSelectOption value="range" label="range" />
-          </FormSelect>
-        </FormGroup>
-      </div>
-
+      <p className="krkn-ai-muted">Fitness queries are evaluated by the configured Prometheus service. Item weights are non-negative relative weights normalized during scoring.</p>
       <fieldset className="krkn-ai-fitness-includes">
         <legend>Include score components</legend>
         <Checkbox
@@ -151,7 +128,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
                 </FormGroup>
                 <Button
                   variant="secondary"
-                  isDisabled={draft.fitnessItems.length === 1 && !draft.fitnessQuery.trim()}
+                  isDisabled={draft.fitnessItems.length === 1}
                   onClick={() => onChange({ fitnessItems: draft.fitnessItems.filter((candidate) => candidate.key !== item.key) })}
                   aria-label={`Remove fitness item ${item.id}`}
                 >

@@ -61,13 +61,10 @@ export interface EditableConfigDraft {
   baselineEnabled: boolean;
   baselineDuration: string;
   scenarioFlags: ScenarioFlags;
-  algorithm: string;
   genetic: GeneticSettingsDraft;
   healthChecks: HealthCheckDraft[];
   stopWatcherOnFailure: boolean;
   stopTimeout: string;
-  fitnessQuery: string;
-  fitnessType: FitnessValueType;
   includeKrknFailure: boolean;
   includeHealthCheckFailure: boolean;
   includeHealthCheckResponseTime: boolean;
@@ -168,9 +165,26 @@ export function createEditableConfigDraft(configYaml: string): { document: Docum
       title: text(item.name ?? item.title, `Fitness item ${key + 1}`),
       query: text(item.query),
       type: item.type === 'range' ? 'range' as const : 'point' as const,
-      weight: text(item.weight, '0'),
+      weight: text(item.weight, '1'),
     };
   });
+  const legacyQuery = text(fitness.query).trim();
+  const legacyType = fitness.type === 'range' ? 'range' : 'point';
+  if (legacyQuery && !fitnessItems.some((item) => item.query.trim() === legacyQuery && item.type === legacyType)) {
+    const nextId = fitnessItems.reduce(
+      (maximum, item) => Math.max(maximum, Number.isFinite(Number(item.id)) ? Number(item.id) : -1),
+      -1,
+    ) + 1;
+    const nextKey = fitnessItems.reduce((maximum, item) => Math.max(maximum, item.key), -1) + 1;
+    fitnessItems.push({
+      key: nextKey,
+      id: String(nextId),
+      title: 'Default fitness query',
+      query: legacyQuery,
+      type: legacyType,
+      weight: '1',
+    });
+  }
   const healthChecks = list(health.applications).map((entry, key) => {
     const check = record(entry);
     return {
@@ -188,25 +202,22 @@ export function createEditableConfigDraft(configYaml: string): { document: Docum
     baselineEnabled: bool(baseline.enable, true),
     baselineDuration: text(baseline.duration, '120'),
     scenarioFlags,
-    algorithm: text(raw.algorithm, 'genetic'),
     genetic: {
       duration: text(genetic.duration),
-      generations: text(genetic.generations, '1'),
-      populationSize: text(genetic.population_size, '2'),
-      mutationRate: text(genetic.mutation_rate, '0'),
-      scenarioMutationRate: text(genetic.scenario_mutation_rate, '0'),
-      crossoverRate: text(genetic.crossover_rate, '0'),
+      generations: text(genetic.generations, text(genetic.duration).trim() ? '' : '20'),
+      populationSize: text(genetic.population_size, '10'),
+      mutationRate: text(genetic.mutation_rate, '0.7'),
+      scenarioMutationRate: text(genetic.scenario_mutation_rate, '0.6'),
+      crossoverRate: text(genetic.crossover_rate, '0.6'),
       compositionRate: text(genetic.composition_rate, '0'),
       selectionStrategy: text(genetic.selection_strategy, 'tournament'),
-      tournamentSize: text(genetic.tournament_size, '2'),
+      tournamentSize: text(genetic.tournament_size, '6'),
       populationInjectionRate: text(genetic.population_injection_rate, '0'),
-      populationInjectionSize: text(genetic.population_injection_size, '1'),
+      populationInjectionSize: text(genetic.population_injection_size, '2'),
     },
     healthChecks,
     stopWatcherOnFailure: bool(health.stop_watcher_on_failure),
     stopTimeout: text(health.stop_timeout, '5'),
-    fitnessQuery: text(fitness.query),
-    fitnessType: fitness.type === 'range' ? 'range' : 'point',
     includeKrknFailure: bool(fitness.include_krkn_failure, true),
     includeHealthCheckFailure: bool(fitness.include_health_check_failure, true),
     includeHealthCheckResponseTime: bool(fitness.include_health_check_response_time, true),
@@ -230,12 +241,12 @@ export function updateConfigDocument(document: Document, draft: EditableConfigDr
   set(['wait_duration'], numberValue(draft.waitDuration));
   set(['baseline', 'enable'], draft.baselineEnabled);
   set(['baseline', 'duration'], numberValue(draft.baselineDuration));
-  set(['algorithm'], draft.algorithm);
+  set(['algorithm'], 'genetic');
   for (const option of scenarioTypeOptions) set(['scenario', option.configKey, 'enable'], draft.scenarioFlags[option.id]);
 
   const genetic = draft.genetic;
   const geneticFields: Array<[keyof GeneticSettingsDraft, string, boolean]> = [
-    ['duration', 'duration', true], ['generations', 'generations', false], ['populationSize', 'population_size', false],
+    ['duration', 'duration', true], ['generations', 'generations', true], ['populationSize', 'population_size', false],
     ['mutationRate', 'mutation_rate', false], ['scenarioMutationRate', 'scenario_mutation_rate', false],
     ['crossoverRate', 'crossover_rate', false], ['compositionRate', 'composition_rate', false],
     ['selectionStrategy', 'selection_strategy', false], ['tournamentSize', 'tournament_size', false],
@@ -251,7 +262,7 @@ export function updateConfigDocument(document: Document, draft: EditableConfigDr
   const updateSequence = (path: Array<string | number>, rows: Array<Record<string, unknown>>) => {
     let sequence = document.getIn(path, true);
     if (!isSeq(sequence)) {
-      document.setIn(path, []);
+      document.setIn(path, document.createNode([]));
       sequence = document.getIn(path, true);
     }
     if (!isSeq(sequence)) return;
@@ -274,8 +285,8 @@ export function updateConfigDocument(document: Document, draft: EditableConfigDr
   }));
   updateSequence(['health_checks', 'applications'], healthRows);
 
-  set(['fitness_function', 'query'], draft.fitnessQuery.trim() ? draft.fitnessQuery : null);
-  set(['fitness_function', 'type'], draft.fitnessType);
+  document.deleteIn(['fitness_function', 'query']);
+  document.deleteIn(['fitness_function', 'type']);
   set(['fitness_function', 'include_krkn_failure'], draft.includeKrknFailure);
   set(['fitness_function', 'include_health_check_failure'], draft.includeHealthCheckFailure);
   set(['fitness_function', 'include_health_check_response_time'], draft.includeHealthCheckResponseTime);
@@ -325,24 +336,37 @@ export function validateConfigDraft(draft: EditableConfigDraft): ConfigValidatio
   add('seed', numericError(draft.seed, 'Seed', { integer: true, optional: true }));
   add('waitDuration', numericError(draft.waitDuration, 'Wait duration', { min: 0, integer: true }));
   add('baselineDuration', numericError(draft.baselineDuration, 'Baseline duration', { min: 1, integer: true }));
-  add('generations', numericError(genetic.generations, 'Generations', { min: 1, integer: true }));
+  const hasDuration = !!genetic.duration.trim();
+  const hasGenerations = !!genetic.generations.trim();
+  if (hasDuration && hasGenerations) {
+    const error = 'Set either generations or duration, not both.';
+    errors.generations = error;
+    errors['genetic.duration'] = error;
+  } else if (!hasDuration && !hasGenerations) {
+    errors.generations = 'Set a generation count or duration.';
+  } else if (hasDuration) {
+    add('genetic.duration', numericError(genetic.duration, 'Genetic duration', { min: 1, integer: true }));
+  } else {
+    add('generations', numericError(genetic.generations, 'Generations', { min: 1, integer: true }));
+  }
   add('populationSize', numericError(genetic.populationSize, 'Population size', { min: 2, integer: true }));
-  add('genetic.duration', numericError(genetic.duration, 'Genetic duration', { min: 1, integer: true, optional: true }));
   for (const [field, label] of [['mutationRate', 'Mutation rate'], ['scenarioMutationRate', 'Scenario mutation rate'], ['crossoverRate', 'Crossover rate'], ['populationInjectionRate', 'Population injection rate']] as const) {
     add(`genetic.${field}`, numericError(genetic[field], label, { min: 0 }));
     if (Number(genetic[field]) > 1) errors[`genetic.${field}`] = `${label} must be at most 1.`;
   }
   add('genetic.compositionRate', Number(genetic.compositionRate) === 0 ? undefined : 'Composition rate must be zero for operator runs.');
-  add('genetic.tournamentSize', numericError(genetic.tournamentSize, 'Tournament size', { min: 1, integer: true }));
-  add('genetic.populationInjectionSize', numericError(genetic.populationInjectionSize, 'Population injection size', { min: 1, integer: true }));
   add('genetic.selectionStrategy', ['roulette', 'tournament'].includes(genetic.selectionStrategy) ? undefined : 'Choose roulette or tournament.');
-  add('algorithm', draft.algorithm === 'genetic' ? undefined : 'Choose the supported genetic algorithm.');
+  if (genetic.selectionStrategy === 'tournament') {
+    add('genetic.tournamentSize', numericError(genetic.tournamentSize, 'Tournament size', { min: 1, integer: true }));
+  }
+  add('genetic.populationInjectionSize', numericError(genetic.populationInjectionSize, 'Population injection size', { min: 1, integer: true }));
   add('stopTimeout', numericError(draft.stopTimeout, 'Health-check stop timeout', { min: 0 }));
-  if (!draft.fitnessQuery.trim() && draft.fitnessItems.length === 0) errors.fitnessQuery = 'Provide a fitness query or at least one fitness item.';
+  if (draft.fitnessItems.length === 0) errors.fitnessItems = 'Add at least one fitness item.';
   for (const item of draft.fitnessItems) {
     const key = `fitnessItem.${item.key}`;
     add(`${key}.id`, numericError(item.id, 'Item ID', { integer: true }));
     add(`${key}.weight`, numericError(item.weight, 'Weight', { min: 0 }));
+    if (!item.query.trim()) errors[`${key}.query`] = 'PromQL query is required.';
   }
   for (const check of draft.healthChecks) {
     const key = `healthCheck.${check.key}`;

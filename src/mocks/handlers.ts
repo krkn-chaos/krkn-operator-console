@@ -823,13 +823,21 @@ export const handlers = [
   ),
 
   // ─── TERMINAL ───
-  http.post(`${BASE}/terminal`, () =>
-    HttpResponse.json({
-      stdout_base64: b64('Preview mode: commands are simulated.\n$ oc get pods\nNAME                    READY   STATUS    RESTARTS   AGE\nkrkn-operator-0         1/1     Running   0          2d\n'),
+  http.post(`${BASE}/terminal`, async ({ request }) => {
+    const { command } = await request.json() as { command?: string };
+    const stdout = command === 'kubectl get namespaces -o json'
+      ? JSON.stringify({
+          apiVersion: 'v1',
+          kind: 'NamespaceList',
+          items: ['default', 'kube-system', 'shop'].map((name) => ({ metadata: { name } })),
+        })
+      : 'Preview mode: commands are simulated.\n$ oc get pods\nNAME                    READY   STATUS    RESTARTS   AGE\nkrkn-operator-0         1/1     Running   0          2d\n';
+    return HttpResponse.json({
+      stdout_base64: b64(stdout),
       stderr_base64: b64(''),
       exit_code: 0,
-    }),
-  ),
+    });
+  }),
   http.get(`${BASE}/terminal/available-commands`, () =>
     HttpResponse.json({
       commands: [

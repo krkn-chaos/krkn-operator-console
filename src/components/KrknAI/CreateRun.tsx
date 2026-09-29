@@ -22,13 +22,14 @@ import {
   SlidersHIcon,
   TopologyIcon,
 } from '@patternfly/react-icons';
+import { operatorApi } from '../../services/operatorApi';
 import { krknAiApi, KrknAIConfigValidationError } from '../../services/krknAiApi';
 import type { KrknAIRunResource, KrknAIConfigValidationIssue } from '../../services/krknAiApi';
 import { isApiError } from '../../utils/apiClient';
 import type { SelectedCluster, TargetResponse } from '../../types/api';
 import { FitnessFunctionEditor } from './FitnessFunctionEditor';
 import { HealthChecksEditor } from './HealthChecksEditor';
-import { DiscoveryOptionsEditor } from './DiscoveryOptionsEditor';
+import { NamespaceSelector } from './NamespaceSelector';
 import { ClusterComponentsEditor } from './ClusterComponentsEditor';
 import {
   createEditableConfigDraft,
@@ -36,8 +37,6 @@ import {
   updateConfigDocument,
   validateConfigDraft,
 } from './configModel';
-import { defaultDiscoveryOptions, validateDiscoveryOptions } from './discoveryOptions';
-import type { DiscoveryOptions } from './discoveryOptions';
 import type { ConfigValidationErrors, EditableConfigDraft, GeneticSettingsDraft } from './configModel';
 import type { Document } from 'yaml';
 
@@ -110,14 +109,29 @@ interface ConfigNumberFieldProps {
   max?: number;
   step?: number | string;
   optional?: boolean;
+  description?: string;
 }
 
-function ConfigNumberField({ id, label, value, onChange, error, min, max, step, optional = false }: ConfigNumberFieldProps) {
+function ConfigNumberField({ id, label, value, onChange, error, min, max, step, optional = false, description }: ConfigNumberFieldProps) {
+  const descriptionId = `${id}-help`;
+  const errorId = `${id}-error`;
   return (
     <FormGroup label={label} fieldId={id} isRequired={!optional}>
-      <TextInput id={id} type="number" min={min} max={max} step={step} value={value} onChange={(_event, nextValue) => onChange(nextValue)} validated={error ? 'error' : 'default'} aria-invalid={!!error} />
-      {error && <p className="krkn-ai-field-error" role="alert">{error}</p>}
-      {!error && optional && <p className="krkn-ai-muted">Leave blank to omit this optional value.</p>}
+      <TextInput
+        id={id}
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(_event, nextValue) => onChange(nextValue)}
+        validated={error ? 'error' : 'default'}
+        aria-invalid={!!error}
+        aria-describedby={error ? errorId : (description || optional ? descriptionId : undefined)}
+      />
+      {error && <p id={errorId} className="krkn-ai-field-error" role="alert">{error}</p>}
+      {!error && description && <p id={descriptionId} className="krkn-ai-field-help">{description}</p>}
+      {!error && optional && !description && <p id={descriptionId} className="krkn-ai-muted">Leave blank to omit this optional value.</p>}
     </FormGroup>
   );
 }
@@ -132,6 +146,27 @@ function apiErrorMessage(error: unknown): string {
   return 'The request failed. Try again.';
 }
 
+function parseNamespaceNames(stdout: string): string[] {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(stdout);
+  } catch {
+    throw new Error('Namespace listing returned invalid JSON.');
+  }
+  if (!payload || typeof payload !== 'object' || !('items' in payload) || !Array.isArray(payload.items)) {
+    throw new Error('Namespace listing returned an invalid response.');
+  }
+  const names = (payload.items as unknown[]).flatMap((item) => {
+    if (!item || typeof item !== 'object' || !('metadata' in item) || !item.metadata || typeof item.metadata !== 'object' || !('name' in item.metadata)) return [];
+    const name = item.metadata.name;
+    return typeof name === 'string' && name.trim() ? [name] : [];
+  });
+  return [...new Set(names)].sort((left, right) => left.localeCompare(right));
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export function CreateRun({
   existingNames,
@@ -146,7 +181,11 @@ export function CreateRun({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [runName, setRunName] = useState('');
   const [selectedClusterValue, setSelectedClusterValue] = useState('');
-  const [discoveryOptions, setDiscoveryOptions] = useState<DiscoveryOptions>(defaultDiscoveryOptions);
+  const [availableNamespaces, setAvailableNamespaces] = useState<string[]>([]);
+  const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
+  const [namespaceLoading, setNamespaceLoading] = useState(false);
+  const [namespaceError, setNamespaceError] = useState<string | null>(null);
+  const [namespaceRetry, setNamespaceRetry] = useState(0);
   const [discoveryWarnings, setDiscoveryWarnings] = useState<string[]>([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
   const [discoveryError, setDiscoveryError] = useState('');
@@ -181,7 +220,41 @@ export function CreateRun({
     ? selectedClusterValue
     : clusterOptions[0]?.value ?? '';
   const selectedCluster = clusterOptions.find((cluster) => cluster.value === resolvedClusterValue) ?? null;
+  const namespaceClusterName = selectedCluster?.clusterName ?? '';
+  const namespaceProviderName = selectedCluster?.operatorName ?? '';
 
+  useEffect(() => {
+    if (!targetRequestId || !namespaceClusterName || !namespaceProviderName) {
+      setAvailableNamespaces([]);
+      setSelectedNamespaces([]);
+      setNamespaceError(null);
+      setNamespaceLoading(false);
+      return undefined;
+    }
+
+    let current = true;
+    setAvailableNamespaces([]);
+    setSelectedNamespaces([]);
+    setNamespaceError(null);
+    setNamespaceLoading(true);
+    void operatorApi.executeTerminalCommand({
+      cluster_id: namespaceClusterName,
+      uuid: targetRequestId,
+      command: 'kubectl get namespaces -o json',
+    }).then(({ stdout, stderr, exitCode }) => {
+      if (!current) return;
+      if (exitCode !== 0) {
+        throw new Error(stderr.trim() || `Namespace listing exited with code ${exitCode}.`);
+      }
+      setAvailableNamespaces(parseNamespaceNames(stdout));
+    }).catch((error) => {
+      if (current) setNamespaceError(error instanceof Error ? error.message : 'Unable to list namespaces.');
+    }).finally(() => {
+      if (current) setNamespaceLoading(false);
+    });
+
+    return () => { current = false; };
+  }, [namespaceClusterName, namespaceProviderName, namespaceRetry, targetRequestId]);
 
   const trimmedName = runName.trim();
   const nameError = !trimmedName
@@ -191,20 +264,27 @@ export function CreateRun({
       : existingNames.some((name) => name.toLowerCase() === trimmedName.toLowerCase())
         ? 'A run with this name already exists.'
         : undefined;
-  const discoveryOptionErrors = validateDiscoveryOptions(discoveryOptions);
   const configErrors = draft ? validateConfigDraft(draft) : {};
   const sectionIndex = configurationSections.findIndex((section) => section.id === configurationSection);
   const previousSection = configurationSections[sectionIndex - 1];
   const nextSection = configurationSections[sectionIndex + 1];
   const targetMap = selectedCluster ? { [selectedCluster.operatorName]: [selectedCluster.clusterName] } : {};
+  const namespacePattern = selectedNamespaces.map(escapeRegex).join(',');
   const noAuthorizedClusters = !!targetRequestId && !targetLoading && !targetError && discoveredClusters.length === 0;
   const canDiscover = !!selectedCluster && !!targetRequestId && !targetLoading && !nameError
-    && !Object.keys(discoveryOptionErrors).length && !discoveryLoading;
+    && selectedNamespaces.length > 0 && !namespaceLoading && !namespaceError && !discoveryLoading;
   const canSaveConfig = !!draft && !!documentRef.current && !!selectedCluster && !nameError && !yamlError
     && !Object.keys(configErrors).length && !actionLoading && !discoveryLoading
     && (!draft.scenarioFlags['service-disruption'] || dangerousConfirmed);
   const canStart = !!createdConfig && !actionLoading && createdConfig.targetRequestId === targetRequestId
     && selectedCluster !== null && createdConfig.targetClusters[selectedCluster.operatorName]?.[0] === selectedCluster.clusterName;
+  const selectedGeneticDuration = draft?.genetic.duration.trim() ?? '';
+  const runBudgetLabel = selectedGeneticDuration ? 'Duration limit' : 'Expected scenarios';
+  const runBudget = selectedGeneticDuration
+    ? `${Number(selectedGeneticDuration).toLocaleString()} seconds`
+    : draft
+      ? (Number(draft.genetic.generations) * Number(draft.genetic.populationSize)).toLocaleString()
+      : 'Not available';
   const abortActiveRequest = () => {
     requestControllerRef.current?.abort();
     requestControllerRef.current = null;
@@ -223,9 +303,12 @@ export function CreateRun({
     setActionError('');
   };
 
-  const updateGenetic = (field: keyof GeneticSettingsDraft, value: string | boolean) => {
+  const updateGenetic = (field: keyof GeneticSettingsDraft, value: string) => {
     if (!draft) return;
-    updateDraft({ genetic: { ...draft.genetic, [field]: value } as GeneticSettingsDraft });
+    const genetic = { ...draft.genetic, [field]: value };
+    if (field === 'duration' && value.trim()) genetic.generations = '';
+    if (field === 'generations' && value.trim()) genetic.duration = '';
+    updateDraft({ genetic });
   };
 
   const startRequest = () => {
@@ -246,9 +329,7 @@ export function CreateRun({
       const response = await krknAiApi.discover({
         targetRequestId,
         targetClusters: targetMap,
-        namespacePattern: discoveryOptions.namespacePattern,
-        podLabelPattern: discoveryOptions.podLabelPattern,
-        nodeLabelPattern: discoveryOptions.nodeLabelPattern,
+        namespacePattern,
       }, { signal: controller.signal });
       if (controller.signal.aborted) return;
       const editable = createEditableConfigDraft(response.configYaml);
@@ -356,11 +437,22 @@ export function CreateRun({
   const handleClusterChange = (value: string) => {
     abortActiveRequest();
     setSelectedClusterValue(value);
+    setAvailableNamespaces([]);
+    setSelectedNamespaces([]);
+    setNamespaceError(null);
     documentRef.current = null;
     setDraft(null);
     setCreatedConfig(null);
     setConfigYaml('');
     setStep(1);
+  };
+
+  const handleNamespaceToggle = (namespace: string, enabled: boolean) => {
+    setSelectedNamespaces((current) => {
+      if (enabled) return current.includes(namespace) ? current : [...current, namespace];
+      return current.filter((selected) => selected !== namespace);
+    });
+    setDiscoveryError('');
   };
 
 
@@ -424,7 +516,16 @@ export function CreateRun({
               {selectedCluster && <p className="krkn-ai-muted">Selected cluster API: <code>{selectedCluster.clusterApiUrl}</code></p>}
             </CardBody>
           </Card>
-          <DiscoveryOptionsEditor options={discoveryOptions} errors={discoveryOptionErrors} onChange={(field, value) => { abortActiveRequest(); setDiscoveryOptions((current) => ({ ...current, [field]: value })); setCreatedConfig(null); }} />
+          <NamespaceSelector
+            namespaces={availableNamespaces}
+            selectedNamespaces={selectedNamespaces}
+            loading={namespaceLoading}
+            error={namespaceError}
+            onToggle={handleNamespaceToggle}
+            onSelectAll={() => setSelectedNamespaces(availableNamespaces)}
+            onClear={() => setSelectedNamespaces([])}
+            onRetry={() => setNamespaceRetry((current) => current + 1)}
+          />
           {discoveryError && <Alert variant="danger" title="Krkn AI discovery failed" isInline>{discoveryError}</Alert>}
           <div className="krkn-ai-actions"><Button variant="secondary" onClick={cancel}>Cancel</Button><Button variant="primary" isDisabled={!canDiscover} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>
 
@@ -453,39 +554,50 @@ export function CreateRun({
           </CardBody></Card>}
 
           {configurationSection === 'genetic' && <Card><CardTitle>{configurationTitle(configurationSections[2])}</CardTitle><CardBody>
-            <Alert variant="info" title="Control the search breadth" isInline>Population size must be at least two. The operator runner requires composition rate to remain zero.</Alert>
-            <div className="krkn-ai-config-fields">
-              <ConfigTextField id="krkn-ai-algorithm" label="Algorithm" value={draft.algorithm} onChange={(value) => updateDraft({ algorithm: value })} error={errorFor(configErrors, 'algorithm')} />
-              <ConfigNumberField id="krkn-ai-generations" label="Generations" value={draft.genetic.generations} onChange={(value) => updateGenetic('generations', value)} error={errorFor(configErrors, 'generations')} min={1} step={1} />
-              <ConfigNumberField id="krkn-ai-population" label="Population size" value={draft.genetic.populationSize} onChange={(value) => updateGenetic('populationSize', value)} error={errorFor(configErrors, 'populationSize')} min={2} step={1} />
-              <ConfigNumberField id="krkn-ai-genetic-duration" label="Genetic duration (seconds)" value={draft.genetic.duration} onChange={(value) => updateGenetic('duration', value)} error={errorFor(configErrors, 'genetic.duration')} min={1} step={1} optional />
-              <ConfigNumberField id="krkn-ai-mutation-rate" label="Mutation rate" value={draft.genetic.mutationRate} onChange={(value) => updateGenetic('mutationRate', value)} error={errorFor(configErrors, 'genetic.mutationRate')} min={0} max={1} step="any" />
-              <ConfigNumberField id="krkn-ai-scenario-mutation-rate" label="Scenario mutation rate" value={draft.genetic.scenarioMutationRate} onChange={(value) => updateGenetic('scenarioMutationRate', value)} error={errorFor(configErrors, 'genetic.scenarioMutationRate')} min={0} max={1} step="any" />
-              <ConfigNumberField id="krkn-ai-crossover-rate" label="Crossover rate" value={draft.genetic.crossoverRate} onChange={(value) => updateGenetic('crossoverRate', value)} error={errorFor(configErrors, 'genetic.crossoverRate')} min={0} max={1} step="any" />
-              <ConfigNumberField id="krkn-ai-composition-rate" label="Composition rate (operator runs)" value={draft.genetic.compositionRate} onChange={(value) => updateGenetic('compositionRate', value)} error={errorFor(configErrors, 'genetic.compositionRate')} min={0} max={0} step="any" />
-              <FormGroup label="Selection strategy" fieldId="krkn-ai-selection-strategy" isRequired>
-                <FormSelect id="krkn-ai-selection-strategy" value={draft.genetic.selectionStrategy} onChange={(_event, value) => updateGenetic('selectionStrategy', value)} validated={configErrors['genetic.selectionStrategy'] ? 'error' : 'default'}><FormSelectOption value="roulette" label="roulette" /><FormSelectOption value="tournament" label="tournament" /></FormSelect>
-                {configErrors['genetic.selectionStrategy'] && <p className="krkn-ai-field-error" role="alert">{configErrors['genetic.selectionStrategy']}</p>}
-              </FormGroup>
-              <ConfigNumberField id="krkn-ai-tournament-size" label="Tournament size" value={draft.genetic.tournamentSize} onChange={(value) => updateGenetic('tournamentSize', value)} error={errorFor(configErrors, 'genetic.tournamentSize')} min={1} step={1} />
-              <ConfigNumberField id="krkn-ai-population-injection-rate" label="Population injection rate" value={draft.genetic.populationInjectionRate} onChange={(value) => updateGenetic('populationInjectionRate', value)} error={errorFor(configErrors, 'genetic.populationInjectionRate')} min={0} max={1} step="any" />
-              <ConfigNumberField id="krkn-ai-population-injection-size" label="Population injection size" value={draft.genetic.populationInjectionSize} onChange={(value) => updateGenetic('populationInjectionSize', value)} error={errorFor(configErrors, 'genetic.populationInjectionSize')} min={1} step={1} />
+            <div className="krkn-ai-genetic-settings">
+              <section className="krkn-ai-genetic-group" aria-labelledby="krkn-ai-genetic-budget">
+                <h3 id="krkn-ai-genetic-budget">Search budget</h3>
+                <div className="krkn-ai-config-fields">
+                  <ConfigNumberField id="krkn-ai-generations" label="Generations" value={draft.genetic.generations} onChange={(value) => updateGenetic('generations', value)} error={errorFor(configErrors, 'generations')} min={1} step={1} optional={!!draft.genetic.duration.trim()} description="Number of evolution cycles to run. Set either generations or duration, not both." />
+                  <ConfigNumberField id="krkn-ai-population" label="Population size" value={draft.genetic.populationSize} onChange={(value) => updateGenetic('populationSize', value)} error={errorFor(configErrors, 'populationSize')} min={2} step={1} description="Number of candidate scenarios evaluated in each generation (minimum 2)." />
+                  <ConfigNumberField id="krkn-ai-genetic-duration" label="Duration (seconds)" value={draft.genetic.duration} onChange={(value) => updateGenetic('duration', value)} error={errorFor(configErrors, 'genetic.duration')} min={1} step={1} optional={!!draft.genetic.generations.trim()} description="Maximum run time. Set either duration or generations, not both." />
+                </div>
+              </section>
+
+              <section className="krkn-ai-genetic-group" aria-labelledby="krkn-ai-genetic-variation">
+                <h3 id="krkn-ai-genetic-variation">Variation rates</h3>
+                <div className="krkn-ai-config-fields">
+                  <ConfigNumberField id="krkn-ai-mutation-rate" label="Mutation rate" value={draft.genetic.mutationRate} onChange={(value) => updateGenetic('mutationRate', value)} error={errorFor(configErrors, 'genetic.mutationRate')} min={0} max={1} step="any" description="Chance that a scenario parameter changes during mutation (0–1)." />
+                  <ConfigNumberField id="krkn-ai-scenario-mutation-rate" label="Scenario mutation rate" value={draft.genetic.scenarioMutationRate} onChange={(value) => updateGenetic('scenarioMutationRate', value)} error={errorFor(configErrors, 'genetic.scenarioMutationRate')} min={0} max={1} step="any" description="Chance mutation changes the scenario family while retaining its run properties (0–1)." />
+                  <ConfigNumberField id="krkn-ai-crossover-rate" label="Crossover rate" value={draft.genetic.crossoverRate} onChange={(value) => updateGenetic('crossoverRate', value)} error={errorFor(configErrors, 'genetic.crossoverRate')} min={0} max={1} step="any" description="Chance of combining parameter values from two parent scenarios (0–1)." />
+                  <ConfigNumberField id="krkn-ai-composition-rate" label="Composition rate" value={draft.genetic.compositionRate} onChange={(value) => updateGenetic('compositionRate', value)} error={errorFor(configErrors, 'genetic.compositionRate')} min={0} max={0} step="any" description="Chance crossover combines experiments. Operator runs require 0." />
+                </div>
+              </section>
+
+              <section className="krkn-ai-genetic-group" aria-labelledby="krkn-ai-genetic-selection">
+                <h3 id="krkn-ai-genetic-selection">Parent selection</h3>
+                <div className="krkn-ai-config-fields">
+                  <FormGroup label="Selection strategy" fieldId="krkn-ai-selection-strategy" isRequired>
+                    <FormSelect id="krkn-ai-selection-strategy" value={draft.genetic.selectionStrategy} onChange={(_event, value) => updateGenetic('selectionStrategy', value)} validated={configErrors['genetic.selectionStrategy'] ? 'error' : 'default'} aria-invalid={!!configErrors['genetic.selectionStrategy']} aria-describedby="krkn-ai-selection-strategy-help"><FormSelectOption value="roulette" label="roulette" /><FormSelectOption value="tournament" label="tournament" /></FormSelect>
+                    <p id="krkn-ai-selection-strategy-help" className="krkn-ai-field-help">Roulette gives higher-fitness candidates a greater chance; tournament picks the best candidate from a random subset.</p>
+                    {configErrors['genetic.selectionStrategy'] && <p className="krkn-ai-field-error" role="alert">{configErrors['genetic.selectionStrategy']}</p>}
+                  </FormGroup>
+                  {draft.genetic.selectionStrategy === 'tournament' && <ConfigNumberField id="krkn-ai-tournament-size" label="Tournament size" value={draft.genetic.tournamentSize} onChange={(value) => updateGenetic('tournamentSize', value)} error={errorFor(configErrors, 'genetic.tournamentSize')} min={1} step={1} description="Number of candidates compared in each tournament; larger values increase selection pressure." />}
+                </div>
+              </section>
             </div>
           </CardBody></Card>}
-
           {configurationSection === 'fitness' && <Card><CardTitle>{configurationTitle(configurationSections[3])}</CardTitle><CardBody>
             {discoveryWarnings.filter((warning) => /prometheus|fitness/i.test(warning)).map((warning, index) => <Alert key={`${index}-${warning}`} variant="warning" title="Fitness recommendation unavailable" isInline>{warning}</Alert>)}
             <FitnessFunctionEditor draft={draft} errors={configErrors} onChange={updateDraft} />
-            {!draft.fitnessQuery.trim() && !draft.fitnessItems.length && <Alert variant="warning" title="Prometheus input required" isInline>Discovery supplied no Prometheus query or fitness item. Add a query or item before saving.</Alert>}
+            {!draft.fitnessItems.length && <Alert variant="warning" title="Prometheus input required" isInline>Add at least one fitness item before saving.</Alert>}
           </CardBody></Card>}
-
           {configurationSection === 'health' && <Card><CardTitle>{configurationTitle(configurationSections[4])}</CardTitle><CardBody>
-            <Alert variant="warning" title="Health checks run against real endpoints" isInline>These URLs are contacted from the operator environment during execution. Verify reachability and safety before launching.</Alert>
             <HealthChecksEditor draft={draft} errors={configErrors} onChange={updateDraft} />
           </CardBody></Card>}
 
           {configurationSection === 'run-settings' && <Card><CardTitle>{configurationTitle(configurationSections[5])}</CardTitle><CardBody>
-            <Alert variant="info" title="Set execution defaults" isInline>The kubeconfig path and discovery fields are retained from Krkn AI. Credentials are never sent to the browser.</Alert>
+            <Alert variant="info" title="Set execution defaults" isInline>Namespace selection scopes discovery. Credentials stay in the operator environment and never reach the browser.</Alert>
             <div className="krkn-ai-config-fields">
               <ConfigNumberField id="krkn-ai-seed" label="Seed" value={draft.seed} onChange={(value) => updateDraft({ seed: value })} error={errorFor(configErrors, 'seed')} step={1} optional />
               <ConfigNumberField id="krkn-ai-wait-duration" label="Wait duration (seconds)" value={draft.waitDuration} onChange={(value) => updateDraft({ waitDuration: value })} error={errorFor(configErrors, 'waitDuration')} min={0} step={1} />
@@ -524,7 +636,15 @@ export function CreateRun({
 
       {step === 3 && selectedCluster && createdConfig && <>
         <Card><CardTitle>Review saved configuration</CardTitle><CardBody>
-          <dl className="krkn-ai-review-grid"><div><dt>Run</dt><dd>{trimmedName}</dd></div><div><dt>Provider</dt><dd>{selectedCluster.operatorName}</dd></div><div><dt>Cluster</dt><dd>{selectedCluster.clusterName}</dd></div><div><dt>Config ID</dt><dd>{createdConfig.id}</dd></div><div><dt>Expected scenarios</dt><dd>{Number(draft?.genetic.generations) * Number(draft?.genetic.populationSize)}</dd></div><div><dt>Fitness items</dt><dd>{draft?.fitnessItems.length}</dd></div><div><dt>Health checks</dt><dd>{draft?.healthChecks.length}</dd></div></dl>
+          <dl className="krkn-ai-review-grid">
+            <div><dt>Run</dt><dd>{trimmedName}</dd></div>
+            <div><dt>Provider</dt><dd>{selectedCluster.operatorName}</dd></div>
+            <div><dt>Cluster</dt><dd>{selectedCluster.clusterName}</dd></div>
+            <div><dt>Config ID</dt><dd>{createdConfig.id}</dd></div>
+            <div><dt>{runBudgetLabel}</dt><dd>{runBudget}</dd></div>
+            <div><dt>Fitness items</dt><dd>{draft?.fitnessItems.length}</dd></div>
+            <div><dt>Health checks</dt><dd>{draft?.healthChecks.length}</dd></div>
+          </dl>
           <p className="krkn-ai-muted">Config identity is frozen as <code>{createdConfig.name}</code>. Editing YAML or settings requires validating and saving a new config.</p>
           <pre className="krkn-ai-yaml" aria-label="Saved Krkn AI configuration YAML">{createdConfig.yaml}</pre>
           {actionError && <Alert variant="danger" title="Run creation failed" isInline>{actionError}</Alert>}

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseDocument } from 'yaml';
 import { KrknAIConfigValidationError } from '../../services/krknAiApi';
 import type {
   KrknAIRunResource,
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => ({
     createTargetRequest: vi.fn(),
     getTargetStatus: vi.fn(),
     getClusters: vi.fn(),
+    executeTerminalCommand: vi.fn(),
     getAvailableFiles: vi.fn(),
     getFile: vi.fn(),
   },
@@ -218,12 +220,20 @@ function setDocumentHidden(hidden: boolean): void {
   });
 }
 
-async function openWizardToPreview(user: ReturnType<typeof userEvent.setup>, name: string): Promise<void> {
+async function openWizardToConfiguration(user: UserEvent, name: string): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'Create run' }));
   await user.type(screen.getByRole('textbox', { name: 'Run name' }), name);
+  const namespace = await screen.findByRole('checkbox', { name: 'shop' });
+  expect(namespace).not.toBeChecked();
+  expect(screen.getByRole('button', { name: 'Discover components' })).toBeDisabled();
+  await user.click(namespace);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Discover components' })).toBeEnabled());
   await user.click(screen.getByRole('button', { name: 'Discover components' }));
   await waitFor(() => expect(screen.getByRole('button', { name: /Review YAML/ })).toBeInTheDocument());
+}
+
+async function openWizardToPreview(user: UserEvent, name: string): Promise<void> {
+  await openWizardToConfiguration(user, name);
   await user.click(screen.getByRole('button', { name: /Review YAML/ }));
 }
 
@@ -251,6 +261,14 @@ describe('Krkn-AI real run lifecycle', () => {
           { 'cluster-name': 'prod', 'cluster-api-url': 'https://api.prod.example.test' },
         ],
       },
+    });
+    mocks.operator.executeTerminalCommand.mockImplementation(async ({ cluster_id }: { cluster_id: string }) => {
+      const names = cluster_id === 'prod' ? ['prod.cluster', 'kube-system'] : ['default', 'shop'];
+      return {
+        stdout: JSON.stringify({ items: names.map((name) => ({ metadata: { name } })) }),
+        stderr: '',
+        exitCode: 0,
+      };
     });
     mocks.operator.getAvailableFiles.mockResolvedValue({ files: [] });
     mocks.operator.getFile.mockResolvedValue({ fileId: 'config-file', fileName: 'saved-ai-config', content: DISCOVERED_YAML, availableToAll: false });
@@ -283,11 +301,21 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.operator.getClusters).not.toHaveBeenCalled();
     await waitFor(() => expect(mocks.operator.getTargetStatus).toHaveBeenCalledTimes(2), { timeout: 5_000 });
     await waitFor(() => expect(mocks.operator.getClusters).toHaveBeenCalledTimes(1));
+    const stagingNamespace = await screen.findByRole('checkbox', { name: 'shop' });
+    expect(stagingNamespace).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Discover components' })).toBeDisabled();
+    await user.click(stagingNamespace);
 
     const clusterSelect = screen.getByRole('combobox', { name: 'Cluster' });
     expect(screen.queryByRole('combobox', { name: 'Provider' })).not.toBeInTheDocument();
     expect(clusterSelect).toHaveDisplayValue('staging (krkn-operator)');
     await user.selectOptions(clusterSelect, screen.getByRole('option', { name: 'prod (krkn-operator-acm)' }));
+    const prodNamespace = await screen.findByRole('checkbox', { name: 'prod.cluster' });
+    const kubeSystemNamespace = screen.getByRole('checkbox', { name: 'kube-system' });
+    expect(prodNamespace).not.toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: 'shop' })).not.toBeInTheDocument();
+    await user.click(prodNamespace);
+    await user.click(kubeSystemNamespace);
     await user.click(screen.getByRole('button', { name: 'Discover components' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /Review YAML/ })).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Cancel' }).closest('.krkn-ai-actions')).toBeInTheDocument();
@@ -304,7 +332,12 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.ai.discover).toHaveBeenCalledWith(expect.objectContaining({
       targetRequestId: 'target-request-1',
       targetClusters: { 'krkn-operator-acm': ['prod'] },
+      namespacePattern: 'prod\\.cluster,kube-system',
     }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    const discoveryRequest = mocks.ai.discover.mock.calls[0][0] as Record<string, unknown>;
+    expect(discoveryRequest.namespacePattern).toBe('prod\\.cluster,kube-system');
+    expect(discoveryRequest).not.toHaveProperty('podLabelPattern');
+    expect(discoveryRequest).not.toHaveProperty('nodeLabelPattern');
 
     await user.click(screen.getByRole('button', { name: /Review YAML/ }));
     const yamlEditor = screen.getByRole('textbox', { name: 'Krkn AI configuration YAML' });
@@ -339,6 +372,33 @@ describe('Krkn-AI real run lifecycle', () => {
     }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(await screen.findByRole('heading', { name: 'real-run-1' })).toBeInTheDocument();
   }, 15_000);
+
+  it('keeps genetic settings grouped and uses the fitness item list', async () => {
+    const user = userEvent.setup();
+    render(<KrknAIPage />);
+    await flushReact();
+    await openWizardToConfiguration(user, 'genetic-controls-run');
+
+    await user.click(screen.getByRole('button', { name: /Genetic algorithm/ }));
+    expect(screen.getByRole('heading', { name: 'Search budget' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Variation rates' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Parent selection' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Algorithm' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: 'Population injection rate' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: 'Population injection size' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Control the search breadth')).not.toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Tournament size' })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Selection strategy' }), 'roulette');
+    expect(screen.queryByRole('spinbutton', { name: 'Tournament size' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Fitness functions/ }));
+    expect(screen.queryByRole('textbox', { name: 'Fitness query' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Fitness query type' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Default fitness query/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Health checks/ }));
+    expect(screen.getByRole('checkbox', { name: 'Stop the health-check watcher on failure' })).toBeInTheDocument();
+  });
 
   it('shows the baseline artifact as a selectable scenario result', async () => {
     const run = makeRun('baseline-run', 'Succeeded');
@@ -672,6 +732,40 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.ai.getScenario).toHaveBeenCalledTimes(2);
   });
 
+  it('uses Krkn-AI model defaults and migrates a legacy fitness query into an item', () => {
+    const { document, draft } = createEditableConfigDraft('fitness_function:\n  query: up\n  type: range\n');
+    expect(draft.genetic).toMatchObject({
+      generations: '20',
+      populationSize: '10',
+      mutationRate: '0.7',
+      scenarioMutationRate: '0.6',
+      crossoverRate: '0.6',
+      compositionRate: '0',
+      selectionStrategy: 'tournament',
+      tournamentSize: '6',
+      populationInjectionRate: '0',
+      populationInjectionSize: '2',
+    });
+    expect(draft.fitnessItems).toEqual([
+      expect.objectContaining({ query: 'up', type: 'range', weight: '1' }),
+    ]);
+
+    const saved = parseDocument(updateConfigDocument(document, draft)).toJS() as Record<string, unknown>;
+    expect(saved.algorithm).toBe('genetic');
+    const savedGenetic = saved.genetic as Record<string, unknown>;
+    expect(savedGenetic.generations).toBe(20);
+    expect(savedGenetic.population_size).toBe(10);
+    const savedFitness = saved.fitness_function as {
+      query?: unknown;
+      type?: unknown;
+      items: Array<Record<string, unknown>>;
+    };
+    expect(savedFitness.query).toBeUndefined();
+    expect(savedFitness.type).toBeUndefined();
+    expect(savedFitness.items).toHaveLength(1);
+    expect(savedFitness.items[0]).toMatchObject({ query: 'up', type: 'range', weight: 1 });
+  });
+
   it('accepts real health URLs and unrestricted nonnegative weights but rejects invalid local bounds', () => {
     const { draft } = createEditableConfigDraft(DISCOVERED_YAML);
     const validDraft = {
@@ -683,7 +777,6 @@ describe('Krkn-AI real run lifecycle', () => {
         compositionRate: '0',
         duration: '',
       },
-      fitnessQuery: '',
       fitnessItems: [{ key: 1, id: '9', title: 'custom', query: 'up', type: 'point' as const, weight: '12' }],
       healthChecks: [{ key: 1, name: 'service', url: 'https://10.1.2.3/ready', statusCode: '200', timeout: '4', interval: '2' }],
     };
