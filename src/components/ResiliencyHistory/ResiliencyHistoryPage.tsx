@@ -19,7 +19,7 @@ import { useClusterDiscovery } from '../../hooks/useClusterDiscovery';
 import type { CategoryResponse, ResiliencyHistoryQueryResponse, TargetResponse } from '../../types/api';
 import { buildResiliencyHistoryCharts, type ResiliencyHistoryChartMode } from './resiliencyHistoryUtils';
 import { ResiliencyHistoryChart } from './ResiliencyHistoryChart';
-import { captureResiliencyHistoryChartVisuals, prepareResiliencyHistoryReport } from './resiliencyHistoryReport';
+import { downloadResiliencyHistoryPdf } from './resiliencyHistoryReport';
 import './resiliencyHistory.css';
 
 interface ClusterOption {
@@ -168,25 +168,15 @@ export function ResiliencyHistoryPage() {
     }
   };
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (!queryResult || !hasHistoryData(queryResult)) {
       setExportError('Apply filters that return score history before exporting.');
       return;
     }
     setExportError(null);
-    let reportWindow: Window | null = null;
+    setExportLoading(true);
     try {
-      reportWindow = window.open('', '_blank');
-      if (!reportWindow) throw new Error('Allow pop-ups to open the PDF report.');
-
-      const loadingPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Preparing resiliency report</title><style>body{margin:0;padding:4rem 1rem;color:#202b3a;background:#f4f7fb;font:16px Arial,sans-serif;text-align:center}.card{max-width:32rem;margin:4rem auto;padding:2rem;border:1px solid #d8dee8;border-radius:8px;background:#fff}h1{font-size:1.35rem}p{color:#627086}</style></head><body><div class="card"><h1>Preparing your resiliency report</h1><p>Collecting chart data and effective run configurations…</p></div></body></html>`;
-      reportWindow.document.open();
-      reportWindow.document.write(loadingPage);
-      reportWindow.document.close();
-
-      setExportLoading(true);
-      const reportWindowRef = reportWindow;
-      void prepareResiliencyHistoryReport({
+      await downloadResiliencyHistoryPdf({
         queryResult,
         categories: appliedFilters?.categories ?? [],
         clusters: appliedFilters?.clusters ?? [],
@@ -195,34 +185,11 @@ export function ResiliencyHistoryPage() {
         showBaselines,
         queriedAt: generatedAt,
         reportGeneratedAt: new Date().toLocaleString(),
-        chartVisuals: captureResiliencyHistoryChartVisuals(charts),
-      }).then((html) => {
-        if (reportWindowRef.closed) return;
-        reportWindowRef.document.open();
-        reportWindowRef.document.write(html);
-        reportWindowRef.document.close();
-        reportWindowRef.document.getElementById('report-print')?.addEventListener('click', () => {
-          reportWindowRef.focus();
-          reportWindowRef.print();
-        });
-        reportWindowRef.document.getElementById('report-close')?.addEventListener('click', () => reportWindowRef.close());
-        reportWindowRef.setTimeout(() => {
-          try {
-            if (reportWindowRef.closed) return;
-            reportWindowRef.focus();
-            reportWindowRef.print();
-          } catch (error) {
-            setExportError(error instanceof Error ? error.message : 'Unable to open the PDF print dialog.');
-          }
-        }, 120);
-      }).catch((error: unknown) => {
-        if (!reportWindowRef.closed) reportWindowRef.close();
-        setExportError(error instanceof Error ? error.message : 'Unable to prepare the PDF report.');
-      }).finally(() => setExportLoading(false));
+      });
     } catch (error) {
-      reportWindow?.close();
+      setExportError(error instanceof Error ? error.message : 'Unable to generate the PDF report.');
+    } finally {
       setExportLoading(false);
-      setExportError(error instanceof Error ? error.message : 'Unable to open the PDF export dialog.');
     }
   };
 
@@ -363,7 +330,7 @@ export function ResiliencyHistoryPage() {
                 isDisabled={!hasResults || exportLoading}
                 isLoading={exportLoading}
               >
-                {exportLoading ? 'Preparing report…' : 'Export PDF'}
+                {exportLoading ? 'Generating PDF…' : 'Export PDF'}
               </Button>
             </div>
             {!hasResults && (
@@ -376,7 +343,7 @@ export function ResiliencyHistoryPage() {
             {hasResults && (
               <>
                 <p id="resiliency-history-export-help" className="resiliency-history__export-help">
-                  Opens a print-ready report with score summaries, vector charts and effective configurations.
+                  Downloads a paginated report with score summaries, vector charts and effective configurations.
                 </p>
                 <div className="resiliency-history__mode-controls" role="group" aria-label="Chart configuration mode">
                   <Radio

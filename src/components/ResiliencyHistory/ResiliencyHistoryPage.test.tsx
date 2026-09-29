@@ -8,6 +8,7 @@ import type { ResiliencyHistoryChartModel } from './resiliencyHistoryUtils';
 import { ResiliencyHistoryPage } from './ResiliencyHistoryPage';
 
 const mocks = vi.hoisted(() => ({
+  downloadResiliencyHistoryPdf: vi.fn(),
   clusterDiscovery: {
     clusters: [{
       uuid: 'cluster-uuid',
@@ -25,6 +26,10 @@ const mocks = vi.hoisted(() => ({
     retry: vi.fn(),
     reset: vi.fn(),
   },
+}));
+
+vi.mock('./resiliencyHistoryReport', () => ({
+  downloadResiliencyHistoryPdf: mocks.downloadResiliencyHistoryPdf,
 }));
 
 vi.mock('../../hooks/useClusterDiscovery', () => ({
@@ -76,20 +81,6 @@ function renderPage() {
   return render(<ResiliencyHistoryPage />);
 }
 
-function createReportWindow() {
-  const reportDocument = document.implementation.createHTMLDocument();
-  const print = vi.fn();
-  const reportWindow = {
-    document: reportDocument,
-    print,
-    focus: vi.fn(),
-    close: vi.fn(),
-    setTimeout: window.setTimeout.bind(window),
-    get closed() { return false; },
-  } as unknown as Window;
-  return { reportDocument, reportWindow, print };
-}
-
 async function selectFilters(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('checkbox', { name: 'resilience' });
   await user.click(screen.getByRole('checkbox', { name: 'resilience' }));
@@ -99,6 +90,7 @@ async function selectFilters(user: ReturnType<typeof userEvent.setup>) {
 describe('ResiliencyHistoryPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.downloadResiliencyHistoryPdf.mockResolvedValue(undefined);
     configCache.clear();
     mocks.clusterDiscovery.clusters = [{
       uuid: 'cluster-uuid',
@@ -260,7 +252,7 @@ describe('ResiliencyHistoryPage', () => {
     expect(mocks.clusterDiscovery.retry).toHaveBeenCalledTimes(1);
   });
 
-  it('opens a structured print-ready report with charts and effective configurations', async () => {
+  it('downloads a structured PDF with charts and effective configurations', async () => {
     const user = userEvent.setup();
     vi.mocked(operatorApi.getCategories).mockResolvedValue({
       categories: [
@@ -274,8 +266,6 @@ describe('ResiliencyHistoryPage', () => {
       { uuid: 'b', clusterName: 'cluster-b', clusterAPIURL: 'https://b.example', operatorSource: 'operator-b', ready: true, secretType: 'kubeconfig' },
     ];
     const query = vi.spyOn(operatorApi, 'queryResiliencyHistory').mockResolvedValue(multiHistory);
-    const report = createReportWindow();
-    vi.spyOn(window, 'open').mockReturnValue(report.reportWindow);
     vi.spyOn(operatorApi, 'getScenarioRunConfig').mockResolvedValue({
       targetRequestId: 'target-scenario',
       targetClusters: { 'krkn-operator': ['cluster-a'] },
@@ -314,23 +304,23 @@ describe('ResiliencyHistoryPage', () => {
     expect(screen.getByText('reliability — Mixed configurations')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Combine configurations by category' })).toBeChecked();
 
+    const windowOpen = vi.spyOn(window, 'open');
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
-    await waitFor(() => expect(report.reportDocument.body.textContent).toContain('Configurations compared'));
-    expect(window.open).toHaveBeenCalledWith('', '_blank');
-    expect(report.reportDocument.body.textContent).toContain('Latest score snapshot');
-    expect(report.reportDocument.body.textContent).toContain('Score trends');
-    expect(report.reportDocument.body.textContent).toContain('Workflow nodes');
-    expect(report.reportDocument.body.textContent).toContain('DURATION');
-    expect(report.reportDocument.body.textContent).toContain('••••••••');
-    expect(report.reportDocument.body.textContent).not.toContain('scenario-secret');
-    expect(report.reportDocument.body.textContent).not.toContain('graph-secret');
-    await waitFor(() => expect(report.print).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.downloadResiliencyHistoryPdf).toHaveBeenCalledTimes(1));
+    expect(mocks.downloadResiliencyHistoryPdf).toHaveBeenCalledWith(expect.objectContaining({
+      queryResult: multiHistory,
+      categories: ['resilience', 'reliability'],
+      clusters: ['cluster-a', 'cluster-b'],
+      chartMode: 'collapsed',
+      showBaselines: true,
+    }));
+    expect(windowOpen).not.toHaveBeenCalled();
   });
 
-  it('explains when the browser blocks the report popup', async () => {
+  it('shows an error when the PDF download fails', async () => {
     const user = userEvent.setup();
     vi.spyOn(operatorApi, 'queryResiliencyHistory').mockResolvedValue(populatedHistory);
-    vi.spyOn(window, 'open').mockReturnValue(null);
+    mocks.downloadResiliencyHistoryPdf.mockRejectedValueOnce(new Error('Download failed'));
     renderPage();
 
     await selectFilters(user);
@@ -338,6 +328,6 @@ describe('ResiliencyHistoryPage', () => {
     await screen.findByRole('button', { name: 'Export PDF' });
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
 
-    expect(await screen.findByText('Allow pop-ups to open the PDF report.')).toBeInTheDocument();
+    expect(await screen.findByText('Download failed')).toBeInTheDocument();
   });
 });
