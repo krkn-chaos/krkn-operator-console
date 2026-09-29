@@ -224,6 +224,35 @@ describe('ScenarioDetail', () => {
       expect(screen.getByText(/sha256:abc123def456/i)).toBeInTheDocument();
     });
 
+    it('copies the complete digest and announces success', async () => {
+      const user = userEvent.setup();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText },
+      });
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /copy full digest/i }));
+
+      expect(writeText).toHaveBeenCalledWith('sha256:abc123def456');
+      expect(await screen.findByRole('status')).toHaveTextContent('Digest copied.');
+    });
+
+    it('shows an accessible error and the full digest when copying fails', async () => {
+      const user = userEvent.setup();
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: vi.fn().mockRejectedValue(new Error('permission denied')) },
+      });
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /copy full digest/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not copy the digest.');
+      expect(screen.getByRole('alert')).toHaveTextContent('sha256:abc123def456');
+    });
+
     it('should render back button', () => {
       renderWithContext();
 
@@ -251,6 +280,19 @@ describe('ScenarioDetail', () => {
       // The DynamicFormBuilder will render the input field
       // This test verifies the component structure
       expect(screen.getByText('Required Parameters')).toBeInTheDocument();
+    });
+
+    it('shows an empty state when the scenario has no required parameters', () => {
+      const scenarioWithoutRequiredFields: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [mockScenarioDetail.fields[1]],
+      };
+      renderWithContext({ scenarioDetail: scenarioWithoutRequiredFields, scenarioFormValues: {} });
+
+      expect(screen.getByText('No required parameters')).toBeInTheDocument();
+      expect(screen.getByText(/can be previewed and run without filling this section/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Optional Parameters/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Preview Configuration/i })).toBeInTheDocument();
     });
   });
 
@@ -616,6 +658,30 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.getActiveRuns).toHaveBeenCalled();
       });
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalled();
+      });
+    });
+
+    it('allows a scenario without required parameters to preview and run', async () => {
+      const user = userEvent.setup();
+      const scenarioWithoutRequiredFields: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [mockScenarioDetail.fields[1]],
+      };
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioDetail: scenarioWithoutRequiredFields,
+        scenarioFormValues: {},
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      expect(screen.getByText('Configuration Preview')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalled();

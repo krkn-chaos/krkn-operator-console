@@ -556,6 +556,7 @@ export function JobsList({
               marginBottom: '1.5rem',
               backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
               border: '1px solid var(--pf-v5-global--BorderColor--100)',
+              boxShadow: 'var(--pf-v5-global--BoxShadow--sm)',
             }}
           >
             <CardTitle>

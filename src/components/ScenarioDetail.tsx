@@ -16,7 +16,7 @@ import {
   HelperTextItem,
   TextInput,
 } from '@patternfly/react-core';
-import { ExclamationTriangleIcon } from '@patternfly/react-icons';
+import { CopyIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
@@ -84,6 +84,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
   const [customRunName, setCustomRunName] = useState('');
+  const [digestCopyStatus, setDigestCopyStatus] = useState<'success' | 'error' | null>(null);
   const [rerunSignatureStatus, setRerunSignatureStatus] = useState<SignatureStatus | null>(null);
   const [rerunSignatureLoading, setRerunSignatureLoading] = useState(false);
   const [rerunSignatureError, setRerunSignatureError] = useState<string | null>(null);
@@ -339,6 +340,16 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleBack = () => {
     dispatch({ type: 'GO_BACK' });
+  };
+
+  const handleCopyDigest = async () => {
+    if (!scenarioDetail?.digest) return;
+    try {
+      await navigator.clipboard.writeText(scenarioDetail.digest);
+      setDigestCopyStatus('success');
+    } catch {
+      setDigestCopyStatus('error');
+    }
   };
 
   const validateForm = (): boolean => {
@@ -720,6 +731,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       : base;
   }, [scenarioDetail, hasGroupedScenarioFields, effectiveCloudType, cloudFilterOptions]);
 
+  const hasConfigurableMainFields = mainFormFields.some((field) => field.type !== 'group');
+
   const previewScenarioFields = useMemo(
     () => filterFieldsByCloudType(
       scenarioDetail?.fields.filter((f) => f.type !== 'group') ?? [],
@@ -766,6 +779,23 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           {scenarioDetail.digest && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', fontFamily: 'monospace' }}>
               <strong>Digest:</strong> {scenarioDetail.digest.substring(0, 19)}...
+              <Button
+                variant="plain"
+                size="sm"
+                icon={<CopyIcon />}
+                aria-label="Copy full digest"
+                onClick={handleCopyDigest}
+              />
+              {digestCopyStatus === 'success' && (
+                <span role="status" aria-live="polite" style={{ marginLeft: '0.5rem', fontFamily: 'inherit' }}>
+                  Digest copied.
+                </span>
+              )}
+              {digestCopyStatus === 'error' && (
+                <span role="alert" style={{ display: 'block', marginTop: '0.25rem', fontFamily: 'inherit', overflowWrap: 'anywhere' }}>
+                  Could not copy the digest. Full digest: <code>{scenarioDetail.digest}</code>
+                </span>
+              )}
             </div>
           )}
         </CardBody>
@@ -838,12 +868,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           <Card>
             <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
             <CardBody>
-              <DynamicFormBuilder
-                fields={mainFormFields}
-                values={scenarioFormValues || {}}
-                onChange={handleFormChange}
-                disabledFields={cloudDisabledFields}
-              />
+              {hasConfigurableMainFields ? (
+                <DynamicFormBuilder
+                  fields={mainFormFields}
+                  values={scenarioFormValues || {}}
+                  onChange={handleFormChange}
+                  disabledFields={cloudDisabledFields}
+                />
+              ) : (
+                <Alert variant="info" isInline isPlain title="No required parameters">
+                  This scenario can be previewed and run without filling this section. Optional and global parameters remain available below.
+                </Alert>
+              )}
             </CardBody>
           </Card>
 
