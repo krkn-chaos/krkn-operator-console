@@ -40,7 +40,7 @@ import { WorkflowDetailsPanel } from './WorkflowDetailsPanel';
 import { studioLeaveGuard } from './studioLeaveGuard';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
-function StudioContent() {
+function StudioContent({ initialRunCategories }: { initialRunCategories: string[] }) {
   const { dispatch } = useAppContext();
   const { updateNode, workflow, savedWorkflow, isDirty, saveWorkflowToCluster, clearSavedWorkflow, clearWorkflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
@@ -324,6 +324,7 @@ function StudioContent() {
       {/* Run Workflow Modal */}
       <RunWorkflowModal
         isOpen={isRunWorkflowOpen}
+        initialCategories={initialRunCategories}
         onClose={handleRunWorkflowClose}
         onSuccess={handleRunWorkflowSuccess}
         targetFetchState={targetFetch.state}
@@ -332,7 +333,10 @@ function StudioContent() {
   );
 }
 
-export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: StudioWorkflow }) {
+export function Studio({
+  initialWorkflow: replayWorkflow,
+  initialRunCategories = [],
+}: { initialWorkflow?: StudioWorkflow; initialRunCategories?: string[] }) {
   const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(replayWorkflow);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; timestamp: number } | null>(null);
@@ -394,7 +398,7 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
 
   return (
     <StudioProvider initialWorkflow={initialWorkflow}>
-      <StudioContent />
+      <StudioContent initialRunCategories={initialRunCategories} />
     </StudioProvider>
   );
 }

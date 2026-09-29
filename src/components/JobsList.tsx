@@ -163,7 +163,7 @@ interface JobsListProps {
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
-  onReplayWorkflow?: (workflow: StudioWorkflow) => void;
+  onReplayWorkflow?: (workflow: StudioWorkflow, categories: string[]) => void;
   loadingRunDetails: Set<string>;
 }
 

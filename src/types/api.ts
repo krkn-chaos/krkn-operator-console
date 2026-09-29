@@ -127,6 +127,7 @@ export interface RerunIntent {
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
   kubeconfigPath: string;
+  categories?: string[];
 }
 
 export interface JobConfigResponse {
@@ -139,6 +140,7 @@ export interface JobConfigResponse {
   scenarioName?: string;
   kubeconfigPath: string;
   environment: { [key: string]: string };
+  categories?: string[];
 }
 
 export type SignatureStatus = 'signed' | 'unsigned' | 'untrusted' | 'unknown';
@@ -275,6 +277,8 @@ export interface ScenarioRunRequest {
   cloudCredentialRef?: string;
   /** Maximum retries after the initial attempt; zero disables retries */
   maxRetries?: number;
+  /** Visible categories to associate with the run when created */
+  categories?: string[];
 }
 
 export interface TargetJobResult {
@@ -492,6 +496,7 @@ export interface AppState {
   graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
   studioReplayWorkflow?: StudioWorkflow | null;
+  studioReplayCategories?: string[];
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
@@ -511,6 +516,7 @@ export interface AppState {
 
   // Re-run workflow
   rerunIntent: RerunIntent | null;
+  rerunCategories: string[];
   startInPreview: boolean;
   rerunScenario: ScenarioReference | null;
   rerunKubeconfigPath: string | null;
@@ -556,7 +562,7 @@ export type AppAction =
   | { type: 'LOAD_GRAPH_RUNS_SUCCESS'; payload: { runs: GraphRunState[] } }
   | { type: 'TOGGLE_GRAPH_RUN_ACCORDION'; payload: { graphRunName: string } }
   | { type: 'DELETE_GRAPH_RUN'; payload: { graphRunName: string } }
-  | { type: 'OPEN_STUDIO_REPLAY'; payload: { workflow: StudioWorkflow } }
+  | { type: 'OPEN_STUDIO_REPLAY'; payload: { workflow: StudioWorkflow; categories?: string[] } }
 
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }
@@ -951,6 +957,8 @@ export interface CreateGraphRunRequest {
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
   targetClusters: { [providerName: string]: string[] };
+  /** Visible categories to associate with the graph run when created */
+  categories?: string[];
   /** Default cloud credential for all nodes (individual nodes may override) */
   cloudCredentialRef?: string;
   /** Maximum retries after the initial attempt for each node; zero disables retries */

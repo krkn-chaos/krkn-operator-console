@@ -138,8 +138,8 @@ function App() {
     }
   };
 
-  const handleReplayWorkflow = (workflow: import('./types/api').StudioWorkflow) => {
-    dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow } });
+  const handleReplayWorkflow = (workflow: import('./types/api').StudioWorkflow, categories: string[]) => {
+    dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow, categories } });
   };
 
   const handleCreateJob = () => {
@@ -190,6 +190,7 @@ function App() {
           clusters,
           environment: config.environment,
           kubeconfigPath: config.kubeconfigPath,
+          categories: config.categories ?? [],
         },
       });
 
@@ -294,7 +295,10 @@ function App() {
       case 'studio':
         return (
           <PageSection>
-            <Studio initialWorkflow={state.studioReplayWorkflow ?? undefined} />
+            <Studio
+              initialWorkflow={state.studioReplayWorkflow ?? undefined}
+              initialRunCategories={state.studioReplayCategories ?? []}
+            />
           </PageSection>
         );
 

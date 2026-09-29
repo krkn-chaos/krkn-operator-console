@@ -22,6 +22,7 @@ import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { FileSelector } from './FileSelector';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
+import { RunCategorySelector } from './RunCategorySelector';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
@@ -64,7 +65,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     error: signatureVerificationError,
     isLoading: signatureVerificationLoading,
   } = useSignatureVerification();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath } = state;
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath, rerunCategories } = state;
   const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
   const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
@@ -123,6 +124,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     };
   }, [registryConfig, rerunScenario, state.scenarios]);
   const [maxRetries, setMaxRetries] = useState(3);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(rerunCategories ?? []);
+
+  useEffect(() => {
+    setSelectedCategories(rerunCategories ?? []);
+  }, [rerunCategories]);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -606,6 +612,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         elasticsearchConfigName: appliedEsConfigName || undefined,
         cloudCredentialRef: appliedCloudCredName || undefined,
         maxRetries,
+        categories: selectedCategories.length > 0 ? selectedCategories : undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -1022,6 +1029,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   </HelperText>
                 </FormHelperText>
               </FormGroup>
+              <RunCategorySelector
+                selectedCategories={selectedCategories}
+                onChange={setSelectedCategories}
+              />
             </CardBody>
           </Card>
 

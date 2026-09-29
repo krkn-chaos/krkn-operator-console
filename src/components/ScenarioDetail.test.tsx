@@ -120,6 +120,7 @@ describe('ScenarioDetail', () => {
     providerConfigStatus: 'idle',
     providerConfigData: null,
     rerunIntent: null,
+    rerunCategories: [],
     startInPreview: false,
     rerunScenario: null,
     rerunKubeconfigPath: null,
@@ -139,6 +140,10 @@ describe('ScenarioDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({ files: [] });
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({
+      categories: [{ name: 'resilience', availableToAll: true }, { name: 'release', availableToAll: true }],
+      total: 2,
+    });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
     vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
   });
@@ -619,6 +624,30 @@ describe('ScenarioDetail', () => {
 
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalled();
+      });
+    });
+
+    it('submits selected categories and retains replay categories', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+        rerunCategories: ['release'],
+      });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      const resilience = await screen.findByRole('checkbox', { name: 'resilience' });
+      expect(screen.getByRole('checkbox', { name: 'release' })).toBeChecked();
+      await user.click(resilience);
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(expect.objectContaining({
+          categories: ['release', 'resilience'],
+        }));
       });
     });
 

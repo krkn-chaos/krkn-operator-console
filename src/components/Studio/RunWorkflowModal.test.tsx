@@ -5,6 +5,7 @@ import { RunWorkflowModal } from './RunWorkflowModal';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { graphRunsApi } from '../../services';
+import { operatorApi } from '../../services/operatorApi';
 import type { StudioNode } from '../../types/api';
 
 const signatureState = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ vi.mock('../../hooks', () => ({ useNotifications: vi.fn() }));
 vi.mock('../../hooks/useSignatureVerification', () => ({
   useSignatureVerification: () => ({ ...signatureState, updateSettings: vi.fn() }),
 }));
+vi.mock('../../services/operatorApi', () => ({ operatorApi: { getCategories: vi.fn() } }));
 vi.mock('../../services', () => ({
   graphRunsApi: { createGraphRun: vi.fn() },
   operatorApi: { deleteTargetRequest: vi.fn() },
@@ -132,11 +134,16 @@ describe('RunWorkflowModal retry configuration', () => {
     } as unknown as ReturnType<typeof useStudioContext>);
     vi.mocked(useNotifications).mockReturnValue({ showSuccess: vi.fn(), showError } as unknown as ReturnType<typeof useNotifications>);
     vi.mocked(graphRunsApi.createGraphRun).mockResolvedValue({ name: 'graph-run-1' } as never);
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({
+      categories: [{ name: 'resilience', availableToAll: true }, { name: 'release', availableToAll: true }],
+      total: 2,
+    });
   });
 
-  const renderRetryModal = (isOpen = true) => render(
+  const renderRetryModal = (isOpen = true, initialCategories: string[] = []) => render(
     <RunWorkflowModal
       isOpen={isOpen}
+      initialCategories={initialCategories}
       onClose={onClose}
       onSuccess={onSuccess}
       targetFetchState={{ status: 'ready', uuid: 'target-1', clusters: { operator: [{ 'cluster-name': 'cluster-1', 'cluster-api-url': 'https://cluster' }] } }}
@@ -154,6 +161,25 @@ describe('RunWorkflowModal retry configuration', () => {
 
     await waitFor(() => {
       expect(graphRunsApi.createGraphRun).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 7 }), expect.anything());
+    });
+  });
+
+  it('submits selected categories and restores them for a replayed workflow', async () => {
+    const user = userEvent.setup();
+    renderRetryModal(true, ['release']);
+    await user.click(screen.getByRole('button', { name: 'Select cluster' }));
+
+    const resilience = await screen.findByRole('checkbox', { name: 'resilience' });
+    const release = screen.getByRole('checkbox', { name: 'release' });
+    expect(release).toBeChecked();
+    await user.click(resilience);
+    await user.click(screen.getByRole('button', { name: /Run Workflow on 1 cluster/i }));
+
+    await waitFor(() => {
+      expect(graphRunsApi.createGraphRun).toHaveBeenCalledWith(
+        expect.objectContaining({ categories: ['release', 'resilience'] }),
+        expect.anything(),
+      );
     });
   });
 

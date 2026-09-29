@@ -77,6 +77,53 @@ describe('AppContext reducer', () => {
     });
   });
 
+  describe('run category replay', () => {
+    it('keeps scenario categories while the replay intent becomes a configured run', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({
+          type: 'RERUN_SCENARIO',
+          payload: {
+            scenario: { name: 'pod-scenarios', private: false },
+            clusters: [{ operatorName: 'operator', clusterName: 'cluster' }],
+            environment: {},
+            kubeconfigPath: '/tmp/kubeconfig',
+            categories: ['resilience', 'release'],
+          },
+        });
+        capturedDispatch({
+          type: 'SCENARIO_DETAIL_SUCCESS',
+          payload: {
+            scenarioDetail: {
+              name: 'pod-scenarios', title: 'Pods', description: 'Test', digest: 'sha256:test', fields: [],
+            },
+          },
+        });
+      });
+
+      expect(capturedState.rerunIntent).toBeNull();
+      expect(capturedState.rerunCategories).toEqual(['resilience', 'release']);
+    });
+
+    it('keeps graph categories when opening the replay in Studio', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({
+          type: 'OPEN_STUDIO_REPLAY',
+          payload: {
+            workflow: { nodes: [], edges: [], nextNodeNumber: 1 },
+            categories: ['resilience', 'release'],
+          },
+        });
+      });
+
+      expect(capturedState.phase).toBe('studio');
+      expect(capturedState.studioReplayCategories).toEqual(['resilience', 'release']);
+    });
+  });
+
   describe('SET_RUN_DETAILS_LOADING', () => {
     it('adds a run name when loading is true', () => {
       renderWithProvider();

@@ -20,6 +20,7 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { ClusterMultiSelector } from '../ClusterMultiSelector';
+import { RunCategorySelector } from '../RunCategorySelector';
 import { ResiliencyScoreModal } from '../ResiliencyScoreModal';
 import { graphRunsApi, operatorApi } from '../../services';
 import { useNotifications } from '../../hooks';
@@ -28,8 +29,11 @@ import { useStudioContext } from './StudioContext';
 import { clearAutosave } from './studioAutosave';
 import { useSignatureVerification } from '../../hooks/useSignatureVerification';
 
+const EMPTY_CATEGORIES: string[] = [];
+
 interface RunWorkflowModalProps {
   isOpen: boolean;
+  initialCategories?: string[];
   onClose: () => void;
   onSuccess: () => void;
   targetFetchState: {
@@ -43,6 +47,7 @@ interface RunWorkflowModalProps {
 
 export function RunWorkflowModal({
   isOpen,
+  initialCategories,
   onClose,
   onSuccess,
   targetFetchState,
@@ -51,6 +56,8 @@ export function RunWorkflowModal({
   const { showSuccess, showError } = useNotifications();
   const { enabled: signatureVerificationEnabled, error: signatureVerificationError, isLoading: signatureVerificationLoading } = useSignatureVerification();
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
+  const replayCategories = initialCategories ?? EMPTY_CATEGORIES;
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(replayCategories);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
   const [showResiliencyModal, setShowResiliencyModal] = useState(false);
@@ -64,12 +71,17 @@ export function RunWorkflowModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedClusters([]);
+      setSelectedCategories([]);
       setEnableResiliencyScore(false);
       setShowResiliencyModal(false);
       setResiliencyConfig(null);
       setMaxRetries(3);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) setSelectedCategories(replayCategories);
+  }, [replayCategories, isOpen]);
 
   useEffect(() => {
     if (isOpen && workflow.resiliencyScoreConfig) {
@@ -197,6 +209,7 @@ export function RunWorkflowModal({
       targetRequestId: targetFetchState.uuid,
       targetClusters,
       maxRetries,
+      categories: selectedCategories.length > 0 ? selectedCategories : undefined,
     };
 
     setIsSubmitting(true);
@@ -364,6 +377,13 @@ export function RunWorkflowModal({
                 style={{ marginTop: '0.5rem' }}
               />
             )}
+          </div>
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <RunCategorySelector
+              selectedCategories={selectedCategories}
+              onChange={setSelectedCategories}
+            />
           </div>
 
           <div style={{ marginTop: '1.5rem' }}>
