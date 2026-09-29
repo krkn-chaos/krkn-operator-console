@@ -6,6 +6,7 @@ import {
   type ResiliencyHistoryChartModel,
   type ResiliencyHistoryChartPoint,
 } from './resiliencyHistoryUtils';
+import { ResiliencyHistoryConfigurationTooltip } from './ResiliencyHistoryConfigurationTooltip';
 
 const CLUSTER_COLORS = [
   '#2563eb', '#7c3aed', '#0f766e', '#c2410c', '#be185d',
@@ -190,6 +191,12 @@ export function ResiliencyHistoryChart({
     .filter((baseline): baseline is number => typeof baseline === 'number' && Number.isFinite(baseline)));
   const hasBaselines = showBaselines && baselinePoints.length > 0;
   const chartIsZoomed = !isFullDomain(domain, fullDomain);
+  const configurationSuffix = chart.configurationGroupId
+    ? ` (configuration ${chart.configurationGroupId})`
+    : '';
+  const visibleTitle = configurationSuffix && chart.title.endsWith(configurationSuffix)
+    ? chart.title.slice(0, -configurationSuffix.length)
+    : chart.title;
 
   const showPointTooltip = (
     event: MouseEvent<SVGCircleElement> | FocusEvent<SVGCircleElement>,
@@ -257,7 +264,18 @@ export function ResiliencyHistoryChart({
 
   return (
     <Card className="resiliency-history__chart-card" aria-label={chart.title}>
-      <CardTitle><Title headingLevel="h3" size="md">{chart.title}</Title></CardTitle>
+      <CardTitle>
+        <div className="resiliency-history__chart-heading">
+          <Title headingLevel="h3" size="md" aria-label={chart.title}>{visibleTitle}</Title>
+          {chart.configurationGroupId && chart.configurationRunType && chart.configurationRunId && (
+            <ResiliencyHistoryConfigurationTooltip
+              configurationGroupId={chart.configurationGroupId}
+              runType={chart.configurationRunType}
+              runId={chart.configurationRunId}
+            />
+          )}
+        </div>
+      </CardTitle>
       <CardBody>
         {!chart.hasData ? (
           <Alert variant="info" isInline isPlain title="No scores for this selection" />

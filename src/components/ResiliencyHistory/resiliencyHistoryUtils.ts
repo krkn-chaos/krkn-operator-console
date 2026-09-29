@@ -21,6 +21,8 @@ export interface ResiliencyHistoryChartModel {
   categoryName: string;
   title: string;
   configurationGroupId?: string;
+  configurationRunType?: 'scenario-runs' | 'graph-runs';
+  configurationRunId?: string;
   isMixedConfiguration: boolean;
   series: ResiliencyHistoryChartSeries[];
   hasData: boolean;
@@ -125,6 +127,13 @@ export function buildResiliencyHistoryCharts(
     const groups: (string | undefined)[] = groupIds.size > 0 ? [...groupIds] : [undefined];
     groups.forEach((groupId) => {
       const metadata = groupId ? response.configurationGroups[categoryName]?.[groupId] : undefined;
+      const [groupRunType, ...groupRunNameParts] = groupId?.split('/') ?? [];
+      const configurationRunType = metadata?.runType === 'scenario-runs' || metadata?.runType === 'graph-runs'
+        ? metadata.runType
+        : groupRunType === 'scenario-runs' || groupRunType === 'graph-runs'
+          ? groupRunType
+          : undefined;
+      const configurationRunId = metadata?.representativeRunId || groupRunNameParts.join('/') || undefined;
       const groupDescription = groupId
         ? metadata?.scenarioNames?.length
           ? `${metadata.scenarioNames.join(', ')} (configuration ${groupId})`
@@ -138,6 +147,8 @@ export function buildResiliencyHistoryCharts(
         categoryName,
         title: `${categoryName} — ${groupDescription}`,
         configurationGroupId: groupId,
+        configurationRunType,
+        configurationRunId,
         isMixedConfiguration: false,
         hasData: series.some((item) => item.data.length > 0),
         series,
