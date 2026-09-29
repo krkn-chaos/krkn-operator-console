@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   Dropdown,
   DropdownItem,
@@ -10,7 +10,6 @@ import {
   MenuToggle,
   MenuToggleElement,
   Spinner,
-  Tooltip,
 } from '@patternfly/react-core';
 import { EllipsisVIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import type { CategoryResponse } from '../types/api';
@@ -187,69 +186,107 @@ function getCategoryStripeGradient(categories: CategoryResponse[]): string {
 /** Renders equal-height category color segments at the left of a run row. */
 export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isTooltipVisible, setIsTooltipVisible] = useState(false);
+  const tooltipId = useId();
+
+  useEffect(() => {
+    if (!isHovered) return;
+
+    const fallbackTimer = window.setTimeout(
+      () => setIsTooltipVisible(true),
+      CATEGORY_STRIPE_TRANSITION_MS + 50,
+    );
+    return () => window.clearTimeout(fallbackTimer);
+  }, [isHovered]);
 
   if (categories.length === 0) return null;
 
   return (
-    <Tooltip
-      position="right"
-      distance={0}
-      entryDelay={CATEGORY_STRIPE_TRANSITION_MS + 20}
-      content={(
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <strong>Categories:</strong>
-          {categories.map((category) => (
-            <span key={category.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span
-                aria-hidden="true"
-                style={{
-                  width: '0.5rem',
-                  height: '0.5rem',
-                  borderRadius: '50%',
-                  backgroundColor: category.color || '#6c757d',
-                  display: 'inline-block',
-                  flexShrink: 0,
-                }}
-              />
-              {category.name}
-            </span>
-          ))}
-        </div>
-      )}
+    <div
+      role="group"
+      tabIndex={0}
+      aria-label={`Categories: ${categories.map((category) => category.name).join(', ')}`}
+      aria-describedby={isTooltipVisible ? tooltipId : undefined}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        setIsTooltipVisible(false);
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsTooltipVisible(false);
+      }}
+      onFocus={() => {
+        setIsHovered(true);
+        setIsTooltipVisible(false);
+      }}
+      onBlur={() => {
+        setIsHovered(false);
+        setIsTooltipVisible(false);
+      }}
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        // This fixed anchor makes the tooltip start exactly at the expanded stripe edge.
+        width: CATEGORY_STRIPE_WIDE_WIDTH,
+      }}
     >
       <div
-        role="img"
-        tabIndex={0}
-        aria-label={`Categories: ${categories.map((category) => category.name).join(', ')}`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onFocus={() => setIsHovered(true)}
-        onBlur={() => setIsHovered(false)}
+        data-testid="category-stripe-visual"
+        aria-hidden="true"
+        onTransitionEnd={(event) => {
+          if (event.propertyName === 'width' && isHovered) setIsTooltipVisible(true);
+        }}
         style={{
           position: 'absolute',
           left: 0,
           top: 0,
           bottom: 0,
-          // Keep the Popper reference fixed at the expanded edge while the color bar animates inside it.
-          width: CATEGORY_STRIPE_WIDE_WIDTH,
+          width: isHovered ? CATEGORY_STRIPE_WIDE_WIDTH : CATEGORY_STRIPE_NARROW_WIDTH,
+          transition: 'width ' + CATEGORY_STRIPE_TRANSITION_MS + 'ms ease-out',
+          overflow: 'hidden',
+          borderRadius: 0,
+          backgroundImage: getCategoryStripeGradient(categories),
         }}
-      >
+      />
+      {isTooltipVisible && (
         <div
-          data-testid="category-stripe-visual"
-          aria-hidden="true"
+          id={tooltipId}
+          role="tooltip"
+          className="pf-v5-c-tooltip pf-m-right"
           style={{
             position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: isHovered ? CATEGORY_STRIPE_WIDE_WIDTH : CATEGORY_STRIPE_NARROW_WIDTH,
-            transition: 'width ' + CATEGORY_STRIPE_TRANSITION_MS + 'ms ease-out',
-            overflow: 'hidden',
-            borderRadius: 0,
-            backgroundImage: getCategoryStripeGradient(categories),
+            left: '100%',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 9999,
           }}
-        />
-      </div>
-    </Tooltip>
+        >
+          <div className="pf-v5-c-tooltip__arrow" />
+          <div className="pf-v5-c-tooltip__content pf-m-text-align-left">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <strong>Categories:</strong>
+              {categories.map((category) => (
+                <span key={category.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: '0.5rem',
+                      height: '0.5rem',
+                      borderRadius: '50%',
+                      backgroundColor: category.color || '#6c757d',
+                      display: 'inline-block',
+                      flexShrink: 0,
+                    }}
+                  />
+                  {category.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

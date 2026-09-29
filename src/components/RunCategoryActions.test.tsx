@@ -8,7 +8,7 @@ describe('RunCategoryStripe', () => {
       <RunCategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />,
     );
 
-    const stripe = screen.getByRole('img', { name: 'Categories: resilience' });
+    const stripe = screen.getByRole('group', { name: 'Categories: resilience' });
     const visualStripe = screen.getByTestId('category-stripe-visual');
     expect(stripe.style.width).toBe('3.23mm');
     expect(visualStripe.style.width).toBe('var(--pf-v5-global--BorderWidth--xl, 4px)');
@@ -18,7 +18,13 @@ describe('RunCategoryStripe', () => {
     expect(stripe.style.width).toBe('3.23mm');
     expect(visualStripe.style.width).toBe('3.23mm');
     expect(visualStripe.style.transition).toBe('width 180ms ease-out');
-    await screen.findByRole('tooltip');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    fireEvent.transitionEnd(visualStripe, { propertyName: 'width' });
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.style.left).toBe('100%');
+    expect(tooltip.style.top).toBe('50%');
+    expect(tooltip.parentElement).toBe(stripe);
   });
 
   it('renders category colors as contiguous equal-height gradient stops', () => {
