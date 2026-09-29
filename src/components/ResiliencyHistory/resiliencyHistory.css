@@ -336,10 +336,6 @@
   background: var(--series-color);
 }
 
-.resiliency-history__print-summary {
-  display: none;
-}
-
 .resiliency-history__charts {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -596,87 +592,5 @@
 
   .resiliency-history__export-button {
     align-self: flex-start;
-  }
-}
-
-@media print {
-  @page {
-    size: landscape;
-    margin: 12mm;
-  }
-
-  .app-sidebar,
-  .pf-v5-c-masthead,
-  .pf-v5-c-page__header,
-  .resiliency-history__controls,
-  .resiliency-history__export-button,
-  .resiliency-history__export-help,
-  .resiliency-history__mode-controls {
-    display: none !important;
-  }
-
-  .resiliency-history__baseline-controls {
-    display: none !important;
-  }
-
-  .app-content--with-sidebar {
-    display: block !important;
-    height: auto !important;
-    padding-left: 0 !important;
-  }
-
-  body,
-  #root,
-  .pf-v5-c-page,
-  .pf-v5-c-page__main-container,
-  .pf-v5-c-page__main-section {
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-  }
-
-  .resiliency-history {
-    color: #111 !important;
-  }
-
-  .resiliency-history__print-summary {
-    display: block;
-    margin-bottom: 1rem;
-  }
-
-  .resiliency-history__charts {
-    display: block;
-  }
-
-  .resiliency-history__chart-card {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    margin-bottom: 0.5rem;
-    background: #fff !important;
-    box-shadow: none !important;
-  }
-
-  .resiliency-history__chart-stage,
-  .resiliency-history__svg {
-    max-width: 100% !important;
-  }
-
-  .resiliency-history__chart-toolbar,
-  .resiliency-history__point-tooltip {
-    display: none !important;
-  }
-
-  .resiliency-history__page-header p,
-  .resiliency-history__applied-filters {
-    color: #333 !important;
-  }
-
-  .resiliency-history__axis-text,
-  .resiliency-history__axis-title {
-    fill: #111 !important;
-  }
-
-  .resiliency-history__grid-line {
-    stroke: #aaa !important;
   }
 }

@@ -2,6 +2,8 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { operatorApi } from '../../services/operatorApi';
+import { graphRunsApi } from '../../services/graphRunsApi';
+import { configCache } from '../scenarioConfigCache';
 import type { ResiliencyHistoryChartModel } from './resiliencyHistoryUtils';
 import { ResiliencyHistoryPage } from './ResiliencyHistoryPage';
 
@@ -74,6 +76,20 @@ function renderPage() {
   return render(<ResiliencyHistoryPage />);
 }
 
+function createReportWindow() {
+  const reportDocument = document.implementation.createHTMLDocument();
+  const print = vi.fn();
+  const reportWindow = {
+    document: reportDocument,
+    print,
+    focus: vi.fn(),
+    close: vi.fn(),
+    setTimeout: window.setTimeout.bind(window),
+    get closed() { return false; },
+  } as unknown as Window;
+  return { reportDocument, reportWindow, print };
+}
+
 async function selectFilters(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('checkbox', { name: 'resilience' });
   await user.click(screen.getByRole('checkbox', { name: 'resilience' }));
@@ -83,6 +99,7 @@ async function selectFilters(user: ReturnType<typeof userEvent.setup>) {
 describe('ResiliencyHistoryPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    configCache.clear();
     mocks.clusterDiscovery.clusters = [{
       uuid: 'cluster-uuid',
       clusterName: 'cluster-a',
@@ -158,7 +175,6 @@ describe('ResiliencyHistoryPage', () => {
     expect(screen.getByTestId('history-chart')).toHaveAttribute('data-show-baselines', 'true');
     await user.click(screen.getByRole('checkbox', { name: 'Show baseline comparisons' }));
     expect(screen.getByTestId('history-chart')).toHaveAttribute('data-show-baselines', 'false');
-    expect(document.querySelector('.resiliency-history__print-summary')).toHaveTextContent('Baseline comparisons: Hidden');
   });
 
   it('shows an empty state when the query returns no scored runs', async () => {
@@ -244,7 +260,7 @@ describe('ResiliencyHistoryPage', () => {
     expect(mocks.clusterDiscovery.retry).toHaveBeenCalledTimes(1);
   });
 
-  it('switches between separate and mixed charts and opens native PDF export', async () => {
+  it('opens a structured print-ready report with charts and effective configurations', async () => {
     const user = userEvent.setup();
     vi.mocked(operatorApi.getCategories).mockResolvedValue({
       categories: [
@@ -258,8 +274,26 @@ describe('ResiliencyHistoryPage', () => {
       { uuid: 'b', clusterName: 'cluster-b', clusterAPIURL: 'https://b.example', operatorSource: 'operator-b', ready: true, secretType: 'kubeconfig' },
     ];
     const query = vi.spyOn(operatorApi, 'queryResiliencyHistory').mockResolvedValue(multiHistory);
-    const print = vi.fn();
-    Object.defineProperty(window, 'print', { configurable: true, value: print });
+    const report = createReportWindow();
+    vi.spyOn(window, 'open').mockReturnValue(report.reportWindow);
+    vi.spyOn(operatorApi, 'getScenarioRunConfig').mockResolvedValue({
+      targetRequestId: 'target-scenario',
+      targetClusters: { 'krkn-operator': ['cluster-a'] },
+      scenarioName: 'pod-kill',
+      kubeconfigPath: '/unused',
+      environment: { DURATION: '60', API_PASSWORD: 'scenario-secret' },
+    });
+    vi.spyOn(graphRunsApi, 'getGraphRunConfig').mockResolvedValue({
+      targetRequestId: 'target-graph',
+      targetClusters: { 'krkn-operator': ['cluster-a', 'cluster-b'] },
+      graph: {
+        'node-a': {
+          scenario: { name: 'node-cpu-hog', private: false },
+          env: { DURATION: '90', API_TOKEN: 'graph-secret' },
+        },
+      },
+      maxRetries: 2,
+    });
     renderPage();
 
     await screen.findByRole('checkbox', { name: 'resilience' });
@@ -278,24 +312,25 @@ describe('ResiliencyHistoryPage', () => {
     expect(screen.getAllByTestId('history-chart')).toHaveLength(2);
     expect(screen.getByText('resilience — Mixed configurations')).toBeInTheDocument();
     expect(screen.getByText('reliability — Mixed configurations')).toBeInTheDocument();
-    const printSummary = document.querySelector('.resiliency-history__print-summary');
-    expect(printSummary).toHaveTextContent('Categories: resilience, reliability');
-    expect(printSummary).toHaveTextContent('Clusters: cluster-a, cluster-b');
-    expect(screen.getByText('Mixed configurations by category')).toBeInTheDocument();
-    expect(printSummary).toHaveTextContent('Baseline comparisons: Shown');
+    expect(screen.getByRole('radio', { name: 'Combine configurations by category' })).toBeChecked();
 
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
-    expect(print).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/Generated at:/)).toBeInTheDocument();
+    await waitFor(() => expect(report.reportDocument.body.textContent).toContain('Configurations compared'));
+    expect(window.open).toHaveBeenCalledWith('', '_blank');
+    expect(report.reportDocument.body.textContent).toContain('Latest score snapshot');
+    expect(report.reportDocument.body.textContent).toContain('Score trends');
+    expect(report.reportDocument.body.textContent).toContain('Workflow nodes');
+    expect(report.reportDocument.body.textContent).toContain('DURATION');
+    expect(report.reportDocument.body.textContent).toContain('••••••••');
+    expect(report.reportDocument.body.textContent).not.toContain('scenario-secret');
+    expect(report.reportDocument.body.textContent).not.toContain('graph-secret');
+    await waitFor(() => expect(report.print).toHaveBeenCalledTimes(1));
   });
 
-  it('shows a clean error when native PDF printing cannot be opened', async () => {
+  it('explains when the browser blocks the report popup', async () => {
     const user = userEvent.setup();
     vi.spyOn(operatorApi, 'queryResiliencyHistory').mockResolvedValue(populatedHistory);
-    Object.defineProperty(window, 'print', {
-      configurable: true,
-      value: () => { throw new Error('Print dialog unavailable'); },
-    });
+    vi.spyOn(window, 'open').mockReturnValue(null);
     renderPage();
 
     await selectFilters(user);
@@ -303,6 +338,6 @@ describe('ResiliencyHistoryPage', () => {
     await screen.findByRole('button', { name: 'Export PDF' });
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
 
-    expect(await screen.findByText('Print dialog unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Allow pop-ups to open the PDF report.')).toBeInTheDocument();
   });
 });
