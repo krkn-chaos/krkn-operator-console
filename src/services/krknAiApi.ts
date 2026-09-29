@@ -64,7 +64,7 @@ export interface KrknAIRunResource {
   };
   spec: {
     targetRequestId: string;
-    targetClusters: Record<string, string[]>;
+    targetClusterApiUrl?: string;
     configMapName?: string;
     configMapKey?: string;
     orchestratorImage?: string;
