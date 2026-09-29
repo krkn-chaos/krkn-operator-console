@@ -31,6 +31,8 @@ describe('ResiliencyHistoryChart', () => {
     expect(screen.getByRole('heading', { name: 'resilience — pod-kill (configuration config-1)' })).toBeInTheDocument();
     expect(screen.getByText('cluster-a')).toBeInTheDocument();
     expect(document.querySelector('svg')).not.toBeNull();
+    expect(document.querySelector('svg')).toHaveAttribute('data-y-max', '130');
+    expect(screen.getByText('125')).toBeInTheDocument();
   });
 
   it('renders an empty chart state when no points match a group', () => {

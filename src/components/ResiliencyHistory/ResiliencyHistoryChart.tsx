@@ -9,7 +9,7 @@ const CLUSTER_COLORS = [
 ];
 const SVG_HEIGHT = 390;
 const MARGIN = { top: 24, right: 24, bottom: 62, left: 62 };
-const SCORE_DOMAIN: [number, number] = [0, 100];
+const SCORE_DOMAIN: [number, number] = [0, 130];
 const DATE_TICK_COUNT = 5;
 
 interface ChartDomain {
@@ -103,10 +103,10 @@ function formatDelta(score: number, baseline: number): string {
 }
 
 function getScoreTicks(domain: [number, number]): number[] {
-  const rawStep = (domain[1] - domain[0]) / 5;
+  const rawStep = (domain[1] - domain[0]) / 6;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
   const normalizedStep = rawStep / magnitude;
-  const step = (normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 5 ? 5 : 10) * magnitude;
+  const step = (normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 2.5 ? 2.5 : normalizedStep <= 5 ? 5 : 10) * magnitude;
   const firstTick = Math.ceil(domain[0] / step) * step;
   const ticks: number[] = [];
   for (let tick = firstTick; tick <= domain[1]; tick += step) ticks.push(Number(tick.toFixed(3)));
@@ -295,6 +295,7 @@ export function ResiliencyHistoryChart({
                 role="group"
                 aria-labelledby={`${id}-title ${id}-description`}
                 data-zoomed={chartIsZoomed}
+                data-y-max={domain.y[1]}
                 onWheel={handleWheel}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
