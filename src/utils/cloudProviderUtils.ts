@@ -13,8 +13,8 @@ export const CLOUD_DISABLED_FIELDS = [
   'CLOUD_TYPE',
 ] as const;
 
-export function isCloudEnvVar(key: string): boolean {
-  return key === 'CLOUD_TYPE' || CLOUD_ENV_VAR_PREFIXES.some(p => key.startsWith(p));
+export function isCloudEnvVar(key: string | null | undefined): boolean {
+  return key === 'CLOUD_TYPE' || (key != null && CLOUD_ENV_VAR_PREFIXES.some(p => key.startsWith(p)));
 }
 
 export function hasCloudFields(fields: Array<{ variable?: string | null }>): boolean {
