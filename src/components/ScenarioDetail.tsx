@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -30,6 +30,8 @@ import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudType
 import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 import { runOnEnterFromFormControl } from '../utils/keyboard';
 import { useSignatureVerification } from '../hooks/useSignatureVerification';
+import { useVisibleCategories } from '../hooks/useVisibleCategories';
+import { CategoryMultiSelect } from './CategoryMultiSelect';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus, ClustersResponse } from '../types/api';
 import { createScenarioReference } from '../utils/scenarioReference';
@@ -74,6 +76,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionLock = useRef(false);
   const [conflictWarning, setConflictWarning] = useState<{
     clusterName: string;
     existingRuns: string[];
@@ -88,6 +91,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [rerunSignatureStatus, setRerunSignatureStatus] = useState<SignatureStatus | null>(null);
   const [rerunSignatureLoading, setRerunSignatureLoading] = useState(false);
   const [rerunSignatureError, setRerunSignatureError] = useState<string | null>(null);
+  const [selectedRunCategories, setSelectedRunCategories] = useState<string[]>(state.rerunCategories);
+  const visibleCategories = useVisibleCategories();
+
+  useEffect(() => {
+    setSelectedRunCategories(state.rerunCategories);
+  }, [state.rerunCategories]);
+
+  useEffect(() => {
+    if (visibleCategories.status !== 'ready') return;
+    const visibleNames = new Set(visibleCategories.categories.map((category) => category.name));
+    setSelectedRunCategories((current) => current.filter((name) => visibleNames.has(name)));
+  }, [visibleCategories.categories, visibleCategories.status]);
 
   useEffect(() => {
     if (!rerunScenario) {
@@ -489,7 +504,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleRunScenario = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || submissionLock.current) return;
 
     if (!state.uuid) {
       setValidationErrors(['Missing target request — please restart the workflow.']);
@@ -521,6 +536,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       return;
     }
 
+    submissionLock.current = true;
     setIsSubmitting(true);
     setValidationErrors([]);
 
@@ -657,6 +673,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         cloudCredentialRef: appliedCloudCredName || undefined,
         maxRetries,
         resiliencyScoreEnabled: enableResiliencyScore || undefined,
+        categories: visibleCategories.status === 'ready' && selectedRunCategories.length > 0
+          ? selectedRunCategories.filter((name) => visibleCategories.categories.some((category) => category.name === name))
+          : undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -679,12 +698,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         },
       });
     } finally {
+      submissionLock.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleKeyboardRunScenario = () => {
-    if (isSubmitting) return;
+    if (isSubmitting || submissionLock.current) return;
 
     if (hasPendingFileInput) {
       setIsPendingFileModalOpen(true);
@@ -705,16 +725,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleConflictContinue = async () => {
-    if (!pendingRunRequest) return;
+    if (!pendingRunRequest || submissionLock.current) return;
 
     setConflictWarning(null);
     const request = pendingRunRequest;
     setPendingRunRequest(null);
 
+    submissionLock.current = true;
     setIsSubmitting(true);
     try {
       await executeScenarioRun(request);
     } finally {
+      submissionLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -915,6 +937,22 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   This scenario can be previewed and run without filling this section. Optional and global parameters remain available below.
                 </Alert>
               )}
+            </CardBody>
+          </Card>
+
+          {/* Run Categories */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardTitle>Categories</CardTitle>
+            <CardBody>
+              <CategoryMultiSelect
+                id="scenario-run-categories"
+                label="Assign categories to this run"
+                categories={visibleCategories.categories}
+                status={visibleCategories.status}
+                selectedCategories={selectedRunCategories}
+                onSelectionChange={setSelectedRunCategories}
+                onRetry={() => { void visibleCategories.reload(); }}
+              />
             </CardBody>
           </Card>
 

@@ -40,6 +40,7 @@ const initialState: AppState = {
 
   // Re-run workflow
   rerunIntent: null,
+  rerunCategories: [],
   startInPreview: false,
   rerunScenario: null,
   rerunKubeconfigPath: null,
@@ -373,6 +374,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalFormValues: null,
         globalTouchedFields: null,
         rerunIntent: null,
+        rerunCategories: [],
         startInPreview: false,
         rerunScenario: null,
         rerunKubeconfigPath: null,
@@ -466,12 +468,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         rerunIntent: action.payload,
+        rerunCategories: action.payload.categories ?? [],
       };
 
     case 'SELECT_SCENARIO_FOR_DETAIL':
       return {
         ...state,
         selectedScenario: action.payload.scenarioName,
+        rerunCategories: [],
         phase: 'loading_scenario_detail',
       };
 
@@ -576,6 +580,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalFormValues: null,
         globalTouchedFields: null,
         rerunIntent: null,
+        rerunCategories: [],
         startInPreview: false,
         rerunScenario: null,
         rerunKubeconfigPath: null,
@@ -686,6 +691,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
               globalFormValues: null,
               globalTouchedFields: null,
               rerunIntent: null,
+              rerunCategories: [],
               startInPreview: false,
               rerunScenario: null,
               rerunKubeconfigPath: null,

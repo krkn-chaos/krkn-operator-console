@@ -157,6 +157,27 @@ describe('RunWorkflowModal retry configuration', () => {
     });
   });
 
+  it('sends only currently visible selected categories with the GraphRun', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useStudioContext).mockReturnValue({
+      workflow: { nodes: [], edges: [], nextNodeNumber: 1 },
+      exportWorkflow: vi.fn(() => ({ graph: { node: { name: 'scenario' } }, metadata: {} })),
+      selectedCategories: ['network', 'hidden'],
+      visibleCategories: [{ name: 'network', color: '#d40078', availableToAll: true }],
+      categoryLoadStatus: 'ready',
+    } as unknown as ReturnType<typeof useStudioContext>);
+    renderRetryModal();
+    await user.click(screen.getByRole('button', { name: 'Select cluster' }));
+    await user.click(screen.getByRole('button', { name: /Run Workflow on 1 cluster/i }));
+
+    await waitFor(() => {
+      expect(graphRunsApi.createGraphRun).toHaveBeenCalledWith(
+        expect.objectContaining({ categories: ['network'] }),
+        expect.anything(),
+      );
+    });
+  });
+
   it('rejects fractional retries without submitting', async () => {
     const user = userEvent.setup();
     renderRetryModal();

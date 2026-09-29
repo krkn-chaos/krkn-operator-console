@@ -27,6 +27,7 @@ import { ArrowLeftIcon, PencilAltIcon, TrashIcon, ExclamationTriangleIcon, SaveI
 import { useAppContext } from '../../context/AppContext';
 import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
 import { useNotifications } from '../../hooks';
+import { useVisibleCategories } from '../../hooks/useVisibleCategories';
 import { workflowsApi } from '../../services/workflowsApi';
 import { StudioProvider, useStudioContext } from './StudioContext';
 import { loadAutosave, clearAutosave } from './studioAutosave';
@@ -37,12 +38,29 @@ import { StudioNodeEditorModal } from './StudioNodeEditorModal';
 import { RunWorkflowModal } from './RunWorkflowModal';
 import { LoadWorkflowSelect } from './LoadWorkflowSelect';
 import { WorkflowDetailsPanel } from './WorkflowDetailsPanel';
+import { CategoryMultiSelect } from '../CategoryMultiSelect';
 import { studioLeaveGuard } from './studioLeaveGuard';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
   const { dispatch } = useAppContext();
-  const { updateNode, workflow, savedWorkflow, isDirty, saveWorkflowToCluster, clearSavedWorkflow, clearWorkflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const {
+    updateNode,
+    workflow,
+    savedWorkflow,
+    isDirty,
+    saveWorkflowToCluster,
+    clearSavedWorkflow,
+    clearWorkflow,
+    isEditingDetails,
+    setIsEditingDetails,
+    selectedCategories,
+    setSelectedCategories,
+    visibleCategories,
+    categoryLoadStatus,
+    setCategoryCatalog,
+  } = useStudioContext();
+  const categoriesQuery = useVisibleCategories();
   const { showSuccess, showError } = useNotifications();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -54,6 +72,10 @@ function StudioContent() {
   const [leaveReason, setLeaveReason] = useState<'dirty' | 'unsaved' | 'editing'>('dirty');
   const pendingLeaveAction = useRef<(() => void) | null>(null);
   const targetFetch = useStudioTargetFetch();
+
+  useEffect(() => {
+    setCategoryCatalog(categoriesQuery.categories, categoriesQuery.status);
+  }, [categoriesQuery.categories, categoriesQuery.status, setCategoryCatalog]);
 
   const workflowRef = useRef(workflow);
   workflowRef.current = workflow;
@@ -205,6 +227,17 @@ function StudioContent() {
             <FlexItem>
               <LoadWorkflowSelect />
             </FlexItem>
+            <FlexItem>
+              <CategoryMultiSelect
+                id="studio-run-categories"
+                label="Categories for this run"
+                categories={visibleCategories}
+                status={categoryLoadStatus}
+                selectedCategories={selectedCategories}
+                onSelectionChange={setSelectedCategories}
+                onRetry={() => { void categoriesQuery.reload(); }}
+              />
+            </FlexItem>
             {savedWorkflow && !isEditingDetails && (
               <FlexItem>
                 <Button
@@ -334,8 +367,9 @@ function StudioContent() {
 
 export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: StudioWorkflow }) {
   const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(replayWorkflow);
+  const [initialCategories, setInitialCategories] = useState<string[]>([]);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; timestamp: number } | null>(null);
+  const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; categories: string[]; timestamp: number } | null>(null);
   const [isReady, setIsReady] = useState(false); // Wait for user decision
 
   // Check for autosave on mount
@@ -343,6 +377,7 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
     if (replayWorkflow) {
       clearAutosave();
       setInitialWorkflow(replayWorkflow);
+      setInitialCategories([]);
       setIsReady(true);
       return;
     }
@@ -351,6 +386,7 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
     if (autosave) {
       setAutosaveData({
         workflow: autosave.workflow,
+        categories: autosave.categories ?? [],
         timestamp: autosave.timestamp,
       });
       setShowRecoveryModal(true);
@@ -365,6 +401,7 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
   const handleResumeAutosave = () => {
     if (autosaveData) {
       setInitialWorkflow(autosaveData.workflow);
+      setInitialCategories(autosaveData.categories);
     }
     setShowRecoveryModal(false);
     setIsReady(true); // Now ready with autosave data
@@ -393,7 +430,7 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
   }
 
   return (
-    <StudioProvider initialWorkflow={initialWorkflow}>
+    <StudioProvider initialWorkflow={initialWorkflow} initialCategories={initialCategories}>
       <StudioContent />
     </StudioProvider>
   );

@@ -120,6 +120,7 @@ describe('ScenarioDetail', () => {
     providerConfigStatus: 'idle',
     providerConfigData: null,
     rerunIntent: null,
+    rerunCategories: [],
     startInPreview: false,
     rerunScenario: null,
     rerunKubeconfigPath: null,
@@ -149,7 +150,9 @@ describe('ScenarioDetail', () => {
         }],
       },
     });
+    vi.mocked(operatorApi.getScenarios).mockResolvedValue({ scenarios: [] });
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({ files: [] });
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({ categories: [], total: 0 });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
     vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
   });
@@ -767,6 +770,64 @@ describe('ScenarioDetail', () => {
       });
     });
 
+    it('sends selected visible categories with a new scenario run', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getCategories).mockResolvedValueOnce({
+        categories: [
+          { name: 'network', color: '#d40078', availableToAll: true },
+          { name: 'reliability', color: '#ff9900', availableToAll: true },
+        ],
+        total: 2,
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(await screen.findByRole('button', { name: /assign categories to this run/i }));
+      await user.click(screen.getByRole('checkbox', { name: 'network' }));
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ categories: ['network'] }),
+        );
+      });
+    });
+
+    it('restores only currently visible categories when replaying a scenario run', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getCategories).mockResolvedValueOnce({
+        categories: [{ name: 'network', color: '#d40078', availableToAll: true }],
+        total: 1,
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        rerunCategories: ['network', 'no-longer-visible'],
+      });
+
+      const toggle = await screen.findByRole('button', { name: /assign categories to this run/i });
+      await waitFor(() => expect(toggle).toHaveTextContent('1 category selected'));
+      await user.click(toggle);
+      expect(screen.getByRole('checkbox', { name: 'network' })).toBeChecked();
+      expect(screen.queryByRole('checkbox', { name: 'no-longer-visible' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ categories: ['network'] }),
+        );
+      });
+    });
+
     it('should serialize a customized maximum retry count', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
@@ -822,7 +883,7 @@ describe('ScenarioDetail', () => {
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/cluster1: retry limit reached/)).toBeInTheDocument();
+        expect(screen.getByText(/retry limit reached/)).toBeInTheDocument();
       });
     });
 

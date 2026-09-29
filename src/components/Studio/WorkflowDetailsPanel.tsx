@@ -55,7 +55,16 @@ const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
  * ```
  */
 export function WorkflowDetailsPanel() {
-  const { savedWorkflow, setSavedWorkflow, workflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const {
+    savedWorkflow,
+    setSavedWorkflow,
+    workflow,
+    isEditingDetails,
+    setIsEditingDetails,
+    selectedCategories = [],
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const [isExpanded, setIsExpanded] = useState(true);
@@ -132,6 +141,9 @@ export function WorkflowDetailsPanel() {
     const trimmedName = editName.trim();
     const groupsArray = editAccessType === 'group' && editSelectedGroup ? [editSelectedGroup] : [];
     const snapshotAtSave = { ...workflow };
+    const categories = categoryLoadStatus === 'ready'
+      ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+      : undefined;
 
     setIsSaving(true);
     try {
@@ -142,6 +154,7 @@ export function WorkflowDetailsPanel() {
         description: editDescription.trim() || undefined,
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories,
       });
       setSavedWorkflow({
         ...savedWorkflow,
@@ -149,6 +162,7 @@ export function WorkflowDetailsPanel() {
         description: editDescription.trim() || undefined,
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories: categories ?? savedWorkflow.categories,
         savedAt: new Date().toISOString(),
       }, snapshotAtSave);
       showSuccess('Workflow updated', `"${trimmedName}" updated successfully`);

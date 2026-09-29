@@ -190,6 +190,7 @@ function App() {
           clusters,
           environment: config.environment,
           kubeconfigPath: config.kubeconfigPath,
+          categories: config.categories,
         },
       });
 

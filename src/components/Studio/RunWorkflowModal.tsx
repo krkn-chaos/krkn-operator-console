@@ -47,7 +47,13 @@ export function RunWorkflowModal({
   onSuccess,
   targetFetchState,
 }: RunWorkflowModalProps) {
-  const { exportWorkflow, workflow } = useStudioContext();
+  const {
+    exportWorkflow,
+    workflow,
+    selectedCategories = [],
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { enabled: signatureVerificationEnabled, error: signatureVerificationError, isLoading: signatureVerificationLoading } = useSignatureVerification();
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
@@ -197,6 +203,9 @@ export function RunWorkflowModal({
       targetRequestId: targetFetchState.uuid,
       targetClusters,
       maxRetries,
+      categories: categoryLoadStatus === 'ready' && selectedCategories.length > 0
+        ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+        : undefined,
     };
 
     setIsSubmitting(true);

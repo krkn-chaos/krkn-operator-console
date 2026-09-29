@@ -44,6 +44,7 @@ describe('RegistrySelector', () => {
     providerConfigStatus: 'idle',
     providerConfigData: null,
     rerunIntent: null,
+    rerunCategories: [],
     startInPreview: false,
     rerunScenario: null,
     rerunKubeconfigPath: null,

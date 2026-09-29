@@ -241,6 +241,33 @@ describe('StudioContext', () => {
       expect(payload.studioLayout!.nodes).toHaveLength(1);
     });
 
+    it('persists category selections and explicitly clears them when the selection is empty', async () => {
+      const wf: StudioWorkflow = { nodes: [makeConfiguredNode('node-a')], edges: [], nextNodeNumber: 2 };
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+
+      act(() => {
+        result.current.setCategoryCatalog([
+          { name: 'network', availableToAll: true },
+        ], 'ready');
+        result.current.loadWorkflow(wf, makeSavedWorkflow({ categories: ['network'] }));
+      });
+
+      await act(async () => {
+        await result.current.saveWorkflowToCluster();
+      });
+      expect(vi.mocked(workflowsApi.updateWorkflow).mock.calls[0][1].categories).toEqual(['network']);
+
+      act(() => {
+        result.current.setSelectedCategories([]);
+      });
+      expect(result.current.isDirty).toBe(true);
+
+      await act(async () => {
+        await result.current.saveWorkflowToCluster();
+      });
+      expect(vi.mocked(workflowsApi.updateWorkflow).mock.calls[1][1].categories).toEqual([]);
+    });
+
     it('updates savedWorkflow timestamp after successful save', async () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
       const meta = makeSavedWorkflow();
@@ -370,6 +397,34 @@ describe('StudioContext', () => {
       expect(result.current.savedWorkflow?.workflowName).toBe('loaded-workflow');
     });
 
+    it('restores categories saved with a workflow template', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      act(() => {
+        result.current.loadWorkflow(
+          { nodes: [], edges: [], nextNodeNumber: 1 },
+          makeSavedWorkflow({ categories: ['network', 'reliability'] }),
+        );
+      });
+
+      expect(result.current.selectedCategories).toEqual(['network', 'reliability']);
+    });
+
+    it('drops categories that are no longer visible after the category catalog loads', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      act(() => {
+        result.current.loadWorkflow(
+          { nodes: [], edges: [], nextNodeNumber: 1 },
+          makeSavedWorkflow({ categories: ['network', 'private-category'] }),
+        );
+      });
+      act(() => {
+        result.current.setCategoryCatalog([{ name: 'network', availableToAll: true }], 'ready');
+      });
+
+      expect(result.current.selectedCategories).toEqual(['network']);
+      expect(result.current.savedWorkflow?.categories).toEqual(['network']);
+    });
+
     it('captures the loaded workflow as the snapshot (isDirty is false)', () => {
       const wf: StudioWorkflow = {
         nodes: [makeConfiguredNode('snap-check')],
@@ -497,6 +552,7 @@ describe('StudioContext', () => {
 
       act(() => {
         result.current.addNode();
+        result.current.setSelectedCategories(['network']);
       });
 
       // Advance past the 30-second autosave interval
@@ -507,6 +563,7 @@ describe('StudioContext', () => {
       expect(saveAutosave).toHaveBeenCalled();
       const call = vi.mocked(saveAutosave).mock.calls[0][0];
       expect(call.workflow.nodes).toHaveLength(1);
+      expect(call.categories).toEqual(['network']);
       expect(call.version).toBe('1.0');
     });
 

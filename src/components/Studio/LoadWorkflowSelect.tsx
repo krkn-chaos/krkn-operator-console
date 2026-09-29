@@ -35,7 +35,14 @@ import type { WorkflowInfo } from '../../types/api';
  * ```
  */
 export function LoadWorkflowSelect() {
-  const { workflow, loadWorkflow, savedWorkflow, isDirty } = useStudioContext();
+  const {
+    workflow,
+    loadWorkflow,
+    savedWorkflow,
+    isDirty,
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,12 +87,18 @@ export function LoadWorkflowSelect() {
         throw new Error('This workflow has no studio layout and cannot be opened in the visual editor');
       }
 
+      const savedCategories = wfResponse.categories ?? [];
+      const categories = categoryLoadStatus === 'ready'
+        ? savedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+        : savedCategories;
+
       loadWorkflow(canvas, {
         workflowId: wfResponse.workflowId,
         workflowName: wfResponse.workflowName,
         description: wfResponse.description,
         availableToAll: wfResponse.availableToAll,
         groups: wfResponse.groups,
+        categories,
         savedAt: wfResponse.updatedAt || wfResponse.createdAt || new Date().toISOString(),
       });
       showSuccess('Workflow loaded', `"${wfResponse.workflowName}" loaded successfully`);

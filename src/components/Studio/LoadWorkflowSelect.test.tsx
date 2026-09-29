@@ -212,6 +212,35 @@ describe('LoadWorkflowSelect', () => {
     );
   });
 
+  it('restores only categories visible to the current user from a saved template', async () => {
+    const user = userEvent.setup();
+    const validLayout = { nodes: [], edges: [], nextNodeNumber: 1 };
+    vi.mocked(useStudioContext).mockReturnValue({
+      ...defaultContext,
+      visibleCategories: [{ name: 'network', availableToAll: true }],
+      categoryLoadStatus: 'ready',
+    } as unknown as ReturnType<typeof useStudioContext>);
+    vi.mocked(workflowsApi.getWorkflow).mockResolvedValue({
+      workflowId: 'w1',
+      workflowName: 'my-workflow',
+      graph: {},
+      studioLayout: validLayout,
+      availableToAll: true,
+      categories: ['network', 'private-category'],
+    });
+
+    render(<LoadWorkflowSelect />);
+    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('my-workflow'));
+
+    await waitFor(() => {
+      expect(mockLoadWorkflow).toHaveBeenCalledWith(
+        validLayout,
+        expect.objectContaining({ categories: ['network'] }),
+      );
+    });
+  });
+
   it('shows error notification on load failure', async () => {
     const user = userEvent.setup();
 

@@ -62,6 +62,7 @@ describe('workflowsApi', () => {
         workflowName: 'my-workflow',
         graph: { 'node-1': { image: 'img', volumes: {}, env: {} } },
         availableToAll: true,
+        categories: ['network'],
       };
       mockFetchJson.mockResolvedValue(mockResponse);
 
@@ -93,6 +94,7 @@ describe('workflowsApi', () => {
         graph: { 'node-1': { image: 'img', volumes: {}, env: {} } },
         description: 'A new workflow',
         availableToAll: true,
+        categories: ['network', 'reliability'],
       };
 
       const mockResponse: CreateWorkflowResponse = {
@@ -131,6 +133,7 @@ describe('workflowsApi', () => {
         graph: { 'node-1': { image: 'img', volumes: {}, env: {} } },
         availableToAll: false,
         groups: ['team-a'],
+        categories: [],
       };
 
       const mockResponse: UpdateWorkflowResponse = {

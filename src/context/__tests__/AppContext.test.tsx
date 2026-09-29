@@ -45,6 +45,7 @@ describe('AppContext reducer', () => {
             clusters: [{ operatorName: 'operator', clusterName: 'cluster' }],
             environment: {},
             kubeconfigPath: '/tmp/kubeconfig',
+            categories: ['network'],
           },
         });
         capturedDispatch({ type: 'INIT_SUCCESS', payload: { uuid: 'target-1' } });
@@ -56,6 +57,7 @@ describe('AppContext reducer', () => {
       expect(capturedState.selectedClusters).toEqual([
         { operatorName: 'operator', clusterName: 'cluster', clusterApiUrl: '' },
       ]);
+      expect(capturedState.rerunCategories).toEqual(['network']);
 
       act(() => {
         capturedDispatch({
