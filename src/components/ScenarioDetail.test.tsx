@@ -828,6 +828,31 @@ describe('ScenarioDetail', () => {
       });
     });
 
+    it('keeps replay categories when the category catalog fails to load', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getCategories).mockRejectedValueOnce(new Error('temporary failure'));
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        rerunCategories: ['network'],
+      });
+
+      await waitFor(() => expect(screen.getByText('Categories could not be loaded')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ categories: ['network'] }),
+        );
+      });
+    });
+
     it('should serialize a customized maximum retry count', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
