@@ -47,7 +47,7 @@ interface GraphRunDetailProps {
   /** Name of the graph run to visualize */
   graphRunName: string;
   /** Opens the saved graph in Chaos Studio for editing before rerun */
-  onReplayWorkflow?: (workflow: StudioWorkflow) => void;
+  onReplayWorkflow?: (workflow: StudioWorkflow, categories?: string[]) => void;
 }
 
 /**
@@ -637,7 +637,7 @@ export function GraphRunDetail({ graphRunName, onReplayWorkflow }: GraphRunDetai
               }
             : undefined,
         };
-        onReplayWorkflow(workflow);
+        onReplayWorkflow(workflow, config.categories ?? []);
         setReplayMessage('Workflow loaded in Chaos Studio for editing');
       } else {
         const replayedRun = await graphRunsApi.createGraphRun(config, headers);

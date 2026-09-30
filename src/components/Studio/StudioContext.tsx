@@ -29,6 +29,25 @@ export interface SavedWorkflowMetadata {
   savedAt: string;
 }
 
+export function normalizeCategoryNames(categories: string[] = []): string[] {
+  return [...new Set(categories)].sort();
+}
+
+export function mergeVisibleCategorySelection(
+  savedCategories: string[] = [],
+  selectedCategories: string[],
+  visibleCategories: CategoryResponse[],
+): string[] {
+  const visibleNames = new Set(visibleCategories.map((category) => category.name));
+  const hiddenCategories = savedCategories.filter((name) => !visibleNames.has(name));
+  const visibleSelection = selectedCategories.filter((name) => visibleNames.has(name));
+  return normalizeCategoryNames([...hiddenCategories, ...visibleSelection]);
+}
+
+function workflowSnapshot(workflow: StudioWorkflow, categories: string[]): string {
+  return JSON.stringify({ workflow, categories: normalizeCategoryNames(categories) });
+}
+
 /**
  * Build the executable graph from the current workflow canvas.
  * Only includes configured nodes; unconfigured nodes are silently skipped.
@@ -97,10 +116,10 @@ interface StudioContextType {
   validateNodeId: (nodeId: string, excludeId?: string) => { valid: boolean; error?: string };
   exportWorkflow: () => { graph: { [nodeId: string]: GraphScenarioNode }; metadata: { exportedAt: string; nodeCount: number } } | { error: string };
   clearWorkflow: () => void;
-  setSavedWorkflow: (meta: SavedWorkflowMetadata, workflowSnapshot?: StudioWorkflow) => void;
+  setSavedWorkflow: (meta: SavedWorkflowMetadata, workflowState?: StudioWorkflow) => void;
   saveWorkflowToCluster: () => Promise<void>;
   clearSavedWorkflow: () => void;
-  loadWorkflow: (workflow: StudioWorkflow, meta: SavedWorkflowMetadata) => void;
+  loadWorkflow: (workflow: StudioWorkflow, meta: SavedWorkflowMetadata, selectedCategories?: string[]) => void;
   isDirty: boolean;
   isEditingDetails: boolean;
   setIsEditingDetails: (editing: boolean) => void;
@@ -143,7 +162,7 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
 
   const isDirty = useMemo(() => {
     if (!savedWorkflow || !lastSavedSnapshot) return false;
-    return JSON.stringify({ workflow, categories: selectedCategories }) !== lastSavedSnapshot;
+    return workflowSnapshot(workflow, selectedCategories) !== lastSavedSnapshot;
   }, [savedWorkflow, lastSavedSnapshot, selectedCategories, workflow]);
 
   const setCategoryCatalog = useCallback((categories: CategoryResponse[], status: CategoryLoadStatus) => {
@@ -154,10 +173,22 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
   useEffect(() => {
     if (categoryLoadStatus !== 'ready') return;
     const visibleNames = new Set(visibleCategories.map((category) => category.name));
-    setSelectedCategories((current) => current.filter((name) => visibleNames.has(name)));
-    setSavedWorkflowState((current) => current
-      ? { ...current, categories: (current.categories ?? []).filter((name) => visibleNames.has(name)) }
-      : current);
+    setSelectedCategories((current) => {
+      const filtered = current.filter((name) => visibleNames.has(name));
+      setLastSavedSnapshot((snapshot) => {
+        if (!snapshot) return snapshot;
+        try {
+          const parsed = JSON.parse(snapshot) as { workflow: StudioWorkflow; categories?: string[] };
+          if (JSON.stringify(normalizeCategoryNames(parsed.categories ?? [])) !== JSON.stringify(normalizeCategoryNames(current))) {
+            return snapshot;
+          }
+          return workflowSnapshot(parsed.workflow, filtered);
+        } catch {
+          return snapshot;
+        }
+      });
+      return filtered;
+    });
   }, [categoryLoadStatus, visibleCategories]);
 
   // Autosave to localStorage only for unsaved workflows (no cluster workflow)
@@ -394,12 +425,17 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     };
   }, [workflow]);
 
-  const setSavedWorkflow = useCallback((meta: SavedWorkflowMetadata, workflowSnapshot?: StudioWorkflow) => {
-    const categories = meta.categories
-      ?? (categoryLoadStatusRef.current === 'ready' ? selectedCategoriesRef.current : []);
-    if (meta.categories !== undefined) setSelectedCategories(meta.categories);
+  const setSavedWorkflow = useCallback((meta: SavedWorkflowMetadata, workflowState?: StudioWorkflow) => {
+    const categories = meta.categories !== undefined
+      ? (categoryLoadStatusRef.current === 'ready'
+        ? meta.categories.filter((name) => visibleCategoriesRef.current.some((category) => category.name === name))
+        : meta.categories)
+      : selectedCategoriesRef.current;
+    if (meta.categories !== undefined) {
+      setSelectedCategories(categories);
+    }
     setSavedWorkflowState(meta);
-    setLastSavedSnapshot(JSON.stringify({ workflow: workflowSnapshot ?? workflowRef.current, categories }));
+    setLastSavedSnapshot(workflowSnapshot(workflowState ?? workflowRef.current, categories));
     clearAutosave();
   }, []);
 
@@ -408,8 +444,8 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     if (!wf) throw new Error('No saved workflow to update');
     const snapshot = { ...workflowRef.current };
     const categories = categoryLoadStatusRef.current === 'ready'
-      ? selectedCategoriesRef.current.filter((name) => visibleCategoriesRef.current.some((category) => category.name === name))
-      : undefined;
+      ? mergeVisibleCategorySelection(wf.categories, selectedCategoriesRef.current, visibleCategoriesRef.current)
+      : wf.categories ?? selectedCategoriesRef.current;
     await workflowsApi.updateWorkflow(wf.workflowId, {
       workflowName: wf.workflowName,
       graph: buildGraph(snapshot),
@@ -421,11 +457,11 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     });
     const metadata = {
       ...wf,
-      ...(categories !== undefined ? { categories } : {}),
+      categories,
       savedAt: new Date().toISOString(),
     };
     setSavedWorkflowState(metadata);
-    setLastSavedSnapshot(JSON.stringify({ workflow: snapshot, categories: categories ?? wf.categories ?? [] }));
+    setLastSavedSnapshot(workflowSnapshot(snapshot, categories));
     clearAutosave();
   }, []);
 
@@ -433,11 +469,11 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     setSavedWorkflowState(null);
   }, []);
 
-  const loadWorkflow = useCallback((newWorkflow: StudioWorkflow, meta: SavedWorkflowMetadata) => {
+  const loadWorkflow = useCallback((newWorkflow: StudioWorkflow, meta: SavedWorkflowMetadata, selected = meta.categories ?? []) => {
     setWorkflow(newWorkflow);
-    setSelectedCategories(meta.categories ?? []);
+    setSelectedCategories(selected);
     setSavedWorkflowState(meta);
-    setLastSavedSnapshot(JSON.stringify({ workflow: newWorkflow, categories: meta.categories ?? [] }));
+    setLastSavedSnapshot(workflowSnapshot(newWorkflow, selected));
     setIsEditingDetails(false);
     clearAutosave();
   }, []);

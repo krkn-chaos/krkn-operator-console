@@ -508,6 +508,8 @@ export interface AppState {
   graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
   studioReplayWorkflow?: StudioWorkflow | null;
+  /** Categories restored when opening a graph run replay in Chaos Studio. */
+  studioReplayCategories?: string[] | null;
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
@@ -574,7 +576,7 @@ export type AppAction =
   | { type: 'LOAD_GRAPH_RUNS_SUCCESS'; payload: { runs: GraphRunState[] } }
   | { type: 'TOGGLE_GRAPH_RUN_ACCORDION'; payload: { graphRunName: string } }
   | { type: 'DELETE_GRAPH_RUN'; payload: { graphRunName: string } }
-  | { type: 'OPEN_STUDIO_REPLAY'; payload: { workflow: StudioWorkflow } }
+  | { type: 'OPEN_STUDIO_REPLAY'; payload: { workflow: StudioWorkflow; categories?: string[] } }
 
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }

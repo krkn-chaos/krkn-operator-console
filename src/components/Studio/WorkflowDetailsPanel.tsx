@@ -29,7 +29,7 @@ import { CheckIcon, TimesIcon } from '@patternfly/react-icons';
 import { FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { workflowsApi } from '../../services/workflowsApi';
-import { useStudioContext, buildGraph } from './StudioContext';
+import { useStudioContext, buildGraph, mergeVisibleCategorySelection } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
@@ -40,7 +40,7 @@ const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 /**
  * Expandable panel showing workflow metadata (name, description, visibility, last saved).
  *
- * Renders inside the Workflow Templates card. Supports read-only and inline-edit modes
+ * Renders inside the Workflow setup card. Supports read-only and inline-edit modes
  * controlled by `isEditingDetails` from StudioContext. When editing starts the panel
  * auto-expands and the toggle is locked until the user saves or cancels.
  *
@@ -142,8 +142,8 @@ export function WorkflowDetailsPanel() {
     const groupsArray = editAccessType === 'group' && editSelectedGroup ? [editSelectedGroup] : [];
     const snapshotAtSave = { ...workflow };
     const categories = categoryLoadStatus === 'ready'
-      ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
-      : undefined;
+      ? mergeVisibleCategorySelection(savedWorkflow.categories, selectedCategories, visibleCategories)
+      : savedWorkflow.categories ?? selectedCategories;
 
     setIsSaving(true);
     try {

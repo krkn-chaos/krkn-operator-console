@@ -21,6 +21,7 @@ const initialState: AppState = {
   graphRuns: [],
   expandedGraphRunIds: new Set<string>(),
   studioReplayWorkflow: null,
+  studioReplayCategories: [],
 
   // Workflow state
   clusters: null,
@@ -345,6 +346,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         phase: 'studio',
         studioReplayWorkflow: action.payload.workflow,
+        studioReplayCategories: action.payload.categories ?? [],
       };
 
     // Workflow control

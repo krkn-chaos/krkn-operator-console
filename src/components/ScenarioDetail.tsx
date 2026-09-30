@@ -673,8 +673,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         cloudCredentialRef: appliedCloudCredName || undefined,
         maxRetries,
         resiliencyScoreEnabled: enableResiliencyScore || undefined,
-        categories: visibleCategories.status === 'ready' && selectedRunCategories.length > 0
-          ? selectedRunCategories.filter((name) => visibleCategories.categories.some((category) => category.name === name))
+        categories: selectedRunCategories.length > 0
+          ? (visibleCategories.status === 'ready'
+            ? selectedRunCategories.filter((name) => visibleCategories.categories.some((category) => category.name === name))
+            : selectedRunCategories)
           : undefined,
       };
 

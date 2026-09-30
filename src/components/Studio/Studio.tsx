@@ -19,6 +19,7 @@ import {
   Button,
   Flex,
   FlexItem,
+  FormGroup,
   Modal,
   ModalVariant,
   Spinner,
@@ -221,16 +222,18 @@ function StudioContent() {
 
       {/* Workflow load + details */}
       <Card style={{ marginBottom: '1rem' }}>
-        <CardTitle>Workflow Templates</CardTitle>
+        <CardTitle>Workflow setup</CardTitle>
         <CardBody>
-          <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
+          <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsSm' }}>
             <FlexItem>
-              <LoadWorkflowSelect />
+              <FormGroup label="Workflow" fieldId="studio-load-workflow">
+                <LoadWorkflowSelect id="studio-load-workflow" />
+              </FormGroup>
             </FlexItem>
             <FlexItem>
               <CategoryMultiSelect
                 id="studio-run-categories"
-                label="Categories for this run"
+                label="Assign categories to this run"
                 categories={visibleCategories}
                 status={categoryLoadStatus}
                 selectedCategories={selectedCategories}
@@ -365,9 +368,15 @@ function StudioContent() {
   );
 }
 
-export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: StudioWorkflow }) {
+export function Studio({
+  initialWorkflow: replayWorkflow,
+  initialCategories = [],
+}: {
+  initialWorkflow?: StudioWorkflow;
+  initialCategories?: string[];
+}) {
   const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(replayWorkflow);
-  const [initialCategories, setInitialCategories] = useState<string[]>([]);
+  const [categorySelection, setCategorySelection] = useState<string[]>([]);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; categories: string[]; timestamp: number } | null>(null);
   const [isReady, setIsReady] = useState(false); // Wait for user decision
@@ -377,7 +386,7 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
     if (replayWorkflow) {
       clearAutosave();
       setInitialWorkflow(replayWorkflow);
-      setInitialCategories([]);
+      setCategorySelection(initialCategories);
       setIsReady(true);
       return;
     }
@@ -395,13 +404,13 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
       // No autosave, ready to start fresh
       setIsReady(true);
     }
-  }, [replayWorkflow]);
+  }, [initialCategories, replayWorkflow]);
 
   // Handle recovery modal actions
   const handleResumeAutosave = () => {
     if (autosaveData) {
       setInitialWorkflow(autosaveData.workflow);
-      setInitialCategories(autosaveData.categories);
+      setCategorySelection(autosaveData.categories);
     }
     setShowRecoveryModal(false);
     setIsReady(true); // Now ready with autosave data
@@ -430,7 +439,7 @@ export function Studio({ initialWorkflow: replayWorkflow }: { initialWorkflow?: 
   }
 
   return (
-    <StudioProvider initialWorkflow={initialWorkflow} initialCategories={initialCategories}>
+    <StudioProvider initialWorkflow={initialWorkflow} initialCategories={categorySelection}>
       <StudioContent />
     </StudioProvider>
   );

@@ -23,18 +23,18 @@ import type { WorkflowInfo } from '../../types/api';
  *
  * Fetches available templates via `workflowsApi.getAvailableWorkflows` on open
  * and provides a searchable list. The toggle label shows the loaded workflow's
- * name when one is active, or "Load Workflow" otherwise.
+ * name when one is active, or "Load saved workflow" otherwise.
  *
  * Prompts the user for confirmation only when there are unsaved changes
  * (dirty saved workflow or unsaved canvas with nodes).
  *
  * @example
  * ```tsx
- * // Used inside StudioProvider, typically in the Workflow Templates card:
+ * // Used inside StudioProvider, typically in the Workflow setup card:
  * <LoadWorkflowSelect />
  * ```
  */
-export function LoadWorkflowSelect() {
+export function LoadWorkflowSelect({ id = 'studio-load-workflow' }: { id?: string }) {
   const {
     workflow,
     loadWorkflow,
@@ -88,7 +88,7 @@ export function LoadWorkflowSelect() {
       }
 
       const savedCategories = wfResponse.categories ?? [];
-      const categories = categoryLoadStatus === 'ready'
+      const selectedCategories = categoryLoadStatus === 'ready'
         ? savedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
         : savedCategories;
 
@@ -98,9 +98,9 @@ export function LoadWorkflowSelect() {
         description: wfResponse.description,
         availableToAll: wfResponse.availableToAll,
         groups: wfResponse.groups,
-        categories,
+        categories: savedCategories,
         savedAt: wfResponse.updatedAt || wfResponse.createdAt || new Date().toISOString(),
-      });
+      }, selectedCategories);
       showSuccess('Workflow loaded', `"${wfResponse.workflowName}" loaded successfully`);
     } catch (err) {
       showError('Load failed', err instanceof Error ? err.message : 'Failed to load workflow');
@@ -127,12 +127,13 @@ export function LoadWorkflowSelect() {
       toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
         <MenuToggle
           ref={toggleRef}
+          id={id}
           onClick={() => setIsOpen(!isOpen)}
           isExpanded={isOpen}
           isDisabled={isLoadingWorkflow}
           icon={isLoadingWorkflow ? <Spinner size="sm" /> : <FolderOpenIcon />}
         >
-          {isLoadingWorkflow ? 'Loading...' : savedWorkflow ? savedWorkflow.workflowName : 'Load Workflow'}
+          {isLoadingWorkflow ? 'Loading...' : savedWorkflow ? savedWorkflow.workflowName : 'Load saved workflow'}
         </MenuToggle>
       )}
     >

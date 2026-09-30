@@ -409,7 +409,7 @@ describe('StudioContext', () => {
       expect(result.current.selectedCategories).toEqual(['network', 'reliability']);
     });
 
-    it('drops categories that are no longer visible after the category catalog loads', () => {
+    it('hides unavailable categories from selection without deleting them from saved metadata', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
       act(() => {
         result.current.loadWorkflow(
@@ -422,7 +422,7 @@ describe('StudioContext', () => {
       });
 
       expect(result.current.selectedCategories).toEqual(['network']);
-      expect(result.current.savedWorkflow?.categories).toEqual(['network']);
+      expect(result.current.savedWorkflow?.categories).toEqual(['network', 'private-category']);
     });
 
     it('captures the loaded workflow as the snapshot (isDirty is false)', () => {

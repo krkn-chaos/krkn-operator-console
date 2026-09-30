@@ -213,6 +213,7 @@ describe('GraphRunDetail', () => {
         },
         targetRequestId: 'target-001',
         targetClusters: { 'krkn-operator': ['cluster1'] },
+        categories: ['resilience', 'network'],
       };
       const onReplayWorkflow = vi.fn();
       mockGetGraphRun.mockResolvedValue(makeMockDetail());
@@ -223,6 +224,7 @@ describe('GraphRunDetail', () => {
 
       await waitFor(() => expect(onReplayWorkflow).toHaveBeenCalledTimes(1));
       expect(mockCreateGraphRun).not.toHaveBeenCalled();
+      expect(onReplayWorkflow.mock.calls[0][1]).toEqual(['resilience', 'network']);
       expect(onReplayWorkflow.mock.calls[0][0].nodes).toHaveLength(2);
       expect(onReplayWorkflow.mock.calls[0][0].edges).toEqual([
         { id: 'node-a-node-b', source: 'node-a', target: 'node-b' },

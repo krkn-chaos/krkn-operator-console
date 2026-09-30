@@ -198,14 +198,18 @@ export function RunWorkflowModal({
       });
     }
 
+    const categories = selectedCategories.length > 0
+      ? (categoryLoadStatus === 'ready'
+        ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+        : selectedCategories)
+      : undefined;
+
     const request: CreateGraphRunRequest = {
       graph,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
       maxRetries,
-      categories: categoryLoadStatus === 'ready' && selectedCategories.length > 0
-        ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
-        : undefined,
+      categories,
     };
 
     setIsSubmitting(true);

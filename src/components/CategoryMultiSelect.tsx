@@ -22,7 +22,22 @@ interface CategoryMultiSelectProps {
   onRetry: () => void;
 }
 
-/** Multi-select for categories visible to the current user. */
+/**
+ * Multi-select for categories visible to the current user.
+ *
+ * @example
+ * ```tsx
+ * <CategoryMultiSelect
+ *   id="run-categories"
+ *   label="Categories for this run"
+ *   categories={visibleCategories}
+ *   status={categoryLoadStatus}
+ *   selectedCategories={selectedCategories}
+ *   onSelectionChange={setSelectedCategories}
+ *   onRetry={reloadCategories}
+ * />
+ * ```
+ */
 export function CategoryMultiSelect({
   id,
   label,
