@@ -3,12 +3,17 @@ import type {
   CreateGraphRunRequest,
   GraphScenarioNode,
   JobConfigResponse,
+  ResiliencyHistoryDataPoint,
   ResiliencyHistoryQueryResponse,
 } from '../../types/api';
 import { graphRunsApi } from '../../services/graphRunsApi';
 import { operatorApi } from '../../services/operatorApi';
 import { cacheSet, configCache } from '../scenarioConfigCache';
-import type { ResiliencyHistoryChartModel, ResiliencyHistoryChartPoint } from './resiliencyHistoryUtils';
+import type {
+  ResiliencyHistoryChartModel,
+  ResiliencyHistoryChartPoint,
+  ResiliencyHistoryClusterSelection,
+} from './resiliencyHistoryUtils';
 
 type ConfigurationRunType = 'scenario-runs' | 'graph-runs';
 type RunConfiguration = CreateGraphRunRequest | JobConfigResponse;
@@ -26,7 +31,7 @@ interface ReportConfiguration {
 interface ReportInput {
   queryResult: ResiliencyHistoryQueryResponse;
   categories: string[];
-  clusters: string[];
+  clusters: (ResiliencyHistoryClusterSelection | string)[];
   charts: ResiliencyHistoryChartModel[];
   chartMode: 'separate' | 'collapsed';
   showBaselines: boolean;
@@ -74,14 +79,34 @@ function normalizeRunType(value: string | undefined): ConfigurationRunType | und
   return value === 'scenario-runs' || value === 'graph-runs' ? value : undefined;
 }
 
+function normalizeClusterSelection(selection: ResiliencyHistoryClusterSelection | string): ResiliencyHistoryClusterSelection {
+  return typeof selection === 'string' ? { name: selection, providerName: '' } : selection;
+}
+
+function clusterDisplayName(selection: ResiliencyHistoryClusterSelection | string): string {
+  const cluster = normalizeClusterSelection(selection);
+  return cluster.providerName ? `${cluster.providerName} / ${cluster.name}` : cluster.name;
+}
+
+function getClusterPoints(
+  response: ResiliencyHistoryQueryResponse,
+  categoryName: string,
+  selection: ResiliencyHistoryClusterSelection | string,
+): ResiliencyHistoryDataPoint[] {
+  const cluster = normalizeClusterSelection(selection);
+  return (response.clusters[cluster.name]?.[categoryName] ?? []).filter((point) =>
+    !cluster.providerName || point.providerName === cluster.providerName,
+  );
+}
+
 function collectConfigurations(
   response: ResiliencyHistoryQueryResponse,
   categories: string[],
-  clusters: string[],
+  clusters: (ResiliencyHistoryClusterSelection | string)[],
 ): Omit<ReportConfiguration, 'config'>[] {
   const entries: Omit<ReportConfiguration, 'config'>[] = [];
   categories.forEach((categoryName) => {
-    const points = clusters.flatMap((clusterName) => response.clusters[clusterName]?.[categoryName] ?? []);
+    const points = clusters.flatMap((cluster) => getClusterPoints(response, categoryName, cluster));
     const groupIds = [...new Set(points.map((point) => point.configurationGroupId))].sort();
     groupIds.forEach((groupId) => {
       const metadata = response.configurationGroups[categoryName]?.[groupId];
@@ -125,7 +150,7 @@ async function loadConfiguration(
 async function loadConfigurations(
   response: ResiliencyHistoryQueryResponse,
   categories: string[],
-  clusters: string[],
+  clusters: (ResiliencyHistoryClusterSelection | string)[],
 ): Promise<ReportConfiguration[]> {
   const pending = new Map<string, Promise<RunConfiguration>>();
   const entries = collectConfigurations(response, categories, clusters);
@@ -257,15 +282,15 @@ function drawFooter(pdf: jsPDF, pageNumber: number, pageCount: number): void {
 
 function buildSnapshotRows(input: ReportInput): ScoreSnapshotRow[] {
   const rows: ScoreSnapshotRow[] = [];
-  input.categories.forEach((categoryName) => input.clusters.forEach((clusterName) => {
-    const points = (input.queryResult.clusters[clusterName]?.[categoryName] ?? [])
+  input.categories.forEach((categoryName) => input.clusters.forEach((cluster) => {
+    const points = getClusterPoints(input.queryResult, categoryName, cluster)
       .slice()
       .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
     const latest = points[points.length - 1];
     if (!latest) return;
     rows.push({
       categoryName,
-      clusterName,
+      clusterName: clusterDisplayName(cluster),
       samples: points.length,
       latestScore: latest.score,
       latestDate: latest.date,
@@ -360,8 +385,8 @@ function drawOverview(pdf: jsPDF, input: ReportInput, reportTitle: string): void
   drawText(pdf, 'History queried', PAGE_WIDTH - PAGE_MARGIN - 61, 34, { size: 6.5, color: COLORS.muted });
   drawText(pdf, input.queriedAt || 'Unknown', PAGE_WIDTH - PAGE_MARGIN - 61, 39, { size: 7.5, bold: true });
 
-  const allPoints = input.clusters.flatMap((clusterName) => input.categories.flatMap((categoryName) => (
-    input.queryResult.clusters[clusterName]?.[categoryName] ?? []
+  const allPoints = input.clusters.flatMap((cluster) => input.categories.flatMap((categoryName) => (
+    getClusterPoints(input.queryResult, categoryName, cluster)
   )));
   const runCount = new Set(allPoints.map((point) => point.runId)).size;
   const metricGap = 4;
@@ -387,7 +412,14 @@ function drawOverview(pdf: jsPDF, input: ReportInput, reportTitle: string): void
   const scopeGap = 5;
   const scopeWidth = (CONTENT_WIDTH - scopeGap) / 2;
   const categoriesBottom = drawScopeCard(pdf, 'Categories', input.categories, PAGE_MARGIN, scopeY, scopeWidth);
-  const clustersBottom = drawScopeCard(pdf, 'Clusters', input.clusters, PAGE_MARGIN + scopeWidth + scopeGap, scopeY, scopeWidth);
+  const clustersBottom = drawScopeCard(
+    pdf,
+    'Clusters',
+    input.clusters.map(clusterDisplayName),
+    PAGE_MARGIN + scopeWidth + scopeGap,
+    scopeY,
+    scopeWidth,
+  );
   const tableTop = Math.max(categoriesBottom, clustersBottom) + 7;
   let y = drawSectionTitle(
     pdf,

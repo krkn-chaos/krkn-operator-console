@@ -2,6 +2,13 @@ import type { ResiliencyHistoryDataPoint, ResiliencyHistoryQueryResponse } from 
 
 export type ResiliencyHistoryChartMode = 'separate' | 'collapsed';
 
+export interface ResiliencyHistoryClusterSelection {
+  name: string;
+  providerName: string;
+}
+
+type ClusterSelectionInput = ResiliencyHistoryClusterSelection | string;
+
 export interface ResiliencyHistoryChartPoint {
   x: number;
   y: number;
@@ -66,14 +73,18 @@ export function calculateBaselineTickHalfWidth(nearestNeighborDistance?: number)
 function buildSeries(
   response: ResiliencyHistoryQueryResponse,
   categoryName: string,
-  clusterNames: string[],
+  clusterSelections: ClusterSelectionInput[],
   groupId?: string,
   collapsed = false,
 ): ResiliencyHistoryChartSeries[] {
-  return clusterNames.map((clusterName) => {
+  return clusterSelections.map((selection) => {
+    const clusterName = typeof selection === 'string' ? selection : selection.name;
+    const providerName = typeof selection === 'string' ? undefined : selection.providerName;
+    const displayName = providerName ? `${providerName} / ${clusterName}` : clusterName;
     const points = response.clusters[clusterName]?.[categoryName] ?? [];
     const data = points
-      .filter((point) => (collapsed || groupId === undefined || point.configurationGroupId === groupId)
+      .filter((point) => (providerName === undefined || point.providerName === providerName)
+        && (collapsed || groupId === undefined || point.configurationGroupId === groupId)
         && Number.isFinite(point.score)
         && Number.isFinite(new Date(point.date).getTime()))
       .slice()
@@ -84,10 +95,10 @@ function buildSeries(
         date: point.date,
         runId: point.runId,
         ...(point.baseline !== undefined ? { baseline: point.baseline } : {}),
-        tooltip: formatResiliencyHistoryTooltip(point, clusterName),
+        tooltip: formatResiliencyHistoryTooltip(point, displayName),
       }));
 
-    return { clusterName, data };
+    return { clusterName: displayName, data };
   });
 }
 
@@ -99,14 +110,14 @@ function buildSeries(
 export function buildResiliencyHistoryCharts(
   response: ResiliencyHistoryQueryResponse,
   categoryNames: string[],
-  clusterNames: string[],
+  clusterSelections: ClusterSelectionInput[],
   mode: ResiliencyHistoryChartMode,
 ): ResiliencyHistoryChartModel[] {
   const charts: ResiliencyHistoryChartModel[] = [];
 
   categoryNames.forEach((categoryName) => {
     if (mode === 'collapsed') {
-      const series = buildSeries(response, categoryName, clusterNames, undefined, true);
+      const series = buildSeries(response, categoryName, clusterSelections, undefined, true);
       charts.push({
         key: `${categoryName}\u0000mixed`,
         categoryName,
@@ -145,7 +156,7 @@ export function buildResiliencyHistoryCharts(
             ? `${scenarioDescription} (configuration ${groupId})`
             : groupId
         : 'No configuration group';
-      const series = buildSeries(response, categoryName, clusterNames, groupId);
+      const series = buildSeries(response, categoryName, clusterSelections, groupId);
       charts.push({
         key: `${categoryName}\u0000${groupId ?? 'empty'}`,
         categoryName,

@@ -1383,6 +1383,7 @@ export interface CategoriesListResponse {
 export interface ResiliencyHistoryQueryRequest {
   categories: string[];
   clusters: string[];
+  clusterProviders?: Record<string, string[]>;
 }
 
 /** One scored scenario run returned by the resiliency history query. */

@@ -24,25 +24,28 @@ import './resiliencyHistory.css';
 
 interface ClusterOption {
   name: string;
-  operators: string[];
+  providerName: string;
 }
 
 interface AppliedFilters {
   categories: string[];
-  clusters: string[];
+  clusters: ClusterOption[];
 }
 
 function toClusterOptions(clusters: TargetResponse[] | null): ClusterOption[] {
-  const options = new Map<string, Set<string>>();
+  const options = new Map<string, ClusterOption>();
   (clusters ?? []).forEach((cluster) => {
-    const operators = options.get(cluster.clusterName) ?? new Set<string>();
-    operators.add(cluster.operatorSource || 'Krkn Operator');
-    options.set(cluster.clusterName, operators);
+    const providerName = cluster.operatorSource || 'krkn-operator';
+    const key = providerName + '\u0000' + cluster.clusterName;
+    options.set(key, { name: cluster.clusterName, providerName });
   });
 
-  return [...options.entries()]
-    .map(([name, operators]) => ({ name, operators: [...operators].sort() }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+  return [...options.values()]
+    .sort((left, right) => left.name.localeCompare(right.name) || left.providerName.localeCompare(right.providerName));
+}
+
+function clusterIdentity(cluster: ClusterOption): string {
+  return cluster.providerName + '\u0000' + cluster.name;
 }
 
 function hasHistoryData(response: ResiliencyHistoryQueryResponse): boolean {
@@ -139,10 +142,21 @@ export function ResiliencyHistoryPage() {
   const applyFilters = async () => {
     if (!canApply) return;
 
-    const filters = {
+    const selectedClusterOptions = clusterOptions.filter((cluster) => selectedClusters.includes(clusterIdentity(cluster)));
+    const filters: AppliedFilters = {
       categories: [...selectedCategories],
-      clusters: [...selectedClusters],
+      clusters: selectedClusterOptions,
     };
+    const selectedClusterNames = [...new Set(selectedClusterOptions.map((cluster) => cluster.name))];
+    const selectedProvidersByName = new Map<string, string[]>();
+    selectedClusterOptions.forEach((cluster) => {
+      if (clusterOptions.filter((option) => option.name === cluster.name).length > 1) {
+        const providers = selectedProvidersByName.get(cluster.name) ?? [];
+        providers.push(cluster.providerName);
+        selectedProvidersByName.set(cluster.name, providers);
+      }
+    });
+    const clusterProviders = Object.fromEntries(selectedProvidersByName);
     const requestId = ++queryRequestId.current;
     setQueryLoading(true);
     setQueryError(null);
@@ -153,7 +167,11 @@ export function ResiliencyHistoryPage() {
     setExportLoading(false);
 
     try {
-      const response = await operatorApi.queryResiliencyHistory(filters);
+      const response = await operatorApi.queryResiliencyHistory({
+        categories: filters.categories,
+        clusters: selectedClusterNames,
+        ...(Object.keys(clusterProviders).length > 0 ? { clusterProviders } : {}),
+      });
       if (requestId === queryRequestId.current) {
         setQueryResult(response);
         setAppliedFilters(filters);
@@ -270,18 +288,16 @@ export function ResiliencyHistoryPage() {
                 <div className="resiliency-history__options" role="group" aria-label="Select clusters">
                   {clusterOptions.map((cluster, index) => (
                     <Checkbox
-                      key={cluster.name}
+                      key={clusterIdentity(cluster)}
                       id={`resiliency-cluster-${index}`}
                       label={(
                         <span className="resiliency-history__option-label">
                           <span>{cluster.name}</span>
-                          {cluster.operators.length > 0 && (
-                            <small className="resiliency-history__option-detail">{cluster.operators.join(', ')}</small>
-                          )}
+                          <small className="resiliency-history__option-detail">{cluster.providerName}</small>
                         </span>
                       )}
-                      isChecked={selectedClusters.includes(cluster.name)}
-                      onChange={() => toggleCluster(cluster.name)}
+                      isChecked={selectedClusters.includes(clusterIdentity(cluster))}
+                      onChange={() => toggleCluster(clusterIdentity(cluster))}
                     />
                   ))}
                 </div>
@@ -320,7 +336,7 @@ export function ResiliencyHistoryPage() {
                 <Title headingLevel="h2" size="xl">Score history</Title>
                 <p className="resiliency-history__applied-filters">
                   <strong>Categories:</strong> {appliedFilters.categories.join(', ')}<br />
-                  <strong>Clusters:</strong> {appliedFilters.clusters.join(', ')}
+                  <strong>Clusters:</strong> {appliedFilters.clusters.map((cluster) => `${cluster.providerName} / ${cluster.name}`).join(', ')}
                 </p>
               </div>
               <Button

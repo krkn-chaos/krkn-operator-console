@@ -48,6 +48,7 @@ const populatedHistory = {
     'cluster-a': {
       resilience: [{
         date: '2026-09-29T10:00:00Z',
+        providerName: 'krkn-operator',
         runId: 'run-1',
         runType: 'scenario-runs',
         score: 87,
@@ -63,12 +64,12 @@ const populatedHistory = {
 const multiHistory = {
   clusters: {
     'cluster-a': {
-      resilience: [{ date: '2026-09-29T10:00:00Z', runId: 'a-1', runType: 'scenario-runs', score: 87, baseline: 85, configurationGroupId: 'cfg-a' }],
-      reliability: [{ date: '2026-09-29T11:00:00Z', runId: 'a-2', runType: 'graph-runs', score: 91, configurationGroupId: 'cfg-b' }],
+      resilience: [{ date: '2026-09-29T10:00:00Z', providerName: 'krkn-operator', runId: 'a-1', runType: 'scenario-runs', score: 87, baseline: 85, configurationGroupId: 'cfg-a' }],
+      reliability: [{ date: '2026-09-29T11:00:00Z', providerName: 'krkn-operator', runId: 'a-2', runType: 'graph-runs', score: 91, configurationGroupId: 'cfg-b' }],
     },
     'cluster-b': {
-      resilience: [{ date: '2026-09-28T10:00:00Z', runId: 'b-1', runType: 'scenario-runs', score: 75, configurationGroupId: 'cfg-a' }],
-      reliability: [{ date: '2026-09-28T11:00:00Z', runId: 'b-2', runType: 'graph-runs', score: 81, configurationGroupId: 'cfg-b' }],
+      resilience: [{ date: '2026-09-28T10:00:00Z', providerName: 'krkn-operator', runId: 'b-1', runType: 'scenario-runs', score: 75, configurationGroupId: 'cfg-a' }],
+      reliability: [{ date: '2026-09-28T11:00:00Z', providerName: 'krkn-operator', runId: 'b-2', runType: 'graph-runs', score: 81, configurationGroupId: 'cfg-b' }],
     },
   },
   configurationGroups: {
@@ -310,7 +311,10 @@ describe('ResiliencyHistoryPage', () => {
     expect(mocks.downloadResiliencyHistoryPdf).toHaveBeenCalledWith(expect.objectContaining({
       queryResult: multiHistory,
       categories: ['resilience', 'reliability'],
-      clusters: ['cluster-a', 'cluster-b'],
+      clusters: [
+        { name: 'cluster-a', providerName: 'krkn-operator' },
+        { name: 'cluster-b', providerName: 'krkn-operator' },
+      ],
       chartMode: 'collapsed',
       showBaselines: true,
     }));
