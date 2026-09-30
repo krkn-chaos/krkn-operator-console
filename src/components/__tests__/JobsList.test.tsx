@@ -291,6 +291,22 @@ describe('JobsList', () => {
       expect(categorizedToggle!.style.marginLeft).toBe(uncategorizedToggle!.style.marginLeft);
     });
 
+    it('keeps categorized and uncategorized standalone scenario-run toggles aligned', async () => {
+      setMockJobs([
+        makeScenarioJobItem('categorized-scenario-run', { categories: ['resilience'] }),
+        makeScenarioJobItem('uncategorized-scenario-run'),
+      ]);
+      render(<JobsList {...defaultProps()} />);
+
+      expect(await screen.findByLabelText('Categories: resilience')).toBeInTheDocument();
+      const categorizedToggle = document.getElementById('toggle-run-categorized-scenario-run');
+      const uncategorizedToggle = document.getElementById('toggle-run-uncategorized-scenario-run');
+
+      expect(categorizedToggle).toBeTruthy();
+      expect(uncategorizedToggle).toBeTruthy();
+      expect(categorizedToggle!.style.marginLeft).toBe(uncategorizedToggle!.style.marginLeft);
+    });
+
     it('refreshes the jobs snapshot after an assignment and reconciles optimistic categories', async () => {
       const original = { ...makeGraphJobItem('category-run'), categories: ['resilience'] };
       const updated = { ...makeGraphJobItem('category-run'), categories: ['network-chaos'] };

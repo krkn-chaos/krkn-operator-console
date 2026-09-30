@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   Dropdown,
   DropdownItem,
@@ -171,8 +171,17 @@ const CATEGORY_STRIPE_NARROW_WIDTH = 'var(--pf-v5-global--BorderWidth--xl, 4px)'
 const CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM = 3.8;
 const CATEGORY_STRIPE_WIDE_WIDTH = (CATEGORY_STRIPE_WIDE_REFERENCE_WIDTH_MM * 0.85).toFixed(2) + 'mm';
 const CATEGORY_STRIPE_TRANSITION_MS = 180;
-// PatternFly's 0.9375rem arrow is a rotated square; its tip projects half its diagonal past the tooltip box.
-const CATEGORY_TOOLTIP_ARROW_OUTSET = '0.6629rem';
+const CATEGORY_TOOLTIP_CLOSE_DELAY_MS = 250;
+const CATEGORY_TOOLTIP_VIEWPORT_GUTTER = 8;
+const CATEGORY_TOOLTIP_MAX_WIDTH_REM = 18.75;
+const CATEGORY_TOOLTIP_ARROW_OUTSET_REM = 0.6629;
+
+interface TooltipPosition {
+  left: number;
+  top: number;
+  maxWidth: number;
+  side: 'left' | 'right';
+}
 
 function getCategoryStripeGradient(categories: CategoryResponse[]): string {
   const stops = categories.flatMap((category, index) => {
@@ -189,21 +198,67 @@ function getCategoryStripeGradient(categories: CategoryResponse[]): string {
 export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
   const tooltipId = useId();
   const stripeRef = useRef<HTMLDivElement>(null);
   const visualStripeRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const revealTimerRef = useRef<number | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+
+  const clearRevealTimer = useCallback(() => {
+    if (revealTimerRef.current !== null) {
+      window.clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+  }, []);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
 
   const updateTooltipPosition = useCallback(() => {
-    const stripeElement = stripeRef.current;
     const visualStripeElement = visualStripeRef.current;
-    if (!stripeElement || !visualStripeElement) return;
+    if (!visualStripeElement) return;
 
-    const stripeRect = stripeElement.getBoundingClientRect();
     const visualStripeRect = visualStripeElement.getBoundingClientRect();
-    setTooltipPosition({
-      left: visualStripeRect.right - stripeRect.left,
-      top: visualStripeRect.top + visualStripeRect.height / 2 - stripeRect.top,
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const arrowOutset = rootFontSize * CATEGORY_TOOLTIP_ARROW_OUTSET_REM;
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const viewportGutter = Math.min(CATEGORY_TOOLTIP_VIEWPORT_GUTTER, viewportWidth / 2);
+    const maxTooltipWidth = Math.max(1, Math.min(
+      rootFontSize * CATEGORY_TOOLTIP_MAX_WIDTH_REM,
+      viewportWidth - viewportGutter * 2,
+    ));
+    const anchorX = visualStripeRect.right;
+    const availableRight = Math.max(1, viewportWidth - viewportGutter - anchorX - arrowOutset);
+    const availableLeft = Math.max(1, anchorX - arrowOutset - viewportGutter);
+    const side = availableRight >= availableLeft ? 'right' : 'left';
+    const availableOnSide = side === 'right' ? availableRight : availableLeft;
+    const tooltipMaxWidth = Math.min(maxTooltipWidth, availableOnSide);
+    const tooltipWidth = Math.min(
+      tooltipMaxWidth,
+      tooltipRef.current?.getBoundingClientRect().width || tooltipMaxWidth,
+    );
+
+    setTooltipPosition((current) => {
+      const next: TooltipPosition = {
+        left: side === 'right' ? anchorX + arrowOutset : anchorX - arrowOutset - tooltipWidth,
+        top: visualStripeRect.top + visualStripeRect.height / 2,
+        maxWidth: tooltipMaxWidth,
+        side,
+      };
+      if (current
+        && Math.abs(current.left - next.left) < 0.5
+        && Math.abs(current.top - next.top) < 0.5
+        && Math.abs(current.maxWidth - next.maxWidth) < 0.5
+        && current.side === next.side) {
+        return current;
+      }
+      return next;
     });
   }, []);
 
@@ -212,15 +267,59 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
     setIsTooltipVisible(true);
   }, [updateTooltipPosition]);
 
-  useEffect(() => {
-    if (!isHovered) return;
+  const startHover = useCallback(() => {
+    clearHideTimer();
+    setIsHovered(true);
+    if (revealTimerRef.current === null && !isTooltipVisible) {
+      revealTimerRef.current = window.setTimeout(() => {
+        revealTimerRef.current = null;
+        revealTooltip();
+      }, CATEGORY_STRIPE_TRANSITION_MS + 50);
+    }
+  }, [clearHideTimer, isTooltipVisible, revealTooltip]);
 
-    const fallbackTimer = window.setTimeout(
-      revealTooltip,
-      CATEGORY_STRIPE_TRANSITION_MS + 50,
-    );
-    return () => window.clearTimeout(fallbackTimer);
-  }, [isHovered, revealTooltip]);
+  const finishHover = useCallback(() => {
+    clearRevealTimer();
+    clearHideTimer();
+    hideTimerRef.current = window.setTimeout(() => {
+      hideTimerRef.current = null;
+      setIsHovered(false);
+      setIsTooltipVisible(false);
+    }, CATEGORY_TOOLTIP_CLOSE_DELAY_MS);
+  }, [clearHideTimer, clearRevealTimer]);
+
+  const endFocus = useCallback(() => {
+    clearRevealTimer();
+    clearHideTimer();
+    setIsHovered(false);
+    setIsTooltipVisible(false);
+  }, [clearHideTimer, clearRevealTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearRevealTimer();
+      clearHideTimer();
+    };
+  }, [clearHideTimer, clearRevealTimer]);
+
+  useLayoutEffect(() => {
+    if (!isTooltipVisible) return;
+
+    updateTooltipPosition();
+    window.addEventListener('resize', updateTooltipPosition);
+    window.addEventListener('scroll', updateTooltipPosition, true);
+    const observer = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updateTooltipPosition);
+    if (observer && stripeRef.current) observer.observe(stripeRef.current);
+    if (observer && visualStripeRef.current) observer.observe(visualStripeRef.current);
+
+    return () => {
+      window.removeEventListener('resize', updateTooltipPosition);
+      window.removeEventListener('scroll', updateTooltipPosition, true);
+      observer?.disconnect();
+    };
+  }, [isTooltipVisible, updateTooltipPosition]);
 
   if (categories.length === 0) return null;
 
@@ -231,37 +330,35 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
       tabIndex={0}
       aria-label={`Categories: ${categories.map((category) => category.name).join(', ')}`}
       aria-describedby={isTooltipVisible ? tooltipId : undefined}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        setIsTooltipVisible(false);
+      onMouseEnter={(event) => {
+        if (tooltipRef.current?.contains(event.target as Node)) clearHideTimer();
+        else startHover();
       }}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setIsTooltipVisible(false);
-      }}
+      onMouseLeave={finishHover}
       onFocus={() => {
-        setIsHovered(true);
-        setIsTooltipVisible(false);
+        startHover();
       }}
-      onBlur={() => {
-        setIsHovered(false);
-        setIsTooltipVisible(false);
-      }}
+      onBlur={endFocus}
       style={{
         position: 'absolute',
         left: 0,
         top: 0,
         bottom: 0,
-        // Keep the hit area stable while only the visible stripe animates.
-        width: CATEGORY_STRIPE_WIDE_WIDTH,
+        // Keep the hit area to the collapsed marker; the expanded visible stripe can overflow it.
+        width: CATEGORY_STRIPE_NARROW_WIDTH,
       }}
     >
       <div
         ref={visualStripeRef}
         data-testid="category-stripe-visual"
         aria-hidden="true"
+        onMouseEnter={startHover}
+        onMouseLeave={finishHover}
         onTransitionEnd={(event) => {
-          if (event.propertyName === 'width' && isHovered) revealTooltip();
+          if (event.propertyName === 'width' && isHovered) {
+            clearRevealTimer();
+            revealTooltip();
+          }
         }}
         style={{
           position: 'absolute',
@@ -277,20 +374,30 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
       />
       {isTooltipVisible && (
         <div
+          ref={tooltipRef}
           id={tooltipId}
           role="tooltip"
-          className="pf-v5-c-tooltip pf-m-right"
+          className={`pf-v5-c-tooltip pf-m-${tooltipPosition?.side ?? 'right'}`}
+          onMouseEnter={clearHideTimer}
+          onMouseLeave={finishHover}
           style={{
-            position: 'absolute',
-            left: `calc(${tooltipPosition?.left ?? 0}px + ${CATEGORY_TOOLTIP_ARROW_OUTSET})`,
+            position: 'fixed',
+            left: `${tooltipPosition?.left ?? 0}px`,
             top: tooltipPosition?.top ?? 0,
             transform: 'translateY(-50%)',
             width: 'max-content',
-            maxWidth: '18.75rem',
+            maxWidth: `${tooltipPosition?.maxWidth ?? 300}px`,
+            boxSizing: 'border-box',
+            overflowWrap: 'anywhere',
             zIndex: 9999,
           }}
         >
-          <div className="pf-v5-c-tooltip__arrow" />
+          <div
+            className="pf-v5-c-tooltip__arrow"
+            style={tooltipPosition?.side === 'left'
+              ? { right: 0, left: 'auto' }
+              : { left: 0, right: 'auto' }}
+          />
           <div className="pf-v5-c-tooltip__content pf-m-text-align-left">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <strong>Categories:</strong>
@@ -307,7 +414,7 @@ export function RunCategoryStripe({ categories }: RunCategoryStripeProps) {
                       flexShrink: 0,
                     }}
                   />
-                  {category.name}
+                  <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{category.name}</span>
                 </span>
               ))}
             </div>
