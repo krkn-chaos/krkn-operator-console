@@ -8,13 +8,11 @@ describe('getStudioRecoveryState', () => {
     expect(getStudioRecoveryState({
       workflow,
       categories: ['network', 'reliability'],
-      timestamp: 123,
-      version: '1.0',
     })).toEqual({ workflow, categories: ['network', 'reliability'] });
   });
 
   it('defaults legacy autosaves without categories to an empty selection', () => {
-    expect(getStudioRecoveryState({ workflow, timestamp: 123, version: '1.0' })).toEqual({
+    expect(getStudioRecoveryState({ workflow })).toEqual({
       workflow,
       categories: [],
     });

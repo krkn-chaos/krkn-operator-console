@@ -6,7 +6,7 @@ export interface StudioRecoveryState {
 }
 
 /** Restore the complete Studio state from an autosave, including legacy autosaves without categories. */
-export function getStudioRecoveryState(autosave: StudioAutosave): StudioRecoveryState {
+export function getStudioRecoveryState(autosave: Pick<StudioAutosave, 'workflow' | 'categories'>): StudioRecoveryState {
   return {
     workflow: autosave.workflow,
     categories: autosave.categories ?? [],
