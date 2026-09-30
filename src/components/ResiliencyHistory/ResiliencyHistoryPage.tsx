@@ -150,11 +150,9 @@ export function ResiliencyHistoryPage() {
     const selectedClusterNames = [...new Set(selectedClusterOptions.map((cluster) => cluster.name))];
     const selectedProvidersByName = new Map<string, string[]>();
     selectedClusterOptions.forEach((cluster) => {
-      if (clusterOptions.filter((option) => option.name === cluster.name).length > 1) {
-        const providers = selectedProvidersByName.get(cluster.name) ?? [];
-        providers.push(cluster.providerName);
-        selectedProvidersByName.set(cluster.name, providers);
-      }
+      const providers = selectedProvidersByName.get(cluster.name) ?? [];
+      providers.push(cluster.providerName);
+      selectedProvidersByName.set(cluster.name, providers);
     });
     const clusterProviders = Object.fromEntries(selectedProvidersByName);
     const requestId = ++queryRequestId.current;

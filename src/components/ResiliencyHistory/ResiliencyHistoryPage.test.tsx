@@ -64,12 +64,12 @@ const populatedHistory = {
 const multiHistory = {
   clusters: {
     'cluster-a': {
-      resilience: [{ date: '2026-09-29T10:00:00Z', providerName: 'krkn-operator', runId: 'a-1', runType: 'scenario-runs', score: 87, baseline: 85, configurationGroupId: 'cfg-a' }],
-      reliability: [{ date: '2026-09-29T11:00:00Z', providerName: 'krkn-operator', runId: 'a-2', runType: 'graph-runs', score: 91, configurationGroupId: 'cfg-b' }],
+      resilience: [{ date: '2026-09-29T10:00:00Z', providerName: 'operator-a', runId: 'a-1', runType: 'scenario-runs', score: 87, baseline: 85, configurationGroupId: 'cfg-a' }],
+      reliability: [{ date: '2026-09-29T11:00:00Z', providerName: 'operator-a', runId: 'a-2', runType: 'graph-runs', score: 91, configurationGroupId: 'cfg-b' }],
     },
     'cluster-b': {
-      resilience: [{ date: '2026-09-28T10:00:00Z', providerName: 'krkn-operator', runId: 'b-1', runType: 'scenario-runs', score: 75, configurationGroupId: 'cfg-a' }],
-      reliability: [{ date: '2026-09-28T11:00:00Z', providerName: 'krkn-operator', runId: 'b-2', runType: 'graph-runs', score: 81, configurationGroupId: 'cfg-b' }],
+      resilience: [{ date: '2026-09-28T10:00:00Z', providerName: 'operator-b', runId: 'b-1', runType: 'scenario-runs', score: 75, configurationGroupId: 'cfg-a' }],
+      reliability: [{ date: '2026-09-28T11:00:00Z', providerName: 'operator-b', runId: 'b-2', runType: 'graph-runs', score: 81, configurationGroupId: 'cfg-b' }],
     },
   },
   configurationGroups: {
@@ -151,7 +151,7 @@ describe('ResiliencyHistoryPage', () => {
     expect(screen.getByRole('radio', { name: 'Combine configurations by category' })).toBeChecked();
   });
 
-  it('sends the selected category and cluster in a query and renders successful results', async () => {
+  it('sends provider identity for a uniquely discovered cluster and renders results', async () => {
     const user = userEvent.setup();
     const query = vi.spyOn(operatorApi, 'queryResiliencyHistory').mockResolvedValue(populatedHistory);
     renderPage();
@@ -162,6 +162,7 @@ describe('ResiliencyHistoryPage', () => {
     await waitFor(() => expect(query).toHaveBeenCalledWith({
       categories: ['resilience'],
       clusters: ['cluster-a'],
+      clusterProviders: { 'cluster-a': ['krkn-operator'] },
     }));
     expect(await screen.findByText('Score history')).toBeInTheDocument();
     expect(screen.getByTestId('history-chart')).toHaveTextContent('resilience — pod-kill');
@@ -297,6 +298,10 @@ describe('ResiliencyHistoryPage', () => {
     expect(query).toHaveBeenCalledWith({
       categories: ['resilience', 'reliability'],
       clusters: ['cluster-a', 'cluster-b'],
+      clusterProviders: {
+        'cluster-a': ['operator-a'],
+        'cluster-b': ['operator-b'],
+      },
     });
 
     await user.click(screen.getByRole('radio', { name: 'Combine configurations by category' }));
@@ -312,8 +317,8 @@ describe('ResiliencyHistoryPage', () => {
       queryResult: multiHistory,
       categories: ['resilience', 'reliability'],
       clusters: [
-        { name: 'cluster-a', providerName: 'krkn-operator' },
-        { name: 'cluster-b', providerName: 'krkn-operator' },
+        { name: 'cluster-a', providerName: 'operator-a' },
+        { name: 'cluster-b', providerName: 'operator-b' },
       ],
       chartMode: 'collapsed',
       showBaselines: true,
