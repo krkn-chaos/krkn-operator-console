@@ -126,10 +126,12 @@ function GraphConfiguration({ config }: { config: CreateGraphRunRequest }) {
 /** Shows the saved representative run configuration in a readable hover card. */
 export function ResiliencyHistoryConfigurationTooltip({
   configurationGroupId,
+  parameterProfileName,
   runType,
   runId,
 }: {
   configurationGroupId: string;
+  parameterProfileName?: string;
   runType: ConfigurationRunType;
   runId: string;
 }) {
@@ -204,19 +206,19 @@ export function ResiliencyHistoryConfigurationTooltip({
       <button
         type="button"
         className="resiliency-history__config-badge"
-        aria-label={`Show compared configuration ${configurationGroupId}`}
+        aria-label={`Show compared configuration ${parameterProfileName || configurationGroupId}`}
         aria-expanded={isOpen}
         aria-describedby={isOpen ? tooltipId : undefined}
         onClick={handleClick}
       >
-        {configurationGroupId}
+        {parameterProfileName || configurationGroupId}
       </button>
       {isOpen && (
         <div className="resiliency-history__config-tooltip" id={tooltipId} role="tooltip">
           <div className="resiliency-history__config-tooltip-header">
             <div>
-              <span>Effective configuration</span>
-              <code>{configurationGroupId}</code>
+              <span>{parameterProfileName ? 'Parameter profile' : 'Effective configuration'}</span>
+              <code>{parameterProfileName || configurationGroupId}</code>
             </div>
             <span className="resiliency-history__config-type">
               {runType === 'graph-runs' ? 'Workflow' : 'Scenario'}

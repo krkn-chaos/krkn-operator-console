@@ -1401,6 +1401,8 @@ export interface ResiliencyHistoryConfigurationGroup {
   runType: string;
   representativeRunId: string;
   scenarioNames?: string[];
+  /** Deterministic readable alias for the group's environment-parameter profile. */
+  parameterProfileName?: string;
 }
 
 /** Query result nested by cluster, category, then score datapoint. */

@@ -19,7 +19,14 @@ const history: ResiliencyHistoryQueryResponse = {
     },
   },
   configurationGroups: {
-    resilience: { 'config-1': { runType: 'scenario-runs', representativeRunId: 'run-1', scenarioNames: ['pod-kill'] } },
+    resilience: {
+      'config-1': {
+        runType: 'scenario-runs',
+        representativeRunId: 'run-1',
+        scenarioNames: ['pod-kill'],
+        parameterProfileName: 'gentle-otter-3tmh56qu',
+      },
+    },
   },
 };
 
@@ -28,7 +35,8 @@ describe('ResiliencyHistoryChart', () => {
     const [chart] = buildResiliencyHistoryCharts(history, ['resilience'], ['cluster-a'], 'separate');
     render(<ResiliencyHistoryChart chart={chart} />);
 
-    expect(screen.getByRole('heading', { name: 'resilience — pod-kill (configuration config-1)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'resilience — pod-kill · gentle-otter-3tmh56qu' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show compared configuration gentle-otter-3tmh56qu' })).toHaveTextContent('gentle-otter-3tmh56qu');
     expect(screen.getByText('cluster-a')).toBeInTheDocument();
     expect(document.querySelector('svg')).not.toBeNull();
     expect(document.querySelector('svg')).toHaveAttribute('data-y-min', '-30');

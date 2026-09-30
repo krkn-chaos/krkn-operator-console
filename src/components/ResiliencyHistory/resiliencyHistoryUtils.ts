@@ -21,6 +21,7 @@ export interface ResiliencyHistoryChartModel {
   categoryName: string;
   title: string;
   configurationGroupId?: string;
+  configurationProfileName?: string;
   configurationRunType?: 'scenario-runs' | 'graph-runs';
   configurationRunId?: string;
   isMixedConfiguration: boolean;
@@ -134,11 +135,14 @@ export function buildResiliencyHistoryCharts(
           ? groupRunType
           : undefined;
       const configurationRunId = metadata?.representativeRunId || groupRunNameParts.join('/') || undefined;
+      const scenarioDescription = metadata?.scenarioNames?.length
+        ? metadata.scenarioNames.join(', ')
+        : metadata?.runType;
       const groupDescription = groupId
-        ? metadata?.scenarioNames?.length
-          ? `${metadata.scenarioNames.join(', ')} (configuration ${groupId})`
-          : metadata?.runType
-            ? `${metadata.runType} configuration ${groupId}`
+        ? metadata?.parameterProfileName
+          ? `${scenarioDescription || 'Parameter profile'} · ${metadata.parameterProfileName}`
+          : scenarioDescription
+            ? `${scenarioDescription} (configuration ${groupId})`
             : groupId
         : 'No configuration group';
       const series = buildSeries(response, categoryName, clusterNames, groupId);
@@ -147,6 +151,7 @@ export function buildResiliencyHistoryCharts(
         categoryName,
         title: `${categoryName} — ${groupDescription}`,
         configurationGroupId: groupId,
+        ...(metadata?.parameterProfileName ? { configurationProfileName: metadata.parameterProfileName } : {}),
         configurationRunType,
         configurationRunId,
         isMixedConfiguration: false,

@@ -32,7 +32,12 @@ const history: ResiliencyHistoryQueryResponse = {
   },
   configurationGroups: {
     alpha: {
-      shared: { runType: 'scenario-runs', representativeRunId: 'alpha-later', scenarioNames: ['pod-kill', 'network-delay'] },
+      shared: {
+        runType: 'scenario-runs',
+        representativeRunId: 'alpha-later',
+        scenarioNames: ['pod-kill', 'network-delay'],
+        parameterProfileName: 'gentle-otter-3tmh56qu',
+      },
       'alpha-only': { runType: 'graph-runs', representativeRunId: 'alpha-other', scenarioNames: ['node-a', 'node-b'] },
     },
     beta: {
@@ -54,6 +59,10 @@ describe('resiliency history chart data', () => {
     expect(charts).toHaveLength(3);
     const alphaShared = charts.find((chart) => chart.categoryName === 'alpha' && chart.configurationGroupId === 'shared')!;
     expect(alphaShared.title).toContain('pod-kill, network-delay');
+    expect(alphaShared.title).toContain('gentle-otter-3tmh56qu');
+    expect(alphaShared.title).not.toContain('(configuration shared)');
+    expect(alphaShared.configurationGroupId).toBe('shared');
+    expect(alphaShared.configurationProfileName).toBe('gentle-otter-3tmh56qu');
     expect(alphaShared.series.map((series) => series.clusterName)).toEqual(['cluster-a', 'cluster-b']);
     expect(alphaShared.series[0].data.map((item) => item.y)).toEqual([82, 0]);
     expect(alphaShared.series[0].data[0].x).toBeLessThan(alphaShared.series[0].data[1].x);
@@ -134,6 +143,13 @@ describe('resiliency history chart data', () => {
     expect(charts).toHaveLength(1);
     expect(charts[0].hasData).toBe(false);
     expect(charts[0].series).toEqual([{ clusterName: 'cluster-a', data: [] }]);
+  });
+
+  it('falls back to the configuration group ID when an older API omits the profile name', () => {
+    const charts = buildResiliencyHistoryCharts(history, ['beta'], ['cluster-a'], 'separate');
+
+    expect(charts[0].title).toContain('(configuration shared)');
+    expect(charts[0].configurationProfileName).toBeUndefined();
   });
 
   it('keeps point tooltips compact while identifying the cluster, date, and run', () => {

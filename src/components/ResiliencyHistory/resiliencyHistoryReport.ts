@@ -457,19 +457,16 @@ function drawChart(
   pdf.roundedRect(x, y, width, height, 1.5, 1.5, 'FD');
 
   const allPoints = chart.series.flatMap((series) => series.data);
-  const configurationSuffix = chart.configurationGroupId
-    ? ' (configuration ' + chart.configurationGroupId + ')'
-    : '';
-  const chartTitle = configurationSuffix && chart.title.endsWith(configurationSuffix)
-    ? chart.title.slice(0, -configurationSuffix.length)
-    : chart.title;
+  const chartTitle = chart.title;
   const titleLines = wrappedLines(pdf, chartTitle, width - 8, 8).slice(0, 2);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(8);
   setColor(pdf, COLORS.ink, 'text');
   pdf.text(titleLines, x + 4, y + 6.5);
-  const configLabel = chart.configurationGroupId
-    ? 'Configuration: ' + chart.configurationGroupId
+  const configLabel = chart.configurationProfileName
+    ? 'Parameter profile: ' + chart.configurationProfileName
+    : chart.configurationGroupId
+      ? 'Configuration: ' + chart.configurationGroupId
     : chart.isMixedConfiguration ? 'Combined configurations' : 'No configuration group';
   drawText(pdf, configLabel, x + 4, y + 14, { size: 6, color: COLORS.muted });
 

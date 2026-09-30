@@ -31,6 +31,7 @@ const queryResult = {
         runType: 'scenario-runs',
         representativeRunId: 'run-1',
         scenarioNames: ['pod-kill'],
+        parameterProfileName: 'gentle-otter-3tmh56qu',
       },
     },
     reliability: {
@@ -84,6 +85,7 @@ describe('resiliency history PDF report', () => {
     expect(pdf.getNumberOfPages()).toBe(4);
     expect(pdfText).toContain('Latest score snapshot');
     expect(pdfText).toContain('Score trends');
+    expect(pdfText).toContain('Parameter profile: gentle-otter-3tmh56qu');
     expect(pdfText).toContain('Target clusters');
     expect(pdfText).toContain('DURATION');
     expect(pdfText).toContain('Workflow nodes');
