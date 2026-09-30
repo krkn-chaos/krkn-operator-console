@@ -344,6 +344,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
   const handleCopyDigest = async () => {
     if (!scenarioDetail?.digest) return;
+    setDigestCopyStatus(null);
     try {
       await navigator.clipboard.writeText(scenarioDetail.digest);
       setDigestCopyStatus('success');

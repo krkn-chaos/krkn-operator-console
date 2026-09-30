@@ -181,6 +181,15 @@ describe('JobsList', () => {
     expect(screen.getByText('60.0%')).toBeInTheDocument();
   });
 
+  it('applies the small shadow to the filters card when jobs are present', () => {
+    setMockJobs([makeScenarioJobItem('run-with-filters', 'Succeeded')]);
+    render(<JobsList {...defaultProps} />);
+
+    const filtersCard = screen.getByRole('heading', { name: 'Filters' }).closest('.pf-v5-c-card');
+    expect(filtersCard).not.toBeNull();
+    expect(filtersCard).toHaveStyle({ boxShadow: 'var(--pf-v5-global--BoxShadow--sm)' });
+  });
+
   describe('Run Name Filter', () => {
     it('matches a graph run by name and shows the row', async () => {
       const user = userEvent.setup();

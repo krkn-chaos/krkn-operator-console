@@ -239,6 +239,33 @@ describe('ScenarioDetail', () => {
       expect(await screen.findByRole('status')).toHaveTextContent('Digest copied.');
     });
 
+    it('resets copy feedback while a repeat digest copy is pending', async () => {
+      const user = userEvent.setup();
+      let resolveSecondCopy: (() => void) | undefined;
+      const writeText = vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockImplementationOnce(() => new Promise<void>((resolve) => {
+          resolveSecondCopy = resolve;
+        }));
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText },
+      });
+      renderWithContext();
+
+      const copyButton = screen.getByRole('button', { name: /copy full digest/i });
+      await user.click(copyButton);
+      expect(await screen.findByRole('status')).toHaveTextContent('Digest copied.');
+
+      await user.click(copyButton);
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+      expect(resolveSecondCopy).toBeDefined();
+      resolveSecondCopy?.();
+      expect(await screen.findByRole('status')).toHaveTextContent('Digest copied.');
+    });
+
     it('shows an accessible error and the full digest when copying fails', async () => {
       const user = userEvent.setup();
       Object.defineProperty(navigator, 'clipboard', {
