@@ -5,6 +5,8 @@ import App from './App';
 import { AppProvider } from './context/AppContext';
 import { operatorApi } from './services/operatorApi';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
+import { buildRerunIntent } from './utils/rerunIntent';
+import type { JobConfigResponse, ScenarioRunState } from './types/api';
 
 /**
  * App-level test for Elasticsearch navigation.
@@ -105,6 +107,28 @@ describe('App Elasticsearch navigation', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('elasticsearch-data-view')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('scenario replay handoff', () => {
+  it('carries categories from the replay response into the scenario intent', () => {
+    const config: JobConfigResponse = {
+      targetRequestId: 'target-1',
+      targetClusters: { operator: ['cluster-1'] },
+      scenario: { name: 'pod-scenarios', private: false },
+      kubeconfigPath: '/tmp/kubeconfig',
+      environment: { NAMESPACE: 'default' },
+      categories: ['network', 'reliability'],
+    };
+    const run = { scenarioRunName: 'run-1', scenarioName: 'pod-scenarios' } as ScenarioRunState;
+
+    expect(buildRerunIntent(config, run)).toEqual({
+      scenario: { name: 'pod-scenarios', private: false },
+      clusters: [{ operatorName: 'operator', clusterName: 'cluster-1' }],
+      environment: { NAMESPACE: 'default' },
+      kubeconfigPath: '/tmp/kubeconfig',
+      categories: ['network', 'reliability'],
     });
   });
 });

@@ -22,6 +22,7 @@ import { graphRunsApi } from './services';
 import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
+import { buildRerunIntent } from './utils/rerunIntent';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -174,25 +175,7 @@ function App() {
     try {
       const config = await operatorApi.getJobConfig(jobId);
 
-      const clusters = Object.entries(config.targetClusters).flatMap(
-        ([operatorName, clusterNames]) =>
-          clusterNames.map(clusterName => ({ operatorName, clusterName }))
-      );
-
-      dispatch({
-        type: 'RERUN_SCENARIO',
-        payload: {
-          scenario: config.scenario ?? {
-            name: config.scenarioName ?? run.scenarioName,
-            private: Boolean(run.registryName),
-            ...(run.registryName ? { registryName: run.registryName } : {}),
-          },
-          clusters,
-          environment: config.environment,
-          kubeconfigPath: config.kubeconfigPath,
-          categories: config.categories,
-        },
-      });
+      dispatch({ type: 'RERUN_SCENARIO', payload: buildRerunIntent(config, run) });
 
       const response = await operatorApi.createTargetRequest();
       dispatch({
