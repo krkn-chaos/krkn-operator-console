@@ -172,6 +172,60 @@ describe('JobsList', () => {
     expect(screen.queryByRole('button', { name: 'Delete Job' })).not.toBeInTheDocument();
   });
 
+  it('shows logs and the failure reason for an expanded failed job', () => {
+    setMockJobs([
+      makeScenarioJobItem('run-failed', 'Failed', {
+        clusterJobs: [{
+          providerName: 'krkn-operator',
+          clusterName: 'cluster-1',
+          jobId: 'job-failed',
+          podName: 'pod-failed',
+          phase: 'Failed',
+          message: 'ImagePullBackOff: failed to pull image',
+        }],
+      }),
+    ]);
+
+    render(
+      <JobsList
+        {...defaultProps}
+        expandedRunIds={new Set(['run-failed'])}
+        expandedJobIds={new Set(['job-failed'])}
+      />
+    );
+
+    expect(screen.getByText('Job failure reason')).toBeInTheDocument();
+    expect(screen.getByText(/ImagePullBackOff: failed to pull image/)).toBeInTheDocument();
+    expect(screen.getByTestId('log-viewer-mock')).toBeInTheDocument();
+  });
+
+  it('shows the pod-start error and investigation guidance for a pending pod', () => {
+    setMockJobs([
+      makeScenarioJobItem('run-pending', 'Running', {
+        clusterJobs: [{
+          providerName: 'krkn-operator',
+          clusterName: 'cluster-1',
+          jobId: 'job-pending',
+          podName: 'pod-pending',
+          phase: 'Pending',
+          message: 'pod sandbox changed, it will be killed and re-created',
+        }],
+      }),
+    ]);
+
+    render(
+      <JobsList
+        {...defaultProps}
+        expandedRunIds={new Set(['run-pending'])}
+        expandedJobIds={new Set(['job-pending'])}
+      />
+    );
+
+    expect(screen.getByText('Pod did not start running')).toBeInTheDocument();
+    expect(screen.getByText(/pod sandbox changed/)).toBeInTheDocument();
+    expect(screen.getByText(/Investigate the pod events for more detail/)).toBeInTheDocument();
+  });
+
   it('renders JobStatsSummary when jobs are present', () => {
     const makeJob = (phase: 'Succeeded' | 'Failed'): ClusterJob => ({
       providerName: 'krkn-operator',

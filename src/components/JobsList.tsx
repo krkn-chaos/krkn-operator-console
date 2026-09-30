@@ -59,6 +59,7 @@ import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
+import { JobDiagnosticAlert } from './JobDiagnosticAlert';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
@@ -1352,6 +1353,7 @@ export function JobsList({
                                 const isJobExpanded = expandedJobIds.has(job.jobId);
                                 const jobPhaseDisplay = getJobPhaseDisplay(job.phase);
                                 const isDeleting = deletingJob === job.jobId;
+                                const hasJobDetails = isJobExpanded;
 
                                 return (
                                   <DataListItem key={job.jobId} isExpanded={isJobExpanded}>
@@ -1442,10 +1444,11 @@ export function JobsList({
                                     <DataListContent
                                       aria-label={`Details for job ${job.jobId}`}
                                       id={`expand-job-${job.jobId}`}
-                                      isHidden={!isJobExpanded}
+                                      isHidden={!hasJobDetails}
                                     >
-                                      {isJobExpanded && (
+                                      {hasJobDetails && (
                                         <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
+                                          <JobDiagnosticAlert job={job} />
                                           {/* Job Details */}
                                           <FlexItem>
                                             <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
@@ -1486,17 +1489,11 @@ export function JobsList({
                                                   </>
                                                 )}
 
-                                                {job.message && (
-                                                  <>
-                                                    <dt style={{ fontWeight: 'bold' }}>Message:</dt>
-                                                    <dd style={{ margin: 0, color: 'var(--pf-v5-global--danger-color--100)' }}>{job.message}</dd>
-                                                  </>
-                                                )}
                                               </dl>
                                             </div>
                                           </FlexItem>
 
-                                          {/* Logs for running, succeeded, and failed jobs */}
+                                          {/* Failed jobs always show logs so their cause is immediately available. */}
                                           {['Running', 'Succeeded', 'Failed', 'MaxRetriesExceeded'].includes(job.phase) && job.jobId && (
                                             <FlexItem>
                                               <LogViewer
