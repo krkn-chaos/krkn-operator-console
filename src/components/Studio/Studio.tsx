@@ -32,6 +32,7 @@ import { useVisibleCategories } from '../../hooks/useVisibleCategories';
 import { workflowsApi } from '../../services/workflowsApi';
 import { StudioProvider, useStudioContext } from './StudioContext';
 import { loadAutosave, clearAutosave } from './studioAutosave';
+import { getStudioRecoveryState } from './studioRecovery';
 import { StudioToolbar } from './StudioToolbar';
 import { StudioCanvas } from './StudioCanvas';
 import { StudioRecoveryModal } from './StudioRecoveryModal';
@@ -393,9 +394,10 @@ export function Studio({
 
     const autosave = loadAutosave();
     if (autosave) {
+      const recovery = getStudioRecoveryState(autosave);
       setAutosaveData({
-        workflow: autosave.workflow,
-        categories: autosave.categories ?? [],
+        workflow: recovery.workflow,
+        categories: recovery.categories,
         timestamp: autosave.timestamp,
       });
       setShowRecoveryModal(true);
@@ -409,8 +411,9 @@ export function Studio({
   // Handle recovery modal actions
   const handleResumeAutosave = () => {
     if (autosaveData) {
-      setInitialWorkflow(autosaveData.workflow);
-      setCategorySelection(autosaveData.categories);
+      const recovery = getStudioRecoveryState(autosaveData);
+      setInitialWorkflow(recovery.workflow);
+      setCategorySelection(recovery.categories);
     }
     setShowRecoveryModal(false);
     setIsReady(true); // Now ready with autosave data
