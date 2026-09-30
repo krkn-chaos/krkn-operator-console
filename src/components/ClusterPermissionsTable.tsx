@@ -29,6 +29,7 @@ import {
   ToolbarGroup,
 } from '@patternfly/react-core';
 import type { ClusterPermissions, TargetResponse } from '../types/api';
+import { ClusterHealthIndicator } from './ClusterHealthIndicator';
 
 interface ClusterPermissionsTableProps {
   /** Available target clusters */
@@ -285,6 +286,7 @@ export function ClusterPermissionsTable({
                             <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
                               {target.clusterName}
                             </strong>
+                            <ClusterHealthIndicator status={target.clusterStatus} />
                           </div>
                           <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
                             {target.clusterAPIURL}

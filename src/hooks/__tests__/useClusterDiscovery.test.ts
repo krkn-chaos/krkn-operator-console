@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { transformDiscoveredClusters } from '../useClusterDiscovery';
 
 describe('transformDiscoveredClusters', () => {
-  it('preserves operator source and liveness metadata', () => {
+	it('preserves operator source, ACM status, and liveness metadata', () => {
     const clusters = transformDiscoveredClusters({
       'krkn-operator': [
         {
           'cluster-name': 'online-cluster',
           'cluster-api-url': 'https://online.example',
+          'cluster-status': 'healthy',
           online: true,
           'checked-at': '2026-09-28T10:00:00Z',
         },
@@ -24,6 +25,7 @@ describe('transformDiscoveredClusters', () => {
     expect(clusters[0]).toEqual(expect.objectContaining({
       clusterName: 'online-cluster',
       operatorSource: 'krkn-operator',
+      clusterStatus: 'healthy',
       online: true,
       checkedAt: '2026-09-28T10:00:00Z',
     }));

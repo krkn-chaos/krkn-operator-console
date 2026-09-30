@@ -83,6 +83,7 @@ export function transformDiscoveredClusters(
         clusterAPIURL: cluster['cluster-api-url'],
         ready: true,
         operatorSource: operatorName,
+        clusterStatus: cluster['cluster-status'],
         online: cluster.online,
         checkedAt: cluster['checked-at'],
         secretType: 'kubeconfig',

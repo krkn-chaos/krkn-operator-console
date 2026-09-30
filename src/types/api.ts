@@ -38,9 +38,13 @@ export interface AvailableCommandsResponse {
   commands: TerminalCommand[];
 }
 
+export type ClusterHealthStatus = 'healthy' | 'unhealthy' | 'unknown';
+
 export interface Cluster {
   'cluster-name': string;
   'cluster-api-url': string;
+  /** ACM sanity-check status, independent of API liveness. */
+  'cluster-status'?: ClusterHealthStatus;
   /** Whether the operator's latest liveness check found the cluster reachable. */
   online?: boolean;
   /** Timestamp of the operator's latest liveness check. */
@@ -83,6 +87,7 @@ export interface TargetResponse {
   ready: boolean;
   createdAt?: string;
   operatorSource?: string; // Source operator (krkn-operator, krkn-operator-acm, etc.) - only for discovered clusters
+  clusterStatus?: ClusterHealthStatus;
   online?: boolean;
   checkedAt?: string;
 }
