@@ -31,7 +31,7 @@ import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 import { runOnEnterFromFormControl } from '../utils/keyboard';
 import { useSignatureVerification } from '../hooks/useSignatureVerification';
 
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus, ClustersResponse } from '../types/api';
 import { createScenarioReference } from '../utils/scenarioReference';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
@@ -513,6 +513,40 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     setValidationErrors([]);
 
     try {
+      let refreshedClusters: ClustersResponse['targetData'];
+      try {
+        refreshedClusters = (await operatorApi.getClusters(state.uuid)).targetData;
+      } catch (error) {
+        const message = error instanceof Error ? `: ${error.message}` : '';
+        setValidationErrors([
+          `Could not verify cluster availability before running${message}. No run was submitted. Retry when cluster discovery is available.`,
+        ]);
+        return;
+      }
+
+      dispatch({ type: 'CLUSTERS_SUCCESS', payload: { clusters: refreshedClusters } });
+      const unavailableClusters = state.selectedClusters.filter((selectedCluster) => {
+        const latestCluster = refreshedClusters[selectedCluster.operatorName]?.find(
+          (cluster) => cluster['cluster-name'] === selectedCluster.clusterName,
+        );
+        return !latestCluster
+          || latestCluster.online === false
+          || latestCluster['cluster-status'] === 'unhealthy';
+      });
+
+      if (unavailableClusters.length > 0) {
+        unavailableClusters.forEach((cluster) => {
+          dispatch({ type: 'TOGGLE_CLUSTER', payload: { cluster } });
+        });
+        const unavailableNames = unavailableClusters
+          .map((cluster) => `${cluster.operatorName}/${cluster.clusterName}`)
+          .join(', ');
+        setValidationErrors([
+          `Cluster availability changed before submission. Removed unavailable cluster(s): ${unavailableNames}. Select available clusters and run again.`,
+        ]);
+        return;
+      }
+
       const environment: { [key: string]: string } = {};
       const files: ScenarioFileMount[] = [];
 

@@ -4,7 +4,7 @@ import type { ClusterHealthStatus } from '../types/api';
 const healthStatusDetails: Record<ClusterHealthStatus, { color: 'green' | 'red' | 'grey'; description: string }> = {
   healthy: {
     color: 'green',
-    description: 'Cluster is active and reachable.',
+    description: 'ACM reports this cluster as healthy.',
   },
   unhealthy: {
     color: 'red',
@@ -23,7 +23,12 @@ interface ClusterHealthIndicatorProps {
 export function ClusterHealthIndicator({ status }: ClusterHealthIndicatorProps) {
   if (!status) return null;
 
-  const details = healthStatusDetails[status];
+  const details = Object.prototype.hasOwnProperty.call(healthStatusDetails, status)
+    ? healthStatusDetails[status]
+    : healthStatusDetails.unknown;
+  const displayedStatus = Object.prototype.hasOwnProperty.call(healthStatusDetails, status)
+    ? status
+    : 'unknown';
 
   return (
     <Tooltip content={details.description} position="top">
@@ -32,9 +37,9 @@ export function ClusterHealthIndicator({ status }: ClusterHealthIndicatorProps) 
           color={details.color}
           variant="filled"
           isCompact
-          aria-label={`Cluster status: ${status}`}
+          aria-label={`Cluster status: ${displayedStatus}`}
         >
-          {status}
+          {displayedStatus}
         </Label>
       </span>
     </Tooltip>

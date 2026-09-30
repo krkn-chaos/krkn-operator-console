@@ -138,6 +138,17 @@ describe('ScenarioDetail', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(operatorApi.getClusters).mockResolvedValue({
+      status: 'ready',
+      targetData: {
+        'krkn-operator': [{
+          'cluster-name': 'cluster1',
+          'cluster-api-url': 'https://api.cluster1.example.com:6443',
+          'cluster-status': 'healthy',
+          online: true,
+        }],
+      },
+    });
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({ files: [] });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
     vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
@@ -594,6 +605,47 @@ describe('ScenarioDetail', () => {
       totalClusters: 0,
       clusterRuns: {},
     };
+
+    it('refreshes health and removes a cluster that became unhealthy before submission', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getClusters).mockResolvedValueOnce({
+        status: 'ready',
+        targetData: {
+          'krkn-operator': [{
+            'cluster-name': 'cluster1',
+            'cluster-api-url': 'https://api.cluster1.example.com:6443',
+            'cluster-status': 'unhealthy',
+            online: true,
+          }],
+        },
+      });
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      expect(await screen.findByText(/Cluster availability changed before submission/)).toBeInTheDocument();
+      expect(operatorApi.getClusters).toHaveBeenCalledWith('test-uuid-123');
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'TOGGLE_CLUSTER',
+        payload: { cluster: expect.objectContaining({ operatorName: 'krkn-operator', clusterName: 'cluster1' }) },
+      });
+      expect(operatorApi.getActiveRuns).not.toHaveBeenCalled();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('does not submit when cluster health cannot be refreshed', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getClusters).mockRejectedValueOnce(new Error('discovery unavailable'));
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      expect(await screen.findByText(/Could not verify cluster availability before running: discovery unavailable/)).toBeInTheDocument();
+      expect(operatorApi.getActiveRuns).not.toHaveBeenCalled();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
 
     it('should run scenario when run button clicked in preview mode', async () => {
       const user = userEvent.setup();
