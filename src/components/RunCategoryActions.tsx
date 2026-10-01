@@ -97,9 +97,10 @@ export function RunCategoryActions({
             aria-label={`Actions for run ${runName}`}
             isExpanded={isOpen}
             isDisabled={isDeleting || isCategoryUpdating}
+            style={{ width: '2.5rem', height: '2.5rem', padding: 0 }}
             onClick={() => handleOpenChange(!isOpen)}
           >
-            <EllipsisVIcon />
+            <EllipsisVIcon style={{ fontSize: '1.25rem' }} />
           </MenuToggle>
         )}
       >

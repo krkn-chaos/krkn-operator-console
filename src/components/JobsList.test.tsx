@@ -268,6 +268,8 @@ describe('JobsList - Run actions menu', () => {
     const actionsButton = screen.getByRole('button', { name: `Actions for run ${runName}` });
     expect(actionsButton).toBeInTheDocument();
     expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).not.toBeNull();
+    expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).toHaveStyle({ alignItems: 'center' });
+    expect(actionsButton).toHaveStyle({ width: '2.5rem', height: '2.5rem' });
   });
 
   it('places the workflow kebab menu in the same dedicated row action area', () => {
@@ -279,6 +281,8 @@ describe('JobsList - Run actions menu', () => {
     const actionsButton = screen.getByRole('button', { name: `Actions for run ${runName}` });
     expect(actionsButton).toBeInTheDocument();
     expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).not.toBeNull();
+    expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).toHaveStyle({ alignItems: 'center' });
+    expect(actionsButton).toHaveStyle({ width: '2.5rem', height: '2.5rem' });
   });
 });
 

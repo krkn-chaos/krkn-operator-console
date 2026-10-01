@@ -942,6 +942,7 @@ export function JobsList({
                         aria-labelledby={`toggle-graph-${item.graphRunName}`}
                         aria-label={`Actions for run ${item.graphRunName}`}
                         isPlainButtonAction
+                        style={{ alignItems: 'center' }}
                       >
                         <RunCategoryActions
                           runName={item.graphRunName}
@@ -1175,6 +1176,7 @@ export function JobsList({
                       aria-labelledby={`toggle-run-${run.scenarioRunName}`}
                       aria-label={`Actions for run ${run.scenarioRunName}`}
                       isPlainButtonAction
+                      style={{ alignItems: 'center' }}
                     >
                       <RunCategoryActions
                         runName={run.scenarioRunName}
