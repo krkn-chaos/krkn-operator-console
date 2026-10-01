@@ -4,11 +4,11 @@
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
-  flex: 0 0 9%;
+  flex: 0 0 clamp(9rem, 10%, 12rem);
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--primary {
-  flex: 0 0 9%;
+  flex: 0 0 clamp(10rem, 11%, 14rem);
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--owner {
