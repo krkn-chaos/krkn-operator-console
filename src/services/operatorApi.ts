@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { BaseApiClient, authenticatedFetch } from '../utils/apiClient';
+import type { PaginationMeta } from '../types/websocket';
 import type {
   CreateTargetResponse,
   ClustersResponse,
@@ -337,15 +338,16 @@ class OperatorApiClient extends BaseApiClient {
    * List all scenario runs with optional pagination.
    * When page/limit are omitted, all items are returned.
    */
-  async listScenarioRuns(page?: number, limit?: number): Promise<ScenarioRunListResponse> {
+  async listScenarioRuns(page?: number, limit?: number, options: { labelSelector?: string; signal?: AbortSignal } = {}): Promise<ScenarioRunListResponse> {
     try {
       const params = new URLSearchParams();
       if (page !== undefined) params.set('page', String(page));
       if (limit !== undefined) params.set('limit', String(limit));
+      if (options.labelSelector) params.set('labelSelector', options.labelSelector);
       const query = params.toString();
       const path = `/scenarios/run${query ? `?${query}` : ''}`;
 
-      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: import('../types/websocket').PaginationMeta }>(path);
+      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: PaginationMeta }>(path, { signal: options.signal });
 
       return {
         scenarioRuns: data.scenarioRuns || data.runs || [],

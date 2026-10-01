@@ -234,6 +234,10 @@ class KrknAIApiClient extends BaseApiClient {
     return this.fetchJson<KrknAIRunResource[]>('/krkn-ai/runs', { signal });
   }
 
+  getRun(name: string, { signal }: KrknAIApiRequestOptions = {}): Promise<KrknAIRunResource> {
+    return this.fetchJson<KrknAIRunResource>(`/krkn-ai/runs/${encodeURIComponent(name)}`, { signal });
+  }
+
   getRunSummary(name: string, { signal }: KrknAIApiRequestOptions = {}): Promise<KrknAIRunSummary> {
     return this.fetchJson<KrknAIRunSummary>(`/krkn-ai/runs/${encodeURIComponent(name)}/results/summary`, { signal });
   }

@@ -340,6 +340,7 @@ export function ScenarioExplorer({
                     </button>
                   </th>
                 ))}
+                <th scope="col">Actions</th>
               </tr></thead>
               <tbody>
                 {visibleScenarios.map((scenario) => {
@@ -352,6 +353,7 @@ export function ScenarioExplorer({
                       aria-label={isBaselineScenario(scenario) ? 'Open baseline scenario details' : `Open generation ${scenario.generation + 1} scenario ${scenario.scenarioId} details`}
                       onClick={() => onSelect(scenario)}
                       onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
                           onSelect(scenario);
@@ -368,6 +370,20 @@ export function ScenarioExplorer({
                       </td>
                       <td><Label color={statusColor(status)}>{status}</Label></td>
                       <td>{scenario.durationSeconds == null ? 'Not available yet' : `${scenario.durationSeconds.toLocaleString(undefined, { maximumFractionDigits: 2 })}s`}</td>
+                      <td>
+                        <Button
+                          variant="secondary"
+                          aria-label={isBaselineScenario(scenario)
+                            ? `View details for baseline scenario ${scenario.scenarioId}`
+                            : `View details for generation ${scenario.generation + 1} scenario ${scenario.scenarioId}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onSelect(scenario);
+                          }}
+                        >
+                          View details
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}

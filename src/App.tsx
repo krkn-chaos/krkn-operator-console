@@ -1,6 +1,6 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
@@ -33,6 +33,8 @@ function App() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
+  const [linkedAiRunName, setLinkedAiRunName] = useState<string | null>(null);
+  const handleInitialAiRunHandled = useCallback(() => setLinkedAiRunName(null), []);
   const { isAdmin } = useRole();
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -230,6 +232,10 @@ function App() {
               }
               onDeleteGraphRun={handleDeleteGraphRun}
               onReplayWorkflow={handleReplayWorkflow}
+              onOpenKrknAIRun={(name) => {
+                setLinkedAiRunName(name);
+                dispatch({ type: 'NAVIGATE_TO_KRKN_AI' });
+              }}
               loadingRunDetails={state.loadingRunDetails}
             />
           </PageSection>
@@ -237,7 +243,7 @@ function App() {
       }
 
       case 'krkn_ai':
-        return <KrknAIPage />;
+        return <KrknAIPage initialRunName={linkedAiRunName} onInitialRunHandled={handleInitialAiRunHandled} />;
 
       case 'settings':
         return <Settings />;

@@ -75,6 +75,14 @@ The run list, creation wizard, and result views expand to the available page wid
 
 Baseline appears first among generation-0 scenario results and in ascending scenario-ID order; its row opens standard result details.
 
+Krkn-AI run and scenario tables provide explicit **View run** and **View details**
+actions alongside row navigation. In Jobs, scenarios triggered by Krkn-AI show
+a **Krkn-AI · run name** link that opens the parent run. The console resolves
+origins using the operator's `krkn.dev/ai-run` label selector (one lookup per
+authorized AI run when the displayed scenario jobs change); no operator API
+change is required. Lookup failures show a retry action, and unavailable parent
+runs show an error instead of opening an unrelated run.
+
 The wizard's Components section provides Select all and Disable all controls for
 namespaces. Each namespace toggle sits beside its accordion title and applies
 the disabled state to all of that namespace's descendants.

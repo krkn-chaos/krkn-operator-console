@@ -55,6 +55,7 @@ export function RunList({
     event: KeyboardEvent<HTMLTableRowElement>,
     run: KrknAIRunResource,
   ) => {
+    if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onSelect(run);
@@ -92,6 +93,7 @@ export function RunList({
                   <th scope="col">Best fitness</th>
                   <th scope="col">Generations</th>
                   <th scope="col">Scenarios completed</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -126,6 +128,18 @@ export function RunList({
                       <td>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
                       <td>{generations}</td>
                       <td>{summary?.completedScenarios ?? 'Not available yet'}</td>
+                      <td>
+                        <Button
+                          variant="secondary"
+                          aria-label={`View run ${name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onSelect(resource);
+                          }}
+                        >
+                          View run
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}

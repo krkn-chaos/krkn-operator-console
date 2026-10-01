@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert } from '@patternfly/react-core';
 import { krknAiApi } from '../../services/krknAiApi';
 import type { KrknAIRunResource } from '../../services/krknAiApi';
 import { CreateRun } from './CreateRun';
@@ -55,12 +56,19 @@ function mergeSummaryIntoRun(run: KrknAIRunResource, summary: KrknAIRunListEntry
   };
 }
 
-export function KrknAIPage() {
+export function KrknAIPage({
+  initialRunName,
+  onInitialRunHandled,
+}: {
+  initialRunName?: string | null;
+  onInitialRunHandled?: () => void;
+}) {
   const [runs, setRuns] = useState<KrknAIRunListEntry[]>([]);
   const runsRef = useRef(runs);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkedRunError, setLinkedRunError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedRun, setSelectedRun] = useState<KrknAIRunResource | null>(null);
   const refreshRef = useRef<(reason: RefreshReason) => void>(() => undefined);
@@ -79,7 +87,28 @@ export function KrknAIPage() {
     setRuns(next);
   }, []);
 
-  const listVisible = !isCreating && selectedRun === null;
+  useEffect(() => {
+    if (!initialRunName) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setLinkedRunError(null);
+    void krknAiApi.getRun(initialRunName, { signal: controller.signal })
+      .then((run) => {
+        if (!controller.signal.aborted) setSelectedRun(run);
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) setLinkedRunError(`Unable to open Krkn-AI run ${initialRunName}: ${errorText(loadError)}`);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          onInitialRunHandled?.();
+        }
+      });
+    return () => controller.abort();
+  }, [initialRunName, onInitialRunHandled]);
+
+  const listVisible = !isCreating && selectedRun === null && !initialRunName;
 
   useEffect(() => {
     if (!listVisible) return undefined;
@@ -266,6 +295,7 @@ export function KrknAIPage() {
 
   return (
     <div className="krkn-ai">
+      {linkedRunError && <Alert variant="danger" title={linkedRunError} isInline />}
       <RunList
         runs={runs}
         loading={loading}
