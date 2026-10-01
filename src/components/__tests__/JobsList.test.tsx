@@ -142,7 +142,9 @@ describe('JobsList', () => {
     it('should show node count', () => {
       setMockJobs([makeGraphJobItem('test-graph-run')]);
       render(<JobsList {...defaultProps()} />);
-      expect(screen.getByText('3 / 3')).toBeInTheDocument();
+      const nodeCount = screen.getByRole('list', { name: 'Scenario runs list' })
+        .querySelector('.jobs-list-graph-node-counts');
+      expect(nodeCount?.textContent).toBe('3/3');
     });
 
     it('should show Succeeded phase label for Completed graph run', () => {
@@ -157,7 +159,9 @@ describe('JobsList', () => {
       })]);
       render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('Running')).toBeInTheDocument();
-      expect(screen.getByText('1 / 3')).toBeInTheDocument();
+      const nodeCount = screen.getByRole('list', { name: 'Scenario runs list' })
+        .querySelector('.jobs-list-graph-node-counts');
+      expect(nodeCount?.textContent).toBe('1/3');
     });
   });
 
