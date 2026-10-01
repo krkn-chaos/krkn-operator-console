@@ -910,6 +910,11 @@ export function JobsList({
                               </div>
                             </div>
                           </DataListCell>,
+                          <DataListCell
+                            key="run-name-spacer"
+                            aria-hidden="true"
+                            className="jobs-list-summary-cell--run-name"
+                          />,
                           <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
