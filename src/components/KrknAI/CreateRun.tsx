@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentType } from 'react';
 import {
   Alert,
   Button,
@@ -55,7 +56,7 @@ const configurationSections: ConfigurationSection[] = [
   { id: 'genetic', label: 'Genetic algorithm', summary: 'Tune the search strategy', icon: DnaIcon },
   { id: 'fitness', label: 'Fitness functions', summary: 'Define scoring signals', icon: ChartLineIcon },
   { id: 'health', label: 'Health checks', summary: 'Configure measured endpoints', icon: HeartbeatIcon },
-  { id: 'run-settings', label: 'Run settings', summary: 'Set timing and output', icon: SlidersHIcon },
+  { id: 'run-settings', label: 'Run settings', summary: 'Set timing and score components', icon: SlidersHIcon },
   { id: 'preview', label: 'Review YAML', summary: 'Inspect the discovered config', icon: FileCodeIcon },
 ];
 
@@ -82,22 +83,6 @@ interface CreateRunProps {
   onCancel: () => void;
 }
 
-interface ConfigTextFieldProps {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-}
-
-function ConfigTextField({ id, label, value, onChange, error }: ConfigTextFieldProps) {
-  return (
-    <FormGroup label={label} fieldId={id} isRequired>
-      <TextInput id={id} value={value} onChange={(_event, nextValue) => onChange(nextValue)} validated={error ? 'error' : 'default'} aria-invalid={!!error} />
-      {error && <p className="krkn-ai-field-error" role="alert">{error}</p>}
-    </FormGroup>
-  );
-}
 
 interface ConfigNumberFieldProps {
   id: string;
@@ -489,7 +474,7 @@ export function CreateRun({
             <CardTitle>
               <div className="krkn-ai-config-wizard__title"><span className="krkn-ai-config-wizard__title-icon" aria-hidden="true"><TopologyIcon /></span><span>Run name and cluster</span></div>
             </CardTitle>
-            <CardBody>
+            <CardBody className="krkn-ai-target-fields">
               <FormGroup label="Run name" fieldId="krkn-ai-run-name" isRequired>
                 <TextInput id="krkn-ai-run-name" value={runName} onChange={(_event, value) => { abortActiveRequest(); setRunName(value); setCreatedConfig(null); }} validated={nameError ? 'error' : 'default'} aria-invalid={!!nameError} />
                 {nameError && <p className="krkn-ai-field-error" role="alert">{nameError}</p>}
@@ -543,13 +528,13 @@ export function CreateRun({
           })}</ol></nav>
 
           {configurationSection === 'scenarios' && <Card><CardTitle>{configurationTitle(configurationSections[0])}</CardTitle><CardBody>
-            <Alert variant="info" title="Choose scenario families" isInline>Scenario enable flags and disabled recommendations come from the discovered YAML.</Alert>
+            <p className="krkn-ai-section-intro">Choose the scenarios Krkn-AI should consider when exploring your cluster and testing its resilience.</p>
             <fieldset className="krkn-ai-scenario-options"><legend>Available scenario types</legend>{scenarioTypeOptions.map((option) => <Checkbox key={option.id} id={`krkn-ai-scenario-${option.id}`} label={option.label} isChecked={draft.scenarioFlags[option.id]} onChange={(_event, checked) => handleScenarioToggle(option.id, checked)} />)}</fieldset>
             {draft.scenarioFlags['service-disruption'] && <Alert variant="danger" title="Cluster-critical scenario enabled" isInline>Service disruption may delete entire namespaces. It is enabled in YAML only after explicit confirmation. Confirmation: {dangerousConfirmed ? 'given' : 'required'}.</Alert>}
           </CardBody></Card>}
 
           {configurationSection === 'components' && <Card><CardTitle>{configurationTitle(configurationSections[1])}</CardTitle><CardBody>
-            <Alert variant="info" title="Limit the cluster mutation scope" isInline>Discovered services, ports, PVC metadata, node fields and VMIs are retained in the YAML. Uncheck a component to set its disabled flag.</Alert>
+            <p className="krkn-ai-section-intro">Choose the cluster components Krkn-AI should target for testing. Uncheck any component you want to exclude.</p>
             {discoveryWarnings.map((warning, index) => <Alert key={`${index}-${warning}`} variant="warning" title="Discovery warning" isInline>{warning}</Alert>)}
             <ClusterComponentsEditor components={draft.clusterComponents} onChange={(clusterComponents) => updateDraft({ clusterComponents })} />
           </CardBody></Card>}
@@ -598,7 +583,6 @@ export function CreateRun({
           </CardBody></Card>}
 
           {configurationSection === 'run-settings' && <Card><CardTitle>{configurationTitle(configurationSections[5])}</CardTitle><CardBody>
-            <Alert variant="info" title="Set execution defaults" isInline>Namespace selection scopes discovery. Credentials stay in the operator environment and never reach the browser.</Alert>
             <div className="krkn-ai-config-fields">
               <ConfigNumberField id="krkn-ai-seed" label="Seed" value={draft.seed} onChange={(value) => updateDraft({ seed: value })} error={errorFor(configErrors, 'seed')} step={1} optional />
               <ConfigNumberField id="krkn-ai-wait-duration" label="Wait duration (seconds)" value={draft.waitDuration} onChange={(value) => updateDraft({ waitDuration: value })} error={errorFor(configErrors, 'waitDuration')} min={0} step={1} />
@@ -607,12 +591,13 @@ export function CreateRun({
               <Checkbox id="krkn-ai-baseline-enabled" label="Enable baseline run" isChecked={draft.baselineEnabled} onChange={(_event, checked) => updateDraft({ baselineEnabled: checked })} />
               <ConfigNumberField id="krkn-ai-baseline-duration" label="Duration (seconds)" value={draft.baselineDuration} onChange={(value) => updateDraft({ baselineDuration: value })} error={errorFor(configErrors, 'baselineDuration')} min={1} step={1} />
             </section>
-            <section className="krkn-ai-config-subsection" aria-labelledby="krkn-ai-output-heading"><h3 id="krkn-ai-output-heading">Output formats</h3><p className="krkn-ai-muted">Each filename format must retain the <code>%s</code> scenario placeholder.</p>
-              <div className="krkn-ai-config-fields">
-                <ConfigTextField id="krkn-ai-result-name-format" label="result_name_fmt" value={draft.resultNameFormat} onChange={(value) => updateDraft({ resultNameFormat: value })} error={errorFor(configErrors, 'resultNameFormat')} />
-                <ConfigTextField id="krkn-ai-graph-name-format" label="graph_name_fmt" value={draft.graphNameFormat} onChange={(value) => updateDraft({ graphNameFormat: value })} error={errorFor(configErrors, 'graphNameFormat')} />
-                <ConfigTextField id="krkn-ai-log-name-format" label="log_name_fmt" value={draft.logNameFormat} onChange={(value) => updateDraft({ logNameFormat: value })} error={errorFor(configErrors, 'logNameFormat')} />
-              </div>
+            <section className="krkn-ai-config-subsection">
+              <fieldset className="krkn-ai-fitness-includes">
+                <legend>Include score components</legend>
+                <Checkbox id="krkn-ai-include-krkn-failure" label="Krkn failure" isChecked={draft.includeKrknFailure} onChange={(_event, checked) => updateDraft({ includeKrknFailure: checked })} />
+                <Checkbox id="krkn-ai-include-health-check-failure" label="Health-check failure" isChecked={draft.includeHealthCheckFailure} onChange={(_event, checked) => updateDraft({ includeHealthCheckFailure: checked })} />
+                <Checkbox id="krkn-ai-include-health-check-response-time" label="Health-check response time" isChecked={draft.includeHealthCheckResponseTime} onChange={(_event, checked) => updateDraft({ includeHealthCheckResponseTime: checked })} />
+              </fieldset>
             </section>
           </CardBody></Card>}
 

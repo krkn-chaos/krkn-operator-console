@@ -70,9 +70,6 @@ export interface EditableConfigDraft {
   includeHealthCheckResponseTime: boolean;
   fitnessItems: FitnessItemDraft[];
   clusterComponents: ClusterComponents;
-  resultNameFormat: string;
-  graphNameFormat: string;
-  logNameFormat: string;
 }
 
 export type ConfigValidationErrors = Record<string, string>;
@@ -151,7 +148,6 @@ export function createEditableConfigDraft(configYaml: string): { document: Docum
   const genetic = record(raw.genetic);
   const fitness = record(raw.fitness_function);
   const health = record(raw.health_checks);
-  const output = record(raw.output);
   const scenario = record(raw.scenario);
   const scenarioFlags = Object.fromEntries(scenarioTypeOptions.map((option) => {
     const scenarioConfig = record(scenario[option.configKey]);
@@ -223,9 +219,6 @@ export function createEditableConfigDraft(configYaml: string): { document: Docum
     includeHealthCheckResponseTime: bool(fitness.include_health_check_response_time, true),
     fitnessItems,
     clusterComponents: componentData(raw.cluster_components),
-    resultNameFormat: text(output.result_name_fmt, 'scenario_%s.yaml'),
-    graphNameFormat: text(output.graph_name_fmt, 'scenario_%s.png'),
-    logNameFormat: text(output.log_name_fmt, 'scenario_%s.log'),
   };
 
   // Keep every supported scenario visible even when discovery disabled it.
@@ -298,9 +291,8 @@ export function updateConfigDocument(document: Document, draft: EditableConfigDr
     weight: numberValue(item.weight),
   }));
   updateSequence(['fitness_function', 'items'], fitnessRows);
-  set(['output', 'result_name_fmt'], draft.resultNameFormat);
-  set(['output', 'graph_name_fmt'], draft.graphNameFormat);
-  set(['output', 'log_name_fmt'], draft.logNameFormat);
+  // Omit filename overrides so Krkn-AI's OutputConfig supplies its defaults.
+  document.deleteIn(['output']);
   set(['allow_dangerous_scenarios'], draft.scenarioFlags['service-disruption']);
 
   const edited = draft.clusterComponents;
@@ -379,11 +371,6 @@ export function validateConfigDraft(draft: EditableConfigDraft): ConfigValidatio
     add(`${key}.timeout`, numericError(check.timeout, 'Health-check timeout', { integer: true }));
     add(`${key}.interval`, numericError(check.interval, 'Health-check interval', { integer: true }));
   }
-  for (const [field, value, label] of [
-    ['resultNameFormat', draft.resultNameFormat, 'Result filename format'],
-    ['graphNameFormat', draft.graphNameFormat, 'Graph filename format'],
-    ['logNameFormat', draft.logNameFormat, 'Log filename format'],
-  ] as const) if (!value.includes('%s')) errors[field] = `${label} must include the %s scenario placeholder.`;
   return errors;
 }
 

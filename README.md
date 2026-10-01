@@ -65,13 +65,21 @@ sending kubeconfig or service credentials to the browser. It edits the returned
 YAML, validates it against the Krkn-AI schema, saves a target-bound config, and
 launches only after the operator returns a `201` `KrknAIRun`.
 
-The discovery step lists namespaces from the selected cluster and starts with none selected. Selected names are escaped and joined into Krkn AI's comma-separated namespace pattern; pod and node label-key filters are not exposed.
+The discovery step lists namespaces from the selected cluster for exploratory testing. Selected names are escaped and joined into Krkn AI's comma-separated namespace pattern; pod and node label-key filters are not exposed.
 
 Genetic settings use the Krkn-AI model defaults and grouped descriptions. The algorithm is fixed to `genetic`; population injection values remain at their model defaults, and tournament size appears only for tournament selection. A legacy single fitness query is migrated into the fitness item list.
 
 Cancel remains in the action row on each target, configuration, and review step.
 
-The run list, creation wizard, and result views expand to the available page width.
+The run list and result views expand to the available page width. Run creation
+uses a centered 72rem layout with bounded settings inputs and wider PromQL/URL
+rows that stack on small screens. Fitness items and health checks use compact
+removal actions with confirmation dialogs; the last fitness item is protected.
+Include score components are configured in Run Settings. Filename overrides are
+omitted from generated YAML so Krkn-AI supplies its output defaults.
+Run metadata uses aligned label/value rows grouped into Run, Progress, and
+Fitness panels, with the normalized fitness scale shown once. The panels stack
+on smaller screens without hiding values or calculation status.
 
 Baseline appears first among generation-0 scenario results and in ascending scenario-ID order; its row opens standard result details.
 

@@ -1,4 +1,5 @@
 import { Button, Checkbox } from '@patternfly/react-core';
+import { BoxIcon, CubeIcon, CubesIcon, DatabaseIcon, ServerIcon, ServiceIcon } from '@patternfly/react-icons';
 import type { ClusterComponents } from './types';
 
 interface ClusterComponentsEditorProps {
@@ -89,7 +90,6 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
 
   return (
     <div className="krkn-ai-component-editor">
-      <p className="krkn-ai-muted">Components start enabled. Uncheck an item to set <code>disabled: true</code>; disabling a namespace disables its descendants.</p>
       <div className="krkn-ai-component-actions">
         <Button
           variant="secondary"
@@ -110,16 +110,20 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
         {components.namespaces.map((namespace, namespaceIndex) => (
           <details key={namespace.name} className="krkn-ai-component-namespace" open={namespaceIndex === 0}>
             <summary className="krkn-ai-component-namespace__summary">
-              <strong>Namespace {namespace.name}</strong>
-              <span className="krkn-ai-component-namespace__state">{namespace.disabled ? 'Disabled' : 'Enabled'}</span>
               <span onClick={(event) => event.stopPropagation()}>
                 <Checkbox
                   id={`krkn-ai-enable-namespace-${namespaceIndex}`}
-                  label={`Enable namespace ${namespace.name}`}
+                  label={(
+                    <span className="krkn-ai-component-label">
+                      <CubesIcon aria-hidden="true" />
+                      {namespace.name}
+                    </span>
+                  )}
                   isChecked={!namespace.disabled}
                   onChange={(_event, checked) => toggleEnabled({ kind: 'namespace', namespaceIndex }, checked)}
                 />
               </span>
+              <span className="krkn-ai-component-namespace__state">{namespace.disabled ? 'Disabled' : 'Enabled'}</span>
             </summary>
             <div className="krkn-ai-component-namespace-content">
               <fieldset className="krkn-ai-component-group">
@@ -129,7 +133,12 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
                   <div key={pod.name} className="krkn-ai-component-pod">
                     <Checkbox
                       id={`krkn-ai-enable-pod-${namespaceIndex}-${podIndex}`}
-                      label={`Enable pod ${pod.name}`}
+                      label={(
+                        <span className="krkn-ai-component-label">
+                          <CubeIcon aria-hidden="true" />
+                          {pod.name}
+                        </span>
+                      )}
                       isChecked={!pod.disabled}
                       isDisabled={namespace.disabled}
                       onChange={(_event, checked) => toggleEnabled({ kind: 'pod', namespaceIndex, podIndex }, checked)}
@@ -141,7 +150,13 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
                         <Checkbox
                           key={containerIndex}
                           id={`krkn-ai-enable-container-${namespaceIndex}-${podIndex}-${containerIndex}`}
-                          label={`Enable container ${container.name} in ${pod.name}`}
+                          label={(
+                            <span className="krkn-ai-component-label">
+                              <BoxIcon aria-hidden="true" />
+                              {container.name}
+                            </span>
+                          )}
+                          aria-label={`Container ${container.name} in pod ${pod.name} in namespace ${namespace.name}`}
                           isChecked={!container.disabled}
                           isDisabled={namespace.disabled || pod.disabled}
                           onChange={(_event, checked) => toggleEnabled({ kind: 'container', namespaceIndex, podIndex, containerIndex }, checked)}
@@ -158,7 +173,12 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
                   <Checkbox
                     key={service.name}
                     id={`krkn-ai-enable-service-${namespaceIndex}-${componentIndex}`}
-                    label={`Enable service ${service.name}`}
+                    label={(
+                      <span className="krkn-ai-component-label">
+                        <ServiceIcon aria-hidden="true" />
+                        {service.name}
+                      </span>
+                    )}
                     isChecked={!service.disabled}
                     isDisabled={namespace.disabled}
                     onChange={(_event, checked) => toggleEnabled({ kind: 'service', namespaceIndex, componentIndex }, checked)}
@@ -172,7 +192,12 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
                   <Checkbox
                     key={pvc.name}
                     id={`krkn-ai-enable-pvc-${namespaceIndex}-${componentIndex}`}
-                    label={`Enable PVC ${pvc.name}`}
+                    label={(
+                      <span className="krkn-ai-component-label">
+                        <DatabaseIcon aria-hidden="true" />
+                        {pvc.name}
+                      </span>
+                    )}
                     isChecked={!pvc.disabled}
                     isDisabled={namespace.disabled}
                     onChange={(_event, checked) => toggleEnabled({ kind: 'pvc', namespaceIndex, componentIndex }, checked)}
@@ -190,7 +215,12 @@ export function ClusterComponentsEditor({ components, onChange }: ClusterCompone
           <Checkbox
             key={node.name}
             id={`krkn-ai-enable-node-${componentIndex}`}
-            label={`Enable node ${node.name}`}
+            label={(
+              <span className="krkn-ai-component-label">
+                <ServerIcon aria-hidden="true" />
+                {node.name}
+              </span>
+            )}
             isChecked={!node.disabled}
             onChange={(_event, checked) => toggleEnabled({ kind: 'node', componentIndex }, checked)}
           />

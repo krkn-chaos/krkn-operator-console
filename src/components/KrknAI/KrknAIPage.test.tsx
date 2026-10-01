@@ -469,7 +469,6 @@ describe('Krkn-AI real run lifecycle', () => {
       'Open baseline scenario details',
       'Open generation 1 scenario 9 details',
     ]);
-    expect(screen.getByText('Baseline fitness (0–100)')).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Baseline' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('row', { name: 'Open baseline scenario details' }));
@@ -687,7 +686,6 @@ describe('Krkn-AI real run lifecycle', () => {
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open run measured-run/ }));
     await flushReact();
-    expect(screen.getByText('Baseline fitness (0–100)')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
@@ -834,6 +832,15 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(savedFitness.items[0]).toMatchObject({ query: 'up', type: 'range', weight: 1 });
   });
 
+  it('omits discovered output overrides so hidden filename options cannot block model defaults', () => {
+    const { document, draft } = createEditableConfigDraft(DISCOVERED_YAML);
+    document.setIn(['output', 'result_name_fmt'], 'invalid-hidden-filename');
+    expect(validateConfigDraft(draft)).toEqual({});
+    const saved = parseDocument(updateConfigDocument(document, draft)).toJS() as Record<string, unknown>;
+    expect(saved.output).toBeUndefined();
+    expect(saved.site_extension).toEqual({ preserve: 'discovery-value' });
+  });
+
   it('accepts real health URLs and unrestricted nonnegative weights but rejects invalid local bounds', () => {
     const { draft } = createEditableConfigDraft(DISCOVERED_YAML);
     const validDraft = {
@@ -875,10 +882,11 @@ describe('Krkn-AI real run lifecycle', () => {
     };
     const onChange = vi.fn((_next: ClusterComponents) => undefined);
     render(<ClusterComponentsEditor components={components} onChange={onChange} />);
-    const accordion = screen.getByText('Namespace shop').closest('details');
+    const namespaceCheckbox = screen.getByRole('checkbox', { name: 'shop' });
+    const accordion = namespaceCheckbox.closest('details');
     expect(accordion?.open).toBe(true);
 
-    await user.click(screen.getByRole('checkbox', { name: 'Enable namespace shop' }));
+    await user.click(namespaceCheckbox);
     expect(accordion?.open).toBe(true);
     const disabledNamespace = onChange.mock.calls[0][0].namespaces[0];
     expect(disabledNamespace.disabled).toBe(true);

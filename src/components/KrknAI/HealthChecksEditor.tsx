@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import {
   Button,
   Checkbox,
   FormGroup,
+  Modal,
+  ModalVariant,
   TextInput,
 } from '@patternfly/react-core';
 import type { ConfigValidationErrors, EditableConfigDraft, HealthCheckDraft } from './configModel';
@@ -13,6 +16,9 @@ interface HealthChecksEditorProps {
 }
 
 export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEditorProps) {
+  const [pendingRemovalKey, setPendingRemovalKey] = useState<number | null>(null);
+  const [expandedHealthCheckKey, setExpandedHealthCheckKey] = useState<number | null>(null);
+
   const updateHealthCheck = (key: number, updates: Partial<HealthCheckDraft>) => {
     onChange({
       healthChecks: draft.healthChecks.map((check) => check.key === key ? { ...check, ...updates } : check),
@@ -31,7 +37,17 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
         interval: '2',
       }],
     });
+    setExpandedHealthCheckKey(nextKey);
   };
+
+  const confirmRemoval = () => {
+    if (pendingRemovalKey !== null) {
+      onChange({ healthChecks: draft.healthChecks.filter((check) => check.key !== pendingRemovalKey) });
+    }
+    setPendingRemovalKey(null);
+  };
+
+  const pendingRemovalCheck = draft.healthChecks.find((check) => check.key === pendingRemovalKey);
 
   return (
     <div className="krkn-ai-health-check-editor">
@@ -58,6 +74,13 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
         </FormGroup>
       </div>
 
+      <div className="krkn-ai-editor-heading">
+        <div>
+          <h3>Health checks</h3>
+          <p className="krkn-ai-muted">Configure the endpoint, expected status, and polling timing for each check.</p>
+        </div>
+        <Button variant="secondary" onClick={addHealthCheck}>Add health check</Button>
+      </div>
       {draft.healthChecks.length === 0 ? (
         <p className="krkn-ai-muted">No health checks are configured. Add a real endpoint if this run needs availability monitoring.</p>
       ) : (
@@ -65,9 +88,22 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
           {draft.healthChecks.map((check) => {
             const itemKey = `healthCheck.${check.key}`;
             return (
-              <details key={check.key} className="krkn-ai-health-check-item">
+              <details
+                key={check.key}
+                className="krkn-ai-health-check-item"
+                open={expandedHealthCheckKey === check.key ? true : undefined}
+                onToggle={(event) => {
+                  if (expandedHealthCheckKey === check.key && !event.currentTarget.open) {
+                    setExpandedHealthCheckKey(null);
+                  }
+                }}
+              >
                 <summary>
-                  <strong>{check.name || 'Unnamed check'}</strong> · {check.url || 'URL required'}
+                  <strong>{check.name || 'Unnamed check'}</strong>
+                  {' · '}
+                  <span title={check.url || undefined} style={{ overflowWrap: 'anywhere' }}>
+                    {check.url || 'URL required'}
+                  </span>
                 </summary>
                 <div className="krkn-ai-health-check-fields">
                   <FormGroup label="Application name" fieldId={`krkn-ai-health-check-${check.key}-name`} isRequired>
@@ -80,7 +116,12 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
                     />
                     {errors[`${itemKey}.name`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.name`]}</p>}
                   </FormGroup>
-                  <FormGroup label="Complete health-check URL" fieldId={`krkn-ai-health-check-${check.key}-url`} isRequired>
+                  <FormGroup
+                    className="krkn-ai-editor-field--wide"
+                    label="Complete health-check URL"
+                    fieldId={`krkn-ai-health-check-${check.key}-url`}
+                    isRequired
+                  >
                     <TextInput
                       id={`krkn-ai-health-check-${check.key}-url`}
                       type="url"
@@ -127,9 +168,11 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
                     />
                     {errors[`${itemKey}.interval`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.interval`]}</p>}
                   </FormGroup>
+                </div>
+                <div className="krkn-ai-editor-actions">
                   <Button
                     variant="secondary"
-                    onClick={() => onChange({ healthChecks: draft.healthChecks.filter((candidate) => candidate.key !== check.key) })}
+                    onClick={() => setPendingRemovalKey(check.key)}
                     aria-label={`Remove health check ${check.name}`}
                   >
                     Remove health check
@@ -140,7 +183,27 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
           })}
         </div>
       )}
-      <Button variant="secondary" onClick={addHealthCheck}>Add health check</Button>
+
+      <Modal
+        variant={ModalVariant.small}
+        title="Remove health check?"
+        isOpen={pendingRemovalKey !== null}
+        onClose={() => setPendingRemovalKey(null)}
+        actions={[
+          <Button key="remove" variant="danger" onClick={confirmRemoval} isDisabled={!pendingRemovalCheck}>
+            Remove
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setPendingRemovalKey(null)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          {pendingRemovalCheck
+            ? <>Remove health check <strong>{pendingRemovalCheck.name || 'Unnamed check'}</strong>?</>
+            : 'This health check is no longer available.'}
+        </p>
+      </Modal>
     </div>
   );
 }

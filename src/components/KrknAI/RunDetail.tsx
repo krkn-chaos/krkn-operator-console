@@ -4,10 +4,6 @@ import {
   CalendarAltIcon,
   ChartLineIcon,
   ClipboardListIcon,
-  CubesIcon,
-  DnaIcon,
-  FileCodeIcon,
-  HeartbeatIcon,
   TopologyIcon,
 } from '@patternfly/react-icons';
 import { operatorApi } from '../../services/operatorApi';
@@ -444,18 +440,18 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
           </Label>
         </div>
         <div className="krkn-ai-run-detail__metadata-groups">
-          <section className="krkn-ai-run-detail__metadata-group" aria-labelledby="krkn-ai-run-overview">
+          <section className="krkn-ai-run-detail__metadata-group krkn-ai-run-detail__metadata-group--run" aria-labelledby="krkn-ai-run-overview">
             <h2 id="krkn-ai-run-overview" className="krkn-ai-run-detail__metadata-heading">
               <CalendarAltIcon aria-hidden="true" />Run
             </h2>
             <dl className="krkn-ai-run-detail__metadata">
               <div>
-                <dt><CalendarAltIcon aria-hidden="true" />Created</dt>
+                <dt>Created</dt>
                 <dd>{createdAt ? <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> : 'Not available'}</dd>
               </div>
               <div>
-                <dt><FileCodeIcon aria-hidden="true" />Artifact status</dt>
-                <dd>{summary?.artifactStatus ?? 'not_available'}</dd>
+                <dt>Artifact status</dt>
+                <dd><Label color={summary?.artifactStatus === 'failed' ? 'red' : summary?.artifactStatus === 'succeeded' ? 'green' : summary?.artifactStatus === 'in_progress' ? 'blue' : 'grey'}>{summary?.artifactStatus === 'in_progress' ? 'In progress' : summary?.artifactStatus === 'succeeded' ? 'Succeeded' : summary?.artifactStatus === 'failed' ? 'Failed' : 'Not available'}</Label></dd>
               </div>
             </dl>
           </section>
@@ -466,15 +462,15 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
             </h2>
             <dl className="krkn-ai-run-detail__metadata">
               <div>
-                <dt><DnaIcon aria-hidden="true" />Generations completed</dt>
+                <dt>Generations completed</dt>
                 <dd>{generationProgress}</dd>
               </div>
               <div>
-                <dt><CubesIcon aria-hidden="true" />Population size</dt>
+                <dt>Population size</dt>
                 <dd>{summary?.populationSize ?? 'Not available yet'}</dd>
               </div>
               <div>
-                <dt><ClipboardListIcon aria-hidden="true" />Scenarios completed</dt>
+                <dt>Scenarios completed</dt>
                 <dd>{summary?.completedScenarios ?? 'Not available yet'}</dd>
               </div>
             </dl>
@@ -483,18 +479,19 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
           <section className="krkn-ai-run-detail__metadata-group" aria-labelledby="krkn-ai-run-fitness">
             <h2 id="krkn-ai-run-fitness" className="krkn-ai-run-detail__metadata-heading">
               <ChartLineIcon aria-hidden="true" />Fitness
+              <span className="krkn-ai-run-detail__fitness-scale" aria-hidden="true">0–100</span>
             </h2>
-            <dl className="krkn-ai-run-detail__metadata">
+            <dl className="krkn-ai-run-detail__metadata" aria-label="Normalized fitness scores from 0 to 100">
               <div>
-                <dt><ChartLineIcon aria-hidden="true" />Best fitness (0–100)</dt>
+                <dt>Best fitness</dt>
                 <dd><FitnessValue value={summary?.bestFitness} calculatingGeneration={calculatingGeneration} /></dd>
               </div>
               <div>
-                <dt><ChartLineIcon aria-hidden="true" />Average fitness (0–100)</dt>
+                <dt>Average fitness</dt>
                 <dd><FitnessValue value={summary?.averageFitness} calculatingGeneration={calculatingGeneration} /></dd>
               </div>
               <div>
-                <dt><HeartbeatIcon aria-hidden="true" />Baseline fitness (0–100)</dt>
+                <dt>Baseline fitness</dt>
                 <dd>{summary?.baselineFitness == null ? 'Not available yet' : summary.baselineFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
               </div>
             </dl>

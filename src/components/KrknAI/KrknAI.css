@@ -47,6 +47,56 @@
   border-block-end: 2px solid currentColor;
 }
 
+.krkn-ai-create {
+  display: grid;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 72rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.krkn-ai-create .pf-v5-c-card__body,
+.krkn-ai-create .pf-v5-c-card__title {
+  padding-inline: clamp(1rem, 2vw, 1.5rem);
+}
+
+.krkn-ai-target-fields {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.krkn-ai-target-fields > .pf-v5-c-form__group {
+  width: 100%;
+  max-width: 36rem;
+}
+
+.krkn-ai-target-fields > .krkn-ai-muted {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.krkn-ai-section-intro {
+  max-width: 60rem;
+  margin-block: 0 1.25rem;
+  color: var(--krkn-ai-muted);
+  line-height: 1.6;
+}
+
+.krkn-ai-create .krkn-ai-config-fields {
+  max-width: 48rem;
+}
+
+.krkn-ai-create .krkn-ai-config-subsection > .pf-v5-c-form__group {
+  max-width: 18rem;
+  margin-block-start: 0.75rem;
+}
+
+.krkn-ai-create .krkn-ai-actions {
+  flex-wrap: wrap;
+  row-gap: 1rem;
+}
+
 .krkn-ai-config-wizard {
   display: grid;
   gap: 1rem;
@@ -207,6 +257,7 @@
 
 .krkn-ai-scenario-options {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
   gap: 0.75rem;
   padding: 0;
   border: 0;
@@ -397,7 +448,6 @@
   color: var(--pf-v5-global--primary-color--100, #0066cc);
 }
 
-.krkn-ai-run-detail__metadata,
 .krkn-ai-main-pod__metadata,
 .krkn-ai-scenario-detail__summary,
 .krkn-ai-scenario-detail__parameters,
@@ -410,13 +460,13 @@
 
 .krkn-ai-run-detail__metadata-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-  gap: 0.75rem;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+  gap: 1rem;
 }
 
 .krkn-ai-run-detail__metadata-group {
   min-width: 0;
-  padding: 0.85rem;
+  padding: 1.25rem;
   border: 1px solid var(--krkn-ai-border);
   border-radius: 8px;
   background: var(--krkn-ai-surface);
@@ -426,20 +476,44 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0 0.65rem;
-  color: var(--krkn-ai-muted);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
+  margin: 0 0 0.85rem;
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+
+.krkn-ai-run-detail__metadata > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: baseline;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-block: 0.65rem;
+  overflow-wrap: anywhere;
+}
+
+.krkn-ai-run-detail__metadata > div + div {
+  border-block-start: 1px solid var(--krkn-ai-border);
 }
 
 .krkn-ai-run-detail__metadata {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
 }
 
-.krkn-ai-run-detail__metadata > div,
+.krkn-ai-run-detail__fitness-scale {
+  margin-inline-start: auto;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
+  color: var(--krkn-ai-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .krkn-ai-main-pod__metadata > div,
 .krkn-ai-scenario-detail__summary > div,
 .krkn-ai-scenario-detail__parameters > div {
@@ -477,12 +551,26 @@
 }
 
 .krkn-ai-run-detail__metadata dt {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
-.krkn-ai-run-detail__metadata dt svg,
+.krkn-ai-run-detail__metadata dd {
+  margin: 0;
+  text-align: end;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.krkn-ai-run-detail__metadata .krkn-ai-fitness-calculating {
+  justify-content: flex-end;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
 .krkn-ai-run-detail__metadata-heading svg {
   flex: 0 0 auto;
   width: 1rem;
@@ -924,7 +1012,39 @@
 }
 
 
+@media (max-width: 1100px) {
+  .krkn-ai-run-detail__metadata-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .krkn-ai-run-detail__metadata-group--run {
+    grid-column: 1 / -1;
+  }
+
+  .krkn-ai-run-detail__metadata-group--run .krkn-ai-run-detail__metadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+
+  .krkn-ai-run-detail__metadata-group--run .krkn-ai-run-detail__metadata > div + div {
+    border-block-start: 0;
+  }
+}
+
 @media (max-width: 768px) {
+  .krkn-ai-run-detail__metadata-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .krkn-ai-run-detail__metadata-group--run .krkn-ai-run-detail__metadata {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .krkn-ai-run-detail__metadata-group--run .krkn-ai-run-detail__metadata > div + div {
+    border-block-start: 1px solid var(--krkn-ai-border);
+  }
+
   .krkn-ai-run-list__toolbar {
     align-items: flex-start;
     flex-direction: column;
@@ -955,15 +1075,78 @@
 }
 
 .krkn-ai-config-fields,
-.krkn-ai-genetic-grid,
-.krkn-ai-health-check-options,
-.krkn-ai-health-check-fields,
-.krkn-ai-fitness-item-editor,
-.krkn-ai-fitness-includes {
+.krkn-ai-genetic-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1.25rem;
   min-width: 0;
+}
+
+.krkn-ai-health-check-options {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 14rem);
+  align-items: center;
+  gap: 1.25rem;
+  max-width: 48rem;
+  margin-block-end: 1.25rem;
+}
+
+.krkn-ai-fitness-item-editor,
+.krkn-ai-health-check-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.krkn-ai-fitness-item-editor > .pf-v5-c-form__group,
+.krkn-ai-health-check-fields > .pf-v5-c-form__group {
+  width: 100%;
+  max-width: 16rem;
+  min-width: 0;
+}
+
+.krkn-ai-fitness-item-editor > .krkn-ai-editor-field--wide,
+.krkn-ai-health-check-fields > .krkn-ai-editor-field--wide {
+  grid-column: 1 / -1;
+  max-width: none;
+}
+
+.krkn-ai-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+}
+
+.krkn-ai-editor-actions > .pf-v5-c-button {
+  flex: 0 0 auto;
+}
+
+.krkn-ai-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block-end: 1.25rem;
+}
+
+.krkn-ai-editor-heading h3 {
+  margin-block: 0 0.5rem;
+}
+
+.krkn-ai-component-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.krkn-ai-component-label svg {
+  flex: 0 0 auto;
+  color: var(--pf-v5-global--primary-color--100, #0066cc);
 }
 
 .krkn-ai-field-help {
@@ -1038,18 +1221,10 @@
   border-block-start: 1px solid var(--krkn-ai-border);
 }
 
-.krkn-ai-config-subsection h3,
-.krkn-ai-fitness-items-heading h3 {
+.krkn-ai-config-subsection h3 {
   margin-block: 0 0.75rem;
 }
 
-.krkn-ai-fitness-items-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-block: 1.25rem 0.75rem;
-}
 
 .krkn-ai-fitness-items,
 .krkn-ai-health-check-list {
@@ -1092,8 +1267,10 @@
 }
 
 .krkn-ai-fitness-includes {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-  margin: 1rem 0;
+  display: grid;
+  gap: 0.75rem;
+  max-width: 48rem;
+  margin: 0;
   padding: 0;
   border: 0;
 }
@@ -1104,8 +1281,27 @@
 }
 
 @media (max-width: 768px) {
-  .krkn-ai-fitness-items-heading {
-    flex-direction: column;
+  .krkn-ai-fitness-item-editor,
+  .krkn-ai-health-check-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+@media (max-width: 560px) {
+  .krkn-ai-config-wizard__nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .krkn-ai-fitness-item-editor,
+  .krkn-ai-health-check-fields,
+  .krkn-ai-health-check-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .krkn-ai-fitness-item-editor > .pf-v5-c-form__group,
+  .krkn-ai-health-check-fields > .pf-v5-c-form__group {
+    max-width: none;
   }
 }
 
@@ -1151,7 +1347,7 @@
   color: var(--krkn-ai-muted);
 }
 
-.krkn-ai-component-namespace__summary > span:last-child {
+.krkn-ai-component-namespace__state {
   margin-inline-start: auto;
 }
 

@@ -31,7 +31,7 @@ export function NamespaceSelector({
         </div>
       </CardTitle>
       <CardBody>
-        <p className="krkn-ai-muted">Select one or more namespaces to include. Nothing is selected by default.</p>
+        <p className="krkn-ai-section-intro">Select namespaces where Krkn-AI should discover targets for exploratory testing.</p>
         {loading && <p role="status">Loading namespaces from the selected cluster…</p>}
         {error && (
           <Alert variant="danger" title="Unable to load namespaces" isInline>
