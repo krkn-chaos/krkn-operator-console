@@ -3,6 +3,18 @@
   container-type: inline-size;
 }
 
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
+  flex: 0 0 9%;
+}
+
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--primary {
+  flex: 0 0 20%;
+}
+
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--owner {
+  flex: 0 0 20%;
+}
+
 @container jobs-list-runs (max-width: 1400px) {
   .jobs-list-summary-cell--created {
     display: none;
