@@ -259,13 +259,26 @@ describe('JobsList', () => {
 });
 
 describe('JobsList - Run actions menu', () => {
-  it('shows the actions kebab menu in the outer run row', () => {
+  it('places the single run kebab menu in the dedicated row action area', () => {
     const runName = 'report-run-001';
     setMockJobs([makeScenarioJobItem(runName, 'Succeeded')]);
 
     render(<JobsList {...defaultProps} />);
 
-    expect(screen.getByRole('button', { name: `Actions for run ${runName}` })).toBeInTheDocument();
+    const actionsButton = screen.getByRole('button', { name: `Actions for run ${runName}` });
+    expect(actionsButton).toBeInTheDocument();
+    expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).not.toBeNull();
+  });
+
+  it('places the workflow kebab menu in the same dedicated row action area', () => {
+    const runName = 'workflow-run-001';
+    setMockJobs([makeGraphJobItem(runName, 'Completed')]);
+
+    render(<JobsList {...defaultProps} />);
+
+    const actionsButton = screen.getByRole('button', { name: `Actions for run ${runName}` });
+    expect(actionsButton).toBeInTheDocument();
+    expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).not.toBeNull();
   });
 });
 

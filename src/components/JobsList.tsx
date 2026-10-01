@@ -9,6 +9,7 @@ import {
   DataListItemRow,
   DataListItemCells,
   DataListCell,
+  DataListAction,
   DataListToggle,
   DataListContent,
   EmptyState,
@@ -934,26 +935,29 @@ export function JobsList({
                               </code>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="actions" width={1}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                              <RunCategoryActions
-                                runName={item.graphRunName}
-                categories={categories}
-                assignedCategoryNames={graphCategoryNames}
-                isCategoriesLoading={isCategoriesLoading}
-                categoriesError={categoryError}
-                isCategoryUpdating={categoryUpdateKeys.has(graphCategoryKey)}
-                isDeleting={deletingRun === item.graphRunName}
-                onOpenCategories={() => { void loadCategories(); }}
-                onToggleCategory={(category) => {
-                                  void handleToggleRunCategory('graph-runs', item.graphRunName, graphCategoryNames, category);
-                                }}
-                                onDelete={() => setConfirmDeleteRun(item.graphRunName)}
-                              />
-                            </div>
-                          </DataListCell>,
                         ]}
                       />
+                      <DataListAction
+                        id={`actions-graph-${item.graphRunName}`}
+                        aria-labelledby={`toggle-graph-${item.graphRunName}`}
+                        aria-label={`Actions for run ${item.graphRunName}`}
+                        isPlainButtonAction
+                      >
+                        <RunCategoryActions
+                          runName={item.graphRunName}
+                          categories={categories}
+                          assignedCategoryNames={graphCategoryNames}
+                          isCategoriesLoading={isCategoriesLoading}
+                          categoriesError={categoryError}
+                          isCategoryUpdating={categoryUpdateKeys.has(graphCategoryKey)}
+                          isDeleting={deletingRun === item.graphRunName}
+                          onOpenCategories={() => { void loadCategories(); }}
+                          onToggleCategory={(category) => {
+                            void handleToggleRunCategory('graph-runs', item.graphRunName, graphCategoryNames, category);
+                          }}
+                          onDelete={() => setConfirmDeleteRun(item.graphRunName)}
+                        />
+                      </DataListAction>
                     </DataListItemRow>
 
                     {/* GraphRun Expanded Content - Show DAG visualization */}
@@ -1164,28 +1168,31 @@ export function JobsList({
                             </code>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="actions" width={1}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                            <RunCategoryActions
-                              runName={run.scenarioRunName}
-                              runId={run.scenarioRunName}
-                              runPhase={run.phase}
-                              categories={categories}
-                              assignedCategoryNames={scenarioCategoryNames}
-                              isCategoriesLoading={isCategoriesLoading}
-                              categoriesError={categoryError}
-                              isCategoryUpdating={categoryUpdateKeys.has(scenarioCategoryKey)}
-                              isDeleting={deletingRun === run.scenarioRunName}
-                              onOpenCategories={() => { void loadCategories(); }}
-                              onToggleCategory={(category) => {
-                                void handleToggleRunCategory('scenario-runs', run.scenarioRunName, scenarioCategoryNames, category);
-                              }}
-                              onDelete={() => setConfirmDeleteRun(run.scenarioRunName)}
-                            />
-                          </div>
-                        </DataListCell>,
                       ]}
                     />
+                    <DataListAction
+                      id={`actions-run-${run.scenarioRunName}`}
+                      aria-labelledby={`toggle-run-${run.scenarioRunName}`}
+                      aria-label={`Actions for run ${run.scenarioRunName}`}
+                      isPlainButtonAction
+                    >
+                      <RunCategoryActions
+                        runName={run.scenarioRunName}
+                        runId={run.scenarioRunName}
+                        runPhase={run.phase}
+                        categories={categories}
+                        assignedCategoryNames={scenarioCategoryNames}
+                        isCategoriesLoading={isCategoriesLoading}
+                        categoriesError={categoryError}
+                        isCategoryUpdating={categoryUpdateKeys.has(scenarioCategoryKey)}
+                        isDeleting={deletingRun === run.scenarioRunName}
+                        onOpenCategories={() => { void loadCategories(); }}
+                        onToggleCategory={(category) => {
+                          void handleToggleRunCategory('scenario-runs', run.scenarioRunName, scenarioCategoryNames, category);
+                        }}
+                        onDelete={() => setConfirmDeleteRun(run.scenarioRunName)}
+                      />
+                    </DataListAction>
                   </DataListItemRow>
 
                   {/* Scenario Run Details - Jobs List (expanded) */}
