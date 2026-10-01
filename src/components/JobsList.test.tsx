@@ -270,6 +270,21 @@ describe('JobsList - Run actions menu', () => {
     expect(runsList.querySelector('.jobs-list-summary-cell--primary')).not.toBeNull();
   });
 
+  it('shows Jobs before Run Name in standalone run rows', () => {
+    setMockJobs([makeScenarioJobItem('ordered-run', 'Succeeded')]);
+
+    render(<JobsList {...defaultProps} />);
+
+    const summaryCells = Array.from(
+      screen.getByRole('list', { name: 'Scenario runs list' }).querySelectorAll('.pf-v5-c-data-list__cell'),
+    );
+    const jobsIndex = summaryCells.findIndex((cell) => cell.textContent?.includes('Jobs:'));
+    const runNameIndex = summaryCells.findIndex((cell) => cell.textContent?.includes('Run Name:'));
+
+    expect(jobsIndex).toBeGreaterThanOrEqual(0);
+    expect(jobsIndex).toBeLessThan(runNameIndex);
+  });
+
   it('places the single run kebab menu in the dedicated row action area', () => {
     const runName = 'report-run-001';
     setMockJobs([makeScenarioJobItem(runName, 'Succeeded')]);

@@ -28,14 +28,20 @@
 }
 
 @container jobs-list-runs (max-width: 1040px) {
-  .jobs-list-summary-cell--secondary {
+  .jobs-list-summary-cell--run-name,
+  .jobs-list-summary-cell--graph-nodes {
+    display: none;
+  }
+}
+
+@container jobs-list-runs (max-width: 980px) {
+  .jobs-list-summary-cell--jobs {
     display: none;
   }
 }
 
 @container jobs-list-runs (max-width: 900px) {
-  .jobs-list-summary-cell--owner,
-  .jobs-list-summary-cell--run-name {
+  .jobs-list-summary-cell--owner {
     display: none;
   }
 }

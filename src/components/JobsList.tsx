@@ -898,7 +898,7 @@ export function JobsList({
                               </code>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="total-nodes" width={2} className="jobs-list-summary-cell--secondary">
+                          <DataListCell key="total-nodes" width={2} className="jobs-list-summary-cell--graph-nodes">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Graph Nodes:</strong>
@@ -1068,6 +1068,24 @@ export function JobsList({
                             </code>
                           </div>
                         </DataListCell>,
+                        <DataListCell key="jobs-summary" width={2} className="jobs-list-summary-cell--jobs">
+                          <div>
+                            <div style={{ marginBottom: '0.25rem' }}>
+                              <strong>Jobs:</strong>
+                            </div>
+                            <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                              <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <span style={{ fontSize: '1.25rem' }}>✓</span> {run.successfulJobs}
+                              </span>
+                              <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <span style={{ fontSize: '1.25rem' }}>✗</span> {run.failedJobs}
+                              </span>
+                              <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <span style={{ fontSize: '1.25rem' }}>⟳</span> {run.runningJobs}
+                              </span>
+                            </div>
+                          </div>
+                        </DataListCell>,
                         <DataListCell key="run-name" width={2} className="jobs-list-summary-cell--run-name">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
@@ -1119,24 +1137,6 @@ export function JobsList({
                                 {run.scenarioRunName}
                               </code>
                             )}
-                          </div>
-                        </DataListCell>,
-                        <DataListCell key="jobs-summary" width={2} className="jobs-list-summary-cell--secondary">
-                          <div>
-                            <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Jobs:</strong>
-                            </div>
-                            <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                              <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>✓</span> {run.successfulJobs}
-                              </span>
-                              <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>✗</span> {run.failedJobs}
-                              </span>
-                              <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>⟳</span> {run.runningJobs}
-                              </span>
-                            </div>
                           </div>
                         </DataListCell>,
                         <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
