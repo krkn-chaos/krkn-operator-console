@@ -10,6 +10,7 @@ import type { KeyboardEvent } from 'react';
 import type { KrknAIRunResource, KrknAIRunSummary } from '../../services/krknAiApi';
 import { formatDateTime } from '../../utils/dateTime';
 import { FitnessValue } from './FitnessValue';
+import { ResultsDownloadButton } from './ResultsDownloadButton';
 
 export interface KrknAIRunListEntry {
   resource: KrknAIRunResource;
@@ -134,6 +135,7 @@ export function RunList({
                       <td>{generations}</td>
                       <td>{summary?.completedScenarios ?? 'Not available yet'}</td>
                       <td>
+                        <div className="krkn-ai-run-actions">
                         <Button
                           variant="secondary"
                           aria-label={`View run ${name}`}
@@ -144,6 +146,8 @@ export function RunList({
                         >
                           View run
                         </Button>
+                          <ResultsDownloadButton runName={name} compact />
+                        </div>
                       </td>
                     </tr>
                   );

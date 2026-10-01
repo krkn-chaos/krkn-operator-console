@@ -1,0 +1,179 @@
+.krkn-ai-scenario-detail {
+  --krkn-ai-border: var(--pf-v5-global--BorderColor--100, #d2d2d2);
+  --krkn-ai-muted: var(--pf-v5-global--Color--200, #6a6e73);
+  --krkn-ai-surface: var(--pf-v5-global--BackgroundColor--100, #fff);
+  color: var(--pf-v5-global--Color--100, #151515);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.krkn-ai-scenario-detail__loading {
+  display: flex;
+  min-height: 12rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--krkn-ai-muted);
+}
+
+.krkn-ai-scenario-detail__metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
+}
+
+.krkn-ai-scenario-detail__metadata-panel,
+.krkn-ai-scenario-detail__fitness-summary {
+  min-width: 0;
+}
+
+.krkn-ai-scenario-detail__metadata-panel h2,
+.krkn-ai-scenario-detail__fitness-summary h2 {
+  margin-block: 0 0.75rem;
+}
+
+.krkn-ai-scenario-detail__uncommitted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-block: 1rem;
+  padding: 0.75rem 1rem;
+  border-inline-start: 4px solid var(--pf-v5-global--warning-color--100, #f0ab00);
+  background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
+}
+
+.krkn-ai-scenario-detail__uncommitted p {
+  margin: 0;
+}
+
+.krkn-ai-scenario-detail__fitness-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin: 0 0 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--krkn-ai-border);
+  border-inline-start: 4px solid var(--pf-v5-global--primary-color--100, #0066cc);
+  border-radius: 8px;
+  background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
+}
+
+.krkn-ai-scenario-detail__fitness-total > span {
+  font-weight: 600;
+}
+
+.krkn-ai-scenario-detail__fitness-total small {
+  color: var(--krkn-ai-muted);
+  font-size: 0.875em;
+  font-weight: 400;
+}
+
+.krkn-ai-scenario-detail__fitness-total strong {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.krkn-ai-scenario-detail__fitness-summary {
+  margin-block-end: 1rem;
+}
+
+
+.krkn-ai-scenario-fitness-table-wrap {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid var(--krkn-ai-border);
+  border-radius: 6px;
+  scrollbar-gutter: stable;
+}
+
+.krkn-ai-scenario-fitness-table-wrap:focus-visible {
+  outline: 2px solid var(--pf-v5-global--focus--Color, #0066cc);
+  outline-offset: 2px;
+}
+
+.krkn-ai-scenario-fitness-table {
+  width: 100%;
+  min-width: 58rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.krkn-ai-scenario-fitness-table th,
+.krkn-ai-scenario-fitness-table td {
+  padding: 0.75rem;
+  border-block-end: 1px solid var(--krkn-ai-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.krkn-ai-scenario-fitness-table th {
+  background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.krkn-ai-scenario-fitness-table th:first-child,
+.krkn-ai-scenario-fitness-table__query {
+  width: 46%;
+}
+
+.krkn-ai-scenario-fitness-table th:nth-child(2) {
+  width: 17%;
+}
+
+.krkn-ai-scenario-fitness-table th:nth-child(3),
+.krkn-ai-scenario-fitness-table th:nth-child(4) {
+  width: 18.5%;
+}
+
+.krkn-ai-scenario-fitness-table__query {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.krkn-ai-scenario-fitness-table__number {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.krkn-ai-scenario-query {
+  display: block;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.krkn-ai-scenario-query code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.krkn-ai-scenario-detail__updating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.krkn-ai-scenario-detail__updating p {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .krkn-ai-scenario-detail__section {
+    min-width: 0;
+    padding: 0.9rem;
+  }
+
+  .krkn-ai-scenario-detail__fitness-total {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

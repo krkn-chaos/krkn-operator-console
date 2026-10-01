@@ -419,6 +419,41 @@
   gap: 1rem;
 }
 
+.krkn-ai-results-loading {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  min-height: 16rem;
+  padding: 2rem;
+  color: var(--krkn-ai-muted);
+}
+
+.krkn-ai-run-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.krkn-ai-run-detail__toolbar {
+  justify-content: space-between;
+}
+
+.krkn-ai-log-follow {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 0.75rem;
+}
+
+.krkn-ai-results-download {
+  min-width: 0;
+}
+
+.krkn-ai-results-download .pf-v5-c-alert {
+  margin-block-start: 0.75rem;
+}
+
 .krkn-ai-run-detail__header {
   display: grid;
   gap: 0.75rem;
@@ -449,9 +484,7 @@
 }
 
 .krkn-ai-main-pod__metadata,
-.krkn-ai-scenario-detail__summary,
-.krkn-ai-scenario-detail__parameters,
-.krkn-ai-scenario-detail__metrics {
+.krkn-ai-scenario-detail__parameters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: 0.75rem;
@@ -515,7 +548,6 @@
 }
 
 .krkn-ai-main-pod__metadata > div,
-.krkn-ai-scenario-detail__summary > div,
 .krkn-ai-scenario-detail__parameters > div {
   min-width: 0;
   padding: 0.75rem;
@@ -525,16 +557,6 @@
   overflow-wrap: anywhere;
 }
 
-.krkn-ai-scenario-detail__metrics > div {
-  min-width: 0;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--krkn-ai-border);
-  border-inline-start: 4px solid var(--pf-v5-global--primary-color--100, #0066cc);
-  border-radius: 6px;
-  background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
-  box-shadow: 0 1px 2px rgba(3, 3, 3, 0.08);
-  overflow-wrap: anywhere;
-}
 
 .krkn-ai-run-detail__metadata dt,
 .krkn-ai-main-pod__metadata dt,
@@ -761,39 +783,15 @@
   font-weight: 400;
 }
 
-.krkn-ai-scenario-detail__command {
-  margin-block-start: 1.25rem;
-}
-
-.krkn-ai-scenario-detail__command h4,
 .krkn-ai-scenario-detail__section h3 {
   margin-block: 0 0.75rem;
 }
 
-.krkn-ai-scenario-command {
-  margin-block-start: 0.5rem;
-}
-
-.krkn-ai-scenario-command code {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.krkn-ai-scenario-detail__fitness-total {
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
-}
 
 .krkn-ai-fitness-calculating {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-}
-.krkn-ai-scenario-detail__metrics dd {
-  margin-block-start: 0.4rem;
-  font-size: 1.125rem;
-  font-weight: 600;
 }
 
 .krkn-ai-scenario-detail__section {

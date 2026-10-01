@@ -244,6 +244,12 @@ class KrknAIApiClient extends BaseApiClient {
     return this.fetchJson<KrknAIRunSummary>(`/krkn-ai/runs/${encodeURIComponent(name)}/results/summary`, { signal });
   }
 
+  async downloadResults(name: string, { signal }: KrknAIApiRequestOptions = {}): Promise<Blob> {
+    const response = await this.fetch(`/krkn-ai/runs/${encodeURIComponent(name)}/results/download`, { signal });
+    if (!response.ok) throw await createKrknAIHttpError(response);
+    return response.blob();
+  }
+
   getScenarioIndex(
     name: string,
     filters?: KrknAIScenarioIndexFilters,

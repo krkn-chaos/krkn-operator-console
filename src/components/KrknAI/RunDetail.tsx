@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, CardBody, CardTitle, Label, Title } from '@patternfly/react-core';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Alert, Button, Card, CardBody, CardTitle, Checkbox, Label, Spinner, Title } from '@patternfly/react-core';
 import {
   CalendarAltIcon,
   ChartLineIcon,
@@ -23,6 +23,8 @@ import { FitnessChart } from './FitnessChart';
 import { FitnessValue } from './FitnessValue';
 import { ScenarioExplorer } from './ScenarioExplorer';
 import { formatDateTime } from '../../utils/dateTime';
+import { MetadataPanel } from './MetadataPanel';
+import { ResultsDownloadButton } from './ResultsDownloadButton';
 
 interface RunDetailProps {
   run: KrknAIRunResource;
@@ -81,6 +83,8 @@ function fitnessChanged(previous: KrknAIScenarioIndexRow | undefined, next: Krkn
 function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; podName: string; phase: string }) {
   const [logs, setLogs] = useState<string[]>(['Connecting to orchestrator log stream…']);
   const [hasConnected, setHasConnected] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const logsContainerRef = useRef<HTMLDivElement>(null);
   const everConnectedRef = useRef(false);
   const follow = TERMINAL_PHASES[phase] !== true;
   const connectionId = `krkn-ai-orchestrator-${runName}`;
@@ -111,6 +115,12 @@ function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; po
     }
   }, [connectionState]);
 
+  useLayoutEffect(() => {
+    if (isFollowing && logsContainerRef.current && logs.length > 0) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  }, [isFollowing, logs]);
+
   return (
     <Card className="krkn-ai-run-detail__main-logs">
       <CardTitle><Title headingLevel="h2" size="lg">Orchestrator pod log</Title></CardTitle>
@@ -124,8 +134,11 @@ function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; po
         ) : !hasConnected && logs.length === 0 ? (
           <p className="krkn-ai-not-available">Connecting to the operator-authorized orchestrator log stream…</p>
         ) : (
-          <LogTerminal logs={logs} ariaLabel="Orchestrator log output" />
+          <LogTerminal ref={logsContainerRef} logs={logs} ariaLabel="Orchestrator log output" />
         )}
+        <div className="krkn-ai-log-follow">
+          <Checkbox id={`follow-orchestrator-${runName}`} label="Follow" description="Auto-scroll to latest logs" isChecked={isFollowing} onChange={(_event, checked) => setIsFollowing(checked)} />
+        </div>
       </CardBody>
     </Card>
   );
@@ -426,10 +439,22 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
     );
   }
 
+  if (initialLoading) {
+    return (
+      <main className="krkn-ai-run-detail">
+        <Button variant="secondary" onClick={onBack} className="krkn-ai-run-detail__back">Back to runs</Button>
+        <div className="krkn-ai-results-loading" role="status"><Spinner size="xl" aria-label="Loading run results" /><p>Loading run results…</p></div>
+      </main>
+    );
+  }
+
   return (
     <main className="krkn-ai-run-detail">
       <header className="krkn-ai-run-detail__header">
-        <Button variant="secondary" onClick={onBack} className="krkn-ai-run-detail__back">Back to runs</Button>
+        <div className="krkn-ai-run-actions krkn-ai-run-detail__toolbar">
+          <Button variant="secondary" onClick={onBack}>Back to runs</Button>
+          <ResultsDownloadButton runName={name} />
+        </div>
         <div className="krkn-ai-run-detail__title-row">
           <div>
             <Title headingLevel="h1" size="2xl">{name}</Title>
@@ -440,65 +465,22 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
           </Label>
         </div>
         <div className="krkn-ai-run-detail__metadata-groups">
-          <section className="krkn-ai-run-detail__metadata-group krkn-ai-run-detail__metadata-group--run" aria-labelledby="krkn-ai-run-overview">
-            <h2 id="krkn-ai-run-overview" className="krkn-ai-run-detail__metadata-heading">
-              <CalendarAltIcon aria-hidden="true" />Run
-            </h2>
-            <dl className="krkn-ai-run-detail__metadata">
-              <div>
-                <dt>Created</dt>
-                <dd>{createdAt ? <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> : 'Not available'}</dd>
-              </div>
-              <div>
-                <dt>Artifact status</dt>
-                <dd><Label color={summary?.artifactStatus === 'failed' ? 'red' : summary?.artifactStatus === 'succeeded' ? 'green' : summary?.artifactStatus === 'in_progress' ? 'blue' : 'grey'}>{summary?.artifactStatus === 'in_progress' ? 'In progress' : summary?.artifactStatus === 'succeeded' ? 'Succeeded' : summary?.artifactStatus === 'failed' ? 'Failed' : 'Not available'}</Label></dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="krkn-ai-run-detail__metadata-group" aria-labelledby="krkn-ai-run-progress">
-            <h2 id="krkn-ai-run-progress" className="krkn-ai-run-detail__metadata-heading">
-              <ClipboardListIcon aria-hidden="true" />Progress
-            </h2>
-            <dl className="krkn-ai-run-detail__metadata">
-              <div>
-                <dt>Generations completed</dt>
-                <dd>{generationProgress}</dd>
-              </div>
-              <div>
-                <dt>Population size</dt>
-                <dd>{summary?.populationSize ?? 'Not available yet'}</dd>
-              </div>
-              <div>
-                <dt>Scenarios completed</dt>
-                <dd>{summary?.completedScenarios ?? 'Not available yet'}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="krkn-ai-run-detail__metadata-group" aria-labelledby="krkn-ai-run-fitness">
-            <h2 id="krkn-ai-run-fitness" className="krkn-ai-run-detail__metadata-heading">
-              <ChartLineIcon aria-hidden="true" />Fitness
-              <span className="krkn-ai-run-detail__fitness-scale" aria-hidden="true">0–100</span>
-            </h2>
-            <dl className="krkn-ai-run-detail__metadata" aria-label="Normalized fitness scores from 0 to 100">
-              <div>
-                <dt>Best fitness</dt>
-                <dd><FitnessValue value={summary?.bestFitness} calculatingGeneration={calculatingGeneration} /></dd>
-              </div>
-              <div>
-                <dt>Average fitness</dt>
-                <dd><FitnessValue value={summary?.averageFitness} calculatingGeneration={calculatingGeneration} /></dd>
-              </div>
-              <div>
-                <dt>Baseline fitness</dt>
-                <dd>{summary?.baselineFitness == null ? 'Not available yet' : summary.baselineFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
-              </div>
-            </dl>
-          </section>
+          <MetadataPanel id="krkn-ai-run-overview" title="Run" icon={<CalendarAltIcon aria-hidden="true" />} className="krkn-ai-run-detail__metadata-group--run" items={[
+            { label: 'Created', value: createdAt ? <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> : 'Not available' },
+            { label: 'Artifact status', value: <Label color={summary?.artifactStatus === 'failed' ? 'red' : summary?.artifactStatus === 'succeeded' ? 'green' : summary?.artifactStatus === 'in_progress' ? 'blue' : 'grey'}>{summary?.artifactStatus === 'in_progress' ? 'In progress' : summary?.artifactStatus === 'succeeded' ? 'Succeeded' : summary?.artifactStatus === 'failed' ? 'Failed' : 'Not available'}</Label> },
+          ]} />
+          <MetadataPanel id="krkn-ai-run-progress" title="Progress" icon={<ClipboardListIcon aria-hidden="true" />} items={[
+            { label: 'Generations completed', value: generationProgress },
+            { label: 'Population size', value: summary?.populationSize ?? 'Not available yet' },
+            { label: 'Scenarios completed', value: summary?.completedScenarios ?? 'Not available yet' },
+          ]} />
+          <MetadataPanel id="krkn-ai-run-fitness" title="Fitness" scale="0–100" icon={<ChartLineIcon aria-hidden="true" />} items={[
+            { label: 'Best fitness', value: <FitnessValue value={summary?.bestFitness} calculatingGeneration={calculatingGeneration} /> },
+            { label: 'Average fitness', value: <FitnessValue value={summary?.averageFitness} calculatingGeneration={calculatingGeneration} /> },
+            { label: 'Baseline fitness', value: summary?.baselineFitness == null ? 'Not available yet' : summary.baselineFitness.toLocaleString(undefined, { maximumFractionDigits: 4 }) },
+          ]} />
         </div>
         {summary?.failureReason && <p className="krkn-ai-run-detail__failure">{summary.failureReason}</p>}
-        {initialLoading && <p role="status">Loading committed run results…</p>}
         {updating && <Alert variant="warning" title="Results are updating" isInline>Showing the last committed summary and scenario results while the next artifact sync completes.</Alert>}
         {summaryError && <p className="krkn-ai-run-detail__error">{summaryError}</p>}
         {indexError && <p className="krkn-ai-run-detail__error">{indexError}</p>}
@@ -535,12 +517,6 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         </Card>
       )}
 
-      <Card className="krkn-ai-run-detail__fitness">
-        <CardBody>
-          <FitnessChart points={summary?.fitnessProgression ?? []} runName={name} />
-        </CardBody>
-      </Card>
-
       <ScenarioExplorer
         scenarios={scenarioIndex?.scenarios ?? []}
         pagination={scenarioIndex?.pagination ?? { page: 1, limit: SCENARIO_PAGE_LIMIT, total: 0, totalPages: 0 }}
@@ -559,6 +535,12 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         currentGeneration={summary?.currentGeneration ?? null}
         completedGenerations={summary?.completedGenerations ?? null}
       />
+      <Card className="krkn-ai-run-detail__fitness">
+        <CardBody>
+          <FitnessChart points={summary?.fitnessProgression ?? []} runName={name} />
+        </CardBody>
+      </Card>
+
     </main>
   );
 }

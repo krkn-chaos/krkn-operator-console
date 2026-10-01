@@ -112,17 +112,35 @@ Run summaries and scenario results show calculation indicators for unfinished
 active generations. Completed generation scores stay visible while later
 generations run; an open scenario modal refreshes when its generation completes.
 Failed or cancelled incomplete results stop calculating and remain unfinalized.
+Initial run and scenario detail requests show loading indicators before rendering
+their content; later refreshes retain committed results. Scenario metadata shares
+the run's metric panels. Scenario parameters and the PromQL-first fitness
+breakdown precede scenario logs and health charts; the command and raw health
+record table are not displayed. Fitness progression follows scenario executions.
+
+Run details and list actions offer **Download results ZIP** via
+`GET /api/v1/krkn-ai/runs/{name}/results/download`. The operator authorizes target
+access and archives every file in the committed manifest, checking its size and
+SHA-256 before serving the ZIP. Active runs download their last committed
+snapshot; uploads in progress can return `503 artifact_updating`. Deploy matching
+operator and console versions to use this endpoint.
 
 Health-check response-time charts leave gaps for `-1` (no response) measurements
 and show red crosses in separate per-application failure lanes. Hover or keyboard
 focus reveals the elapsed time, recorded value, and error. HTTP errors with a
 measured response time remain on the latency line; raw sample values are retained.
+The outcomes chart retains every sample on a shared elapsed-time axis with
+readable cells, sparse ticks, fixed application labels, and horizontal/vertical
+scrolling. Hover or keyboard focus shows each sample's timestamp, status, outcome,
+latency, and error; different polling intervals remain time-aligned.
 
 Scenario child-job logs use
 `/api/v2/ws/scenarios/run/{scenarioRunName}/jobs/{jobID}/logs`; orchestrator
 logs use `/api/v2/ws/krkn-ai/runs/{name}/logs`. Both authenticate the WebSocket
 handshake with `Sec-WebSocket-Protocol: access_token.<JWT>`. No status
 WebSocket is used for Krkn-AI runs.
+The orchestrator log's **Follow** checkbox enables auto-scrolling, matching the
+scenario log control; unchecking it leaves the live stream connected.
 
 ### Temporary GitHub Pages preview
 

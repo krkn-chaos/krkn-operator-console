@@ -14,6 +14,7 @@ import { operatorApi } from '../../services/operatorApi';
 import { websocketService } from '../../services/websocketService';
 import { validateConfigDraft, createEditableConfigDraft, updateConfigDocument } from './configModel';
 import { KrknAIPage } from './KrknAIPage';
+import { RunDetail } from './RunDetail';
 import { ClusterComponentsEditor } from './ClusterComponentsEditor';
 import type { ClusterComponents } from './types';
 
@@ -282,6 +283,29 @@ describe('Krkn-AI real run lifecycle', () => {
     vi.restoreAllMocks();
     if (originalHiddenDescriptor) Object.defineProperty(document, 'hidden', originalHiddenDescriptor);
     else Reflect.deleteProperty(document, 'hidden');
+  });
+
+  it('withholds initial run and scenario content until their result requests settle', async () => {
+    let resolveSummary!: (summary: KrknAIRunSummary) => void;
+    let resolveDetail!: (detail: KrknAIScenarioDetail) => void;
+    mocks.ai.getRunSummary.mockReturnValue(new Promise<KrknAIRunSummary>((resolve) => { resolveSummary = resolve; }));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([makeScenarioRow({ fitnessScore: 75, fitnessState: 'final' })]));
+    mocks.ai.getScenario.mockReturnValue(new Promise<KrknAIScenarioDetail>((resolve) => { resolveDetail = resolve; }));
+    render(<RunDetail run={makeRun('loading-run')} onBack={vi.fn()} />);
+    expect(screen.getByLabelText('Loading run results')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'loading-run' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Scenario executions' })).not.toBeInTheDocument();
+    await act(async () => resolveSummary(makeSummary('loading-run', 'Succeeded', { completedGenerations: 1 })));
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
+    await flushReact();
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByRole('status')).toBeInTheDocument();
+    expect(dialog.queryByText('Scenario parameters')).not.toBeInTheDocument();
+    expect(dialog.queryByText('Fitness function result')).not.toBeInTheDocument();
+    await act(async () => resolveDetail(makeScenarioDetail(75, 'final')));
+    expect(dialog.getByText('75 / 100')).toBeInTheDocument();
+    expect(dialog.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('discovers clusters automatically, lets users pick one, and reuses its target for discovery/config/run', async () => {
@@ -556,7 +580,7 @@ describe('Krkn-AI real run lifecycle', () => {
     render(<KrknAIPage />);
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open run config-retry-run/ }));
-    fireEvent.click(screen.getByText('View krkn-ai.yaml used for this run'));
+    fireEvent.click(await screen.findByText('View krkn-ai.yaml used for this run'));
     const retry = await screen.findByRole('button', { name: 'Retry configuration load' });
     fireEvent.click(retry);
     expect(await screen.findByText(/Preserve this discovery comment/)).toBeInTheDocument();
@@ -569,7 +593,7 @@ describe('Krkn-AI real run lifecycle', () => {
     render(<KrknAIPage />);
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open run config-retry-run/ }));
-    fireEvent.click(screen.getByText('View krkn-ai.yaml used for this run'));
+    fireEvent.click(await screen.findByText('View krkn-ai.yaml used for this run'));
     expect(await screen.findByText('This configuration is not available to your account, or is no longer available.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry configuration load' })).not.toBeInTheDocument();
   });
@@ -689,15 +713,6 @@ describe('Krkn-AI real run lifecycle', () => {
 
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
-    const expectedSampleTime = new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-    }).format(new Date('2026-09-01T12:00:02Z'));
-    expect(screen.getByText(expectedSampleTime)).toBeInTheDocument();
     expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
     expect(screen.getByText(/Calculating generation fitness/)).toBeInTheDocument();
     expect(screen.queryByText('3 / 100')).not.toBeInTheDocument();
