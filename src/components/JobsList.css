@@ -1,0 +1,35 @@
+.jobs-list-runs {
+  container-name: jobs-list-runs;
+  container-type: inline-size;
+}
+
+@container jobs-list-runs (max-width: 1400px) {
+  .jobs-list-summary-cell--created {
+    display: none;
+  }
+}
+
+@container jobs-list-runs (max-width: 1220px) {
+  .jobs-list-summary-cell--score {
+    display: none;
+  }
+}
+
+@container jobs-list-runs (max-width: 1040px) {
+  .jobs-list-summary-cell--secondary {
+    display: none;
+  }
+}
+
+@container jobs-list-runs (max-width: 900px) {
+  .jobs-list-summary-cell--owner,
+  .jobs-list-summary-cell--run-name {
+    display: none;
+  }
+}
+
+@container jobs-list-runs (max-width: 560px) {
+  .jobs-list-summary-cell--status {
+    display: none;
+  }
+}

@@ -259,6 +259,17 @@ describe('JobsList', () => {
 });
 
 describe('JobsList - Run actions menu', () => {
+  it('keeps summary rows horizontal and truncates cells when the list is narrow', () => {
+    setMockJobs([makeScenarioJobItem('responsive-run', 'Succeeded')]);
+
+    render(<JobsList {...defaultProps} />);
+
+    const runsList = screen.getByRole('list', { name: 'Scenario runs list' });
+    expect(runsList).toHaveClass('pf-m-grid-none', 'pf-m-truncate', 'jobs-list-runs');
+    expect(runsList.querySelector('.jobs-list-summary-cell--status')).not.toBeNull();
+    expect(runsList.querySelector('.jobs-list-summary-cell--primary')).not.toBeNull();
+  });
+
   it('places the single run kebab menu in the dedicated row action area', () => {
     const runName = 'report-run-001';
     setMockJobs([makeScenarioJobItem(runName, 'Succeeded')]);

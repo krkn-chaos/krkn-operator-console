@@ -63,6 +63,7 @@ import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
+import './JobsList.css';
 
 import type { CategoryResponse, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem, StudioWorkflow } from '../types/api';
 
@@ -810,7 +811,13 @@ export function JobsList({
         ) : (
           <>
           {hasReceivedStats && <JobStatsSummary stats={stats} />}
-          <DataList aria-label="Scenario runs list" isCompact>
+          <DataList
+            aria-label="Scenario runs list"
+            className="jobs-list-runs"
+            gridBreakpoint="none"
+            isCompact
+            wrapModifier="truncate"
+          >
             {filteredUnifiedRuns.map((item) => {
               // Handle GraphRun
               if (item.type === 'graph') {
@@ -834,7 +841,7 @@ export function JobsList({
                       />
                       <DataListItemCells
                         dataListCells={[
-                          <DataListCell key="status" width={1}>
+                          <DataListCell key="status" width={1} className="jobs-list-summary-cell--status">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Status:</strong>
@@ -844,7 +851,7 @@ export function JobsList({
                               </Label>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="workflow" width={2}>
+                          <DataListCell key="workflow" width={2} className="jobs-list-summary-cell--primary">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>
@@ -870,7 +877,7 @@ export function JobsList({
                               </div>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="owner" width={2}>
+                          <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>User:</strong>
@@ -891,7 +898,7 @@ export function JobsList({
                               </code>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="total-nodes" width={2}>
+                          <DataListCell key="total-nodes" width={2} className="jobs-list-summary-cell--secondary">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Graph Nodes:</strong>
@@ -903,7 +910,7 @@ export function JobsList({
                               </div>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="resiliency-score" width={2}>
+                          <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Resiliency Score:</strong>
@@ -914,7 +921,7 @@ export function JobsList({
                               />
                             </div>
                           </DataListCell>,
-                          <DataListCell key="created" width={2}>
+                          <DataListCell key="created" width={2} className="jobs-list-summary-cell--created">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Created:</strong>
@@ -997,7 +1004,7 @@ export function JobsList({
                     />
                     <DataListItemCells
                       dataListCells={[
-                        <DataListCell key="status" width={1}>
+                        <DataListCell key="status" width={1} className="jobs-list-summary-cell--status">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Status:</strong>
@@ -1007,7 +1014,7 @@ export function JobsList({
                             </Label>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="scenario" width={2}>
+                        <DataListCell key="scenario" width={2} className="jobs-list-summary-cell--primary">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>
@@ -1040,7 +1047,7 @@ export function JobsList({
                             </div>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="owner" width={2}>
+                        <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>User:</strong>
@@ -1061,7 +1068,7 @@ export function JobsList({
                             </code>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="run-name" width={2}>
+                        <DataListCell key="run-name" width={2} className="jobs-list-summary-cell--run-name">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Run Name:</strong>
@@ -1114,7 +1121,7 @@ export function JobsList({
                             )}
                           </div>
                         </DataListCell>,
-                        <DataListCell key="jobs-summary" width={2}>
+                        <DataListCell key="jobs-summary" width={2} className="jobs-list-summary-cell--secondary">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Jobs:</strong>
@@ -1132,7 +1139,7 @@ export function JobsList({
                             </div>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="resiliency-score" width={2}>
+                        <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Resiliency Score:</strong>
@@ -1148,7 +1155,7 @@ export function JobsList({
                             />
                           </div>
                         </DataListCell>,
-                        <DataListCell key="created" width={2}>
+                        <DataListCell key="created" width={2} className="jobs-list-summary-cell--created">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Created:</strong>
