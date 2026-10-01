@@ -9,10 +9,12 @@
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--primary {
   flex: 0 0 clamp(10rem, 11%, 14rem);
+  min-width: 0;
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--owner {
-  flex: 1 0 max-content;
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--score {
@@ -45,6 +47,40 @@
   flex: 0 0 2.5rem;
   justify-content: center;
   margin-inline-start: auto;
+}
+
+.jobs-list-owner-id,
+.jobs-list-run-primary-value,
+.jobs-list-compact-run-identity code {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.jobs-list-owner-id {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.jobs-list-run-primary-value {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.jobs-list-compact-run-identity {
+  display: none;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+}
+
+.jobs-list-compact-run-identity code {
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .jobs-list-job-counts,
@@ -115,6 +151,10 @@
   .jobs-list-summary-cell--run-name {
     display: none;
   }
+
+  .jobs-list-compact-run-identity {
+    display: flex;
+  }
 }
 
 @container jobs-list-runs (max-width: 980px) {
@@ -131,7 +171,16 @@
 }
 
 @container jobs-list-runs (max-width: 560px) {
-  .jobs-list-summary-cell--status {
-    display: none;
+  .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
+    flex: 0 1 7.5rem;
+    min-width: 0;
+  }
+
+  .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--primary {
+    flex: 1 1 8rem;
+  }
+
+  .jobs-list-summary-cell--primary > div {
+    min-width: 0;
   }
 }
