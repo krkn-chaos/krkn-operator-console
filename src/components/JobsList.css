@@ -12,12 +12,7 @@
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--owner {
-  flex: 0 0 clamp(11rem, 12%, 15rem);
-}
-
-.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--graph-nodes {
-  display: flex;
-  justify-content: center;
+  flex: 0 0 20%;
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--score {
