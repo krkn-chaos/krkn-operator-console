@@ -91,7 +91,6 @@ function StudioNodeEditorModalComponent({
       setResiliencyWeight(node.config.resiliencyWeight ?? 1);
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
-      fetchScenarios(node.config.registryConfig);
     } else {
       setRegistryType('public');
       setRegistryName('');
@@ -106,7 +105,6 @@ function StudioNodeEditorModalComponent({
       setResiliencyWeight(1);
       setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
-      fetchScenarios({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); // Only trigger on isOpen changes, ignore node reference changes
@@ -115,9 +113,8 @@ function StudioNodeEditorModalComponent({
   const handleRegistryTypeChange = useCallback((type: 'public' | 'private') => {
     setRegistryType(type);
     if (type === 'public') {
-      // Public registry - clear registry name and fetch
+      // Public registry - clear the private registry selection.
       setRegistryName('');
-      fetchScenarios({});
     } else {
       // Private registry - reset to trigger auto-select
       setRegistryName('');
@@ -128,25 +125,30 @@ function StudioNodeEditorModalComponent({
     setFormValues({});
     setScenarioDefaultValues({});
     setCloudCredentialRef('');
-  }, [fetchScenarios]);
+  }, []);
 
   // Handle registry name change
   const handleRegistryNameChange = useCallback((name: string) => {
     setRegistryName(name);
-    const config: ScenariosRequest = name ? { registryName: name } : {};
-    fetchScenarios(config);
     // Clear scenario, form values and defaults when registry name changes
     setSelectedScenario(null);
     setSelectedSignatureStatus(undefined);
     setFormValues({});
     setScenarioDefaultValues({});
     setCloudCredentialRef('');
-  }, [fetchScenarios]);
+  }, []);
+
+  const getSelectedRegistryConfig = useCallback((): ScenariosRequest => (
+    registryType === 'private' && registryName ? { registryName } : {}
+  ), [registryType, registryName]);
+
+  const loadScenariosForSelectedRegistry = useCallback(() => {
+    void fetchScenarios(getSelectedRegistryConfig());
+  }, [fetchScenarios, getSelectedRegistryConfig]);
 
   const retryFetchScenarios = useCallback(() => {
-    const config: ScenariosRequest = registryName ? { registryName } : {};
-    fetchScenarios(config);
-  }, [fetchScenarios, registryName]);
+    loadScenariosForSelectedRegistry();
+  }, [loadScenariosForSelectedRegistry]);
 
   // Validate node ID
   const handleNodeIdChange = useCallback((value: string) => {
@@ -258,7 +260,7 @@ function StudioNodeEditorModalComponent({
           onRegistryNameChange={handleRegistryNameChange}
         />
       ),
-      isNextDisabled: loadingScenarios,
+      isNextDisabled: registryType === 'private' && !registryName,
     },
     {
       id: 'scenario-step',
@@ -274,6 +276,7 @@ function StudioNodeEditorModalComponent({
         />
       ),
       isNextDisabled: !selectedScenario,
+      onEnter: loadScenariosForSelectedRegistry,
     },
     {
       id: 'configuration-step',

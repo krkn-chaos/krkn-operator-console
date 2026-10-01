@@ -23,6 +23,7 @@ export interface WizardStepConfig {
   name: string;
   component: ReactNode;
   isNextDisabled?: boolean;
+  onEnter?: () => void;
 }
 
 interface WizardStepperProps {
@@ -63,7 +64,9 @@ export function WizardStepper({
   const handleNext = () => {
     if (currentStep.isNextDisabled) return;
     if (!isLastStep) {
-      setActiveStepIndex(prev => prev + 1);
+      const nextStepIndex = activeStepIndex + 1;
+      setActiveStepIndex(nextStepIndex);
+      steps[nextStepIndex]?.onEnter?.();
     } else {
       onSave();
     }
@@ -80,7 +83,9 @@ export function WizardStepper({
   };
 
   const handleStepClick = (stepIndex: number) => {
+    if (stepIndex === activeStepIndex) return;
     setActiveStepIndex(stepIndex);
+    steps[stepIndex]?.onEnter?.();
   };
 
   const handleModalClose = () => {

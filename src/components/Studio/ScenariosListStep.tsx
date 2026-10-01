@@ -23,6 +23,7 @@ import {
   Title,
   Tooltip,
   Button,
+  Spinner,
 } from '@patternfly/react-core';
 import { FileCodeIcon } from '@patternfly/react-icons';
 import type { ScenarioTag } from '../../types/api';
@@ -52,12 +53,12 @@ export function ScenariosListStep({
   if (loading) {
     return (
       <EmptyState>
-        <EmptyStateIcon icon={FileCodeIcon} />
+        <EmptyStateIcon icon={Spinner} />
         <Title headingLevel="h4" size="lg">
           Loading Scenarios
         </Title>
         <EmptyStateBody>
-          Fetching chaos scenarios from the registry…
+          Loading chaos scenarios from registry...
         </EmptyStateBody>
       </EmptyState>
     );
