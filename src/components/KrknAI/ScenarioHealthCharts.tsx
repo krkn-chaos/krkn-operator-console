@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { Tooltip } from '@patternfly/react-core';
 import type { KrknAIScenarioHealthCheck } from '../../services/krknAiApi';
 
 interface ScenarioHealthChartsProps {
@@ -11,10 +13,24 @@ interface MeasuredSample {
   responseTimeSeconds: number;
   statusCode: number | null;
   success: boolean | null;
+  error?: string;
 }
 
 const colors = ['#0066cc', '#f4c145', '#3e8635', '#8a8d90', '#6753ac', '#009596', '#c9190b'];
 const formatNumber = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+function FailedMeasurement({ x, y, label }: { x: number; y: number; label: string }) {
+  const markerRef = useRef<SVGGElement>(null);
+  return (
+    <Tooltip triggerRef={markerRef} content={label}>
+      <g ref={markerRef} className="krkn-ai-health-chart__failure" role="img" aria-label={label} tabIndex={0}>
+        <title>{label}</title>
+        <circle cx={x} cy={y} r="8" fill="transparent" stroke="none" />
+        <path d={`M ${x - 4} ${y - 4} l 8 8 m -8 0 l 8 -8`} />
+      </g>
+    </Tooltip>
+  );
+}
 
 export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChartsProps) {
   const measuredSamples: MeasuredSample[] = samples.flatMap((sample) => (
@@ -28,6 +44,7 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
         responseTimeSeconds: sample.responseTimeSeconds,
         statusCode: sample.statusCode ?? null,
         success: sample.success ?? null,
+        error: sample.error,
       }]
       : []
   ));
@@ -47,12 +64,14 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
   }
   const applications = [...grouped.keys()];
   const width = 860;
-  const responseHeight = 340;
-  const responseMargin = { top: 24, right: 24, bottom: 58, left: 68 };
+  const failureApplications = applications.filter((application) => grouped.get(application)?.some((sample) => sample.responseTimeSeconds < 0));
+  const failureHeight = failureApplications.length > 0 ? 38 + failureApplications.length * 24 : 0;
+  const responseHeight = 340 + failureHeight;
+  const responseMargin = { top: 24, right: 24, bottom: 58 + failureHeight, left: 68 };
   const responsePlotWidth = width - responseMargin.left - responseMargin.right;
   const responsePlotHeight = responseHeight - responseMargin.top - responseMargin.bottom;
   const maxSeconds = Math.max(...measuredSamples.map((sample) => sample.secondsIntoScenario), 1);
-  const maxResponse = Math.max(...measuredSamples.map((sample) => sample.responseTimeSeconds), 1) * 1.1;
+  const maxResponse = Math.max(...measuredSamples.filter((sample) => sample.responseTimeSeconds >= 0).map((sample) => sample.responseTimeSeconds), 1) * 1.1;
   const x = (seconds: number) => responseMargin.left + (seconds / maxSeconds) * responsePlotWidth;
   const y = (seconds: number) => responseMargin.top + ((maxResponse - seconds) / maxResponse) * responsePlotHeight;
   const xTicks = Array.from({ length: 5 }, (_, index) => (maxSeconds * index) / 4);
@@ -91,11 +110,20 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
           <line className="krkn-ai-health-chart__axis" x1={responseMargin.left} x2={width - responseMargin.right} y1={responseHeight - responseMargin.bottom} y2={responseHeight - responseMargin.bottom} />
           {applications.map((application, applicationIndex) => {
             const applicationSamples = grouped.get(application) ?? [];
-            const path = applicationSamples.map((sample, index) => `${index === 0 ? 'M' : 'L'} ${x(sample.secondsIntoScenario)} ${y(sample.responseTimeSeconds)}`).join(' ');
+            let path = '';
+            let connected = false;
+            for (const sample of applicationSamples) {
+              if (sample.responseTimeSeconds < 0) {
+                connected = false;
+                continue;
+              }
+              path += `${connected ? ' L' : ' M'} ${x(sample.secondsIntoScenario)} ${y(sample.responseTimeSeconds)}`;
+              connected = true;
+            }
             return (
               <g key={application}>
                 <path className="krkn-ai-health-chart__line" d={path} style={{ stroke: colors[applicationIndex % colors.length] }} />
-                {applicationSamples.map((sample) => (
+                {applicationSamples.filter((sample) => sample.responseTimeSeconds >= 0).map((sample) => (
                   <circle
                     key={`${application}-${sample.secondsIntoScenario}`}
                     cx={x(sample.secondsIntoScenario)}
@@ -103,9 +131,30 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
                     r="4"
                     style={{ fill: colors[applicationIndex % colors.length] }}
                   >
-                    <title>{application} at {formatNumber(sample.secondsIntoScenario)} seconds: {formatNumber(sample.responseTimeSeconds)} seconds, HTTP {sample.statusCode ?? 'not recorded'}</title>
+                    <title>{application} at {formatNumber(sample.secondsIntoScenario)} seconds: {formatNumber(sample.responseTimeSeconds)} seconds, {sample.success === false ? 'failed check, ' : ''}HTTP {sample.statusCode ?? 'not recorded'}{sample.error ? `, ${sample.error}` : ''}</title>
                   </circle>
                 ))}
+              </g>
+            );
+          })}
+          {failureApplications.length > 0 && (
+            <text className="krkn-ai-health-chart__label" x={responseMargin.left} y={responseHeight - responseMargin.bottom + 43}>No response (−1)</text>
+          )}
+          {failureApplications.map((application, applicationIndex) => {
+            const markerY = responseHeight - responseMargin.bottom + 62 + applicationIndex * 24;
+            return (
+              <g key={`failure-${application}`}>
+                <text className="krkn-ai-health-chart__label" x={responseMargin.left - 9} y={markerY + 4} textAnchor="end">
+                  <title>{application}</title>
+                  {application.length > 8 ? `${application.slice(0, 7)}…` : application}
+                </text>
+                <line className="krkn-ai-health-chart__failure-lane" x1={responseMargin.left} x2={width - responseMargin.right} y1={markerY} y2={markerY} />
+                {grouped.get(application)?.filter((sample) => sample.responseTimeSeconds < 0).map((sample, index) => {
+                  const label = `${application} at ${formatNumber(sample.secondsIntoScenario)} seconds: failed health check, no response (recorded value ${sample.responseTimeSeconds}), ${sample.error || 'error not recorded'}`;
+                  return (
+                    <FailedMeasurement key={`${sample.secondsIntoScenario}-${index}`} x={x(sample.secondsIntoScenario)} y={markerY} label={label} />
+                  );
+                })}
               </g>
             );
           })}
@@ -117,6 +166,9 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
             <span key={application}><i style={{ backgroundColor: colors[index % colors.length] }} />{application}</span>
           ))}
         </div>
+        {failureApplications.length > 0 && (
+          <p className="krkn-ai-health-chart__failure-note">Red crosses mark failed checks with no response (recorded as −1), not negative latency. Gaps in the line show missing measurements. Hover or focus a cross for the application, elapsed time, and error.</p>
+        )}
       </figure>
 
       <figure className="krkn-ai-health-chart">

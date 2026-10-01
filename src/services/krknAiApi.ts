@@ -102,6 +102,7 @@ export interface KrknAIRunSummary {
   orchestratorPodName: string;
   failureReason: string;
   artifactStatus: KrknAIArtifactStatus;
+  currentGeneration: number | null;
   completedGenerations: number | null;
   completedScenarios: number | null;
   configuredGenerations: number | null;
@@ -159,9 +160,10 @@ export interface KrknAIScenarioIndexResponse {
 
 export interface KrknAIScenarioFitnessScore {
   id: number;
-  fitnessScore: number | null;
-  weightedScore: number | null;
+  rawScore: number | null;
   normalizedScore: number | null;
+  query: string | null;
+  queryType: string | null;
 }
 
 export interface KrknAIScenarioFitnessResult {

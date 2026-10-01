@@ -697,6 +697,11 @@
   background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
 }
 
+.krkn-ai-fitness-calculating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .krkn-ai-scenario-detail__metrics dd {
   margin-block-start: 0.4rem;
   font-size: 1.125rem;
@@ -759,6 +764,28 @@
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.krkn-ai-health-chart__failure path {
+  fill: none;
+  stroke: var(--pf-v5-global--danger-color--100, #c9190b);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.krkn-ai-health-chart__failure:focus {
+  outline: 2px solid var(--pf-v5-global--primary-color--100, #0066cc);
+  outline-offset: 2px;
+}
+
+.krkn-ai-health-chart__failure-lane {
+  stroke: var(--krkn-ai-border);
+  stroke-dasharray: 3 3;
+}
+
+.krkn-ai-health-chart__failure-note {
+  margin-block-start: 0.75rem;
+  color: var(--krkn-ai-muted);
 }
 
 .krkn-ai-health-chart__legend,

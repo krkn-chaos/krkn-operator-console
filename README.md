@@ -94,6 +94,22 @@ stops when runs become terminal or the page is hidden. A `503
 artifact_updating` preserves the last good result and retries on the next active
 poll. The result-uploader sidecar commits artifacts every 10 seconds.
 
+Krkn-AI fitness totals are withheld until the entire generation is complete and
+the scenario result is finalized. Final totals and generation best/average
+scores use the 0–100 scale; per-item normalized scores remain on the 0–1 scale,
+with raw scores also shown. Scenario details include the run-specific PromQL
+query and query type for each item; old artifacts without persisted queries do
+not display a fabricated query.
+Run summaries and scenario results show calculation indicators for unfinished
+active generations. Completed generation scores stay visible while later
+generations run; an open scenario modal refreshes when its generation completes.
+Failed or cancelled incomplete results stop calculating and remain unfinalized.
+
+Health-check response-time charts leave gaps for `-1` (no response) measurements
+and show red crosses in separate per-application failure lanes. Hover or keyboard
+focus reveals the elapsed time, recorded value, and error. HTTP errors with a
+measured response time remain on the latency line; raw sample values are retained.
+
 Scenario child-job logs use
 `/api/v2/ws/scenarios/run/{scenarioRunName}/jobs/{jobID}/logs`; orchestrator
 logs use `/api/v2/ws/krkn-ai/runs/{name}/logs`. Both authenticate the WebSocket

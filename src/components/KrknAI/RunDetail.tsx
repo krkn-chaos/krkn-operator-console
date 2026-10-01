@@ -24,6 +24,7 @@ import { websocketService } from '../../services/websocketService';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { LogTerminal } from '../LogTerminal';
 import { FitnessChart } from './FitnessChart';
+import { FitnessValue } from './FitnessValue';
 import { ScenarioExplorer } from './ScenarioExplorer';
 import { formatDateTime } from '../../utils/dateTime';
 
@@ -137,6 +138,7 @@ function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; po
 export function RunDetail({ run, onBack }: RunDetailProps) {
   const name = run.metadata.name;
   const [summary, setSummary] = useState<KrknAIRunSummary | null>(null);
+  const summaryRef = useRef(summary);
   const [scenarioIndex, setScenarioIndex] = useState<KrknAIScenarioIndexResponse | null>(null);
   const [page, setPage] = useState(1);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -179,6 +181,7 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
     setScenarioErrors((current) => ({ ...current, [key]: '' }));
     try {
       const detail = await krknAiApi.getScenario(name, row.generation, row.scenarioId, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       scenarioDetailsRef.current = { ...scenarioDetailsRef.current, [key]: detail };
       setScenarioDetails((current) => ({ ...current, [key]: detail }));
       scenarioUpdatingRef.current = { ...scenarioUpdatingRef.current, [key]: false };
@@ -283,10 +286,14 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
       const indexStatus = indexResult.status === 'rejected' ? errorStatus(indexResult.reason) : undefined;
       const nextPhase = summaryResult.status === 'fulfilled' ? summaryResult.value.phase : phaseRef.current;
       phaseRef.current = nextPhase || 'Pending';
+      const generationCompleted = summaryResult.status === 'fulfilled'
+        && summaryRef.current?.completedGenerations !== summaryResult.value.completedGenerations;
 
       if (summaryResult.status === 'fulfilled') {
         missingRunCount.current = 0;
-        setSummary(summaryResult.value);
+        const nextSummary = summaryResult.value;
+        summaryRef.current = nextSummary;
+        setSummary(nextSummary);
         setSummaryError(null);
         setDeleted(false);
       } else {
@@ -317,7 +324,8 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
           if (newRow) {
             selectedScenarioRef.current = newRow;
             setSelectedScenario(newRow);
-            if (fitnessChanged(oldRow, newRow) || scenarioUpdatingRef.current[key]) {
+            if (fitnessChanged(oldRow, newRow) || scenarioUpdatingRef.current[key]
+              || (generationCompleted && newRow.generation < (summaryRef.current?.completedGenerations ?? 0))) {
               void fetchScenarioDetail(newRow, true);
             }
           }
@@ -396,6 +404,10 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
   }, []);
 
   const phase = summary?.phase ?? run.status?.phase ?? 'Pending';
+  const currentGeneration = summary?.currentGeneration;
+  const calculatingGeneration = ACTIVE_PHASES[phase] === true && currentGeneration != null
+    && (summary?.completedGenerations == null || currentGeneration >= summary.completedGenerations)
+    ? currentGeneration : null;
   const cluster = summary?.cluster || Object.values(run.spec.targetClusters ?? {})[0]?.[0] || 'Not available';
   const podName = summary?.orchestratorPodName || run.status?.orchestratorPodName || '';
   const createdAt = summary?.createdAt || run.metadata.creationTimestamp;
@@ -474,15 +486,15 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
             </h2>
             <dl className="krkn-ai-run-detail__metadata">
               <div>
-                <dt><ChartLineIcon aria-hidden="true" />Best fitness</dt>
-                <dd>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
+                <dt><ChartLineIcon aria-hidden="true" />Best fitness (0–100)</dt>
+                <dd><FitnessValue value={summary?.bestFitness} calculatingGeneration={calculatingGeneration} /></dd>
               </div>
               <div>
-                <dt><ChartLineIcon aria-hidden="true" />Average fitness</dt>
-                <dd>{summary?.averageFitness == null ? 'Not available yet' : summary.averageFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
+                <dt><ChartLineIcon aria-hidden="true" />Average fitness (0–100)</dt>
+                <dd><FitnessValue value={summary?.averageFitness} calculatingGeneration={calculatingGeneration} /></dd>
               </div>
               <div>
-                <dt><HeartbeatIcon aria-hidden="true" />Baseline fitness</dt>
+                <dt><HeartbeatIcon aria-hidden="true" />Baseline fitness (0–100)</dt>
                 <dd>{summary?.baselineFitness == null ? 'Not available yet' : summary.baselineFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</dd>
               </div>
             </dl>
@@ -546,6 +558,9 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         detailError={detailError}
         onRetryDetail={() => selectedScenario && void fetchScenarioDetail(selectedScenario, true)}
         clusterName={cluster}
+        runPhase={phase}
+        currentGeneration={summary?.currentGeneration ?? null}
+        completedGenerations={summary?.completedGenerations ?? null}
       />
     </main>
   );

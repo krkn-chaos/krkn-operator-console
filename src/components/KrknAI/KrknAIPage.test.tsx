@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseDocument } from 'yaml';
@@ -135,6 +135,7 @@ function makeSummary(name: string, phase = 'Running', values: Partial<KrknAIRunS
     orchestratorPodName: `orchestrator-${name}`,
     failureReason: '',
     artifactStatus: phase === 'Succeeded' ? 'succeeded' : 'in_progress',
+    currentGeneration: phase === 'Succeeded' ? null : 0,
     completedGenerations: 0,
     completedScenarios: 0,
     configuredGenerations: 2,
@@ -171,7 +172,7 @@ function makeScenarioRow(overrides: Partial<KrknAIScenarioIndexRow> = {}): KrknA
   };
 }
 
-function makeScenarioDetail(score: number, fitnessState: 'provisional' | 'final' = 'provisional'): KrknAIScenarioDetail {
+function makeScenarioDetail(score: number, fitnessState: KrknAIScenarioDetail['fitnessState'] = 'provisional'): KrknAIScenarioDetail {
   return {
     generation: 0,
     scenarioId: '9',
@@ -184,7 +185,7 @@ function makeScenarioDetail(score: number, fitnessState: 'provisional' | 'final'
     returnCode: 0,
     fitnessResult: {
       fitnessScore: score,
-      scores: [{ id: 1, fitnessScore: score, weightedScore: score / 2, normalizedScore: fitnessState === 'final' ? 1 : null }],
+      scores: [{ id: 1, rawScore: score, normalizedScore: fitnessState === 'final' ? 1 : null, query: 'up{job="krkn"}', queryType: 'point' }],
       healthCheckFailureScore: 0.25,
       healthCheckResponseTimeScore: 0.5,
       krknFailureScore: 0.75,
@@ -435,6 +436,8 @@ describe('Krkn-AI real run lifecycle', () => {
     });
     mocks.ai.listRuns.mockResolvedValue([run]);
     mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Succeeded', {
+      currentGeneration: null,
+      completedGenerations: 1,
       baselineFitness: 12,
       artifactStatus: 'succeeded',
     }));
@@ -466,12 +469,18 @@ describe('Krkn-AI real run lifecycle', () => {
       'Open baseline scenario details',
       'Open generation 1 scenario 9 details',
     ]);
-    expect(screen.getByText('Baseline fitness')).toBeInTheDocument();
+    expect(screen.getByText('Baseline fitness (0–100)')).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Baseline' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('row', { name: 'Open baseline scenario details' }));
     await flushReact();
-    expect(screen.getByText('12 fitness units')).toBeInTheDocument();
+    expect(screen.getByText('12 / 100')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Raw score' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Normalized score (0–1)' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'PromQL query' })).toBeInTheDocument();
+    const fitnessTable = screen.getByRole('table', { name: 'Measured fitness components' });
+    expect(fitnessTable.textContent).toContain('up{job="krkn"}');
+    expect(screen.getByRole('cell', { name: 'point' })).toBeInTheDocument();
     expect(screen.getByText('Run type')).toBeInTheDocument();
     expect(screen.getByText('baseline-child-run')).toBeInTheDocument();
   });
@@ -650,20 +659,26 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.ai.listRuns).toHaveBeenCalledTimes(2);
   });
 
-  it('loads measured scenario fitness and health, refreshes normalization, and separates the two log streams', async () => {
+  it('withholds scenario totals and normalization until the generation finalizes, while keeping both log streams available', async () => {
     vi.useFakeTimers();
     const run = makeRun('measured-run', 'Running');
     const provisional = makeScenarioRow({ fitnessScore: 3, fitnessState: 'provisional' });
     const finalized = makeScenarioRow({ fitnessScore: 75, fitnessState: 'final' });
     mocks.ai.listRuns.mockResolvedValue([run]);
     mocks.ai.getRunSummary
-      .mockResolvedValueOnce(makeSummary('measured-run', 'Running', { bestFitness: 3, baselineFitness: 12 }))
-      .mockResolvedValueOnce(makeSummary('measured-run', 'Running', { bestFitness: 3, baselineFitness: 12 }))
-      .mockResolvedValueOnce(makeSummary('measured-run', 'Running', { bestFitness: 3, baselineFitness: 12 }))
-      .mockResolvedValueOnce(makeSummary('measured-run', 'Succeeded', { bestFitness: 75, baselineFitness: 12, artifactStatus: 'succeeded' }));
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Running'))
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Running'))
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Running'))
+      .mockResolvedValueOnce(makeSummary('measured-run', 'Succeeded', {
+        currentGeneration: null,
+        completedGenerations: 1,
+        bestFitness: 75,
+        baselineFitness: 12,
+        artifactStatus: 'succeeded',
+      }));
     mocks.ai.getScenarioIndex.mockResolvedValueOnce(makeIndex([provisional])).mockResolvedValue(makeIndex([finalized]));
     mocks.ai.getScenario
-      .mockResolvedValueOnce(makeScenarioDetail(3, 'provisional'))
+      .mockResolvedValueOnce(makeScenarioDetail(3, 'final'))
       .mockRejectedValueOnce(Object.assign(new Error('artifact_updating'), { status: 503, statusText: 'Service Unavailable' }))
       .mockResolvedValueOnce(makeScenarioDetail(75, 'final'));
     const orchestratorUrl = vi.spyOn(websocketService, 'buildAiRunLogsUrl');
@@ -672,7 +687,7 @@ describe('Krkn-AI real run lifecycle', () => {
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open run measured-run/ }));
     await flushReact();
-    expect(screen.getByText('Baseline fitness')).toBeInTheDocument();
+    expect(screen.getByText('Baseline fitness (0–100)')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
@@ -685,7 +700,13 @@ describe('Krkn-AI real run lifecycle', () => {
       second: '2-digit',
     }).format(new Date('2026-09-01T12:00:02Z'));
     expect(screen.getByText(expectedSampleTime)).toBeInTheDocument();
-    expect(screen.getByText('3 fitness units')).toBeInTheDocument();
+    expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
+    expect(screen.getByText(/Calculating generation fitness/)).toBeInTheDocument();
+    expect(screen.queryByText('3 / 100')).not.toBeInTheDocument();
+    const fitnessComponents = screen.getByRole('table', { name: 'Measured fitness components' });
+    expect(within(fitnessComponents).getByRole('cell', { name: '3' })).toBeInTheDocument();
+    expect(within(fitnessComponents).getByRole('cell', { name: /Normalization is pending/ })).toBeInTheDocument();
+    expect(screen.getByText('Fitness provisional')).toBeInTheDocument();
     expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', true, 200, true);
     expect(childUrl).toHaveBeenCalledWith('child-run-9', 'real-job-9', true);
     const openedPaths = [...new Set(mocks.useWebSocket.mock.calls.map((call) => new URL(String(call[1])).pathname))];
@@ -695,15 +716,50 @@ describe('Krkn-AI real run lifecycle', () => {
 
     await advance(10_000);
     expect(screen.getByText('Result upload is updating. Showing the last committed scenario result.')).toBeInTheDocument();
-    expect(screen.getByText('3 fitness units')).toBeInTheDocument();
+    expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
+    expect(screen.queryByText('3 / 100')).not.toBeInTheDocument();
     await advance(10_000);
-    expect(screen.getByText('75 fitness units')).toBeInTheDocument();
+    expect(screen.getByText('75 / 100')).toBeInTheDocument();
     expect(screen.getByText('Fitness final')).toBeInTheDocument();
     expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', false, 200, true);
     await advance(20_000);
     expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(4);
     expect(mocks.ai.getScenarioIndex).toHaveBeenCalledTimes(3);
     expect(mocks.ai.getScenario).toHaveBeenCalledTimes(3);
+  });
+
+  it('shows terminal incomplete fitness as not finalized without a calculation spinner', async () => {
+    const run = makeRun('failed-incomplete-run', 'Failed');
+    const row = makeScenarioRow({
+      outcome: 'failed',
+      fitnessScore: null,
+      fitnessState: 'unfinalized',
+      phase: 'Failed',
+      childRunName: undefined,
+      jobId: undefined,
+      podName: undefined,
+    });
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Failed', {
+      currentGeneration: 0,
+      completedGenerations: 0,
+      artifactStatus: 'failed',
+    }));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([row]));
+    mocks.ai.getScenario.mockResolvedValue(makeScenarioDetail(7, 'unfinalized'));
+
+    render(<KrknAIPage />);
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open run failed-incomplete-run/ }));
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
+    await flushReact();
+
+    expect(screen.getByText('Not finalized', { selector: 'strong' })).toBeInTheDocument();
+    const scores = screen.getByRole('table', { name: 'Measured fitness components' });
+    expect(within(scores).getByRole('cell', { name: '7' })).toBeInTheDocument();
+    expect(within(scores).getByRole('cell', { name: 'Not finalized' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Calculating fitness')).not.toBeInTheDocument();
   });
 
   it('retries an in-progress scenario detail 404 after visibility returns and retains indexed rows', async () => {
@@ -736,7 +792,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     setDocumentHidden(false);
     await flushReact();
-    expect(screen.getByText('9 fitness units')).toBeInTheDocument();
+    expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ })).toBeInTheDocument();
     expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(3);

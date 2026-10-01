@@ -9,6 +9,7 @@ import {
 import type { KeyboardEvent } from 'react';
 import type { KrknAIRunResource, KrknAIRunSummary } from '../../services/krknAiApi';
 import { formatDateTime } from '../../utils/dateTime';
+import { FitnessValue } from './FitnessValue';
 
 export interface KrknAIRunListEntry {
   resource: KrknAIRunResource;
@@ -90,7 +91,7 @@ export function RunList({
                   <th scope="col">Cluster</th>
                   <th scope="col">Phase</th>
                   <th scope="col">Started</th>
-                  <th scope="col">Best fitness</th>
+                  <th scope="col">Best fitness (0–100)</th>
                   <th scope="col">Generations</th>
                   <th scope="col">Scenarios completed</th>
                   <th scope="col">Actions</th>
@@ -103,6 +104,10 @@ export function RunList({
                   const createdAt = summary?.createdAt || resource.metadata.creationTimestamp;
                   const completed = summary?.completedGenerations;
                   const configured = summary?.configuredGenerations;
+                  const currentGeneration = summary?.currentGeneration;
+                  const calculatingGeneration = (phase === 'Pending' || phase === 'Provisioning' || phase === 'Running')
+                    && currentGeneration != null && (completed == null || currentGeneration >= completed)
+                    ? currentGeneration : null;
                   const generations = completed !== null && completed !== undefined
                     && configured !== null && configured !== undefined
                     ? `${completed} / ${configured}`
@@ -125,7 +130,7 @@ export function RunList({
                       <td>{getClusterName(resource, summary)}</td>
                       <td><Label color={phaseColor(phase)}>{phase}</Label></td>
                       <td>{createdAt ? <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> : 'Not available'}</td>
-                      <td>{summary?.bestFitness == null ? 'Not available yet' : summary.bestFitness.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                      <td><FitnessValue value={summary?.bestFitness} calculatingGeneration={calculatingGeneration} /></td>
                       <td>{generations}</td>
                       <td>{summary?.completedScenarios ?? 'Not available yet'}</td>
                       <td>

@@ -102,7 +102,7 @@ export function FitnessChart({ points, runName }: FitnessChartProps) {
             </g>
           ))}
           <text className="krkn-ai-fitness-chart__axis-label" x={18} y={margin.top + plotHeight / 2} textAnchor="middle" transform={`rotate(-90 18 ${margin.top + plotHeight / 2})`}>
-            Fitness score
+            Fitness score (0–100)
           </text>
           <text className="krkn-ai-fitness-chart__axis-label" x={margin.left + plotWidth / 2} y={height - 12} textAnchor="middle">
             Generation (displayed 1-based)
