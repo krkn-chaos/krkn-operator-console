@@ -9,6 +9,8 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import type { ConfigValidationErrors, EditableConfigDraft, FitnessItemDraft } from './configModel';
+import { validateConfigDraft } from './configModel';
+import './FitnessFunctionEditor.css';
 
 interface FitnessFunctionEditorProps {
   draft: EditableConfigDraft;
@@ -17,29 +19,64 @@ interface FitnessFunctionEditorProps {
 }
 
 export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFunctionEditorProps) {
+  const [editingItem, setEditingItem] = useState<FitnessItemDraft | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [showEntryErrors, setShowEntryErrors] = useState(false);
   const [pendingRemovalKey, setPendingRemovalKey] = useState<number | null>(null);
-  const [expandedItemKey, setExpandedItemKey] = useState<number | null>(null);
 
-  const updateItem = (key: number, updates: Partial<FitnessItemDraft>) => {
-    onChange({
-      fitnessItems: draft.fitnessItems.map((item) => item.key === key ? { ...item, ...updates } : item),
-    });
+  const openAdd = () => {
+    const nextKey = draft.fitnessItems.reduce((maximum, item) => Math.max(maximum, item.key), -1) + 1;
+    const nextId = draft.fitnessItems.reduce(
+      (maximum, item) => Math.max(maximum, Number.isFinite(Number(item.id)) ? Number(item.id) : -1),
+      -1,
+    ) + 1;
+    setEditingItem({ key: nextKey, id: String(nextId), title: 'Custom fitness item', query: '', type: 'point', weight: '1' });
+    setIsAdding(true);
+    setShowEntryErrors(false);
   };
 
-  const addItem = () => {
-    const nextKey = draft.fitnessItems.reduce((maximum, item) => Math.max(maximum, item.key), -1) + 1;
-    const nextId = draft.fitnessItems.reduce((maximum, item) => Math.max(maximum, Number.isFinite(Number(item.id)) ? Number(item.id) : -1), -1) + 1;
+  const openEdit = (item: FitnessItemDraft) => {
+    setEditingItem({ ...item });
+    setIsAdding(false);
+    setShowEntryErrors(false);
+  };
+
+  const closeEditor = () => {
+    setEditingItem(null);
+    setIsAdding(false);
+    setShowEntryErrors(false);
+  };
+
+  const updateEditingItem = (updates: Partial<FitnessItemDraft>) => {
+    setEditingItem((current) => current ? { ...current, ...updates } : current);
+  };
+
+  const entryErrors = editingItem
+    ? validateConfigDraft({
+      ...draft,
+      fitnessItems: isAdding
+        ? [...draft.fitnessItems, editingItem]
+        : draft.fitnessItems.map((item) => item.key === editingItem.key ? editingItem : item),
+    })
+    : {};
+  const fieldError = (field: 'id' | 'query' | 'weight') =>
+    showEntryErrors ? entryErrors[`fitnessItem.${editingItem?.key}.${field}`] : undefined;
+
+  const saveItem = () => {
+    if (!editingItem) return;
+    const itemErrors = ['id', 'query', 'weight'].some((field) =>
+      entryErrors[`fitnessItem.${editingItem.key}.${field}`],
+    );
+    if (itemErrors) {
+      setShowEntryErrors(true);
+      return;
+    }
     onChange({
-      fitnessItems: [...draft.fitnessItems, {
-        key: nextKey,
-        id: String(nextId),
-        title: 'Custom fitness item',
-        query: '',
-        type: 'point',
-        weight: '1',
-      }],
+      fitnessItems: isAdding
+        ? [...draft.fitnessItems, editingItem]
+        : draft.fitnessItems.map((item) => item.key === editingItem.key ? editingItem : item),
     });
-    setExpandedItemKey(nextKey);
+    closeEditor();
   };
 
   const confirmRemoval = () => {
@@ -60,95 +97,109 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
           <h3>Fitness function items</h3>
           <p className="krkn-ai-muted">Edit each item’s ID, PromQL query, aggregation type, and weight.</p>
         </div>
-        <Button variant="secondary" onClick={addItem}>Add fitness item</Button>
+        <Button variant="secondary" onClick={openAdd}>Add fitness item</Button>
       </div>
       {errors.fitnessItems && <p className="krkn-ai-field-error" role="alert">{errors.fitnessItems}</p>}
-      <div className="krkn-ai-fitness-items">
-        {draft.fitnessItems.map((item) => {
-          const itemKey = `fitnessItem.${item.key}`;
-          return (
-            <details
-              key={item.key}
-              className="krkn-ai-fitness-item"
-              open={expandedItemKey === item.key ? true : undefined}
-              onToggle={(event) => {
-                if (expandedItemKey === item.key && !event.currentTarget.open) {
-                  setExpandedItemKey(null);
-                }
-              }}
-            >
-              <summary>
-                <strong>Item {item.id}</strong> · {item.title} · {item.type} · weight {item.weight}
-              </summary>
-              <div className="krkn-ai-fitness-item-editor">
-                <FormGroup label="Item ID" fieldId={`krkn-ai-fitness-item-${item.key}-id`} isRequired>
-                  <TextInput
-                    id={`krkn-ai-fitness-item-${item.key}-id`}
-                    type="number"
-                    step={1}
-                    value={item.id}
-                    onChange={(_event, value) => updateItem(item.key, { id: value })}
-                    validated={errors[`${itemKey}.id`] ? 'error' : 'default'}
-                    aria-label={`Fitness item ${item.key} ID`}
-                  />
-                  {errors[`${itemKey}.id`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.id`]}</p>}
-                </FormGroup>
-                <FormGroup label="Aggregation type" fieldId={`krkn-ai-fitness-item-${item.key}-type`} isRequired>
-                  <FormSelect
-                    id={`krkn-ai-fitness-item-${item.key}-type`}
-                    value={item.type}
-                    onChange={(_event, value) => updateItem(item.key, { type: value as FitnessItemDraft['type'] })}
-                    aria-label={`Fitness item ${item.key} aggregation type`}
-                  >
-                    <FormSelectOption value="range" label="range" />
-                    <FormSelectOption value="point" label="point" />
-                  </FormSelect>
-                </FormGroup>
-                <FormGroup label="Weight (finite, non-negative)" fieldId={`krkn-ai-fitness-item-${item.key}-weight`} isRequired>
-                  <TextInput
-                    id={`krkn-ai-fitness-item-${item.key}-weight`}
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={item.weight}
-                    onChange={(_event, value) => updateItem(item.key, { weight: value })}
-                    validated={errors[`${itemKey}.weight`] ? 'error' : 'default'}
-                    aria-label={`Fitness item ${item.key} weight`}
-                  />
-                  {errors[`${itemKey}.weight`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.weight`]}</p>}
-                </FormGroup>
-                <FormGroup
-                  className="krkn-ai-editor-field--wide"
-                  label="PromQL query"
-                  fieldId={`krkn-ai-fitness-item-${item.key}-query`}
-                  isRequired
-                >
-                  <textarea
-                    id={`krkn-ai-fitness-item-${item.key}-query`}
-                    className="krkn-ai-fitness-query"
-                    rows={4}
-                    value={item.query}
-                    onChange={(event) => updateItem(item.key, { query: event.currentTarget.value })}
-                    aria-label={`Fitness item ${item.key} query`}
-                    aria-invalid={!!errors[`${itemKey}.query`]}
-                  />
-                  {errors[`${itemKey}.query`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.query`]}</p>}
-                </FormGroup>
-              </div>
-              <div className="krkn-ai-editor-actions">
-                <Button
-                  variant="secondary"
-                  isDisabled={draft.fitnessItems.length === 1}
-                  onClick={() => setPendingRemovalKey(item.key)}
-                  aria-label={`Remove fitness item ${item.id}`}
-                >
-                  Remove item
-                </Button>
-              </div>
-            </details>
-          );
-        })}
+      <div className="krkn-ai-fitness-table-scroll">
+        <table className="krkn-ai-fitness-table">
+          <thead>
+            <tr>
+              <th scope="col">PromQL query</th>
+              <th scope="col">Type</th>
+              <th scope="col">Weight</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {draft.fitnessItems.map((item) => (
+              <tr key={item.key}>
+                <td><code className="krkn-ai-fitness-query-summary">{item.query || 'No query entered'}</code></td>
+                <td>{item.type}</td>
+                <td>{item.weight}</td>
+                <td className="krkn-ai-fitness-table-actions">
+                  <Button size="sm" variant="secondary" onClick={() => openEdit(item)} aria-label={`Edit fitness item ${item.id}`}>Edit</Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    isDisabled={draft.fitnessItems.length === 1}
+                    onClick={() => setPendingRemovalKey(item.key)}
+                    aria-label={`Remove fitness item ${item.id}`}
+                  >Remove</Button>
+                </td>
+              </tr>
+            ))}
+            {!draft.fitnessItems.length && <tr><td colSpan={4}>No fitness items. Add an item to configure a PromQL query.</td></tr>}
+          </tbody>
+        </table>
       </div>
+
+      <Modal
+        variant={ModalVariant.medium}
+        className="krkn-ai-config-editor-modal"
+        title={isAdding ? 'Add fitness item' : 'Edit fitness item'}
+        isOpen={editingItem !== null}
+        onClose={closeEditor}
+        actions={[
+          <Button key="save" variant="primary" onClick={saveItem}>Save</Button>,
+          <Button key="cancel" variant="link" onClick={closeEditor}>Cancel</Button>,
+        ]}
+      >
+        {editingItem && <div className="krkn-ai-fitness-item-editor">
+          <FormGroup label="Item ID" fieldId={`krkn-ai-fitness-item-${editingItem.key}-id`} isRequired>
+            <TextInput
+              id={`krkn-ai-fitness-item-${editingItem.key}-id`}
+              type="number"
+              step={1}
+              value={editingItem.id}
+              onChange={(_event, value) => updateEditingItem({ id: value })}
+              validated={fieldError('id') ? 'error' : 'default'}
+              aria-label={`Fitness item ${editingItem.key} ID`}
+            />
+            {fieldError('id') && <p className="krkn-ai-field-error" role="alert">{fieldError('id')}</p>}
+          </FormGroup>
+          <FormGroup label="Aggregation type" fieldId={`krkn-ai-fitness-item-${editingItem.key}-type`} isRequired>
+            <FormSelect
+              id={`krkn-ai-fitness-item-${editingItem.key}-type`}
+              value={editingItem.type}
+              onChange={(_event, value) => updateEditingItem({ type: value as FitnessItemDraft['type'] })}
+              aria-label={`Fitness item ${editingItem.key} aggregation type`}
+            >
+              <FormSelectOption value="range" label="range" />
+              <FormSelectOption value="point" label="point" />
+            </FormSelect>
+          </FormGroup>
+          <FormGroup label="Weight (finite, non-negative)" fieldId={`krkn-ai-fitness-item-${editingItem.key}-weight`} isRequired>
+            <TextInput
+              id={`krkn-ai-fitness-item-${editingItem.key}-weight`}
+              type="number"
+              min={0}
+              step="any"
+              value={editingItem.weight}
+              onChange={(_event, value) => updateEditingItem({ weight: value })}
+              validated={fieldError('weight') ? 'error' : 'default'}
+              aria-label={`Fitness item ${editingItem.key} weight`}
+            />
+            {fieldError('weight') && <p className="krkn-ai-field-error" role="alert">{fieldError('weight')}</p>}
+          </FormGroup>
+          <FormGroup
+            className="krkn-ai-editor-field--wide"
+            label="PromQL query"
+            fieldId={`krkn-ai-fitness-item-${editingItem.key}-query`}
+            isRequired
+          >
+            <textarea
+              id={`krkn-ai-fitness-item-${editingItem.key}-query`}
+              className="krkn-ai-fitness-query"
+              rows={4}
+              value={editingItem.query}
+              onChange={(event) => updateEditingItem({ query: event.currentTarget.value })}
+              aria-label={`Fitness item ${editingItem.key} query`}
+              aria-invalid={!!fieldError('query')}
+            />
+            {fieldError('query') && <p className="krkn-ai-field-error" role="alert">{fieldError('query')}</p>}
+          </FormGroup>
+        </div>}
+      </Modal>
 
       <Modal
         variant={ModalVariant.small}
@@ -173,4 +224,3 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
     </div>
   );
 }
-

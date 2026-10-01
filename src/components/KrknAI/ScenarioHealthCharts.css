@@ -1,8 +1,14 @@
+.krkn-ai-health-chart__guidance {
+  margin-block: 0.75rem 0;
+  color: var(--krkn-ai-muted);
+  font-size: 0.875rem;
+}
+
 .krkn-ai-health-chart__heatmap-scroll {
   display: grid;
   grid-template-columns: 11rem minmax(0, 1fr);
   max-height: 30rem;
-  overflow: auto;
+  overflow-y: auto;
   border: 1px solid var(--krkn-ai-border);
   scrollbar-gutter: stable;
 }
@@ -16,10 +22,6 @@
   border-inline-end: 1px solid var(--krkn-ai-border);
 }
 
-.krkn-ai-health-chart__heatmap-label-spacer {
-  height: 40px;
-}
-
 .krkn-ai-health-chart__heatmap-label {
   display: flex;
   align-items: center;
@@ -29,10 +31,6 @@
   font-size: 0.8125rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.krkn-ai-health-chart__heatmap-label-bottom {
-  height: 38px;
 }
 
 .krkn-ai-health-chart__heatmap-viewport {
@@ -52,12 +50,6 @@
 .krkn-ai-health-chart__heatmap-sample:focus rect {
   stroke: var(--pf-v5-global--primary-color--100, #0066cc);
   stroke-width: 3px;
-}
-
-.krkn-ai-health-chart__heatmap-tick text {
-  fill: currentColor;
-  font-family: inherit;
-  font-size: 12px;
 }
 
 @media (max-width: 640px) {

@@ -88,7 +88,7 @@ function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; po
   const everConnectedRef = useRef(false);
   const follow = TERMINAL_PHASES[phase] !== true;
   const connectionId = `krkn-ai-orchestrator-${runName}`;
-  const url = websocketService.buildAiRunLogsUrl(runName, follow, 200, true);
+  const url = websocketService.buildAiRunLogsUrl(runName, follow, follow ? 200 : undefined, true);
   const handleMessage = useCallback((message: string) => {
     setLogs((current) => {
       if (current.length === 0 || current[0].startsWith('Connecting') || current[0].startsWith('Reconnecting')) {
@@ -103,13 +103,18 @@ function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; po
   });
 
   useEffect(() => {
+    setLogs(['Connecting to orchestrator log stream…']);
+    setHasConnected(false);
+    everConnectedRef.current = false;
+  }, [url]);
+
+  useEffect(() => {
     if (connectionState === 'reconnecting' || (connectionState === 'connecting' && everConnectedRef.current)) {
       setLogs(['Reconnecting to orchestrator log stream…']);
       setHasConnected(false);
       return;
     }
     if (connectionState === 'connected') {
-      if (everConnectedRef.current) setLogs([]);
       everConnectedRef.current = true;
       setHasConnected(true);
     }
@@ -460,12 +465,10 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
             <Title headingLevel="h1" size="2xl">{name}</Title>
             <p className="krkn-ai-run-detail__cluster"><TopologyIcon aria-hidden="true" />Cluster: {cluster}</p>
           </div>
-          <Label color={phase === 'Succeeded' ? 'green' : phase === 'Failed' ? 'red' : phase === 'Running' ? 'blue' : 'grey'}>
-            {phase}
-          </Label>
         </div>
         <div className="krkn-ai-run-detail__metadata-groups">
           <MetadataPanel id="krkn-ai-run-overview" title="Run" icon={<CalendarAltIcon aria-hidden="true" />} className="krkn-ai-run-detail__metadata-group--run" items={[
+            { label: 'Status', value: <Label color={phase === 'Succeeded' ? 'green' : phase === 'Failed' ? 'red' : phase === 'Running' ? 'blue' : 'grey'}>{phase}</Label> },
             { label: 'Created', value: createdAt ? <time dateTime={createdAt}>{formatDateTime(createdAt)}</time> : 'Not available' },
             { label: 'Artifact status', value: <Label color={summary?.artifactStatus === 'failed' ? 'red' : summary?.artifactStatus === 'succeeded' ? 'green' : summary?.artifactStatus === 'in_progress' ? 'blue' : 'grey'}>{summary?.artifactStatus === 'in_progress' ? 'In progress' : summary?.artifactStatus === 'succeeded' ? 'Succeeded' : summary?.artifactStatus === 'failed' ? 'Failed' : 'Not available'}</Label> },
           ]} />

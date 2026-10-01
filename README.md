@@ -73,13 +73,15 @@ Cancel remains in the action row on each target, configuration, and review step.
 
 The run list and result views expand to the available page width. Run creation
 uses a centered 72rem layout with bounded settings inputs and wider PromQL/URL
-rows that stack on small screens. Fitness items and health checks use compact
-removal actions with confirmation dialogs; the last fitness item is protected.
+rows that stack on small screens. Fitness items and health checks are summarized
+in tables with Add/Edit modals; changes apply only on Save, and Cancel/Escape
+discard them. Removal requires confirmation, and the last fitness item is protected.
 Include score components are configured in Run Settings. Filename overrides are
 omitted from generated YAML so Krkn-AI supplies its output defaults.
 Run metadata uses aligned label/value rows grouped into Run, Progress, and
 Fitness panels, with the normalized fitness scale shown once. The panels stack
-on smaller screens without hiding values or calculation status.
+on smaller screens without hiding values or calculation status. The run phase
+appears as Status in the Run panel rather than beside the page title.
 
 Baseline appears first among generation-0 scenario results and in ascending scenario-ID order; its row opens standard result details.
 
@@ -125,14 +127,14 @@ SHA-256 before serving the ZIP. Active runs download their last committed
 snapshot; uploads in progress can return `503 artifact_updating`. Deploy matching
 operator and console versions to use this endpoint.
 
-Health-check response-time charts leave gaps for `-1` (no response) measurements
-and show red crosses in separate per-application failure lanes. Hover or keyboard
-focus reveals the elapsed time, recorded value, and error. HTTP errors with a
-measured response time remain on the latency line; raw sample values are retained.
-The outcomes chart retains every sample on a shared elapsed-time axis with
-readable cells, sparse ticks, fixed application labels, and horizontal/vertical
-scrolling. Hover or keyboard focus shows each sample's timestamp, status, outcome,
-latency, and error; different polling intervals remain time-aligned.
+Health-check response-time charts leave gaps for `-1`, missing, or nonfinite
+latency measurements and resume when measurements return; there are no crosses.
+HTTP errors with measured latency remain on the line, while failure counts in
+the legend and red outcome cells distinguish failed checks from missing responses.
+The latency axis scales to measured values rather than a fixed one-second floor.
+Outcome cells are adjacent and ordered per service, without a heatmap time axis.
+Every record is retained, with readable minimum cell sizes and scrolling for dense
+rows. Hover or keyboard focus reveals timestamp, status, outcome, latency, and error.
 
 Scenario child-job logs use
 `/api/v2/ws/scenarios/run/{scenarioRunName}/jobs/{jobID}/logs`; orchestrator
@@ -141,6 +143,9 @@ handshake with `Sec-WebSocket-Protocol: access_token.<JWT>`. No status
 WebSocket is used for Krkn-AI runs.
 The orchestrator log's **Follow** checkbox enables auto-scrolling, matching the
 scenario log control; unchecking it leaves the live stream connected.
+While active, orchestrator logs stream with a 200-line initial tail. After a run
+finishes, the console reconnects without a tail limit to fetch the complete
+available pod log from its beginning.
 
 ### Temporary GitHub Pages preview
 

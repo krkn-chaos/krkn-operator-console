@@ -852,27 +852,6 @@
   stroke-linejoin: round;
 }
 
-.krkn-ai-health-chart__failure path {
-  fill: none;
-  stroke: var(--pf-v5-global--danger-color--100, #c9190b);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-}
-
-.krkn-ai-health-chart__failure:focus {
-  outline: 2px solid var(--pf-v5-global--primary-color--100, #0066cc);
-  outline-offset: 2px;
-}
-
-.krkn-ai-health-chart__failure-lane {
-  stroke: var(--krkn-ai-border);
-  stroke-dasharray: 3 3;
-}
-
-.krkn-ai-health-chart__failure-note {
-  margin-block-start: 0.75rem;
-  color: var(--krkn-ai-muted);
-}
 
 .krkn-ai-health-chart__legend,
 .krkn-ai-health-heatmap__legend {
@@ -1089,38 +1068,7 @@
   margin-block-end: 1.25rem;
 }
 
-.krkn-ai-fitness-item-editor,
-.krkn-ai-health-check-fields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.25rem;
-  min-width: 0;
-}
 
-.krkn-ai-fitness-item-editor > .pf-v5-c-form__group,
-.krkn-ai-health-check-fields > .pf-v5-c-form__group {
-  width: 100%;
-  max-width: 16rem;
-  min-width: 0;
-}
-
-.krkn-ai-fitness-item-editor > .krkn-ai-editor-field--wide,
-.krkn-ai-health-check-fields > .krkn-ai-editor-field--wide {
-  grid-column: 1 / -1;
-  max-width: none;
-}
-
-.krkn-ai-editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0 1rem 1rem;
-}
-
-.krkn-ai-editor-actions > .pf-v5-c-button {
-  flex: 0 0 auto;
-}
 
 .krkn-ai-editor-heading {
   display: flex;
@@ -1224,32 +1172,6 @@
 }
 
 
-.krkn-ai-fitness-items,
-.krkn-ai-health-check-list {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.krkn-ai-fitness-item,
-.krkn-ai-health-check-item {
-  min-width: 0;
-  border: 1px solid var(--krkn-ai-border);
-  border-radius: 4px;
-  background: var(--krkn-ai-surface);
-}
-
-.krkn-ai-fitness-item summary,
-.krkn-ai-health-check-item summary {
-  padding: 0.85rem;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-
-.krkn-ai-fitness-item-editor,
-.krkn-ai-health-check-fields {
-  padding: 0.85rem;
-  border-block-start: 1px solid var(--krkn-ai-border);
-}
 
 .krkn-ai-fitness-query {
   box-sizing: border-box;
@@ -1278,28 +1200,14 @@
   font-weight: 600;
 }
 
-@media (max-width: 768px) {
-  .krkn-ai-fitness-item-editor,
-  .krkn-ai-health-check-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-}
 
 @media (max-width: 560px) {
   .krkn-ai-config-wizard__nav {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .krkn-ai-fitness-item-editor,
-  .krkn-ai-health-check-fields,
   .krkn-ai-health-check-options {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .krkn-ai-fitness-item-editor > .pf-v5-c-form__group,
-  .krkn-ai-health-check-fields > .pf-v5-c-form__group {
-    max-width: none;
   }
 }
 
@@ -1389,4 +1297,15 @@
 
 .krkn-ai-node-group {
   margin: 0;
+}
+
+.krkn-ai-config-editor-modal {
+  --krkn-ai-border: var(--pf-v5-global--BorderColor--100, #d2d2d2);
+  --krkn-ai-muted: var(--pf-v5-global--Color--200, #6a6e73);
+  --krkn-ai-surface: var(--pf-v5-global--BackgroundColor--100, #fff);
+}
+
+.krkn-ai-editor-field--wide {
+  grid-column: 1 / -1;
+  min-width: 0;
 }

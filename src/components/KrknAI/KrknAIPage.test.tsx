@@ -432,7 +432,6 @@ describe('Krkn-AI real run lifecycle', () => {
     await user.click(screen.getByRole('button', { name: /Fitness functions/ }));
     expect(screen.queryByRole('textbox', { name: 'Fitness query' })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Fitness query type' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Default fitness query/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Health checks/ }));
     expect(screen.getByRole('checkbox', { name: 'Stop the health-check watcher on failure' })).toBeInTheDocument();
   });
@@ -734,7 +733,7 @@ describe('Krkn-AI real run lifecycle', () => {
     await advance(10_000);
     expect(screen.getByText('75 / 100')).toBeInTheDocument();
     expect(screen.getByText('Fitness final')).toBeInTheDocument();
-    expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', false, 200, true);
+    expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', false, undefined, true);
     await advance(20_000);
     expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(4);
     expect(mocks.ai.getScenarioIndex).toHaveBeenCalledTimes(3);

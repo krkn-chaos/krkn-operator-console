@@ -8,6 +8,8 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import type { ConfigValidationErrors, EditableConfigDraft, HealthCheckDraft } from './configModel';
+import { validateConfigDraft } from './configModel';
+import './HealthChecksEditor.css';
 
 interface HealthChecksEditorProps {
   draft: EditableConfigDraft;
@@ -15,30 +17,36 @@ interface HealthChecksEditorProps {
   onChange: (updates: Partial<EditableConfigDraft>) => void;
 }
 
+const createHealthCheck = (key: number): HealthCheckDraft => ({
+  key,
+  name: `application-${key}`,
+  url: '',
+  statusCode: '200',
+  timeout: '4',
+  interval: '2',
+});
+
 export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEditorProps) {
   const [pendingRemovalKey, setPendingRemovalKey] = useState<number | null>(null);
-  const [expandedHealthCheckKey, setExpandedHealthCheckKey] = useState<number | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingHealthCheck, setEditingHealthCheck] = useState<HealthCheckDraft | null>(null);
 
-  const updateHealthCheck = (key: number, updates: Partial<HealthCheckDraft>) => {
-    onChange({
-      healthChecks: draft.healthChecks.map((check) => check.key === key ? { ...check, ...updates } : check),
-    });
+  const editHealthCheck = (check: HealthCheckDraft) => {
+    setEditingHealthCheck({ ...check });
+    setIsAdding(false);
   };
 
   const addHealthCheck = () => {
     const nextKey = draft.healthChecks.reduce((maximum, check) => Math.max(maximum, check.key), -1) + 1;
-    onChange({
-      healthChecks: [...draft.healthChecks, {
-        key: nextKey,
-        name: `application-${nextKey}`,
-        url: '',
-        statusCode: '200',
-        timeout: '4',
-        interval: '2',
-      }],
-    });
-    setExpandedHealthCheckKey(nextKey);
+    setEditingHealthCheck(createHealthCheck(nextKey));
+    setIsAdding(true);
   };
+
+  const closeHealthCheckEditor = () => {
+    setEditingHealthCheck(null);
+    setIsAdding(false);
+  };
+
 
   const confirmRemoval = () => {
     if (pendingRemovalKey !== null) {
@@ -48,6 +56,25 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
   };
 
   const pendingRemovalCheck = draft.healthChecks.find((check) => check.key === pendingRemovalKey);
+  const entryErrors = editingHealthCheck
+    ? validateConfigDraft({ ...draft, healthChecks: [editingHealthCheck] })
+    : {};
+  const itemErrorPrefix = editingHealthCheck ? `healthCheck.${editingHealthCheck.key}.` : '';
+  const hasEntryErrors = Object.keys(entryErrors).some((field) => field.startsWith(itemErrorPrefix));
+  const saveHealthCheck = () => {
+    if (!editingHealthCheck || hasEntryErrors) return;
+    const exists = draft.healthChecks.some((check) => check.key === editingHealthCheck.key);
+    if (!isAdding && !exists) {
+      closeHealthCheckEditor();
+      return;
+    }
+    onChange({
+      healthChecks: isAdding
+        ? [...draft.healthChecks, editingHealthCheck]
+        : draft.healthChecks.map((check) => check.key === editingHealthCheck.key ? editingHealthCheck : check),
+    });
+    closeHealthCheckEditor();
+  };
 
   return (
     <div className="krkn-ai-health-check-editor">
@@ -84,105 +111,137 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
       {draft.healthChecks.length === 0 ? (
         <p className="krkn-ai-muted">No health checks are configured. Add a real endpoint if this run needs availability monitoring.</p>
       ) : (
-        <div className="krkn-ai-health-check-list">
-          {draft.healthChecks.map((check) => {
-            const itemKey = `healthCheck.${check.key}`;
-            return (
-              <details
-                key={check.key}
-                className="krkn-ai-health-check-item"
-                open={expandedHealthCheckKey === check.key ? true : undefined}
-                onToggle={(event) => {
-                  if (expandedHealthCheckKey === check.key && !event.currentTarget.open) {
-                    setExpandedHealthCheckKey(null);
-                  }
-                }}
-              >
-                <summary>
-                  <strong>{check.name || 'Unnamed check'}</strong>
-                  {' · '}
-                  <span title={check.url || undefined} style={{ overflowWrap: 'anywhere' }}>
-                    {check.url || 'URL required'}
-                  </span>
-                </summary>
-                <div className="krkn-ai-health-check-fields">
-                  <FormGroup label="Application name" fieldId={`krkn-ai-health-check-${check.key}-name`} isRequired>
-                    <TextInput
-                      id={`krkn-ai-health-check-${check.key}-name`}
-                      value={check.name}
-                      onChange={(_event, value) => updateHealthCheck(check.key, { name: value })}
-                      validated={errors[`${itemKey}.name`] ? 'error' : 'default'}
-                      aria-label={`Health check ${check.key} name`}
-                    />
-                    {errors[`${itemKey}.name`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.name`]}</p>}
-                  </FormGroup>
-                  <FormGroup
-                    className="krkn-ai-editor-field--wide"
-                    label="Complete health-check URL"
-                    fieldId={`krkn-ai-health-check-${check.key}-url`}
-                    isRequired
-                  >
-                    <TextInput
-                      id={`krkn-ai-health-check-${check.key}-url`}
-                      type="url"
-                      value={check.url}
-                      onChange={(_event, value) => updateHealthCheck(check.key, { url: value })}
-                      validated={errors[`${itemKey}.url`] ? 'error' : 'default'}
-                      aria-label={`Health check ${check.key} URL`}
-                    />
-                    {errors[`${itemKey}.url`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.url`]}</p>}
-                  </FormGroup>
-                  <FormGroup label="Expected status code" fieldId={`krkn-ai-health-check-${check.key}-status`} isRequired>
-                    <TextInput
-                      id={`krkn-ai-health-check-${check.key}-status`}
-                      type="number"
-                      step={1}
-                      value={check.statusCode}
-                      onChange={(_event, value) => updateHealthCheck(check.key, { statusCode: value })}
-                      validated={errors[`${itemKey}.statusCode`] ? 'error' : 'default'}
-                      aria-label={`Health check ${check.key} expected status code`}
-                    />
-                    {errors[`${itemKey}.statusCode`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.statusCode`]}</p>}
-                  </FormGroup>
-                  <FormGroup label="Timeout (seconds)" fieldId={`krkn-ai-health-check-${check.key}-timeout`} isRequired>
-                    <TextInput
-                      id={`krkn-ai-health-check-${check.key}-timeout`}
-                      type="number"
-                      step={1}
-                      value={check.timeout}
-                      onChange={(_event, value) => updateHealthCheck(check.key, { timeout: value })}
-                      validated={errors[`${itemKey}.timeout`] ? 'error' : 'default'}
-                      aria-label={`Health check ${check.key} timeout`}
-                    />
-                    {errors[`${itemKey}.timeout`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.timeout`]}</p>}
-                  </FormGroup>
-                  <FormGroup label="Interval (seconds)" fieldId={`krkn-ai-health-check-${check.key}-interval`} isRequired>
-                    <TextInput
-                      id={`krkn-ai-health-check-${check.key}-interval`}
-                      type="number"
-                      step={1}
-                      value={check.interval}
-                      onChange={(_event, value) => updateHealthCheck(check.key, { interval: value })}
-                      validated={errors[`${itemKey}.interval`] ? 'error' : 'default'}
-                      aria-label={`Health check ${check.key} interval`}
-                    />
-                    {errors[`${itemKey}.interval`] && <p className="krkn-ai-field-error" role="alert">{errors[`${itemKey}.interval`]}</p>}
-                  </FormGroup>
-                </div>
-                <div className="krkn-ai-editor-actions">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setPendingRemovalKey(check.key)}
-                    aria-label={`Remove health check ${check.name}`}
-                  >
-                    Remove health check
-                  </Button>
-                </div>
-              </details>
-            );
-          })}
+        <div className="krkn-ai-health-check-table-wrap">
+          <table className="krkn-ai-health-check-table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">URL</th>
+                <th scope="col">Expected status</th>
+                <th scope="col">Timeout (seconds)</th>
+                <th scope="col">Interval (seconds)</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {draft.healthChecks.map((check) => (
+                <tr key={check.key}>
+                  <th scope="row">{check.name || 'Unnamed check'}</th>
+                  <td title={check.url || undefined}>{check.url || 'URL required'}</td>
+                  <td>{check.statusCode}</td>
+                  <td>{check.timeout}</td>
+                  <td>{check.interval}</td>
+                  <td className="krkn-ai-health-check-table__actions">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => editHealthCheck(check)}
+                      aria-label={`Edit health check ${check.name}`}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setPendingRemovalKey(check.key)}
+                      aria-label={`Remove health check ${check.name}`}
+                    >
+                      Remove
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
+
+      <Modal
+        variant={ModalVariant.medium}
+        className="krkn-ai-config-editor-modal"
+        title={isAdding ? 'Add health check' : 'Edit health check'}
+        isOpen={editingHealthCheck !== null}
+        onClose={closeHealthCheckEditor}
+        actions={[
+          <Button key="save" variant="primary" onClick={saveHealthCheck} isDisabled={hasEntryErrors}>
+            Save
+          </Button>,
+          <Button key="cancel" variant="link" onClick={closeHealthCheckEditor}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        {editingHealthCheck && (() => {
+          const check = editingHealthCheck;
+          const itemKey = `healthCheck.${check.key}`;
+          return (
+            <div className="krkn-ai-health-check-modal-fields">
+              <FormGroup label="Application name" fieldId={`krkn-ai-health-check-${check.key}-name`} isRequired>
+                <TextInput
+                  id={`krkn-ai-health-check-${check.key}-name`}
+                  value={check.name}
+                  onChange={(_event, value) => setEditingHealthCheck({ ...check, name: value })}
+                  validated={entryErrors[`${itemKey}.name`] ? 'error' : 'default'}
+                  aria-label={`Health check ${check.key} name`}
+                />
+                {entryErrors[`${itemKey}.name`] && <p className="krkn-ai-field-error" role="alert">{entryErrors[`${itemKey}.name`]}</p>}
+              </FormGroup>
+              <FormGroup
+                className="krkn-ai-editor-field--wide"
+                label="Complete health-check URL"
+                fieldId={`krkn-ai-health-check-${check.key}-url`}
+                isRequired
+              >
+                <TextInput
+                  id={`krkn-ai-health-check-${check.key}-url`}
+                  type="url"
+                  value={check.url}
+                  onChange={(_event, value) => setEditingHealthCheck({ ...check, url: value })}
+                  validated={entryErrors[`${itemKey}.url`] ? 'error' : 'default'}
+                  aria-label={`Health check ${check.key} URL`}
+                />
+                {entryErrors[`${itemKey}.url`] && <p className="krkn-ai-field-error" role="alert">{entryErrors[`${itemKey}.url`]}</p>}
+              </FormGroup>
+              <FormGroup label="Expected status code" fieldId={`krkn-ai-health-check-${check.key}-status`} isRequired>
+                <TextInput
+                  id={`krkn-ai-health-check-${check.key}-status`}
+                  type="number"
+                  step={1}
+                  value={check.statusCode}
+                  onChange={(_event, value) => setEditingHealthCheck({ ...check, statusCode: value })}
+                  validated={entryErrors[`${itemKey}.statusCode`] ? 'error' : 'default'}
+                  aria-label={`Health check ${check.key} expected status code`}
+                />
+                {entryErrors[`${itemKey}.statusCode`] && <p className="krkn-ai-field-error" role="alert">{entryErrors[`${itemKey}.statusCode`]}</p>}
+              </FormGroup>
+              <FormGroup label="Timeout (seconds)" fieldId={`krkn-ai-health-check-${check.key}-timeout`} isRequired>
+                <TextInput
+                  id={`krkn-ai-health-check-${check.key}-timeout`}
+                  type="number"
+                  step={1}
+                  value={check.timeout}
+                  onChange={(_event, value) => setEditingHealthCheck({ ...check, timeout: value })}
+                  validated={entryErrors[`${itemKey}.timeout`] ? 'error' : 'default'}
+                  aria-label={`Health check ${check.key} timeout`}
+                />
+                {entryErrors[`${itemKey}.timeout`] && <p className="krkn-ai-field-error" role="alert">{entryErrors[`${itemKey}.timeout`]}</p>}
+              </FormGroup>
+              <FormGroup label="Interval (seconds)" fieldId={`krkn-ai-health-check-${check.key}-interval`} isRequired>
+                <TextInput
+                  id={`krkn-ai-health-check-${check.key}-interval`}
+                  type="number"
+                  step={1}
+                  value={check.interval}
+                  onChange={(_event, value) => setEditingHealthCheck({ ...check, interval: value })}
+                  validated={entryErrors[`${itemKey}.interval`] ? 'error' : 'default'}
+                  aria-label={`Health check ${check.key} interval`}
+                />
+                {entryErrors[`${itemKey}.interval`] && <p className="krkn-ai-field-error" role="alert">{entryErrors[`${itemKey}.interval`]}</p>}
+              </FormGroup>
+            </div>
+          );
+        })()}
+      </Modal>
 
       <Modal
         variant={ModalVariant.small}
