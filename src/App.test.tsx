@@ -5,6 +5,8 @@ import App from './App';
 import { AppProvider } from './context/AppContext';
 import { operatorApi } from './services/operatorApi';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
+import { buildRerunIntent } from './utils/rerunIntent';
+import type { JobConfigResponse, ScenarioRunState } from './types/api';
 
 /**
  * App-level test for Elasticsearch navigation.
@@ -68,6 +70,9 @@ vi.mock('./components/KrknAI/KrknAIPage', () => ({
   KrknAIPage: () => <div data-testid="krkn-ai-page">KrknAIPage</div>,
 }));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
+vi.mock('./components/ResiliencyHistory', () => ({
+  ResiliencyHistoryPage: () => <div data-testid="resiliency-history-page">ResiliencyHistoryPage</div>,
+}));
 vi.mock('./components/ScenarioDetail', () => ({ ScenarioDetail: () => <div>ScenarioDetail</div> }));
 vi.mock('./components/UserForm', () => ({ UserForm: () => <div>UserForm</div> }));
 vi.mock('./components/ChangePasswordForm', () => ({ ChangePasswordForm: () => <div>ChangePasswordForm</div> }));
@@ -109,6 +114,28 @@ describe('App Elasticsearch navigation', () => {
   });
 });
 
+describe('scenario replay handoff', () => {
+  it('carries categories from the replay response into the scenario intent', () => {
+    const config: JobConfigResponse = {
+      targetRequestId: 'target-1',
+      targetClusters: { operator: ['cluster-1'] },
+      scenario: { name: 'pod-scenarios', private: false },
+      kubeconfigPath: '/tmp/kubeconfig',
+      environment: { NAMESPACE: 'default' },
+      categories: ['network', 'reliability'],
+    };
+    const run = { scenarioRunName: 'run-1', scenarioName: 'pod-scenarios' } as ScenarioRunState;
+
+    expect(buildRerunIntent(config, run)).toEqual({
+      scenario: { name: 'pod-scenarios', private: false },
+      clusters: [{ operatorName: 'operator', clusterName: 'cluster-1' }],
+      environment: { NAMESPACE: 'default' },
+      kubeconfigPath: '/tmp/kubeconfig',
+      categories: ['network', 'reliability'],
+    });
+  });
+});
+
 describe('App Krkn AI navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -128,6 +155,28 @@ describe('App Krkn AI navigation', () => {
 
     await user.click(screen.getByText('Krkn AI'));
     await waitFor(() => expect(screen.getByTestId('krkn-ai-page')).toBeInTheDocument());
+  });
+});
+
+describe('App Resiliency History navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+    });
+  });
+
+  it('renders ResiliencyHistoryPage after choosing its sidebar destination', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    expect(screen.queryByTestId('resiliency-history-page')).not.toBeInTheDocument();
+    await user.click(screen.getByText('Resiliency History'));
+    await waitFor(() => expect(screen.getByTestId('resiliency-history-page')).toBeInTheDocument());
   });
 });
 

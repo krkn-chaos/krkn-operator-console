@@ -46,9 +46,9 @@ beforeEach(() => {
 });
 
 describe('LoadWorkflowSelect', () => {
-  it('shows "Load Workflow" when no savedWorkflow', () => {
+  it('shows "Load saved workflow" when no savedWorkflow', () => {
     render(<LoadWorkflowSelect />);
-    expect(screen.getByText('Load Workflow')).toBeInTheDocument();
+    expect(screen.getByText('Load saved workflow')).toBeInTheDocument();
   });
 
   it('shows savedWorkflow.workflowName when a workflow is loaded', () => {
@@ -87,7 +87,7 @@ describe('LoadWorkflowSelect', () => {
     render(<LoadWorkflowSelect />);
 
     // Open dropdown
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
 
     // Wait for templates to load
     await waitFor(() => {
@@ -151,7 +151,7 @@ describe('LoadWorkflowSelect', () => {
 
     render(<LoadWorkflowSelect />);
 
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
     await waitFor(() => {
       expect(screen.getByText('my-workflow')).toBeInTheDocument();
     });
@@ -186,7 +186,7 @@ describe('LoadWorkflowSelect', () => {
 
     render(<LoadWorkflowSelect />);
 
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
     await waitFor(() => {
       expect(screen.getByText('my-workflow')).toBeInTheDocument();
     });
@@ -202,7 +202,8 @@ describe('LoadWorkflowSelect', () => {
           availableToAll: true,
           groups: ['group-a'],
           savedAt: expect.any(String),
-        })
+        }),
+        [],
       );
     });
 
@@ -212,6 +213,36 @@ describe('LoadWorkflowSelect', () => {
     );
   });
 
+  it('preserves all saved categories while selecting only visible categories', async () => {
+    const user = userEvent.setup();
+    const validLayout = { nodes: [], edges: [], nextNodeNumber: 1 };
+    vi.mocked(useStudioContext).mockReturnValue({
+      ...defaultContext,
+      visibleCategories: [{ name: 'network', availableToAll: true }],
+      categoryLoadStatus: 'ready',
+    } as unknown as ReturnType<typeof useStudioContext>);
+    vi.mocked(workflowsApi.getWorkflow).mockResolvedValue({
+      workflowId: 'w1',
+      workflowName: 'my-workflow',
+      graph: {},
+      studioLayout: validLayout,
+      availableToAll: true,
+      categories: ['network', 'private-category'],
+    });
+
+    render(<LoadWorkflowSelect />);
+    await user.click(screen.getByText('Load saved workflow'));
+    await user.click(screen.getByText('my-workflow'));
+
+    await waitFor(() => {
+      expect(mockLoadWorkflow).toHaveBeenCalledWith(
+        validLayout,
+        expect.objectContaining({ categories: ['network', 'private-category'] }),
+        ['network'],
+      );
+    });
+  });
+
   it('shows error notification on load failure', async () => {
     const user = userEvent.setup();
 
@@ -219,7 +250,7 @@ describe('LoadWorkflowSelect', () => {
 
     render(<LoadWorkflowSelect />);
 
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
     await waitFor(() => {
       expect(screen.getByText('my-workflow')).toBeInTheDocument();
     });
@@ -243,7 +274,7 @@ describe('LoadWorkflowSelect', () => {
 
     render(<LoadWorkflowSelect />);
 
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
     await waitFor(() => {
       expect(screen.getByText('my-workflow')).toBeInTheDocument();
     });
@@ -266,7 +297,7 @@ describe('LoadWorkflowSelect', () => {
 
     render(<LoadWorkflowSelect />);
 
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
     await waitFor(() => {
       expect(screen.getByText('my-workflow')).toBeInTheDocument();
     });
@@ -301,7 +332,7 @@ describe('LoadWorkflowSelect', () => {
 
     render(<LoadWorkflowSelect />);
 
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
     await waitFor(() => {
       expect(screen.getByText('my-workflow')).toBeInTheDocument();
     });
@@ -312,7 +343,8 @@ describe('LoadWorkflowSelect', () => {
         validLayout,
         expect.objectContaining({
           savedAt: '2025-06-15T10:30:00Z',
-        })
+        }),
+        [],
       );
     });
   });
@@ -337,7 +369,7 @@ describe('LoadWorkflowSelect', () => {
 
     render(<LoadWorkflowSelect />);
 
-    await user.click(screen.getByText('Load Workflow'));
+    await user.click(screen.getByText('Load saved workflow'));
     await waitFor(() => {
       expect(screen.getByText('my-workflow')).toBeInTheDocument();
     });
@@ -348,7 +380,8 @@ describe('LoadWorkflowSelect', () => {
         validLayout,
         expect.objectContaining({
           savedAt: '2025-06-01T08:00:00Z',
-        })
+        }),
+        [],
       );
     });
   });

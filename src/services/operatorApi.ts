@@ -25,10 +25,14 @@ import type {
   UpdateFileResponse,
   DeleteFileResponse,
   GroupsListResponse,
-  FileTypeResponse,
-  FileTypesListResponse,
-  CreateFileTypeRequest,
-  UpdateFileTypeRequest,
+  CategoriesListResponse,
+  CategoryResponse,
+  CreateCategoryRequest,
+  UpdateCategoryRequest,
+  DeleteCategoryResponse,
+  CategoryEntityAssociationResponse,
+  ResiliencyHistoryQueryRequest,
+  ResiliencyHistoryQueryResponse,
   JobConfigResponse,
   UnifiedJobsResponse,
   ScenarioRunListResponse,
@@ -38,6 +42,22 @@ import type {
 class OperatorApiClient extends BaseApiClient {
   constructor() {
     super(config.apiBaseUrl);
+  }
+
+  private async fetchV2Json<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const response = await authenticatedFetch(`${config.apiV2BaseUrl}${path}`, options);
+    if (!response.ok) {
+      let message = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const error = await response.json();
+        if (error.message) message = error.message;
+      } catch { /* use default message */ }
+      const apiError = new Error(message) as Error & { status: number; statusText: string };
+      apiError.status = response.status;
+      apiError.statusText = response.statusText;
+      throw apiError;
+    }
+    return response.json() as Promise<T>;
   }
 
   /**
@@ -495,6 +515,67 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   // ============================================================================
+  // Category Management API (v2)
+  // ============================================================================
+
+  /** List categories visible to the current user. */
+  async getCategories(): Promise<CategoriesListResponse> {
+    return this.fetchV2Json<CategoriesListResponse>('/categories');
+  }
+
+  /** Get one category by its immutable name. */
+  async getCategory(name: string): Promise<CategoryResponse> {
+    return this.fetchV2Json<CategoryResponse>(`/categories/${encodeURIComponent(name)}`);
+  }
+
+  /** Create a category with public or group visibility. */
+  async createCategory(request: CreateCategoryRequest): Promise<CategoryResponse> {
+    return this.fetchV2Json<CategoryResponse>('/categories', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  /** Update a category's color and visibility. Its name cannot be changed. */
+  async updateCategory(name: string, request: UpdateCategoryRequest): Promise<CategoryResponse> {
+    return this.fetchV2Json<CategoryResponse>(`/categories/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    });
+  }
+
+  /** Delete a category by its immutable name. */
+  async deleteCategory(name: string): Promise<DeleteCategoryResponse> {
+    return this.fetchV2Json<DeleteCategoryResponse>(`/categories/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /** Add or remove one category association from a scenario or graph run. */
+  async updateCategoryAssociation(
+    category: string,
+    entityType: 'scenario-runs' | 'graph-runs',
+    entityName: string,
+    associated: boolean,
+  ): Promise<CategoryEntityAssociationResponse> {
+    const method = associated ? 'PUT' : 'DELETE';
+    return this.fetchV2Json<CategoryEntityAssociationResponse>(
+      `/categories/${encodeURIComponent(category)}/entities/${entityType}/${encodeURIComponent(entityName)}`,
+      { method },
+    );
+  }
+
+  /** Query score history across selected visible categories and clusters. */
+  async queryResiliencyHistory(
+    request: ResiliencyHistoryQueryRequest,
+  ): Promise<ResiliencyHistoryQueryResponse> {
+    return this.fetchV2Json<ResiliencyHistoryQueryResponse>('/resiliency-history', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  // ============================================================================
   // File Management API
   // ============================================================================
 
@@ -522,15 +603,6 @@ class OperatorApiClient extends BaseApiClient {
    */
   async getAllFiles(): Promise<AvailableFilesResponse> {
     return this.fetchJson<AvailableFilesResponse>('/files');
-  }
-
-  /**
-   * GET /api/v1/file-types
-   * Get all file types with colors and metadata
-   * @returns Promise with file types list
-   */
-  async getFileTypes(): Promise<FileTypesListResponse> {
-    return this.fetchJson<FileTypesListResponse>('/file-types');
   }
 
   /**
@@ -587,71 +659,17 @@ class OperatorApiClient extends BaseApiClient {
     });
   }
 
-  // ============================================================================
-  // File Types Management API
-  // ============================================================================
-
-  /**
-   * GET /api/v1/file-types/{name}
-   * Get details of a specific file type
-   * @param name - File type name
-   * @returns Promise with file type details
-   */
-  async getFileType(name: string): Promise<FileTypeResponse> {
-    return this.fetchJson<FileTypeResponse>(`/file-types/${encodeURIComponent(name)}`);
-  }
-
-  /**
-   * POST /api/v1/file-types
-   * Create a new file type (admin only)
-   * @param request - File type creation request
-   * @returns Promise with created file type data
-   */
-  async createFileType(request: CreateFileTypeRequest): Promise<FileTypeResponse> {
-    return this.fetchJson<FileTypeResponse>('/file-types', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-  }
-
-  /**
-   * PUT /api/v1/file-types/{name}
-   * Update file type metadata (admin only)
-   * @param name - File type name
-   * @param request - File type update request
-   * @returns Promise with updated file type data
-   */
-  async updateFileType(name: string, request: UpdateFileTypeRequest): Promise<FileTypeResponse> {
-    return this.fetchJson<FileTypeResponse>(`/file-types/${encodeURIComponent(name)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-  }
-
-  /**
-   * DELETE /api/v1/file-types/{name}
-   * Delete a file type (admin only, fails if in use)
-   * @param name - File type name
-   * @returns Promise that resolves when type is deleted
-   * @throws 409 Conflict if type is in use
-   */
-  async deleteFileType(name: string): Promise<void> {
-    await this.fetchJson<void>(`/file-types/${encodeURIComponent(name)}`, {
-      method: 'DELETE',
-    });
-  }
-
   /**
    * GET /api/v2/jobs
-   * List unified jobs (scenario runs + graph runs) with optional pagination.
-   * When page/limit are omitted, all items are returned.
+   * List unified jobs (scenario runs + graph runs) with optional pagination and category filters.
+   * Repeated category parameters match jobs assigned to any selected category.
+   * When page/limit are omitted, all matching items are returned.
    */
-  async listUnifiedJobs(page?: number, limit?: number): Promise<UnifiedJobsResponse> {
+  async listUnifiedJobs(page?: number, limit?: number, categories: string[] = []): Promise<UnifiedJobsResponse> {
     const params = new URLSearchParams();
     if (page !== undefined) params.set('page', String(page));
     if (limit !== undefined) params.set('limit', String(limit));
+    categories.forEach((category) => params.append('category', category));
     const query = params.toString();
     const url = `${config.apiV2BaseUrl}/jobs${query ? `?${query}` : ''}`;
 

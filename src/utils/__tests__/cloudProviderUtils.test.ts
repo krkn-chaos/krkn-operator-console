@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   filterFieldsByCloudType,
   filterScenarioFieldsByCloudType,
+  isCloudEnvVar,
   resolveEffectiveCloudType,
 } from '../cloudProviderUtils';
 
@@ -18,6 +19,13 @@ const cloudFields = [
 ];
 
 describe('cloudProviderUtils', () => {
+  describe('isCloudEnvVar', () => {
+    it('treats missing field variables as non-cloud fields', () => {
+      expect(isCloudEnvVar(null)).toBe(false);
+      expect(isCloudEnvVar(undefined)).toBe(false);
+    });
+  });
+
   describe('resolveEffectiveCloudType', () => {
     const cloudTypeField = {
       type: 'enum',

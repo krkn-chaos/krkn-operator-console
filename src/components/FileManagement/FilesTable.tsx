@@ -94,7 +94,6 @@ function canModifyFile(file: FileInfo, userGroups: string[], isAdmin: boolean): 
 
 interface FilesTableProps {
   files: FileInfo[];
-  fileTypes: Array<{ name: string; color: string }>;
   isAdmin: boolean;
   userGroups: string[];
   onCreateClick: () => void;
@@ -105,7 +104,6 @@ interface FilesTableProps {
 
 export function FilesTable({
   files,
-  fileTypes,
   isAdmin,
   userGroups,
   onCreateClick,
@@ -114,19 +112,10 @@ export function FilesTable({
   onRefresh,
 }: FilesTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
   const [selectedAccess, setSelectedAccess] = useState<string[]>([]);
   const [isAccessFilterOpen, setIsAccessFilterOpen] = useState(false);
 
   const filesList = useMemo(() => Array.isArray(files) ? files : [], [files]);
-  const typeOptions = useMemo(
-    () => Array.from(new Set([
-      ...fileTypes.map((type) => type.name),
-      ...filesList.flatMap((file) => file.fileType ? [file.fileType] : []),
-    ])).sort(),
-    [fileTypes, filesList],
-  );
   const accessOptions = useMemo(
     () => [
       { value: 'public', label: 'Public' },
@@ -146,14 +135,13 @@ export function FilesTable({
         file.workflowName?.toLowerCase().includes(term) ||
         file.description?.toLowerCase().includes(term)
       );
-      const matchesType = selectedTypes.length === 0 || (file.fileType && selectedTypes.includes(file.fileType));
       const matchesAccess = selectedAccess.length === 0 || (
         (file.availableToAll && selectedAccess.includes('public')) ||
         (file.groups || []).some((group) => selectedAccess.includes(`group:${group}`))
       );
-      return matchesSearch && matchesType && matchesAccess;
+      return matchesSearch && matchesAccess;
     }
-  ), [filesList, searchTerm, selectedTypes, selectedAccess]);
+  ), [filesList, searchTerm, selectedAccess]);
 
   const {
     paginatedData: paginatedFiles,
@@ -207,17 +195,6 @@ export function FilesTable({
           </ToolbarItem>
           <ToolbarItem>
             <MultiFilter
-              ariaLabel="Filter files by type"
-              label="Filter by type"
-              options={typeOptions.map((typeName) => ({ value: typeName, label: typeName }))}
-              selected={selectedTypes}
-              isOpen={isTypeFilterOpen}
-              onToggle={setIsTypeFilterOpen}
-              onSelect={(value) => toggleSelection(value, setSelectedTypes)}
-            />
-          </ToolbarItem>
-          <ToolbarItem>
-            <MultiFilter
               ariaLabel="Filter files by access"
               label="Filter by access"
               options={accessOptions}
@@ -247,9 +224,8 @@ export function FilesTable({
       >
         <Thead>
           <Tr>
-            <Th width={40}>File Name</Th>
-            <Th width={15}>Type</Th>
-            <Th width={20}>Access</Th>
+            <Th width={50}>File Name</Th>
+            <Th width={25}>Access</Th>
             <Th width={25}>Actions</Th>
           </Tr>
         </Thead>
@@ -284,21 +260,6 @@ export function FilesTable({
                       )}
                     </div>
                   </Tooltip>
-                </Td>
-                <Td dataLabel="Type">
-                  {file.fileType ? (
-                    <Label
-                      isCompact
-                      style={{
-                        backgroundColor: fileTypes.find(t => t.name === file.fileType)?.color || '#6c757d',
-                        color: '#fff',
-                      }}
-                    >
-                      {file.fileType}
-                    </Label>
-                  ) : (
-                    <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>—</span>
-                  )}
                 </Td>
                 <Td dataLabel="Access">
                   {file.availableToAll ? (
@@ -357,7 +318,7 @@ export function FilesTable({
         />
       )}
 
-      {filteredFiles.length === 0 && (searchTerm || selectedTypes.length > 0 || selectedAccess.length > 0) && (
+      {filteredFiles.length === 0 && (searchTerm || selectedAccess.length > 0) && (
         <EmptyState>
           <EmptyStateHeader titleText="No results found" headingLevel="h4" />
           <EmptyStateBody>

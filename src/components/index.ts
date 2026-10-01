@@ -1,6 +1,7 @@
 export { LoadingScreen } from './LoadingScreen';
 export { ErrorDisplay } from './ErrorDisplay';
 export { ClusterMultiSelector } from './ClusterMultiSelector';
+export { ClusterHealthIndicator } from './ClusterHealthIndicator';
 export { RegistrySelector } from './RegistrySelector';
 export { ScenariosList } from './ScenariosList';
 export { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
@@ -22,6 +23,5 @@ export { TerminalDrawer } from './TerminalDrawer';
 export { TerminalContent } from './TerminalContent';
 export { Studio } from './Studio';
 export { FileManagementPage } from './FileManagement';
-export { FileTypesManagementModal } from './FileTypesManagement';
 export { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 export { ElasticsearchDataView } from './ElasticsearchDataView';

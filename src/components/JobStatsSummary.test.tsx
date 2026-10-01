@@ -16,6 +16,20 @@ describe('JobStatsSummary', () => {
     expect(screen.getByText('Pass Rate')).toBeInTheDocument();
   });
 
+  it('styles each summary card to match the dark filters panel', () => {
+    render(<JobStatsSummary stats={makeStats(4, 3, 1)} />);
+
+    for (const label of ['Total Jobs', 'Succeeded', 'Failed', 'Pass Rate']) {
+      const card = screen.getByText(label).closest('.pf-v5-c-card');
+      expect(card).toHaveStyle({
+        backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+        boxShadow: 'var(--pf-v5-global--BoxShadow--sm)',
+      });
+      expect(card).toHaveClass('pf-m-compact');
+      expect(card).not.toHaveClass('pf-m-flat');
+    }
+  });
+
   it('renders sub-text descriptions in card footers', () => {
     render(<JobStatsSummary stats={makeStats(0, 0, 0)} />);
     expect(screen.getByText('Total cluster jobs across all runs')).toBeInTheDocument();

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FileForm } from '../FileForm';
-import type { FileTypeResponse } from '../../../types/api';
 
 // Mock operatorApi
 vi.mock('../../../services/operatorApi', () => ({
@@ -31,10 +30,8 @@ function createApiError(message: string, status: number, statusText: string): Er
 
 const defaultProps = {
   mode: 'create' as const,
-  availableFileTypes: [] as FileTypeResponse[],
   onSuccess: vi.fn(),
   onCancel: vi.fn(),
-  onRequestNewFileType: vi.fn(),
 };
 
 describe('FileForm error handling', () => {
@@ -112,6 +109,34 @@ describe('FileForm error handling', () => {
       expect(
         screen.getByText('Internal Server Error'),
       ).toBeInTheDocument();
+    });
+  });
+
+  it('preserves legacy file type metadata when editing a file', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      fileId: 'legacy-file',
+      fileName: 'legacy-config.yaml',
+      content: 'key: value',
+      availableToAll: true,
+      fileType: 'config',
+    });
+    (operatorApi.updateFile as ReturnType<typeof vi.fn>).mockResolvedValue({ fileId: 'legacy-file' });
+
+    render(
+      <FileForm
+        mode="edit"
+        initialData={{ fileId: 'legacy-file', fileName: 'legacy-config.yaml', availableToAll: true }}
+        onSuccess={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('legacy-config.yaml');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(operatorApi.updateFile).toHaveBeenCalledWith('legacy-file', expect.objectContaining({ fileType: 'config' }));
     });
   });
 });

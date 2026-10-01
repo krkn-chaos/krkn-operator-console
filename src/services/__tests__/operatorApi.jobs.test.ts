@@ -29,6 +29,11 @@ describe('OperatorApi - listUnifiedJobs', () => {
           failedJobs: 0,
           runningJobs: 2,
           clusterJobs: [],
+          resiliencyScoreEnabled: true,
+          resiliencyScores: [
+            { clusterName: 'cluster-1', score: 85.5 },
+            { clusterName: 'cluster-2', score: 92.3 },
+          ],
         },
       },
       {

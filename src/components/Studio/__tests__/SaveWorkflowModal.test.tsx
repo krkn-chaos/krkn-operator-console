@@ -136,6 +136,29 @@ describe('SaveWorkflowModal - 409 conflict handling', () => {
     });
   });
 
+  it('saves visible category selections with the workflow template', async () => {
+    vi.mocked(useStudioContext).mockReturnValue({
+      workflow: { nodes: [], edges: [], nextNodeNumber: 1 },
+      setSavedWorkflow: mockSetSavedWorkflow,
+      selectedCategories: ['network', 'private-category'],
+      visibleCategories: [{ name: 'network', availableToAll: true }],
+      categoryLoadStatus: 'ready',
+    } as unknown as ReturnType<typeof useStudioContext>);
+    vi.mocked(workflowsApi.createWorkflow).mockResolvedValue({ message: 'ok', workflowId: 'w1' });
+    const user = userEvent.setup();
+    render(<SaveWorkflowModal isOpen onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+
+    await user.type(screen.getByPlaceholderText('e.g., network-chaos-suite'), 'network-workflow');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(workflowsApi.createWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+        categories: ['network'],
+      }));
+    });
+    expect(mockSetSavedWorkflow).toHaveBeenCalledWith(expect.objectContaining({ categories: ['network'] }));
+  });
+
   it('does not close the modal on 409 conflict', async () => {
     const conflictError = Object.assign(new Error('conflict'), {
       status: 409,

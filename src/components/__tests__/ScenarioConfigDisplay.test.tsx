@@ -73,6 +73,26 @@ describe('ScenarioConfigDisplay', () => {
     expect(mockGetScenarioRunConfig).not.toHaveBeenCalled();
   });
 
+  it('renders graph config nodes and clusters for multiple providers', async () => {
+    mockGetGraphRunConfig.mockResolvedValue({
+      graph: {},
+      targetRequestId: 'target-graph-001',
+      targetClusters: {
+        'krkn-operator': ['staging-east', 'staging-west'],
+        'acm': ['production'],
+      },
+    });
+
+    render(<ScenarioConfigDisplay graphRunName="empty-graph-run" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Workflow Graph')).toBeInTheDocument();
+    });
+    expect(screen.getByText('No nodes configured')).toBeInTheDocument();
+    expect(screen.getByText('krkn-operator: staging-east, staging-west')).toBeInTheDocument();
+    expect(screen.getByText('acm: production')).toBeInTheDocument();
+  });
+
   it('sorts environment variables alphabetically', async () => {
     mockGetScenarioRunConfig.mockResolvedValue(makeConfig({
       ZEBRA: 'z',

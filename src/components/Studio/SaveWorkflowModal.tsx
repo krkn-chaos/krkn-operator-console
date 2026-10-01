@@ -63,7 +63,13 @@ interface SaveWorkflowModalProps {
  * ```
  */
 export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowModalProps) {
-  const { workflow, setSavedWorkflow } = useStudioContext();
+  const {
+    workflow,
+    setSavedWorkflow,
+    selectedCategories = [],
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
 
@@ -116,13 +122,18 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
     setIsSaving(true);
     setError(null);
     try {
-      const response = await workflowsApi.createWorkflow({
+    const categories = categoryLoadStatus === 'ready'
+      ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+      : selectedCategories;
+
+    const response = await workflowsApi.createWorkflow({
         workflowName: trimmedName,
         graph: buildGraph(workflow),
         studioLayout: workflow,
         description: description.trim() || undefined,
         availableToAll: accessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories,
       });
       setSavedWorkflow({
         workflowId: response.workflowId,
@@ -130,6 +141,7 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
         description: description.trim() || undefined,
         availableToAll: accessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories,
         savedAt: new Date().toISOString(),
       });
       showSuccess('Workflow saved', `"${trimmedName}" saved successfully`);

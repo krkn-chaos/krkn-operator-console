@@ -1,13 +1,16 @@
 import { http, HttpResponse } from 'msw';
 import { config } from '../config';
+import type { CategoryResponse } from '../types/api';
 
 const BASE = config.apiBaseUrl;
+const V2_BASE = config.apiV2BaseUrl;
 
 // ─── SCENARIO RUNS ───
 
 const mockScenarioRuns = [
   {
     scenarioRunName: 'pod-disruption-run-01',
+    categories: [] as string[],
     scenarioName: 'pod-disruption',
     phase: 'Succeeded',
     totalTargets: 2,
@@ -39,9 +42,15 @@ const mockScenarioRuns = [
     createdAt: '2026-07-02T10:00:00Z',
     ownerUserId: 'admin@preview.local',
     registryName: 'default',
+    resiliencyScoreEnabled: true,
+    resiliencyScores: [
+      { clusterName: 'staging-us-east-1', score: 92.3 },
+      { clusterName: 'staging-eu-west-1', score: 88.7 },
+    ],
   },
   {
     scenarioRunName: 'node-cpu-hog-run-02',
+    categories: [] as string[],
     scenarioName: 'node-cpu-hog',
     phase: 'Failed',
     totalTargets: 1,
@@ -64,9 +73,14 @@ const mockScenarioRuns = [
     createdAt: '2026-07-02T09:30:00Z',
     ownerUserId: 'admin@preview.local',
     registryName: 'default',
+    resiliencyScoreEnabled: true,
+    resiliencyScores: [
+      { clusterName: 'prod-us-central1', score: 62.1 },
+    ],
   },
   {
     scenarioRunName: 'network-chaos-run-03',
+    categories: [] as string[],
     scenarioName: 'network-chaos',
     phase: 'Running',
     totalTargets: 1,
@@ -87,6 +101,10 @@ const mockScenarioRuns = [
     createdAt: '2026-07-02T10:10:00Z',
     ownerUserId: 'admin@preview.local',
     registryName: 'default',
+    resiliencyScoreEnabled: true,
+    resiliencyScores: [
+      { clusterName: 'staging-us-east-1', score: 85.2 },
+    ],
   },
 ];
 
@@ -95,6 +113,7 @@ const mockScenarioRuns = [
 const mockGraphRuns = [
   {
     name: 'chaos-workflow-daily',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T08:00:00Z',
     phase: 'Completed',
@@ -118,13 +137,15 @@ const mockGraphRuns = [
   },
   {
     name: 'resilience-test-staging',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T10:05:00Z',
     phase: 'Running',
     ownerUserId: 'admin@preview.local',
     targetRequestId: 'target-002',
-    summary: { totalNodes: 3, completedNodes: 1, runningNodes: 1, failedNodes: 0, pendingNodes: 1 },
+    summary: { totalNodes: 3, completedNodes: 3, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
     startTime: '2026-07-02T10:05:00Z',
+    completionTime: '2026-07-02T10:25:00Z',
     resiliencyScoreEnabled: true,
     resiliencyScoreBaseline: 90.0,
     resiliencyScores: [
@@ -133,6 +154,7 @@ const mockGraphRuns = [
   },
   {
     name: 'multi-cluster-resilience',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T11:00:00Z',
     phase: 'Completed',
@@ -150,6 +172,7 @@ const mockGraphRuns = [
   },
   {
     name: 'large-fleet-resilience',
+    categories: [] as string[],
     namespace: 'krkn-operator-system',
     creationTimestamp: '2026-07-02T12:00:00Z',
     phase: 'Completed',
@@ -188,7 +211,7 @@ const mockGraphRunDetails: Record<string, object> = {
         'time-skew': { name: 'time-skew', image: 'quay.io/krkn-chaos/krkn-hub:time-skew', depends_on: 'net-chaos' },
       },
       targetRequestId: 'target-001',
-      targetClusters: { 'krkn-operator': ['staging-us-east-1'] },
+      targetClusters: { 'krkn-operator': ['staging-us-east-1', 'staging-eu-west-1'] },
       ownerUserId: 'admin@preview.local',
       resiliencyScoreEnabled: true,
       resiliencyMountPath: '/etc/krkn/metrics.yaml',
@@ -330,9 +353,9 @@ const mockGraphRunDetails: Record<string, object> = {
 const mockClusters = {
   targetData: {
     'krkn-operator': [
-      { 'cluster-name': 'staging-us-east-1', 'cluster-api-url': 'https://api.staging-east.example.com:6443' },
-      { 'cluster-name': 'staging-eu-west-1', 'cluster-api-url': 'https://api.staging-west.example.com:6443' },
-      { 'cluster-name': 'prod-us-central1', 'cluster-api-url': 'https://api.prod.example.com:6443' },
+      { 'cluster-name': 'staging-us-east-1', 'cluster-api-url': 'https://api.staging-east.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
+      { 'cluster-name': 'staging-eu-west-1', 'cluster-api-url': 'https://api.staging-west.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
+      { 'cluster-name': 'prod-us-central1', 'cluster-api-url': 'https://api.prod.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
     ],
   },
   status: 'ready',
@@ -388,35 +411,61 @@ const mockTargets = [
 // ─── SCENARIOS (ScenarioTag) ───
 
 const mockScenarios = [
-  { name: 'pod-disruption', description: 'Disrupts pods in target namespaces' },
-  { name: 'node-cpu-hog', description: 'Stresses CPU on target nodes' },
-  { name: 'network-chaos', description: 'Introduces network latency and packet loss' },
-  { name: 'container-kill', description: 'Kills containers in target pods' },
-  { name: 'time-skew', description: 'Skews system time on target nodes' },
-  { name: 'node-scenarios', description: 'Node-level chaos scenarios requiring cloud provider credentials' },
+  { name: 'pod-disruption', description: 'Disrupts pods in target namespaces', signature_status: 'signed' },
+  { name: 'node-cpu-hog', description: 'Stresses CPU on target nodes', signature_status: 'unsigned' },
+  { name: 'network-chaos', description: 'Introduces network latency and packet loss', signature_status: 'untrusted' },
+  { name: 'container-kill', description: 'Kills containers in target pods', signature_status: 'unknown' },
+  { name: 'time-skew', description: 'Skews system time on target nodes', signature_status: 'signed' },
+  { name: 'node-scenarios', description: 'Node-level chaos scenarios requiring cloud provider credentials', signature_status: 'unknown' },
 ];
 
 // ─── FILES (FileInfo for listings) ───
 
 const mockFiles = [
-  { fileId: 'file-001', fileName: 'kubeconfig-staging', availableToAll: false, groups: ['chaos-engineers'], fileType: 'kubeconfig', filePurpose: 'file' },
-  { fileId: 'file-002', fileName: 'metrics.yaml', description: 'Prometheus metrics config', availableToAll: true, fileType: 'yaml', filePurpose: 'file' },
+  { fileId: 'file-001', fileName: 'kubeconfig-staging', availableToAll: false, groups: ['chaos-engineers'], filePurpose: 'file' },
+  { fileId: 'file-002', fileName: 'metrics.yaml', description: 'Prometheus metrics config', availableToAll: true, filePurpose: 'file' },
   { fileId: 'file-003', fileName: 'workflow.json', workflowName: 'chaos-daily-suite', description: 'Daily chaos workflow', availableToAll: true, filePurpose: 'workflow-template' },
-  { fileId: 'file-004', fileName: 'alerts-custom.yaml', description: 'Custom alerting rules', availableToAll: false, groups: ['platform-team'], fileType: 'yaml', filePurpose: 'file' },
+  { fileId: 'file-004', fileName: 'alerts-custom.yaml', description: 'Custom alerting rules', availableToAll: false, groups: ['platform-team'], filePurpose: 'file' },
 ];
 
-// ─── FILE TYPES (FileTypeResponse) ───
-
-const mockFileTypes = [
-  { name: 'kubeconfig', color: '#0066CC', icon: '', usageCount: 1, createdAt: '2026-06-01T00:00:00Z' },
-  { name: 'yaml', color: '#CB7832', icon: '', usageCount: 2, createdAt: '2026-06-01T00:00:00Z' },
+const mockCategories: CategoryResponse[] = [
+  { name: 'cluster-reliability', color: '#0066CC', availableToAll: true, createdBy: 'admin@preview.local' },
+  { name: 'network-chaos', color: '#CB7832', groups: ['chaos-engineers'], availableToAll: false, createdBy: 'admin@preview.local' },
 ];
+
+function updateMockCategoryAssociation(
+  categoryName: string,
+  entityType: string,
+  entityName: string,
+  associated: boolean,
+) {
+  if (!mockCategories.some((category) => category.name === categoryName)) {
+    return HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
+  }
+
+  const entity = entityType === 'scenario-runs'
+    ? mockScenarioRuns.find((run) => run.scenarioRunName === entityName)
+    : entityType === 'graph-runs'
+      ? mockGraphRuns.find((run) => run.name === entityName)
+      : undefined;
+  if (!entity) {
+    return HttpResponse.json({ error: 'not_found', message: 'Run not found' }, { status: 404 });
+  }
+
+  const currentCategories = entity.categories || [];
+  entity.categories = associated
+    ? Array.from(new Set([...currentCategories, categoryName])).sort()
+    : currentCategories.filter((name) => name !== categoryName);
+
+  return HttpResponse.json({ category: categoryName, entityType, entityName, associated });
+}
 
 // ─── WORKFLOWS (WorkflowInfo for listings) ───
 
 const mockWorkflows = [
   { workflowId: 'wf-001', workflowName: 'chaos-daily-suite', description: 'Daily chaos workflow for staging', nodeCount: 4 },
   { workflowId: 'wf-002', workflowName: 'resilience-quick-check', description: 'Quick resilience validation', nodeCount: 2 },
+  { workflowId: 'wf-dummy', workflowName: 'dummy-scenario-pair', description: 'Two-node preview workflow using dummy-scenario', nodeCount: 2 },
 ];
 
 const mockWorkflowDetail = {
@@ -438,6 +487,50 @@ const mockWorkflowDetail = {
   },
   createdAt: '2026-07-01T00:00:00Z',
   updatedAt: '2026-07-02T08:00:00Z',
+  createdBy: 'admin@preview.local',
+};
+
+const mockDummyWorkflowDetail = {
+  workflowId: 'wf-dummy',
+  workflowName: 'dummy-scenario-pair',
+  description: 'Two-node preview workflow using dummy-scenario',
+  availableToAll: true,
+  graph: {
+    'dummy-node-1': { name: 'dummy-scenario', image: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario', env: {} },
+    'dummy-node-2': { name: 'dummy-scenario', image: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario', env: {}, depends_on: 'dummy-node-1' },
+  },
+  studioLayout: {
+    edges: [{ id: 'dummy-node-1-dummy-node-2', source: 'dummy-node-1', target: 'dummy-node-2' }],
+    nextNodeNumber: 3,
+    nodes: [
+      {
+        nodeId: 'dummy-node-1',
+        position: { x: 100, y: 200 },
+        status: 'configured',
+        config: {
+          registryType: 'public',
+          registryConfig: {},
+          scenarioName: 'dummy-scenario',
+          scenarioImage: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario',
+          scenarioFormValues: {},
+        },
+      },
+      {
+        nodeId: 'dummy-node-2',
+        position: { x: 400, y: 200 },
+        status: 'configured',
+        config: {
+          registryType: 'public',
+          registryConfig: {},
+          scenarioName: 'dummy-scenario',
+          scenarioImage: 'quay.io/krkn-chaos/krkn-hub:dummy-scenario',
+          scenarioFormValues: {},
+        },
+      },
+    ],
+  },
+  createdAt: '2026-07-02T00:00:00Z',
+  updatedAt: '2026-07-02T00:00:00Z',
   createdBy: 'admin@preview.local',
 };
 
@@ -727,6 +820,13 @@ export const handlers = [
   http.patch(`${BASE}/providers/:name`, ({ params }) =>
     HttpResponse.json({ message: 'Provider updated', name: params.name as string, active: true }),
   ),
+  http.get(`${BASE}/operator/signature-verification`, () =>
+    HttpResponse.json({ enabled: false }),
+  ),
+  http.patch(`${BASE}/operator/signature-verification`, async ({ request }) => {
+    const body = await request.json() as { enabled?: boolean };
+    return HttpResponse.json({ enabled: body.enabled === true });
+  }),
   http.post(`${BASE}/provider-config`, () =>
     HttpResponse.json({ uuid: 'mock-provider-config-001' }),
   ),
@@ -786,22 +886,59 @@ export const handlers = [
     HttpResponse.json({ message: 'File deleted' }),
   ),
 
-  // ─── FILE TYPES (CRUD) ───
-  http.get(`${BASE}/file-types`, () =>
-    HttpResponse.json({ fileTypes: mockFileTypes }),
+  // ─── CATEGORIES (v2 CRUD) ───
+  http.get(`${V2_BASE}/categories`, () =>
+    HttpResponse.json({ categories: mockCategories, total: mockCategories.length }),
   ),
-  http.get(`${BASE}/file-types/:name`, ({ params }) => {
-    const ft = mockFileTypes.find((x) => x.name === params.name);
-    return HttpResponse.json(ft || mockFileTypes[0]);
+  http.get(`${V2_BASE}/categories/:name`, ({ params }) => {
+    const category = mockCategories.find((item) => item.name === params.name);
+    return category
+      ? HttpResponse.json(category)
+      : HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
   }),
-  http.post(`${BASE}/file-types`, () =>
-    HttpResponse.json({ message: 'File type created', name: 'new-type' }),
+  http.post(`${V2_BASE}/categories`, async ({ request }) => {
+    const body = await request.json() as {
+      name: string;
+      color?: string;
+      groups?: string[];
+      availableToAll: boolean;
+    };
+    if (mockCategories.some((item) => item.name === body.name)) {
+      return HttpResponse.json({ error: 'conflict', message: 'Category already exists' }, { status: 409 });
+    }
+    const category = { ...body, createdBy: 'admin@preview.local' };
+    mockCategories.push(category);
+    return HttpResponse.json(category, { status: 201 });
+  }),
+  http.put(`${V2_BASE}/categories/:name`, async ({ params, request }) => {
+    const index = mockCategories.findIndex((item) => item.name === params.name);
+    if (index < 0) {
+      return HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
+    }
+    const body = await request.json() as {
+      color?: string;
+      groups?: string[];
+      availableToAll?: boolean;
+    };
+    mockCategories[index] = { ...mockCategories[index], ...body };
+    return HttpResponse.json(mockCategories[index]);
+  }),
+  http.delete(`${V2_BASE}/categories/:name`, ({ params }) => {
+    const index = mockCategories.findIndex((item) => item.name === params.name);
+    if (index < 0) {
+      return HttpResponse.json({ error: 'not_found', message: 'Category not found' }, { status: 404 });
+    }
+    [...mockScenarioRuns, ...mockGraphRuns].forEach((run) => {
+      run.categories = (run.categories || []).filter((category) => category !== params.name);
+    });
+    mockCategories.splice(index, 1);
+    return HttpResponse.json({ message: 'Category deleted successfully' });
+  }),
+  http.put(`${V2_BASE}/categories/:category/entities/:entityType/:entityName`, ({ params }) =>
+    updateMockCategoryAssociation(params.category as string, params.entityType as string, params.entityName as string, true),
   ),
-  http.put(`${BASE}/file-types/:name`, () =>
-    HttpResponse.json({ message: 'File type updated' }),
-  ),
-  http.delete(`${BASE}/file-types/:name`, () =>
-    HttpResponse.json({ message: 'File type deleted' }),
+  http.delete(`${V2_BASE}/categories/:category/entities/:entityType/:entityName`, ({ params }) =>
+    updateMockCategoryAssociation(params.category as string, params.entityType as string, params.entityName as string, false),
   ),
 
   // ─── WORKFLOWS (CRUD) ───
@@ -810,6 +947,7 @@ export const handlers = [
   ),
   http.get(`${BASE}/workflows/:workflowId`, ({ params }) => {
     if (params.workflowId === 'wf-001') return HttpResponse.json(mockWorkflowDetail);
+    if (params.workflowId === 'wf-dummy') return HttpResponse.json(mockDummyWorkflowDetail);
     return HttpResponse.json({ ...mockWorkflowDetail, workflowId: params.workflowId, workflowName: 'loaded-workflow' });
   }),
   http.post(`${BASE}/workflows`, () =>

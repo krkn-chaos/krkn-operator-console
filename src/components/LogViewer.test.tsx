@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { LogViewer } from './LogViewer';
+import { websocketService } from '../services/websocketService';
+
+vi.mock('../hooks/useWebSocket', () => ({
+  useWebSocket: vi.fn(() => ({ connectionState: 'disconnected' })),
+}));
 
 vi.mock('../services/authService', () => ({
   authService: {
@@ -31,6 +36,13 @@ async function clickDropdownItem(user: ReturnType<typeof userEvent.setup>, optio
 }
 
 describe('LogViewer download', () => {
+  it('does not follow logs after retries are exhausted', () => {
+    const buildUrl = vi.spyOn(websocketService, 'buildJobLogsUrl');
+    render(<LogViewer {...defaultProps} status="MaxRetriesExceeded" />);
+
+    expect(buildUrl).toHaveBeenCalledWith(defaultProps.scenarioRunName, defaultProps.jobId, false);
+  });
+
   describe('dropdown UI', () => {
     it('renders the download menu toggle', () => {
       render(<LogViewer {...defaultProps} />);

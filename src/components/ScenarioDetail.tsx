@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -7,6 +7,7 @@ import {
   Button,
   Alert,
   Spinner,
+  Switch,
   Modal,
   ModalVariant,
   FormGroup,
@@ -15,7 +16,7 @@ import {
   HelperTextItem,
   TextInput,
 } from '@patternfly/react-core';
-import { ExclamationTriangleIcon } from '@patternfly/react-icons';
+import { CopyIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
@@ -28,8 +29,12 @@ import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { hasCloudFields, isCloudEnvVar, getCloudDisabledFields, resolveCloudTypeForProvider, resolveEffectiveCloudType, filterScenarioFieldsByCloudType, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
 import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 import { runOnEnterFromFormControl } from '../utils/keyboard';
+import { useSignatureVerification } from '../hooks/useSignatureVerification';
+import { useVisibleCategories } from '../hooks/useVisibleCategories';
+import { CategoryMultiSelect } from './CategoryMultiSelect';
 
-import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, CloudCredential } from '../types/api';
+import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus, ClustersResponse } from '../types/api';
+import { createScenarioReference } from '../utils/scenarioReference';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -57,13 +62,21 @@ interface ScenarioDetailProps {
 
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenarioImage, rerunKubeconfigPath } = state;
+  const {
+    enabled: signatureVerificationEnabled,
+    error: signatureVerificationError,
+    isLoading: signatureVerificationLoading,
+  } = useSignatureVerification();
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath } = state;
+  const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
+  const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionLock = useRef(false);
   const [conflictWarning, setConflictWarning] = useState<{
     clusterName: string;
     existingRuns: string[];
@@ -74,6 +87,61 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [isPendingFileModalOpen, setIsPendingFileModalOpen] = useState(false);
   const [customRunName, setCustomRunName] = useState('');
+  const [digestCopyStatus, setDigestCopyStatus] = useState<'success' | 'error' | null>(null);
+  const [maxRetries, setMaxRetries] = useState(3);
+  const [rerunSignatureStatus, setRerunSignatureStatus] = useState<SignatureStatus | null>(null);
+  const [rerunSignatureLoading, setRerunSignatureLoading] = useState(false);
+  const [rerunSignatureError, setRerunSignatureError] = useState<string | null>(null);
+  const [selectedRunCategories, setSelectedRunCategories] = useState<string[]>(state.rerunCategories);
+  const visibleCategories = useVisibleCategories();
+
+  useEffect(() => {
+    setSelectedRunCategories(state.rerunCategories);
+  }, [state.rerunCategories]);
+
+  useEffect(() => {
+    if (visibleCategories.status !== 'ready') return;
+    const visibleNames = new Set(visibleCategories.categories.map((category) => category.name));
+    setSelectedRunCategories((current) => current.filter((name) => visibleNames.has(name)));
+  }, [visibleCategories.categories, visibleCategories.status]);
+
+  useEffect(() => {
+    if (!rerunScenario) {
+      setRerunSignatureStatus(null);
+      setRerunSignatureError(null);
+      setRerunSignatureLoading(false);
+      return;
+    }
+
+    const loadedScenario = state.scenarios?.find((scenario) => scenario.name === rerunScenario.name);
+    if (state.scenarios !== null) {
+      setRerunSignatureStatus(loadedScenario?.signature_status ?? 'unknown');
+      setRerunSignatureError(null);
+      setRerunSignatureLoading(false);
+      return;
+    }
+
+    let mounted = true;
+    setRerunSignatureLoading(true);
+    setRerunSignatureError(null);
+    operatorApi.getScenarios(registryConfig || {})
+      .then((response) => {
+        if (mounted) {
+          setRerunSignatureStatus(response.scenarios.find((scenario) => scenario.name === rerunScenario.name)?.signature_status ?? 'unknown');
+        }
+      })
+      .catch((error) => {
+        if (mounted) setRerunSignatureError(error instanceof Error ? error.message : 'Unable to verify the scenario image signature.');
+      })
+      .finally(() => {
+        if (mounted) setRerunSignatureLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [registryConfig, rerunScenario, state.scenarios]);
+  const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -290,6 +358,17 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     dispatch({ type: 'GO_BACK' });
   };
 
+  const handleCopyDigest = async () => {
+    if (!scenarioDetail?.digest) return;
+    setDigestCopyStatus(null);
+    try {
+      await navigator.clipboard.writeText(scenarioDetail.digest);
+      setDigestCopyStatus('success');
+    } catch {
+      setDigestCopyStatus('error');
+    }
+  };
+
   const validateForm = (): boolean => {
     if (!scenarioDetail) {
       // Without this, a null scenarioDetail (e.g. a re-fetch in flight) fails validation
@@ -360,7 +439,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       // Build ScenarioRunState
       const newRun: ScenarioRunState = {
         scenarioRunName: createResponse.scenarioRunName,
-        scenarioName,
+        scenarioName: runRequest.scenario.name,
         phase: statusResponse.phase,
         totalTargets: statusResponse.totalTargets,
         successfulJobs: statusResponse.successfulJobs,
@@ -371,6 +450,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         ownerUserId: statusResponse.ownerUserId,
         registryName: statusResponse.registryName,
         customRunName: statusResponse.customRunName || runRequest.customRunName,
+        resiliencyScoreEnabled: statusResponse.resiliencyScoreEnabled ?? enableResiliencyScore,
+        resiliencyScores: statusResponse.resiliencyScores,
       };
 
       // Dispatch creation event
@@ -392,7 +473,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
       // Handle partial failures
       if (statusResponse.failedJobs > 0) {
-        const failedJobs = statusResponse.clusterJobs.filter((j) => j.phase === 'Failed');
+        const failedJobs = statusResponse.clusterJobs.filter((j) =>
+          j.phase === 'Failed' || j.phase === 'MaxRetriesExceeded'
+        );
         const failedErrors = failedJobs
           .map((j) => `${j.clusterName}: ${j.message || 'Unknown error'}`)
           .join('\n');
@@ -422,7 +505,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleRunScenario = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || submissionLock.current) return;
 
     if (!state.uuid) {
       setValidationErrors(['Missing target request — please restart the workflow.']);
@@ -436,11 +519,62 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       setValidationErrors(['Scenario configuration is not ready — please reload the page.']);
       return;
     }
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+      setValidationErrors(['Maximum retries must be a non-negative whole number.']);
+      return;
+    }
+    if (rerunScenario && (signatureVerificationLoading || rerunSignatureLoading)) {
+      setValidationErrors(['Image signature verification is still loading — please try again.']);
+      return;
+    }
+    if (rerunScenario && (signatureVerificationError || rerunSignatureError || signatureVerificationEnabled === null || rerunSignatureStatus === null)) {
+      setValidationErrors([signatureVerificationError || rerunSignatureError || 'Image signature verification status is unavailable.']);
+      return;
+    }
+    if (rerunScenario && signatureVerificationEnabled && rerunSignatureStatus !== 'signed') {
+      setValidationErrors(['This scenario cannot run because its image signature is not verified.']);
+      return;
+    }
 
+    submissionLock.current = true;
     setIsSubmitting(true);
     setValidationErrors([]);
 
     try {
+      let refreshedClusters: ClustersResponse['targetData'];
+      try {
+        refreshedClusters = (await operatorApi.getClusters(state.uuid)).targetData;
+      } catch (error) {
+        const message = error instanceof Error ? `: ${error.message}` : '';
+        setValidationErrors([
+          `Could not verify cluster availability before running${message}. No run was submitted. Retry when cluster discovery is available.`,
+        ]);
+        return;
+      }
+
+      dispatch({ type: 'CLUSTERS_SUCCESS', payload: { clusters: refreshedClusters } });
+      const unavailableClusters = state.selectedClusters.filter((selectedCluster) => {
+        const latestCluster = refreshedClusters[selectedCluster.operatorName]?.find(
+          (cluster) => cluster['cluster-name'] === selectedCluster.clusterName,
+        );
+        return !latestCluster
+          || latestCluster.online === false
+          || latestCluster['cluster-status'] === 'unhealthy';
+      });
+
+      if (unavailableClusters.length > 0) {
+        unavailableClusters.forEach((cluster) => {
+          dispatch({ type: 'TOGGLE_CLUSTER', payload: { cluster } });
+        });
+        const unavailableNames = unavailableClusters
+          .map((cluster) => `${cluster.operatorName}/${cluster.clusterName}`)
+          .join(', ');
+        setValidationErrors([
+          `Cluster availability changed before submission. Removed unavailable cluster(s): ${unavailableNames}. Select available clusters and run again.`,
+        ]);
+        return;
+      }
+
       const environment: { [key: string]: string } = {};
       const files: ScenarioFileMount[] = [];
 
@@ -495,8 +629,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         }
       }
 
-      const isPrivateRegistry = !!registryConfig?.registryName;
-      const scenarioImage = rerunScenarioImage ?? (isPrivateRegistry ? scenarioName : `krkn-hub:${scenarioName}`);
+      const scenario: ScenarioReference = rerunScenario ?? createScenarioReference(
+        scenarioName,
+        Boolean(registryConfig?.registryName),
+        registryConfig?.registryName,
+      );
 
       const targetClusters: { [providerName: string]: string[] } = {};
       state.selectedClusters.forEach(cluster => {
@@ -526,16 +663,21 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       const runRequest: ScenarioRunRequest = {
         targetRequestId: state.uuid,
         targetClusters,
-        scenarioImage,
-        scenarioName,
+        scenario,
         kubeconfigPath: rerunKubeconfigPath ?? '/home/krkn/.kube/config',
         environment,
         files: files.length > 0 ? files : undefined,
         fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
-        registryName: registryConfig?.registryName, // Optional: if not provided, backend defaults to quay.io
         customRunName: customRunName.trim() || undefined,
         elasticsearchConfigName: appliedEsConfigName || undefined,
         cloudCredentialRef: appliedCloudCredName || undefined,
+        maxRetries,
+        resiliencyScoreEnabled: enableResiliencyScore || undefined,
+        categories: selectedRunCategories.length > 0
+          ? (visibleCategories.status === 'ready'
+            ? selectedRunCategories.filter((name) => visibleCategories.categories.some((category) => category.name === name))
+            : selectedRunCategories)
+          : undefined,
       };
 
       const activeRuns = await operatorApi.getActiveRuns();
@@ -558,12 +700,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         },
       });
     } finally {
+      submissionLock.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleKeyboardRunScenario = () => {
-    if (isSubmitting) return;
+    if (isSubmitting || submissionLock.current) return;
 
     if (hasPendingFileInput) {
       setIsPendingFileModalOpen(true);
@@ -584,16 +727,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   };
 
   const handleConflictContinue = async () => {
-    if (!pendingRunRequest) return;
+    if (!pendingRunRequest || submissionLock.current) return;
 
     setConflictWarning(null);
     const request = pendingRunRequest;
     setPendingRunRequest(null);
 
+    submissionLock.current = true;
     setIsSubmitting(true);
     try {
       await executeScenarioRun(request);
     } finally {
+      submissionLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -645,6 +790,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       : base;
   }, [scenarioDetail, hasGroupedScenarioFields, effectiveCloudType, cloudFilterOptions]);
 
+  const hasConfigurableMainFields = mainFormFields.some((field) => field.type !== 'group');
+
   const previewScenarioFields = useMemo(
     () => filterFieldsByCloudType(
       scenarioDetail?.fields.filter((f) => f.type !== 'group') ?? [],
@@ -691,10 +838,38 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           {scenarioDetail.digest && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', fontFamily: 'monospace' }}>
               <strong>Digest:</strong> {scenarioDetail.digest.substring(0, 19)}...
+              <Button
+                variant="plain"
+                size="sm"
+                icon={<CopyIcon />}
+                aria-label="Copy full digest"
+                onClick={handleCopyDigest}
+              />
+              {digestCopyStatus === 'success' && (
+                <span role="status" aria-live="polite" style={{ marginLeft: '0.5rem', fontFamily: 'inherit' }}>
+                  Digest copied.
+                </span>
+              )}
+              {digestCopyStatus === 'error' && (
+                <span role="alert" style={{ display: 'block', marginTop: '0.25rem', fontFamily: 'inherit', overflowWrap: 'anywhere' }}>
+                  Could not copy the digest. Full digest: <code>{scenarioDetail.digest}</code>
+                </span>
+              )}
             </div>
           )}
         </CardBody>
       </Card>
+
+      {showSignatureOverrideWarning && (
+        <Alert
+          variant="warning"
+          isInline
+          title="Image signature verification override is active"
+          style={{ marginBottom: '1.5rem' }}
+        >
+          {scenarioName}: this image is not signed and may be executed because signature verification is disabled.
+        </Alert>
+      )}
 
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
@@ -752,11 +927,33 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           <Card>
             <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
             <CardBody>
-              <DynamicFormBuilder
-                fields={mainFormFields}
-                values={scenarioFormValues || {}}
-                onChange={handleFormChange}
-                disabledFields={cloudDisabledFields}
+              {hasConfigurableMainFields ? (
+                <DynamicFormBuilder
+                  fields={mainFormFields}
+                  values={scenarioFormValues || {}}
+                  onChange={handleFormChange}
+                  disabledFields={cloudDisabledFields}
+                />
+              ) : (
+                <Alert variant="info" isInline isPlain title="No required parameters">
+                  This scenario can be previewed and run without filling this section. Optional and global parameters remain available below.
+                </Alert>
+              )}
+            </CardBody>
+          </Card>
+
+          {/* Run Categories */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardTitle>Categories</CardTitle>
+            <CardBody>
+              <CategoryMultiSelect
+                id="scenario-run-categories"
+                label="Assign categories to this run"
+                categories={visibleCategories.categories}
+                status={visibleCategories.status}
+                selectedCategories={selectedRunCategories}
+                onSelectionChange={setSelectedRunCategories}
+                onRetry={() => { void visibleCategories.reload(); }}
               />
             </CardBody>
           </Card>
@@ -872,22 +1069,22 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                         effectiveCloudType,
                         cloudFilterOptions
                       ).map((field) => {
-                          const value = globalFormValues?.[field.variable];
-                          const displayValue = getFieldPreviewDisplayValue(field, value, {
-                            appliedCloudCredName,
-                            appliedEsConfigName,
-                          });
+                        const value = globalFormValues?.[field.variable];
+                        const displayValue = getFieldPreviewDisplayValue(field, value, {
+                          appliedCloudCredName,
+                          appliedEsConfigName,
+                        });
 
-                          return (
-                            <Tr key={field.variable}>
-                              <Td>
-                                <code>{field.variable}</code>
-                              </Td>
-                              <Td>{field.short_description}</Td>
-                              <Td style={{ fontFamily: 'monospace' }}>{displayValue}</Td>
-                            </Tr>
-                          );
-                        })}
+                        return (
+                          <Tr key={field.variable}>
+                            <Td>
+                              <code>{field.variable}</code>
+                            </Td>
+                            <Td>{field.short_description}</Td>
+                            <Td style={{ fontFamily: 'monospace' }}>{displayValue}</Td>
+                          </Tr>
+                        );
+                      })}
                     </Tbody>
                   </Table>
                 </>
@@ -922,6 +1119,28 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             </CardBody>
           </Card>
 
+          {/* Retry configuration */}
+          <Card style={{ marginTop: '1.5rem' }}>
+            <CardBody>
+              <FormGroup label="Maximum retries" fieldId="max-retries" isRequired>
+                <TextInput
+                  id="max-retries"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={maxRetries}
+                  onChange={(_event, value) => setMaxRetries(Math.max(0, Number(value) || 0))}
+                  isDisabled={isSubmitting}
+                />
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>Retries after the initial attempt. Set to 0 to disable retries.</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              </FormGroup>
+            </CardBody>
+          </Card>
+
           {/* Custom Run Name */}
           <Card style={{ marginTop: '1.5rem' }}>
             <CardBody>
@@ -945,6 +1164,24 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               </FormGroup>
             </CardBody>
           </Card>
+
+          {/* Resiliency Score option */}
+          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+            <FormGroup label="Calculate Resiliency Score" fieldId="enable-resiliency-score">
+              <Switch
+                id="enable-resiliency-score"
+                label="Enabled"
+                labelOff="Disabled"
+                isChecked={enableResiliencyScore}
+                onChange={(_event, checked) => setEnableResiliencyScore(checked)}
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>Enable resiliency score calculation for this scenario run</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+          </div>
 
           {/* Run Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>

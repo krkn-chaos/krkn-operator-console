@@ -26,6 +26,7 @@ import {
   CardBody,
   Spinner,
   Alert,
+  Button,
   Label,
   Tooltip,
 } from '@patternfly/react-core';
@@ -35,15 +36,18 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   BanIcon,
+  RedoIcon,
 } from '@patternfly/react-icons';
-import type { GraphRunDetail, NodeStatus, ClusterResiliencyScore, GraphClusterScore } from '../types/api';
-import { graphRunsApi } from '../services';
+import type { GraphRunDetail, NodeStatus, ClusterResiliencyScore, GraphClusterScore, StudioWorkflow } from '../types/api';
+import { graphRunsApi, operatorApi } from '../services';
 import { ScenarioRunDetailModal } from './ScenarioRunDetailModal';
 import { getScoreColor, getScoreLevel, formatScore, SCORE_CALCULATING } from '../utils/resiliency';
 
 interface GraphRunDetailProps {
   /** Name of the graph run to visualize */
   graphRunName: string;
+  /** Opens the saved graph in Chaos Studio for editing before rerun */
+  onReplayWorkflow?: (workflow: StudioWorkflow, categories?: string[]) => void;
 }
 
 /**
@@ -537,9 +541,16 @@ function getLayoutedElements(
 }
 
 /**
- * Main GraphRunDetail component
+ * Main GraphRunDetail component.
+ *
+ * Completed and failed runs can be replayed from the saved graph configuration.
+ *
+ * @example
+ * ```tsx
+ * <GraphRunDetail graphRunName="graphrun-abc123" />
+ * ```
  */
-export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
+export function GraphRunDetail({ graphRunName, onReplayWorkflow }: GraphRunDetailProps) {
   const [graphRunDetail, setGraphRunDetail] = useState<GraphRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -547,6 +558,9 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedScenarioRunName, setSelectedScenarioRunName] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayMessage, setReplayMessage] = useState<string | null>(null);
+  const [replayError, setReplayError] = useState<string | null>(null);
 
   // Handle node click - open detail modal
   const handleNodeClick = useCallback((nodeStatus: NodeStatus) => {
@@ -555,6 +569,86 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
       setIsModalOpen(true);
     }
   }, []);
+
+  const handleReplay = async () => {
+    setIsReplaying(true);
+    setReplayMessage(null);
+    setReplayError(null);
+    try {
+      const config = await graphRunsApi.getGraphRunConfig(graphRunName);
+      const headers: Record<string, string> = {};
+      if (graphRunDetail?.spec.resiliencyScoreEnabled) {
+        headers['X-Resiliency-Score'] = 'true';
+        if (graphRunDetail.spec.resiliencyScoreBaseline !== undefined) {
+          headers['X-Resiliency-Baseline'] = graphRunDetail.spec.resiliencyScoreBaseline.toString();
+        }
+        if (graphRunDetail.spec.resiliencyMountPath) {
+          headers['X-Resiliency-Mount-Path'] = graphRunDetail.spec.resiliencyMountPath;
+        }
+      }
+      if (onReplayWorkflow) {
+        const replayNodes = Object.entries(config.graph)
+          .filter(([nodeId]) => !nodeId.startsWith('_'));
+        const signatureStatuses = await Promise.all(replayNodes.map(async ([, node]) => {
+          const scenarioName = node.scenario?.name ?? node.name ?? '';
+          try {
+            const response = await operatorApi.getScenarios(
+              node.scenario?.registryName ? { registryName: node.scenario.registryName } : {},
+            );
+            return response.scenarios.find((scenario) => scenario.name === scenarioName)?.signature_status;
+          } catch {
+            return undefined;
+          }
+        }));
+        const workflow: StudioWorkflow = {
+          nodes: replayNodes.map(([nodeId, node], index) => {
+              const scenarioName = node.scenario?.name ?? node.name ?? '';
+              return {
+                nodeId,
+                status: 'configured',
+                position: { x: (index % 3) * 280, y: Math.floor(index / 3) * 180 },
+                config: {
+                  registryType: node.scenario?.private ? 'private' : 'public',
+                  registryConfig: node.scenario?.registryName ? { registryName: node.scenario.registryName } : {},
+                  scenarioName,
+                  scenarioImage: node.image ?? `krkn-hub:${scenarioName}`,
+                  signature_status: signatureStatuses[index] ?? node.scenario?.signature_status,
+                  scenarioFormValues: node.env ?? {},
+                  volumes: node.volumes,
+                  cloudCredentialRef: node.cloudCredentialRef,
+                },
+              };
+            }),
+          edges: Object.entries(config.graph)
+            .filter(([, node]) => node.depends_on && !node.depends_on.startsWith('_'))
+            .map(([nodeId, node]) => ({ id: `${node.depends_on}-${nodeId}`, source: node.depends_on!, target: nodeId })),
+          nextNodeNumber: (() => {
+            const nodeIds = new Set(Object.keys(config.graph));
+            let nextNodeNumber = 1;
+            while (nodeIds.has(`node-${nextNodeNumber}`)) {
+              nextNodeNumber += 1;
+            }
+            return nextNodeNumber;
+          })(),
+          resiliencyScoreConfig: graphRunDetail?.spec.resiliencyScoreEnabled
+            ? {
+                baseline: graphRunDetail.spec.resiliencyScoreBaseline ?? 0,
+                mountPath: graphRunDetail.spec.resiliencyMountPath ?? '/etc/krkn/metrics.yaml',
+              }
+            : undefined,
+        };
+        onReplayWorkflow(workflow, config.categories ?? []);
+        setReplayMessage('Workflow loaded in Chaos Studio for editing');
+      } else {
+        const replayedRun = await graphRunsApi.createGraphRun(config, headers);
+        setReplayMessage(`GraphRun ${replayedRun.name} created successfully`);
+      }
+    } catch (err) {
+      setReplayError(err instanceof Error ? err.message : 'Unable to replay workflow');
+    } finally {
+      setIsReplaying(false);
+    }
+  };
 
   // Fetch graph run details
   useEffect(() => {
@@ -727,6 +821,9 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
     failedNodes: filteredNodes.filter((ns: NodeStatus) => ns.phase === 'Failed').length,
     pendingNodes: filteredNodes.filter((ns: NodeStatus) => ns.phase === 'Pending').length,
   };
+  const isTerminal = filteredNodes.length > 0 && filteredNodes.every((nodeStatus) =>
+    nodeStatus.phase === 'Completed' || nodeStatus.phase === 'Failed' || nodeStatus.phase === 'Blocked'
+  );
 
   const clusterScoresOverall = graphRunDetail.status.resiliencyScores;
   const specEnabled = graphRunDetail.spec.resiliencyScoreEnabled;
@@ -736,6 +833,8 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
       <CardBody>
         {/* Graph summary */}
         <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {replayMessage && <Alert variant="success" isInline isPlain title="Workflow replay started">{replayMessage}</Alert>}
+          {replayError && <Alert variant="danger" isInline isPlain title="Failed to replay workflow">{replayError}</Alert>}
           <Tooltip content="Total nodes in the graph">
             <Label color="blue" isCompact>
               Total: {summary.totalNodes}
@@ -760,6 +859,18 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
             <Label color="orange" icon={<HourglassHalfIcon />} isCompact>
               Pending: {summary.pendingNodes}
             </Label>
+          </Tooltip>
+
+          <Tooltip content="Replay workflow">
+            <Button
+              variant="plain"
+              icon={<RedoIcon style={{ fontSize: '1.2rem' }} />}
+              onClick={handleReplay}
+              isDisabled={!isTerminal || isReplaying}
+              isLoading={isReplaying}
+              aria-label="Re-run workflow"
+              style={{ color: 'var(--pf-v5-global--link--Color)' }}
+            />
           </Tooltip>
 
         </div>

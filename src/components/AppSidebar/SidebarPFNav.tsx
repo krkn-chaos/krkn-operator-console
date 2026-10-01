@@ -1,6 +1,7 @@
 import { Nav, NavItem, NavList, NavExpandable } from '@patternfly/react-core';
-import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon } from '@patternfly/react-icons';
+import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon, TagsIcon } from '@patternfly/react-icons';
 import { MdAutoAwesome, MdWork } from 'react-icons/md';
+import { FiBarChart2 } from 'react-icons/fi';
 import type { ReactNode } from 'react';
 import type { SidebarNavProps } from './types';
 import './SidebarPFNav.css';
@@ -26,8 +27,10 @@ import './SidebarPFNav.css';
  * @param onRunScenario - Called when Run Scenario menu item is clicked
  * @param onNavigateStudio - Called when Chaos Studio menu item is clicked
  * @param onOpenFiles - Called when Files menu item is clicked
+ * @param onNavigateCategories - Called when Categories menu item is clicked
  * @param onNavigateTerminal - Called when Terminal menu item is clicked
  * @param onNavigateElasticsearchData - Called when Elasticsearch Data menu item is clicked
+ * @param onNavigateResiliencyHistory - Called when Resiliency History is selected
  * @param onNavigateSettings - Called when Settings menu item is clicked
  * @param onEditProfile - Called when Edit Profile menu item is clicked
  * @param onChangePassword - Called when Change Password menu item is clicked
@@ -67,8 +70,10 @@ export function SidebarPFNav({
   onRunScenario,
   onNavigateStudio,
   onOpenFiles,
+  onNavigateCategories,
   onNavigateTerminal,
   onNavigateElasticsearchData,
+  onNavigateResiliencyHistory,
   onNavigateSettings,
   onEditProfile,
   onChangePassword,
@@ -96,12 +101,18 @@ export function SidebarPFNav({
           <NavItem isActive={activePhase === 'studio'} onClick={onNavigateStudio} aria-label="Chaos Studio">
             {item(<TopologyIcon />, 'Chaos Studio')}
           </NavItem>
-          <NavItem onClick={onOpenFiles} aria-label="Files">{item(<FolderIcon />, 'Files')}</NavItem>
+          <NavItem isActive={activePhase === 'files'} onClick={onOpenFiles} aria-label="Files">{item(<FolderIcon />, 'Files')}</NavItem>
+          <NavItem isActive={activePhase === 'categories'} onClick={onNavigateCategories} aria-label="Categories">
+            {item(<TagsIcon />, 'Categories')}
+          </NavItem>
           <NavItem isActive={activePhase === 'terminal'} onClick={onNavigateTerminal} aria-label="Terminal">
             {item(<TerminalIcon />, 'Terminal')}
           </NavItem>
           <NavItem isActive={activePhase === 'elasticsearch_data'} onClick={onNavigateElasticsearchData} aria-label="Elasticsearch Data">
             {item(<DatabaseIcon />, 'ES Data')}
+          </NavItem>
+          <NavItem isActive={activePhase === 'resiliency_history'} onClick={onNavigateResiliencyHistory} aria-label="Resiliency History">
+            {item(<FiBarChart2 />, 'Resiliency History')}
           </NavItem>
           {isAdmin && (
             <NavItem isActive={activePhase === 'settings'} onClick={onNavigateSettings} aria-label="Settings">

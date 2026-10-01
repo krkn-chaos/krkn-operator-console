@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ResiliencyScoreModal } from './ResiliencyScoreModal';
 import { operatorApi } from '../services/operatorApi';
-import type { AvailableFilesResponse, FileTypesListResponse } from '../types/api';
+import type { AvailableFilesResponse } from '../types/api';
 
 vi.mock('../services/operatorApi');
 
@@ -18,7 +18,6 @@ describe('ResiliencyScoreModal', () => {
         fileName: 'metrics-baseline.yaml',
         description: 'Baseline metrics configuration',
         availableToAll: true,
-        fileType: 'metrics',
       },
       {
         fileId: 'file-2',
@@ -26,26 +25,6 @@ describe('ResiliencyScoreModal', () => {
         description: 'Advanced metrics with custom rules',
         availableToAll: false,
         groups: ['team-a'],
-        fileType: 'config',
-      },
-    ],
-  };
-
-  const mockFileTypes: FileTypesListResponse = {
-    fileTypes: [
-      {
-        name: 'metrics',
-        color: '#0066cc',
-        icon: '',
-        usageCount: 5,
-        createdAt: '2024-01-01T00:00:00Z',
-      },
-      {
-        name: 'config',
-        color: '#28a745',
-        icon: '',
-        usageCount: 3,
-        createdAt: '2024-01-02T00:00:00Z',
       },
     ],
   };
@@ -53,7 +32,6 @@ describe('ResiliencyScoreModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue(mockFiles);
-    vi.mocked(operatorApi.getFileTypes).mockResolvedValue(mockFileTypes);
   });
 
   describe('Modal Rendering', () => {

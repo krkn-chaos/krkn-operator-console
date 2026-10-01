@@ -23,6 +23,10 @@ const mockScenarioRunUpdate = {
   createdAt: '2026-07-02T10:10:00Z',
   ownerUserId: 'admin@preview.local',
   registryName: 'default',
+  resiliencyScoreEnabled: true,
+  resiliencyScores: [
+    { clusterName: 'staging-us-east-1', score: 85.2 },
+  ],
 };
 
 const mockJobsSnapshot = {
@@ -33,20 +37,55 @@ const mockJobsSnapshot = {
       createdAt: '2026-07-02T10:10:00Z',
       scenarioRun: mockScenarioRunUpdate,
     },
+    {
+      type: 'graphRun',
+      name: 'chaos-workflow-daily',
+      createdAt: '2026-07-02T08:00:00Z',
+      graphRun: {
+        name: 'chaos-workflow-daily',
+        namespace: 'krkn-operator-system',
+        creationTimestamp: '2026-07-02T08:00:00Z',
+        phase: 'Completed',
+        ownerUserId: 'admin@preview.local',
+        targetRequestId: 'target-001',
+        summary: { totalNodes: 4, completedNodes: 4, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
+        startTime: '2026-07-02T08:00:00Z',
+        completionTime: '2026-07-02T08:25:00Z',
+        resiliencyScoreEnabled: true,
+        resiliencyScoreBaseline: 80.0,
+        resiliencyScores: [
+          {
+            clusterName: 'staging-us-east-1',
+            calculated: 87.5,
+            baseline: 80.0,
+            status: 'pass',
+            message: 'Score 87.5 meets baseline 80.0',
+          },
+          {
+            clusterName: 'staging-eu-west-1',
+            calculated: 82.0,
+            baseline: 80.0,
+            status: 'pass',
+            message: 'Score 82.0 meets baseline 80.0',
+          },
+        ],
+      },
+    },
   ],
-  pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
-  stats: { totalJobs: 1, succeededJobs: 0, failedJobs: 0 },
+  pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
+  stats: { totalJobs: 2, succeededJobs: 1, failedJobs: 0 },
 };
 
 const mockGraphRunUpdate = {
   name: 'resilience-test-staging',
   namespace: 'krkn-operator-system',
   creationTimestamp: '2026-07-02T10:05:00Z',
-  phase: 'Running',
+  phase: 'Completed',
   ownerUserId: 'admin@preview.local',
   targetRequestId: 'target-002',
-  summary: { totalNodes: 3, completedNodes: 1, runningNodes: 1, failedNodes: 0, pendingNodes: 1 },
+  summary: { totalNodes: 3, completedNodes: 3, runningNodes: 0, failedNodes: 0, pendingNodes: 0 },
   startTime: '2026-07-02T10:05:00Z',
+  completionTime: '2026-07-02T10:25:00Z',
   resiliencyScoreEnabled: true,
   resiliencyScoreBaseline: 90.0,
   resiliencyScores: undefined as undefined | object[],
@@ -143,18 +182,14 @@ const graphrunsHandler = graphrunsWs.addEventListener('connection', ({ client })
         }, 500);
 
         const interval = setInterval(() => {
-          const completedNodes = Math.min(3, mockGraphRunUpdate.summary.completedNodes + Math.floor(Math.random() * 2));
           client.send(JSON.stringify({
             resource: 'graphrun',
             id: mockGraphRunUpdate.name,
             event: 'updated',
             data: {
               ...mockGraphRunUpdate,
-              summary: {
-                ...mockGraphRunUpdate.summary,
-                completedNodes,
-                runningNodes: Math.max(0, 3 - completedNodes),
-              },
+               summary: mockGraphRunUpdate.summary,
+               completionTime: mockGraphRunUpdate.completionTime,
             },
           }));
         }, 5000);

@@ -1,9 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GraphRunListItem, UnifiedJobItem } from '../../types/api';
-import { setMockJobs, resetJobsMock } from '../../hooks/__mocks__/useJobs';
+import { setMockJobs, setMockSnapshotVersion, resetJobsMock } from '../../hooks/__mocks__/useJobs';
+import { operatorApi } from '../../services/operatorApi';
 
 vi.mock('../../hooks/useJobs');
+vi.mock('../../services/operatorApi', () => ({
+  operatorApi: {
+    getCategories: vi.fn(),
+    updateCategoryAssociation: vi.fn(),
+  },
+}));
 
 vi.mock('../../hooks/useRole', () => ({
   useRole: () => ({ isAdmin: false, role: 'user' }),
@@ -101,6 +108,14 @@ describe('JobsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetJobsMock();
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({
+      categories: [
+        { name: 'resilience', color: '#0066CC', availableToAll: true },
+        { name: 'network-chaos', color: '#CB7832', availableToAll: true },
+      ],
+      total: 2,
+    });
+    vi.mocked(operatorApi.updateCategoryAssociation).mockResolvedValue({} as never);
   });
 
   describe('Empty State', () => {
@@ -127,7 +142,9 @@ describe('JobsList', () => {
     it('should show node count', () => {
       setMockJobs([makeGraphJobItem('test-graph-run')]);
       render(<JobsList {...defaultProps()} />);
-      expect(screen.getByText('3 / 3')).toBeInTheDocument();
+      const nodeCount = screen.getByRole('list', { name: 'Scenario runs list' })
+        .querySelector('.jobs-list-graph-node-counts');
+      expect(nodeCount?.textContent).toBe('3/3');
     });
 
     it('should show Succeeded phase label for Completed graph run', () => {
@@ -142,7 +159,9 @@ describe('JobsList', () => {
       })]);
       render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('Running')).toBeInTheDocument();
-      expect(screen.getByText('1 / 3')).toBeInTheDocument();
+      const nodeCount = screen.getByRole('list', { name: 'Scenario runs list' })
+        .querySelector('.jobs-list-graph-node-counts');
+      expect(nodeCount?.textContent).toBe('1/3');
     });
   });
 
@@ -185,14 +204,53 @@ describe('JobsList', () => {
       const naElements = screen.getAllByText('N/A');
       expect(naElements.length).toBeGreaterThan(0);
     });
+
+    it('should show Calculating for standalone run with scoring enabled while running', () => {
+      setMockJobs([makeScenarioJobItem('running-with-score', {
+        scenarioRun: {
+          scenarioRunName: 'running-with-score',
+          scenarioName: 'network-chaos',
+          phase: 'Running',
+          totalTargets: 1,
+          successfulJobs: 0,
+          failedJobs: 0,
+          runningJobs: 1,
+          clusterJobs: [],
+          ownerUserId: 'admin@test.com',
+          resiliencyScoreEnabled: true,
+        },
+      })]);
+      render(<JobsList {...defaultProps()} />);
+      expect(screen.getByText('Calculating...')).toBeInTheDocument();
+    });
+
+    it('should show N/A for standalone run without scoring enabled while running', () => {
+      setMockJobs([makeScenarioJobItem('running-no-score', {
+        scenarioRun: {
+          scenarioRunName: 'running-no-score',
+          scenarioName: 'network-chaos',
+          phase: 'Running',
+          totalTargets: 1,
+          successfulJobs: 0,
+          failedJobs: 0,
+          runningJobs: 1,
+          clusterJobs: [],
+          ownerUserId: 'admin@test.com',
+        },
+      })]);
+      render(<JobsList {...defaultProps()} />);
+      const naElements = screen.getAllByText('N/A');
+      expect(naElements.length).toBeGreaterThan(0);
+    });
+
   });
 
   describe('Delete Confirmation', () => {
     it('should show confirmation modal when delete clicked', () => {
       setMockJobs([makeGraphJobItem('test-graph-run')]);
       render(<JobsList {...defaultProps()} />);
-      const deleteBtn = screen.getByLabelText('Delete graph run');
-      fireEvent.click(deleteBtn);
+      fireEvent.click(screen.getByLabelText('Actions for run test-graph-run'));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
       expect(screen.getByText('Delete Graph Run')).toBeInTheDocument();
       expect(screen.getByText(/Are you sure you want to delete graph run/)).toBeInTheDocument();
     });
@@ -201,7 +259,8 @@ describe('JobsList', () => {
       setMockJobs([makeGraphJobItem('test-graph-run')]);
       const props = defaultProps();
       render(<JobsList {...props} />);
-      fireEvent.click(screen.getByLabelText('Delete graph run'));
+      fireEvent.click(screen.getByLabelText('Actions for run test-graph-run'));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
       await waitFor(() => {
         expect(props.onDeleteGraphRun).toHaveBeenCalledWith('test-graph-run');
@@ -211,10 +270,71 @@ describe('JobsList', () => {
     it('should close modal on cancel', () => {
       setMockJobs([makeGraphJobItem('test-graph-run')]);
       render(<JobsList {...defaultProps()} />);
-      fireEvent.click(screen.getByLabelText('Delete graph run'));
+      fireEvent.click(screen.getByLabelText('Actions for run test-graph-run'));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
       expect(screen.getByText('Delete Graph Run')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByText('Delete Graph Run')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Category assignment', () => {
+    it('keeps categorized and uncategorized run toggles aligned', async () => {
+      setMockJobs([
+        { ...makeGraphJobItem('categorized-run'), categories: ['resilience'] },
+        makeGraphJobItem('uncategorized-run'),
+      ]);
+      render(<JobsList {...defaultProps()} />);
+
+      expect(await screen.findByLabelText('Categories: resilience')).toBeInTheDocument();
+      const categorizedToggle = document.getElementById('toggle-graph-categorized-run');
+      const uncategorizedToggle = document.getElementById('toggle-graph-uncategorized-run');
+
+      expect(categorizedToggle).toBeTruthy();
+      expect(uncategorizedToggle).toBeTruthy();
+      expect(categorizedToggle!.style.marginLeft).toBe(uncategorizedToggle!.style.marginLeft);
+    });
+
+    it('keeps categorized and uncategorized standalone scenario-run toggles aligned', async () => {
+      setMockJobs([
+        makeScenarioJobItem('categorized-scenario-run', { categories: ['resilience'] }),
+        makeScenarioJobItem('uncategorized-scenario-run'),
+      ]);
+      render(<JobsList {...defaultProps()} />);
+
+      expect(await screen.findByLabelText('Categories: resilience')).toBeInTheDocument();
+      const categorizedToggle = document.getElementById('toggle-run-categorized-scenario-run');
+      const uncategorizedToggle = document.getElementById('toggle-run-uncategorized-scenario-run');
+
+      expect(categorizedToggle).toBeTruthy();
+      expect(uncategorizedToggle).toBeTruthy();
+      expect(categorizedToggle!.style.marginLeft).toBe(uncategorizedToggle!.style.marginLeft);
+    });
+
+    it('refreshes the jobs snapshot after an assignment and reconciles optimistic categories', async () => {
+      const original = { ...makeGraphJobItem('category-run'), categories: ['resilience'] };
+      const updated = { ...makeGraphJobItem('category-run'), categories: ['network-chaos'] };
+      setMockJobs([original]);
+      const props = defaultProps();
+      const { rerender } = render(<JobsList {...props} />);
+
+      expect(await screen.findByLabelText('Categories: resilience')).toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText('Actions for run category-run'));
+      fireEvent.mouseEnter(screen.getByText('Category'));
+      const resilienceItem = await screen.findByRole('menuitem', { name: 'Remove category resilience' });
+      fireEvent.click(resilienceItem.querySelector('input[type="checkbox"]')!);
+
+      await waitFor(() => {
+        expect(operatorApi.updateCategoryAssociation).toHaveBeenCalledWith(
+          'resilience', 'graph-runs', 'category-run', false,
+        );
+      });
+      expect(operatorApi.getCategories).toHaveBeenCalled();
+
+      setMockJobs([updated]);
+      setMockSnapshotVersion(1);
+      rerender(<JobsList {...props} />);
+      expect(await screen.findByLabelText('Categories: network-chaos')).toBeInTheDocument();
     });
   });
 

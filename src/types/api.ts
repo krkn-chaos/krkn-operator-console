@@ -39,9 +39,17 @@ export interface AvailableCommandsResponse {
   commands: TerminalCommand[];
 }
 
+export type ClusterHealthStatus = 'healthy' | 'unhealthy' | 'unknown';
+
 export interface Cluster {
   'cluster-name': string;
   'cluster-api-url': string;
+  /** ACM sanity-check status, independent of API liveness. */
+  'cluster-status'?: ClusterHealthStatus;
+  /** Whether the operator's latest liveness check found the cluster reachable. */
+  online?: boolean;
+  /** Timestamp of the operator's latest liveness check. */
+  'checked-at'?: string;
 }
 
 export interface ClustersResponse {
@@ -80,6 +88,9 @@ export interface TargetResponse {
   ready: boolean;
   createdAt?: string;
   operatorSource?: string; // Source operator (krkn-operator, krkn-operator-acm, etc.) - only for discovered clusters
+  clusterStatus?: ClusterHealthStatus;
+  online?: boolean;
+  checkedAt?: string;
 }
 
 export interface ListTargetsResponse {
@@ -101,26 +112,50 @@ export interface ScenariosRequest {
   registryName?: string;
 }
 
-export interface RerunIntent {
-  scenarioName: string;
+export interface SignatureVerificationSettingsResponse {
+  enabled: boolean;
+}
+
+export interface SignatureVerificationSettingsRequest {
+  enabled: boolean;
+}
+
+/** Registry-independent scenario reference sent to the operator. */
+export interface ScenarioReference {
+  name: string;
+  private: boolean;
   registryName?: string;
+  signature_status?: SignatureStatus;
+}
+
+export interface RerunIntent {
+  scenario: ScenarioReference;
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
-  scenarioImage: string;
   kubeconfigPath: string;
+  /** Visible category assignments restored from the run configuration. */
+  categories?: string[];
 }
 
 export interface JobConfigResponse {
   targetRequestId: string;
   targetClusters: { [operatorName: string]: string[] };
-  scenarioImage: string;
-  scenarioName: string;
+  scenario?: ScenarioReference;
+  /** Backend response compatibility only; never sent by the console. */
+  scenarioImage?: string;
+  /** Backend response compatibility only. */
+  scenarioName?: string;
   kubeconfigPath: string;
   environment: { [key: string]: string };
+  /** Categories visible to the current user and restored for replay. */
+  categories?: string[];
 }
+
+export type SignatureStatus = 'signed' | 'unsigned' | 'untrusted' | 'unknown';
 
 export interface ScenarioTag {
   name: string;
+  signature_status?: SignatureStatus;
   digest?: string;
   size?: number;
   lastModified?: string;
@@ -236,21 +271,24 @@ export interface FileReference {
 export interface ScenarioRunRequest {
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
-  scenarioImage: string;
-  scenarioName: string;
+  scenario: ScenarioReference;
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
   files?: ScenarioFileMount[];
   /** References to centrally-managed files (optional) */
   fileReferences?: FileReference[];
-  /** Name of a private registry configured in the system. If not provided, defaults to public quay.io */
-  registryName?: string;
   /** Optional custom label for the run, displayed in the runs list */
   customRunName?: string;
   /** Name of a saved Elasticsearch config — backend injects its credentials server-side so the password is never sent by the client */
   elasticsearchConfigName?: string;
   /** Name of a saved cloud credential — backend injects via SecretKeyRef at controller level */
   cloudCredentialRef?: string;
+  /** Maximum retries after the initial attempt for the scenario run */
+  maxRetries?: number;
+  /** Enable resiliency score calculation for this run */
+  resiliencyScoreEnabled?: boolean;
+  /** Visible category names to assign to the newly created run. */
+  categories?: string[];
 }
 
 export interface TargetJobResult {
@@ -291,8 +329,8 @@ export interface JobsListResponse {
 
 // NEW API Types for ScenarioRun (CRD-based)
 
-export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed';
-export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed';
+export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed' | 'MaxRetriesExceeded';
+export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'MaxRetriesExceeded';
 
 export interface ClusterJob {
   providerName: string; // Provider that owns this cluster (e.g., 'krkn-operator', 'krkn-operator-acm')
@@ -340,6 +378,7 @@ export interface ScenarioRunStatusResponse {
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
   customRunName?: string;
+  resiliencyScoreEnabled?: boolean;
   resiliencyScores?: ClusterResiliencyScore[];
   reportStatus?: ReportStatus;
 }
@@ -360,6 +399,8 @@ export interface ScenarioRunState {
   graphRunName?: string; // Name of the parent GraphRun (if this ScenarioRun is part of a graph)
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
   customRunName?: string; // User-provided label for the run
+  resiliencyScoreEnabled?: boolean;
+  resiliencyScores?: ClusterResiliencyScore[];
 }
 
 // User Management Types
@@ -416,8 +457,10 @@ export type AppPhase =
   | 'studio' // Chaos Scenario Studio page
   | 'terminal' // Full-screen cluster terminal page
   | 'files' // File management page
+  | 'categories' // Category management page
   | 'elasticsearch_data' // Elasticsearch telemetry data table page
   | 'krkn_ai' // Mock Krkn AI console
+  | 'resiliency_history' // Resiliency history analytics page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -466,6 +509,9 @@ export interface AppState {
   // Graph runs list (GraphRun orchestration)
   graphRuns: GraphRunState[];
   expandedGraphRunIds: Set<string>; // Graph run names that are expanded to show DAG
+  studioReplayWorkflow?: StudioWorkflow | null;
+  /** Categories restored when opening a graph run replay in Chaos Studio. */
+  studioReplayCategories?: string[] | null;
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
@@ -485,8 +531,10 @@ export interface AppState {
 
   // Re-run workflow
   rerunIntent: RerunIntent | null;
+  /** Categories restored from a run config for a scenario replay. */
+  rerunCategories: string[];
   startInPreview: boolean;
-  rerunScenarioImage: string | null;
+  rerunScenario: ScenarioReference | null;
   rerunKubeconfigPath: string | null;
 
   // Error handling
@@ -530,6 +578,7 @@ export type AppAction =
   | { type: 'LOAD_GRAPH_RUNS_SUCCESS'; payload: { runs: GraphRunState[] } }
   | { type: 'TOGGLE_GRAPH_RUN_ACCORDION'; payload: { graphRunName: string } }
   | { type: 'DELETE_GRAPH_RUN'; payload: { graphRunName: string } }
+  | { type: 'OPEN_STUDIO_REPLAY'; payload: { workflow: StudioWorkflow; categories?: string[] } }
 
   // Workflow control (NEW)
   | { type: 'START_CREATE_WORKFLOW' }
@@ -573,8 +622,10 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_STUDIO' }
   | { type: 'NAVIGATE_TO_TERMINAL' }
   | { type: 'NAVIGATE_TO_FILES' }
+  | { type: 'NAVIGATE_TO_CATEGORIES' }
   | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
   | { type: 'NAVIGATE_TO_KRKN_AI' }
+  | { type: 'NAVIGATE_TO_RESILIENCY_HISTORY' }
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
@@ -672,7 +723,7 @@ export interface RegistryDetails {
   description?: string;
   skipTls: boolean;
   insecure: boolean;
-  groups: string[];
+  groups?: string[];
   availableToAll?: boolean;
   createdAt?: string;
   createdBy?: string;
@@ -736,9 +787,11 @@ export interface AvailableRegistriesResponse {
 export interface GraphScenarioNode {
   /** Optional comment describing the scenario */
   _comment?: string;
-  /** Container image for the scenario */
+  /** Registry-independent scenario identity sent to the operator. */
+  scenario?: ScenarioReference;
+  /** @deprecated Legacy fields are accepted only for stored workflow compatibility. */
   image?: string;
-  /** Name of the scenario */
+  /** @deprecated Use scenario.name. */
   name?: string;
   /** Environment variables for the scenario */
   env?: { [key: string]: string };
@@ -746,6 +799,8 @@ export interface GraphScenarioNode {
   volumes?: { [key: string]: string };
   /** Node ID that this scenario depends on (parent in the graph) */
   depends_on?: string;
+  /** Positive multiplier for this scenario's resiliency score contribution */
+  resiliencyWeight?: number;
   /** Saved cloud credential to inject for this node (overrides graph-level default) */
   cloudCredentialRef?: string;
 }
@@ -802,6 +857,8 @@ export interface GraphRunSpec {
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
   targetClusters: { [providerName: string]: string[] };
+  /** Maximum retries after the initial attempt for each node */
+  maxRetries?: number;
   /** Email address of the user who created this graph run */
   ownerUserId?: string;
 
@@ -921,6 +978,10 @@ export interface CreateGraphRunRequest {
   targetClusters: { [providerName: string]: string[] };
   /** Default cloud credential for all nodes (individual nodes may override) */
   cloudCredentialRef?: string;
+  /** Maximum retries after the initial attempt for each node */
+  maxRetries?: number;
+  /** Visible category names to assign to the newly created graph run. */
+  categories?: string[];
 }
 
 /**
@@ -995,6 +1056,8 @@ export interface UnifiedJobItem {
   type: 'scenarioRun' | 'graphRun';
   name: string;
   createdAt: string;
+  /** Category names visible to the current user and associated with this run. */
+  categories?: string[];
   scenarioRun?: ScenarioRunStatusResponse;
   graphRun?: GraphRunListItem;
 }
@@ -1044,6 +1107,8 @@ export interface StudioNode {
     scenarioName: string;
     /** Full scenario image URL */
     scenarioImage: string;
+    /** Signature status observed when the scenario was selected. */
+    signature_status?: SignatureStatus;
     /** Scenario form values (environment variables) */
     scenarioFormValues: ScenarioFormValues;
     /** Global form values (optional) */
@@ -1054,6 +1119,8 @@ export interface StudioNode {
     volumes?: { [key: string]: string };
     /** File mounts (mock dropdown for now) */
     files?: string[];
+    /** Positive multiplier for this scenario's resiliency score contribution */
+    resiliencyWeight?: number;
     /** Saved cloud credential injected server-side for this node */
     cloudCredentialRef?: string;
   };
@@ -1083,6 +1150,8 @@ export interface StudioWorkflow {
   edges: StudioEdge[];
   /** Next node number for auto-positioning */
   nextNodeNumber: number;
+  /** Resiliency scoring configuration restored when replaying a workflow. */
+  resiliencyScoreConfig?: ResiliencyScoreConfig;
 }
 
 /**
@@ -1091,6 +1160,8 @@ export interface StudioWorkflow {
 export interface StudioAutosave {
   /** Saved workflow state */
   workflow: StudioWorkflow;
+  /** Run categories selected before the workflow was saved. */
+  categories?: string[];
   /** When the autosave was created */
   timestamp: number;
   /** Autosave format version */
@@ -1117,10 +1188,10 @@ export interface FileResponse {
   groups?: string[];
   /** If true, available to all users */
   availableToAll: boolean;
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /** Legacy metadata retained when updating files against older operators. */
+  fileType?: string;
 }
 
 /**
@@ -1138,8 +1209,6 @@ export interface CreateFileRequest {
   groups?: string[];
   /** If true, available to all users */
   availableToAll: boolean;
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
 }
@@ -1168,10 +1237,10 @@ export interface UpdateFileRequest {
   groups?: string[];
   /** If true, available to all users */
   availableToAll: boolean;
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /** Preserved when editing legacy files until older operators stop requiring it. */
+  fileType?: string;
 }
 
 /**
@@ -1200,10 +1269,10 @@ export interface FileInfo {
   availableToAll: boolean;
   /** Groups that can access this file */
   groups?: string[];
-  /** Optional file type classification */
-  fileType?: string;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /** Legacy operator metadata preserved during updates; it is not editable in the console. */
+  fileType?: string;
 }
 
 /**
@@ -1239,7 +1308,6 @@ export interface WorkflowInfo {
   workflowId: string;
   workflowName: string;
   description?: string;
-  fileType?: string;
   nodeCount?: number;
 }
 
@@ -1255,7 +1323,8 @@ export interface WorkflowResponse {
   description?: string;
   availableToAll: boolean;
   groups?: string[];
-  fileType?: string;
+  /** Workflow-level category metadata, when supported by the operator API. */
+  categories?: string[];
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -1269,7 +1338,7 @@ export interface CreateWorkflowRequest {
   description?: string;
   availableToAll: boolean;
   groups?: string[];
-  fileType?: string;
+  categories?: string[];
 }
 
 export interface CreateWorkflowResponse {
@@ -1284,7 +1353,7 @@ export interface UpdateWorkflowRequest {
   description?: string;
   availableToAll: boolean;
   groups?: string[];
-  fileType?: string;
+  categories?: string[];
 }
 
 export interface UpdateWorkflowResponse {
@@ -1320,56 +1389,85 @@ export interface GroupsListResponse {
   groups: GroupResponse[];
 }
 
-// ============================================================================
-// File Types API Types
-// ============================================================================
-
-/**
- * FileTypeResponse - File type metadata with usage statistics
- */
-export interface FileTypeResponse {
-  /** Type name (unique identifier) */
+/** Public category data returned by the operator API. */
+export interface CategoryResponse {
+  /** Immutable Kubernetes-safe category name. */
   name: string;
-  /** Hex color for badge (e.g., #FF5733) - empty string means use UI default */
-  color: string;
-  /** Icon name/identifier - empty string means use UI default */
-  icon: string;
-  /** Number of files using this type */
-  usageCount: number;
-  /** When this type was created */
-  createdAt: string;
-}
-
-/**
- * FileTypesListResponse - Response containing list of file types
- */
-export interface FileTypesListResponse {
-  /** Array of file types */
-  fileTypes: FileTypeResponse[];
-}
-
-/**
- * CreateFileTypeRequest - Request to create a new file type
- */
-export interface CreateFileTypeRequest {
-  /** Type name (Kubernetes label-compatible) */
-  name: string;
-  /** Hex color (optional - empty string for default) */
+  /** Optional hex color used to display the category. */
   color?: string;
-  /** Icon name (optional - empty string for default) */
-  icon?: string;
+  /** The group that can view this category, when it is group-scoped. */
+  groups?: string[];
+  /** Whether the category is visible to all users. */
+  availableToAll: boolean;
+  /** User ID of the creator, used to show management actions. */
+  createdBy?: string;
 }
 
-/**
- * UpdateFileTypeRequest - Request to update file type metadata
- */
-export interface UpdateFileTypeRequest {
-  /** Type name (must match URL param, immutable) */
+/** Response containing categories visible to the caller. */
+export interface CategoriesListResponse {
+  categories: CategoryResponse[];
+  total: number;
+}
+
+/** Filters used to query score history across visible categories and clusters. */
+export interface ResiliencyHistoryQueryRequest {
+  categories: string[];
+  clusters: string[];
+  clusterProviders?: Record<string, string[]>;
+}
+
+/** One scored scenario run returned by the resiliency history query. */
+export interface ResiliencyHistoryDataPoint {
+  date: string;
+  runId: string;
+  runType: string;
+  score: number;
+  baseline?: number;
+  configurationGroupId: string;
+  providerName?: string;
+}
+
+/** Run metadata shared by score points in a category configuration group. */
+export interface ResiliencyHistoryConfigurationGroup {
+  runType: string;
+  representativeRunId: string;
+  scenarioNames?: string[];
+  /** Deterministic readable alias for the group's environment-parameter profile. */
+  parameterProfileName?: string;
+}
+
+/** Query result nested by cluster, category, then score datapoint. */
+export interface ResiliencyHistoryQueryResponse {
+  clusters: Record<string, Record<string, ResiliencyHistoryDataPoint[]>>;
+  configurationGroups: Record<string, Record<string, ResiliencyHistoryConfigurationGroup>>;
+}
+
+/** Request to create a category. */
+export interface CreateCategoryRequest {
   name: string;
-  /** Hex color (empty string resets to default) */
-  color: string;
-  /** Icon name (empty string resets to default) */
-  icon: string;
+  color?: string;
+  groups?: string[];
+  availableToAll: boolean;
+}
+
+/** Mutable category fields. Visibility fields must be sent together. */
+export interface UpdateCategoryRequest {
+  color?: string;
+  groups?: string[];
+  availableToAll?: boolean;
+}
+
+/** Response from deleting a category. */
+export interface DeleteCategoryResponse {
+  message: string;
+}
+
+/** Response from associating or disassociating a run with a category. */
+export interface CategoryEntityAssociationResponse {
+  category: string;
+  entityType: 'KrknScenarioRun' | 'KrknGraphRun';
+  entityName: string;
+  associated: boolean;
 }
 
 // Elasticsearch Config Types
@@ -1455,6 +1553,65 @@ export interface QueryTelemetryRequest {
   endDate?: string;
 }
 
+// Run-level cluster/infrastructure metadata surfaced for an expanded row. All
+// fields are optional; the backend omits any it did not find in the source doc.
+export interface ClusterMetadata {
+  // Object kind (e.g. "Pod", "ConfigMap") to count present in the cluster.
+  kubernetes_objects_count?: Record<string, number>;
+  network_plugins?: string[];
+  total_node_count?: number;
+  cloud_infrastructure?: string;
+  cloud_type?: string;
+  cluster_version?: string;
+  major_version?: string;
+  build_url?: string;
+  fips_enabled?: boolean;
+  tag?: string;
+  etcd_encryption_enabled?: boolean;
+  ipsec_enabled?: boolean;
+  // Per-node-group summaries describing each distinct node role/shape.
+  node_summary_infos?: NodeSummaryInfo[];
+}
+
+// One node-group summary krkn records per distinct node role/shape.
+export interface NodeSummaryInfo {
+  count: number;
+  nodes_type: string;
+  architecture: string;
+  instance_type: string;
+  kernel_version: string;
+  kubelet_version: string;
+  os_version: string;
+}
+
+// Recovery timings krkn records for a single pod that came back after a
+// pod_disruption scenario. Times are fractional seconds.
+export interface RecoveredPod {
+  pod_name: string;
+  namespace: string;
+  total_recovery_time: number;
+  pod_readiness_time: number;
+  pod_rescheduling_time: number;
+}
+
+// Pods a scenario disrupted. Only recovered pods carry recovery timings, used by
+// the pod-recovery chart.
+export interface TelemetryAffectedPods {
+  recovered?: RecoveredPod[];
+}
+
+// A single scenario within a telemetry run. parameters is left untyped because
+// its shape varies by scenario type (e.g. application_outage vs pod-scenario).
+export interface TelemetryScenarioDetail {
+  scenario_type: string;
+  start_timestamp: number;
+  end_timestamp: number;
+  exit_status: number;
+  parameters?: Record<string, unknown>;
+  // Per-pod recovery timings for pod_disruption scenarios; absent otherwise.
+  affected_pods?: TelemetryAffectedPods;
+}
+
 export interface TelemetryDocument {
   run_uuid: string;
   scenario_type: string;
@@ -1464,6 +1621,10 @@ export interface TelemetryDocument {
   namespace: string;
   // true = passed, false = failed.
   status: boolean;
+  // Run-level cluster detail; absent when the source doc had no metadata.
+  metadata?: ClusterMetadata;
+  // Every scenario in the run, each with its raw parameters.
+  scenarios?: TelemetryScenarioDetail[];
 }
 
 // Pass/fail aggregates across the whole matched window (not just the returned

@@ -16,7 +16,7 @@ import { ScenarioConfigStep } from './ScenarioConfigStep';
 import { NodeMetadataStep } from './NodeMetadataStep';
 import { useStudioContext } from './StudioContext';
 import { useScenariosFetch } from '../../hooks';
-import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields } from '../../types/api';
+import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields, SignatureStatus } from '../../types/api';
 
 interface StudioNodeEditorModalProps {
   isOpen: boolean;
@@ -40,6 +40,7 @@ function StudioNodeEditorModalComponent({
 
   // Step 2: Scenario selection
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [selectedSignatureStatus, setSelectedSignatureStatus] = useState<SignatureStatus | undefined>();
   const [scenarioImage, setScenarioImage] = useState<string>('');
 
   // Step 3: Scenario configuration
@@ -49,6 +50,7 @@ function StudioNodeEditorModalComponent({
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
   const [cloudCredentialRef, setCloudCredentialRef] = useState('');
   const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
+  const [resiliencyWeight, setResiliencyWeight] = useState(1);
 
   // Step 4: Node metadata
   const [newNodeId, setNewNodeId] = useState<string>('');
@@ -79,12 +81,14 @@ function StudioNodeEditorModalComponent({
       setRegistryType(node.config.registryType);
       setRegistryName(node.config.registryConfig.registryName || '');
       setSelectedScenario(node.config.scenarioName);
+      setSelectedSignatureStatus(node.config.signature_status);
       setScenarioImage(node.config.scenarioImage);
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
       setCloudCredentialRef(node.config.cloudCredentialRef || '');
       setVolumes(node.config.volumes || {});
+      setResiliencyWeight(node.config.resiliencyWeight ?? 1);
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
       fetchScenarios(node.config.registryConfig);
@@ -92,12 +96,14 @@ function StudioNodeEditorModalComponent({
       setRegistryType('public');
       setRegistryName('');
       setSelectedScenario(null);
+      setSelectedSignatureStatus(undefined);
       setScenarioImage('');
       setFormValues({});
       setGlobalFormValues({});
       setGlobalTouchedFields({});
       setCloudCredentialRef('');
       setVolumes({});
+      setResiliencyWeight(1);
       setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
       fetchScenarios({});
@@ -118,6 +124,7 @@ function StudioNodeEditorModalComponent({
     }
     // Clear scenario, form values and defaults when registry changes
     setSelectedScenario(null);
+    setSelectedSignatureStatus(undefined);
     setFormValues({});
     setScenarioDefaultValues({});
     setCloudCredentialRef('');
@@ -130,6 +137,7 @@ function StudioNodeEditorModalComponent({
     fetchScenarios(config);
     // Clear scenario, form values and defaults when registry name changes
     setSelectedScenario(null);
+    setSelectedSignatureStatus(undefined);
     setFormValues({});
     setScenarioDefaultValues({});
     setCloudCredentialRef('');
@@ -148,8 +156,9 @@ function StudioNodeEditorModalComponent({
   }, [validateNodeId, node?.nodeId]);
 
   // Wizard step callbacks
-  const handleScenarioSelect = useCallback((scenarioName: string) => {
+  const handleScenarioSelect = useCallback((scenarioName: string, signatureStatus?: SignatureStatus) => {
     setSelectedScenario(scenarioName);
+    setSelectedSignatureStatus(signatureStatus);
 
     // Build image URL
     const registry = registryType === 'private' && registryName
@@ -176,6 +185,11 @@ function StudioNodeEditorModalComponent({
   const handleSave = () => {
     if (!node || !selectedScenario || nodeIdError) return;
 
+    if (!Number.isFinite(resiliencyWeight) || resiliencyWeight <= 0) {
+      setValidationWarnings(['Resiliency weight must be greater than 0.']);
+      return;
+    }
+
     // Check for pending file input (file selected or path typed but not added)
     if (hasPendingFileInput && !pendingFileWarningShown) {
       setValidationWarnings([
@@ -198,10 +212,12 @@ function StudioNodeEditorModalComponent({
         registryConfig,
         scenarioName: selectedScenario,
         scenarioImage,
+        signature_status: selectedSignatureStatus,
         scenarioFormValues: finalFormValues,
         globalFormValues,
         globalTouchedFields,
         volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
+        resiliencyWeight,
         cloudCredentialRef: cloudCredentialRef || undefined,
       },
     };
@@ -293,8 +309,10 @@ function StudioNodeEditorModalComponent({
             setPendingFileWarningShown(false);
             setValidationWarnings([]);
           }}
-          onPendingChange={setHasPendingFileInput}
-        />
+           onPendingChange={setHasPendingFileInput}
+           resiliencyWeight={resiliencyWeight}
+           onResiliencyWeightChange={setResiliencyWeight}
+         />
       ),
       isNextDisabled: !!nodeIdError || !newNodeId,
     },

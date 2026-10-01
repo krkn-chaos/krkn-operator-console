@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Card,
   CardTitle,
@@ -9,6 +9,7 @@ import {
   DataListItemRow,
   DataListItemCells,
   DataListCell,
+  DataListAction,
   DataListToggle,
   DataListContent,
   EmptyState,
@@ -34,6 +35,8 @@ import {
   TextInput,
   Pagination,
   PaginationVariant,
+  Alert,
+  AlertActionCloseButton,
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
@@ -51,18 +54,23 @@ import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
 import { JobStatsSummary } from './JobStatsSummary';
-import { ReportDownloadButton } from './ReportDownloadButton';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
+import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
+import { operatorApi } from '../services/operatorApi';
+import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
+import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
+import './JobsList.css';
 
-import type { ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
+import type { CategoryResponse, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem, StudioWorkflow } from '../types/api';
 
 export type UnifiedRunItem =
   | {
       type: 'graph';
+      categories: string[];
       graphRunName: string;
       nodes: ScenarioRunState[];
       phase: ScenarioRunPhase;
@@ -73,7 +81,7 @@ export type UnifiedRunItem =
       resiliencyScoreBaseline?: number;
       resiliencyScores?: GraphClusterScore[];
     }
-  | { type: 'scenario'; run: ScenarioRunState };
+  | { type: 'scenario'; run: ScenarioRunState; categories: string[] };
 
 function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
   if (item.type === 'graphRun') {
@@ -86,6 +94,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
       }
       return {
         type: 'graph',
+        categories: item.categories || [],
         graphRunName: item.name,
         nodes: [],
         phase,
@@ -99,6 +108,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
     }
     return {
       type: 'graph',
+      categories: item.categories || [],
       graphRunName: item.name,
       nodes: [],
       phase: 'Pending',
@@ -110,6 +120,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
   if (sr) {
     return {
       type: 'scenario',
+      categories: item.categories || [],
       run: {
         scenarioRunName: sr.scenarioRunName,
         scenarioName: sr.scenarioName || '',
@@ -124,11 +135,14 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
         registryName: sr.registryName,
         graphRunName: sr.graphRunName,
         customRunName: sr.customRunName,
+        resiliencyScoreEnabled: sr.resiliencyScoreEnabled,
+        resiliencyScores: sr.resiliencyScores,
       },
     };
   }
   return {
     type: 'scenario',
+    categories: item.categories || [],
     run: {
       scenarioRunName: item.name,
       scenarioName: '',
@@ -154,6 +168,7 @@ interface JobsListProps {
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
+  onReplayWorkflow?: (workflow: StudioWorkflow, categories?: string[]) => void;
   loadingRunDetails: Set<string>;
 }
 
@@ -168,11 +183,26 @@ export function JobsList({
   expandedGraphRunIds,
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
+  onReplayWorkflow,
   loadingRunDetails,
 }: JobsListProps) {
   const { isAdmin } = useRole();
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
-  const { jobs, pagination, stats, hasReceivedStats, page, setPage, limit, setLimit, isLoading } = useJobs();
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [isCategorySelectOpen, setIsCategorySelectOpen] = useState(false);
+  const {
+    jobs,
+    pagination,
+    stats,
+    hasReceivedStats,
+    page,
+    setPage,
+    limit,
+    setLimit,
+    isLoading,
+    snapshotVersion,
+    refresh: refreshJobs,
+  } = useJobs(categoryFilters);
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -183,6 +213,48 @@ export function JobsList({
   const [timeRangeError, setTimeRangeError] = useState('');
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string[]>>({});
+  const [categoryOverrideSnapshotVersions, setCategoryOverrideSnapshotVersions] = useState<Record<string, number>>({});
+  const [categoryUpdateKeys, setCategoryUpdateKeys] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    const reconciledKeys = Object.entries(categoryOverrideSnapshotVersions)
+      .filter(([, version]) => snapshotVersion > version)
+      .map(([key]) => key);
+    if (reconciledKeys.length === 0) return;
+
+    setCategoryOverrides((current) => {
+      const next = { ...current };
+      reconciledKeys.forEach((key) => delete next[key]);
+      return next;
+    });
+    setCategoryOverrideSnapshotVersions((current) => {
+      const next = { ...current };
+      reconciledKeys.forEach((key) => delete next[key]);
+      return next;
+    });
+  }, [categoryOverrideSnapshotVersions, snapshotVersion]);
+
+  const loadCategories = useCallback(async () => {
+    setIsCategoriesLoading(true);
+    setCategoryError(null);
+    try {
+      const response = await operatorApi.getCategories();
+      setCategories(response.categories || []);
+    } catch (error) {
+      setCategories([]);
+      setCategoryError(error instanceof Error ? error.message : 'Failed to load categories');
+    } finally {
+      setIsCategoriesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCategories();
+  }, [loadCategories]);
 
   // Format timestamp for display
   const formatTimestamp = (dateString?: string): string => {
@@ -224,6 +296,8 @@ export function JobsList({
         return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
@@ -262,6 +336,46 @@ export function JobsList({
     } finally {
       setDeletingJob(null);
     }
+  };
+
+  const runCategoryKey = (runType: 'scenario-runs' | 'graph-runs', runName: string) => `${runType}/${runName}`;
+
+  const handleToggleRunCategory = async (
+    runType: 'scenario-runs' | 'graph-runs',
+    runName: string,
+    currentCategoryNames: string[],
+    category: CategoryResponse,
+  ) => {
+    const key = runCategoryKey(runType, runName);
+    if (categoryUpdateKeys.has(key)) return;
+
+    const isCurrentlyAssigned = currentCategoryNames.includes(category.name);
+    const nextCategoryNames = isCurrentlyAssigned
+      ? currentCategoryNames.filter((name) => name !== category.name)
+      : [...currentCategoryNames, category.name].sort();
+
+    setCategoryUpdateKeys((current) => new Set(current).add(key));
+    setCategoryError(null);
+    setCategoryOverrides((current) => ({ ...current, [key]: nextCategoryNames }));
+    try {
+      await operatorApi.updateCategoryAssociation(category.name, runType, runName, !isCurrentlyAssigned);
+      setCategoryOverrideSnapshotVersions((current) => ({ ...current, [key]: snapshotVersion }));
+      refreshJobs();
+    } catch (error) {
+      setCategoryOverrides((current) => ({ ...current, [key]: currentCategoryNames }));
+      setCategoryError(error instanceof Error ? error.message : 'Failed to update category assignment');
+    } finally {
+      setCategoryUpdateKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const getRunCategories = (runType: 'scenario-runs' | 'graph-runs', runName: string, names: string[]) => {
+    const assignedNames = categoryOverrides[runCategoryKey(runType, runName)] ?? names;
+    return categories.filter((category) => assignedNames.includes(category.name));
   };
 
   const toTimeValue = (date: Date | undefined): string => {
@@ -386,6 +500,11 @@ export function JobsList({
         if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return false;
       }
 
+      const runName = item.type === 'graph' ? item.graphRunName : item.run.scenarioRunName;
+      const runType = item.type === 'graph' ? 'graph-runs' : 'scenario-runs';
+      const assignedCategories = categoryOverrides[runCategoryKey(runType, runName)] ?? item.categories;
+      if (categoryFilters.length > 0 && !categoryFilters.some((name) => assignedCategories.includes(name))) return false;
+
       if (customRunNameFilter) {
         const needle = customRunNameFilter.toLowerCase();
         const haystacks = item.type === 'graph'
@@ -396,7 +515,52 @@ export function JobsList({
 
       return true;
     });
-  }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter]);
+  }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter, categoryFilters, categoryOverrides]);
+
+  const hasActiveFilters = Boolean(ownerFilter || isValidDate(dateTimeFrom) || isValidDate(dateTimeTo) || customRunNameFilter || categoryFilters.length > 0);
+
+  const renderRunActions = ({
+    actionType,
+    runName,
+    categoryKey,
+    assignedCategoryNames,
+    onToggleCategory,
+    onDelete,
+    runId,
+    runPhase,
+  }: {
+    actionType: 'graph' | 'run';
+    runName: string;
+    categoryKey: string;
+    assignedCategoryNames: string[];
+    onToggleCategory: (category: CategoryResponse) => void;
+    onDelete: () => void;
+    runId?: string;
+    runPhase?: string;
+  }) => (
+    <DataListAction
+      id={`actions-${actionType}-${runName}`}
+      aria-labelledby={`toggle-${actionType === 'graph' ? 'graph' : 'run'}-${runName}`}
+      aria-label={`Actions for run ${runName}`}
+      isPlainButtonAction
+      style={{ alignItems: 'center' }}
+    >
+      <RunCategoryActions
+        runName={runName}
+        runId={runId}
+        runPhase={runPhase}
+        categories={categories}
+        assignedCategoryNames={assignedCategoryNames}
+        isCategoriesLoading={isCategoriesLoading}
+        categoriesError={categoryError}
+        isCategoryUpdating={categoryUpdateKeys.has(categoryKey)}
+        isDeleting={deletingRun === runName}
+        onOpenCategories={() => { void loadCategories(); }}
+        onToggleCategory={onToggleCategory}
+        onDelete={onDelete}
+      />
+    </DataListAction>
+  );
 
   return (
     <Card>
@@ -416,15 +580,27 @@ export function JobsList({
           loading={activeRunsLoading}
           error={activeRunsError}
         />
+        {categoryError && (
+          <Alert
+            variant="danger"
+            title="Category action failed"
+            isInline
+            style={{ marginTop: '1rem' }}
+            actionClose={<AlertActionCloseButton onClose={() => setCategoryError(null)} />}
+          >
+            {categoryError}
+          </Alert>
+        )}
 
         {/* Filters Box */}
-        {jobs.length > 0 && (
+        {(jobs.length > 0 || categoryFilters.length > 0) && (
           <Card
             isCompact
             style={{
               marginBottom: '1.5rem',
               backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
               border: '1px solid var(--pf-v5-global--BorderColor--100)',
+              boxShadow: 'var(--pf-v5-global--BoxShadow--sm)',
             }}
           >
             <CardTitle>
@@ -439,6 +615,55 @@ export function JobsList({
                 }
               `}</style>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                {/* Category Filter */}
+                <div>
+                  <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
+                    Filter by Category:
+                  </div>
+                  <Select
+                    isOpen={isCategorySelectOpen}
+                    onOpenChange={setIsCategorySelectOpen}
+                    onSelect={(_event, value) => {
+                      const categoryName = value as string;
+                      setCategoryFilters((current) => current.includes(categoryName)
+                        ? current.filter((name) => name !== categoryName)
+                        : [...current, categoryName].sort());
+                      setPage(1);
+                    }}
+                    toggle={(toggleRef) => (
+                      <MenuToggle
+                        ref={toggleRef}
+                        onClick={() => setIsCategorySelectOpen((open) => !open)}
+                        isExpanded={isCategorySelectOpen}
+                        style={{ width: '222px' }}
+                        className="custom-select-toggle"
+                        aria-label="Filter by category"
+                      >
+                        {categoryFilters.length === 0
+                          ? 'All categories'
+                          : `${categoryFilters.length} ${categoryFilters.length === 1 ? 'category' : 'categories'} selected`}
+                      </MenuToggle>
+                    )}
+                  >
+                    <SelectList>
+                      {categories.map((category) => (
+                        <SelectOption
+                          key={category.name}
+                          value={category.name}
+                          hasCheckbox
+                          isSelected={categoryFilters.includes(category.name)}
+                          icon={<span aria-hidden="true" style={{ display: 'inline-block', width: '0.75rem', height: '0.75rem', borderRadius: '50%', backgroundColor: category.color }} />}
+                        >
+                          {category.name}
+                        </SelectOption>
+                      ))}
+                      {categories.length === 0 && (
+                        <SelectOption value="no-categories" isDisabled>{isCategoriesLoading ? 'Loading categories…' : 'No categories available'}</SelectOption>
+                      )}
+                    </SelectList>
+                  </Select>
+                </div>
+
                 {/* Run Name Filter */}
                 <div>
                   <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
@@ -577,7 +802,7 @@ export function JobsList({
               )}
 
               {/* Clear filters button */}
-              {(ownerFilter || isValidDate(dateTimeFrom) || isValidDate(dateTimeTo) || customRunNameFilter) && (
+              {hasActiveFilters && (
                 <div style={{ marginTop: '1rem' }}>
                   <Button
                     variant="link"
@@ -587,6 +812,8 @@ export function JobsList({
                       setDateTimeFrom(undefined);
                       setDateTimeTo(undefined);
                       setCustomRunNameFilter('');
+                      setCategoryFilters([]);
+                      setPage(1);
                       setTimeRangeError('');
                     }}
                   >
@@ -606,7 +833,7 @@ export function JobsList({
             </Title>
             <EmptyStateBody>Fetching scenario runs...</EmptyStateBody>
           </EmptyState>
-        ) : filteredUnifiedRuns.length === 0 && jobs.length > 0 ? (
+        ) : filteredUnifiedRuns.length === 0 && (jobs.length > 0 || hasActiveFilters) ? (
           <EmptyState>
             <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
@@ -627,17 +854,27 @@ export function JobsList({
         ) : (
           <>
           {hasReceivedStats && <JobStatsSummary stats={stats} />}
-          <DataList aria-label="Scenario runs list" isCompact>
+          <DataList
+            aria-label="Scenario runs list"
+            className="jobs-list-runs"
+            gridBreakpoint="none"
+            isCompact
+            wrapModifier="truncate"
+          >
             {filteredUnifiedRuns.map((item) => {
               // Handle GraphRun
               if (item.type === 'graph') {
                 const isGraphExpanded = expandedGraphRunIds.has(item.graphRunName);
                 const phaseDisplay = getRunPhaseDisplay(item.phase);
+                const graphCategoryKey = runCategoryKey('graph-runs', item.graphRunName);
+                const graphCategoryNames = categoryOverrides[graphCategoryKey] ?? item.categories;
+                const graphCategories = getRunCategories('graph-runs', item.graphRunName, item.categories);
 
                 return (
                   <DataListItem key={item.graphRunName} isExpanded={isGraphExpanded}>
                     {/* GraphRun Summary Row */}
-                    <DataListItemRow>
+                    <DataListItemRow style={{ position: 'relative' }}>
+                      <RunCategoryStripe categories={graphCategories} />
                       <DataListToggle
                         onClick={() => onToggleGraphRunAccordion(item.graphRunName)}
                         isExpanded={isGraphExpanded}
@@ -647,7 +884,7 @@ export function JobsList({
                       />
                       <DataListItemCells
                         dataListCells={[
-                          <DataListCell key="status" width={1}>
+                          <DataListCell key="status" width={1} className="jobs-list-summary-cell--status">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Status:</strong>
@@ -657,7 +894,7 @@ export function JobsList({
                               </Label>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="workflow" width={2}>
+                          <DataListCell key="workflow" width={2} className="jobs-list-summary-cell--primary">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>
@@ -667,6 +904,7 @@ export function JobsList({
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <code
+                                  className="jobs-list-run-primary-value"
                                   style={{
                                     fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
                                     fontSize: 'var(--pf-v5-global--FontSize--sm)',
@@ -683,40 +921,60 @@ export function JobsList({
                               </div>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="owner" width={2}>
+                          <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>User:</strong>
                               </div>
-                              <code
-                                style={{
-                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                  padding: '0.125rem 0.5rem',
-                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                  display: 'inline-block',
-                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {item.ownerUserId || 'Unknown'}
-                              </code>
+                              <Tooltip content={item.ownerUserId || 'Unknown'}>
+                                <code
+                                  className="jobs-list-owner-id"
+                                  aria-label={item.ownerUserId || 'Unknown'}
+                                  style={{
+                                    fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                    fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                    padding: '0.125rem 0.5rem',
+                                    borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                    display: 'inline-block',
+                                    border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {item.ownerUserId || 'Unknown'}
+                                </code>
+                              </Tooltip>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="total-nodes" width={2}>
+                          <DataListCell key="total-nodes" width={2} className="jobs-list-summary-cell--graph-nodes">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Graph Nodes:</strong>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Label color="blue" icon={<TopologyIcon />}>
-                                  {item.summary.completedNodes} / {item.summary.totalNodes}
-                                </Label>
+                                <Tooltip
+                                  content={`${item.summary.completedNodes} completed, ${item.summary.failedNodes} failed, ${item.summary.runningNodes} running, ${item.summary.pendingNodes} pending, ${item.summary.totalNodes} total`}
+                                >
+                                  <Label color="blue" icon={<TopologyIcon />}>
+                                    <span className="jobs-list-graph-node-counts">
+                                      <span className="jobs-list-graph-node-counts__completed">
+                                        <CheckCircleIcon aria-hidden="true" />
+                                        {item.summary.completedNodes}
+                                      </span>
+                                      <span className="jobs-list-graph-node-counts__separator" aria-hidden="true">/</span>
+                                      <span className="jobs-list-graph-node-counts__total">{item.summary.totalNodes}</span>
+                                    </span>
+                                  </Label>
+                                </Tooltip>
                               </div>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="resiliency-score" width={2}>
+                          <DataListCell
+                            key="run-name-spacer"
+                            aria-hidden="true"
+                            className="jobs-list-summary-cell--run-name"
+                          />,
+                          <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Resiliency Score:</strong>
@@ -727,7 +985,7 @@ export function JobsList({
                               />
                             </div>
                           </DataListCell>,
-                          <DataListCell key="created" width={2}>
+                          <DataListCell key="created" width={2} className="jobs-list-summary-cell--created">
                             <div>
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Created:</strong>
@@ -748,20 +1006,18 @@ export function JobsList({
                               </code>
                             </div>
                           </DataListCell>,
-                          <DataListCell key="actions" width={1}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                              <Button
-                                variant="plain"
-                                aria-label="Delete graph run"
-                                onClick={() => setConfirmDeleteRun(item.graphRunName)}
-                                isDisabled={deletingRun === item.graphRunName}
-                                icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
-                                style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
-                              />
-                            </div>
-                          </DataListCell>,
                         ]}
                       />
+                      {renderRunActions({
+                        actionType: 'graph',
+                        runName: item.graphRunName,
+                        categoryKey: graphCategoryKey,
+                        assignedCategoryNames: graphCategoryNames,
+                        onToggleCategory: (category) => {
+                          void handleToggleRunCategory('graph-runs', item.graphRunName, graphCategoryNames, category);
+                        },
+                        onDelete: () => setConfirmDeleteRun(item.graphRunName),
+                      })}
                     </DataListItemRow>
 
                     {/* GraphRun Expanded Content - Show DAG visualization */}
@@ -771,7 +1027,7 @@ export function JobsList({
                       isHidden={!isGraphExpanded}
                     >
                       {isGraphExpanded && (
-                        <GraphRunDetail graphRunName={item.graphRunName} />
+                        <GraphRunDetail graphRunName={item.graphRunName} onReplayWorkflow={onReplayWorkflow} />
                       )}
                     </DataListContent>
                   </DataListItem>
@@ -780,13 +1036,19 @@ export function JobsList({
 
               // Handle standalone ScenarioRun
               const run = item.run;
+              const customRunName = run.customRunName?.trim();
+              const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
+              const scenarioCategoryKey = runCategoryKey('scenario-runs', run.scenarioRunName);
+              const scenarioCategoryNames = categoryOverrides[scenarioCategoryKey] ?? item.categories;
+              const scenarioCategories = getRunCategories('scenario-runs', run.scenarioRunName, item.categories);
 
               return (
                 <DataListItem key={run.scenarioRunName} isExpanded={isRunExpanded}>
                   {/* Scenario Run Summary Row */}
-                  <DataListItemRow>
+                  <DataListItemRow style={{ position: 'relative' }}>
+                    <RunCategoryStripe categories={scenarioCategories} />
                     <DataListToggle
                       onClick={() => onToggleRunAccordion(run.scenarioRunName)}
                       isExpanded={isRunExpanded}
@@ -796,7 +1058,7 @@ export function JobsList({
                     />
                     <DataListItemCells
                       dataListCells={[
-                        <DataListCell key="status" width={1}>
+                        <DataListCell key="status" width={1} className="jobs-list-summary-cell--status">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Status:</strong>
@@ -806,7 +1068,7 @@ export function JobsList({
                             </Label>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="scenario" width={2}>
+                        <DataListCell key="scenario" width={2} className="jobs-list-summary-cell--primary">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>
@@ -816,6 +1078,7 @@ export function JobsList({
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <code
+                                className="jobs-list-run-primary-value"
                                 style={{
                                   fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
                                   fontSize: 'var(--pf-v5-global--FontSize--sm)',
@@ -837,35 +1100,85 @@ export function JobsList({
                                 </Tooltip>
                               )}
                             </div>
+                            <Tooltip
+                              content={customRunName && customRunName !== scenarioRunName
+                                ? `Run name: ${customRunName}; run ID: ${scenarioRunName}`
+                                : `Run ID: ${scenarioRunName}`}
+                            >
+                              <div
+                                className="jobs-list-compact-run-identity"
+                                aria-label={customRunName && customRunName !== scenarioRunName
+                                  ? `Run name ${customRunName}, run ID ${scenarioRunName}`
+                                  : `Run ID ${scenarioRunName}`}
+                              >
+                                {customRunName && customRunName !== scenarioRunName && (
+                                  <code>{customRunName}</code>
+                                )}
+                                <code>{scenarioRunName}</code>
+                              </div>
+                            </Tooltip>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="owner" width={2}>
+                        <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>User:</strong>
                             </div>
-                            <code
-                              style={{
-                                fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                padding: '0.125rem 0.5rem',
-                                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                display: 'inline-block',
-                                border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {run.ownerUserId || 'Unknown'}
-                            </code>
+                            <Tooltip content={run.ownerUserId || 'Unknown'}>
+                              <code
+                                className="jobs-list-owner-id"
+                                aria-label={run.ownerUserId || 'Unknown'}
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {run.ownerUserId || 'Unknown'}
+                              </code>
+                            </Tooltip>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="run-name" width={2}>
+                        <DataListCell key="jobs-summary" width={2} className="jobs-list-summary-cell--jobs">
+                          <div>
+                            <div style={{ marginBottom: '0.25rem' }}>
+                              <strong>Jobs:</strong>
+                            </div>
+                            <Tooltip
+                              content={`${run.successfulJobs} succeeded, ${run.failedJobs} failed, ${run.runningJobs} running`}
+                            >
+                              <Label color="blue" icon={<HiOutlineRocketLaunch />}>
+                                <span className="jobs-list-job-counts">
+                                  <span className="jobs-list-job-counts__succeeded">
+                                    <CheckCircleIcon aria-hidden="true" />
+                                    {run.successfulJobs}
+                                  </span>
+                                  <span className="jobs-list-job-counts__separator" aria-hidden="true">/</span>
+                                  <span className="jobs-list-job-counts__failed">
+                                    <ExclamationCircleIcon aria-hidden="true" />
+                                    {run.failedJobs}
+                                  </span>
+                                  <span className="jobs-list-job-counts__separator" aria-hidden="true">/</span>
+                                  <span className="jobs-list-job-counts__running">
+                                    <SyncAltIcon aria-hidden="true" />
+                                    {run.runningJobs}
+                                  </span>
+                                </span>
+                              </Label>
+                            </Tooltip>
+                          </div>
+                        </DataListCell>,
+                        <DataListCell key="run-name" width={2} className="jobs-list-summary-cell--run-name">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Run Name:</strong>
                             </div>
-                            {run.customRunName ? (
+                            {customRunName ? (
                               <>
                                 <code
                                   style={{
@@ -877,23 +1190,25 @@ export function JobsList({
                                     display: 'inline-block',
                                     border: '1px solid var(--pf-v5-global--BorderColor--100)',
                                     whiteSpace: 'nowrap',
-                                    marginBottom: '0.25rem',
+                                    marginBottom: customRunName !== scenarioRunName ? '0.25rem' : 0,
                                   }}
                                 >
-                                  {run.customRunName}
+                                  {customRunName}
                                 </code>
-                                <div>
-                                  <code
-                                    style={{
-                                      fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                      fontSize: 'var(--pf-v5-global--FontSize--xs)',
-                                      color: 'var(--pf-v5-global--Color--200)',
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    {run.scenarioRunName}
-                                  </code>
-                                </div>
+                                {customRunName !== scenarioRunName && (
+                                  <div>
+                                    <code
+                                      style={{
+                                        fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                        fontSize: 'var(--pf-v5-global--FontSize--xs)',
+                                        color: 'var(--pf-v5-global--Color--200)',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {scenarioRunName}
+                                    </code>
+                                  </div>
+                                )}
                               </>
                             ) : (
                               <code
@@ -908,30 +1223,28 @@ export function JobsList({
                                   whiteSpace: 'nowrap',
                                 }}
                               >
-                                {run.scenarioRunName}
+                                {scenarioRunName}
                               </code>
                             )}
                           </div>
                         </DataListCell>,
-                        <DataListCell key="jobs-summary" width={2}>
+                        <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Jobs:</strong>
+                              <strong>Resiliency Score:</strong>
                             </div>
-                            <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                              <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>✓</span> {run.successfulJobs}
-                              </span>
-                              <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>✗</span> {run.failedJobs}
-                              </span>
-                              <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>⟳</span> {run.runningJobs}
-                              </span>
-                            </div>
+                            <ResiliencyScoreTooltip
+                              scores={
+                                run.resiliencyScores
+                                  ? toGraphClusterScores(run.resiliencyScores)
+                                  : run.resiliencyScoreEnabled && !TERMINAL_PHASES.includes(run.phase)
+                                    ? [{ clusterName: '', calculated: SCORE_CALCULATING, status: 'no-baseline' as const }]
+                                    : undefined
+                              }
+                            />
                           </div>
                         </DataListCell>,
-                        <DataListCell key="created" width={2}>
+                        <DataListCell key="created" width={2} className="jobs-list-summary-cell--created">
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Created:</strong>
@@ -952,27 +1265,20 @@ export function JobsList({
                             </code>
                           </div>
                         </DataListCell>,
-                        <DataListCell key="reports" width={3}>
-                          <ReportDownloadButton
-                            runId={run.scenarioRunName}
-                            runName={run.scenarioRunName}
-                            runPhase={run.phase}
-                          />
-                        </DataListCell>,
-                        <DataListCell key="actions" width={1}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                            <Button
-                              variant="plain"
-                              aria-label="Delete scenario run"
-                              onClick={() => setConfirmDeleteRun(run.scenarioRunName)}
-                              isDisabled={deletingRun === run.scenarioRunName}
-                              icon={<TrashIcon style={{ fontSize: '1.2rem' }} />}
-                              style={{ color: 'var(--pf-v5-global--danger-color--100)' }}
-                            />
-                          </div>
-                        </DataListCell>,
                       ]}
                     />
+                    {renderRunActions({
+                      actionType: 'run',
+                      runName: run.scenarioRunName,
+                      categoryKey: scenarioCategoryKey,
+                      assignedCategoryNames: scenarioCategoryNames,
+                      onToggleCategory: (category) => {
+                        void handleToggleRunCategory('scenario-runs', run.scenarioRunName, scenarioCategoryNames, category);
+                      },
+                      onDelete: () => setConfirmDeleteRun(run.scenarioRunName),
+                      runId: run.scenarioRunName,
+                      runPhase: run.phase,
+                    })}
                   </DataListItemRow>
 
                   {/* Scenario Run Details - Jobs List (expanded) */}
@@ -1148,7 +1454,7 @@ export function JobsList({
                                           </FlexItem>
 
                                           {/* Logs for running, succeeded, and failed jobs */}
-                                          {['Running', 'Succeeded', 'Failed'].includes(job.phase) && job.jobId && (
+                                          {['Running', 'Succeeded', 'Failed', 'MaxRetriesExceeded'].includes(job.phase) && job.jobId && (
                                             <FlexItem>
                                               <LogViewer
                                                 scenarioRunName={run.scenarioRunName}
@@ -1162,7 +1468,7 @@ export function JobsList({
                                           )}
 
                                           {/* Delete button for non-terminal jobs */}
-                                          {!['Succeeded', 'Failed'].includes(job.phase) && (
+                                          {!['Succeeded', 'Failed', 'MaxRetriesExceeded'].includes(job.phase) && (
                                             <FlexItem>
                                               <Button
                                                 variant="danger"

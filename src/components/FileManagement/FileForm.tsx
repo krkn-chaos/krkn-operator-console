@@ -31,29 +31,24 @@ import {
   FlexItem,
   Spinner,
 } from '@patternfly/react-core';
-import { FiPlus, FiX } from 'react-icons/fi';
+import { FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
-import type { FileInfo, CreateFileRequest, UpdateFileRequest, FileTypeResponse, GroupResponse } from '../../types/api';
+import type { FileInfo, CreateFileRequest, UpdateFileRequest, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
   mode: 'create' | 'edit';
   initialData?: FileInfo;
-  availableFileTypes: FileTypeResponse[];
   onSuccess: () => void;
   onCancel: () => void;
-  onRequestNewFileType: () => void;
 }
-
 
 export function FileForm({
   mode,
   initialData,
-  availableFileTypes,
   onSuccess,
   onCancel,
-  onRequestNewFileType,
 }: FileFormProps) {
   const { isAdmin } = useRole();
 
@@ -61,7 +56,7 @@ export function FileForm({
   const [fileName, setFileName] = useState('');
   const [content, setContent] = useState('');
   const [description, setDescription] = useState('');
-  const [fileType, setFileType] = useState('');
+  const [legacyFileType, setLegacyFileType] = useState(initialData?.fileType);
   const [accessType, setAccessType] = useState<'public' | 'group'>('public');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
@@ -71,10 +66,6 @@ export function FileForm({
   const [loadingFile, setLoadingFile] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-
-  // File type select state
-  const [isFileTypeSelectOpen, setIsFileTypeSelectOpen] = useState(false);
-  const [fileTypeSearchTerm, setFileTypeSearchTerm] = useState('');
 
   // Group select state (single selection)
   const [isGroupSelectOpen, setIsGroupSelectOpen] = useState(false);
@@ -97,7 +88,7 @@ export function FileForm({
         setFileName(file.fileName);
         setContent(file.content);
         setDescription(file.description || '');
-        setFileType(file.fileType || '');
+        setLegacyFileType(file.fileType || initialData?.fileType);
         setAccessType(file.availableToAll ? 'public' : 'group');
         setSelectedGroup(file.groups?.[0] || '');
       } catch (err) {
@@ -188,7 +179,6 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
-          fileType: fileType.trim() || undefined,
         };
 
         await operatorApi.createFile(request);
@@ -199,7 +189,7 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
-          fileType: fileType.trim() || undefined,
+          fileType: legacyFileType,
         };
 
         await operatorApi.updateFile(initialData!.fileId, request);
@@ -294,137 +284,6 @@ export function FileForm({
         />
       </FormGroup>
 
-      <FormGroup label="File Type" fieldId="file-type-select">
-        {/* Selected file type badge preview */}
-        {fileType && (
-          <div style={{ marginBottom: '0.5rem' }}>
-            <Label
-              color="grey"
-              style={{
-                backgroundColor: availableFileTypes.find(t => t.name === fileType)?.color || '#6c757d',
-                color: '#fff',
-              }}
-              onClose={() => setFileType('')}
-            >
-              {fileType}
-            </Label>
-          </div>
-        )}
-
-        {/* Combobox: select existing OR type new (freeform input) */}
-        <Select
-          isOpen={isFileTypeSelectOpen}
-          selected={fileType}
-          onSelect={(_event, value) => {
-            setFileType(value as string);
-            setIsFileTypeSelectOpen(false);
-            setFileTypeSearchTerm('');
-          }}
-          onOpenChange={(isOpen) => {
-            setIsFileTypeSelectOpen(isOpen);
-            if (!isOpen) {
-              setFileTypeSearchTerm('');
-            }
-          }}
-          toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-            <MenuToggle
-              ref={toggleRef}
-              onClick={() => setIsFileTypeSelectOpen(!isFileTypeSelectOpen)}
-              isExpanded={isFileTypeSelectOpen}
-              style={{ width: '100%' }}
-            >
-              <TextInputGroup>
-                <TextInputGroupMain
-                  value={fileTypeSearchTerm}
-                  onClick={() => setIsFileTypeSelectOpen(true)}
-                  onChange={(_event, value) => {
-                    setFileTypeSearchTerm(value);
-                    // Allow freeform input: update fileType as user types
-                    setFileType(value);
-                  }}
-                  placeholder={fileType || 'Type to create new or select existing...'}
-                />
-                {fileTypeSearchTerm && (
-                  <TextInputGroupUtilities>
-                    <Button
-                      variant="plain"
-                      onClick={() => {
-                        setFileTypeSearchTerm('');
-                        setFileType('');
-                      }}
-                      icon={<FiX />}
-                      aria-label="Clear"
-                    />
-                  </TextInputGroupUtilities>
-                )}
-              </TextInputGroup>
-            </MenuToggle>
-          )}
-        >
-          <SelectList>
-            {/* No type option */}
-            <SelectOption value="">
-              <span style={{ color: '#666', fontStyle: 'italic' }}>(No type)</span>
-            </SelectOption>
-
-            {/* Filtered file types */}
-            {availableFileTypes
-              .filter((type) =>
-                type.name.toLowerCase().includes(fileTypeSearchTerm.toLowerCase())
-              )
-              .map((type) => (
-                <SelectOption key={type.name} value={type.name}>
-                  <Label
-                    color="grey"
-                    isCompact
-                    style={{
-                      backgroundColor: type.color || '#6c757d',
-                      color: '#fff',
-                      marginRight: '0.5rem',
-                    }}
-                  >
-                    {type.name}
-                  </Label>
-                </SelectOption>
-              ))}
-
-            {/* Show "Create new" option if search term doesn't match existing */}
-            {fileTypeSearchTerm &&
-              !availableFileTypes.some(
-                (type) => type.name.toLowerCase() === fileTypeSearchTerm.toLowerCase()
-              ) && (
-                <SelectOption value={fileTypeSearchTerm}>
-                  <span style={{ color: 'var(--pf-v5-global--link--Color)', fontWeight: 'bold' }}>
-                    + Create "{fileTypeSearchTerm}"
-                  </span>
-                  <span style={{ color: 'var(--pf-v5-global--Color--200)', fontSize: '0.85em', marginLeft: '0.5rem' }}>
-                    (will be auto-created)
-                  </span>
-                </SelectOption>
-              )}
-          </SelectList>
-        </Select>
-
-        {/* Manage Types link */}
-        <div style={{ marginTop: '0.5rem' }}>
-          <Button
-            variant="link"
-            isInline
-            onClick={onRequestNewFileType}
-            icon={<FiPlus />}
-          >
-            Manage Types
-          </Button>
-        </div>
-
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem>
-              Optional. Type to create a new type (auto-created on save), or select existing.
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
         {/* Admin: can choose public or group */}

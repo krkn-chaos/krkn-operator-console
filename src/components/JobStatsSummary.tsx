@@ -75,7 +75,17 @@ export function JobStatsSummary({ stats: serverStats, labels, subTexts }: JobSta
           const label = labels?.[card.id] ?? card.label;
           const subText = subTexts?.[card.id] ?? card.subText;
           return (
-            <Card isCompact isFlat key={card.id} style={{ flex: '1 1 0', minWidth: '140px',}}>
+            <Card
+              isCompact
+              key={card.id}
+              style={{
+                flex: '1 1 0',
+                minWidth: '140px',
+                backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                boxShadow: 'var(--pf-v5-global--BoxShadow--sm)',
+              }}
+            >
               <CardTitle>
                  <Icon style={{ fontSize: '1.5rem', color: card.color, marginRight: '0.5rem' }} />
                 {label}</CardTitle>

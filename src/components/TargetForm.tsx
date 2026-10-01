@@ -13,6 +13,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import type { CreateTargetRequest, SecretType, TargetResponse } from '../types/api';
+import { isValidKubernetesLabelValue } from '../utils/kubernetes';
 
 /**
  * Form for creating or editing a cluster target.
@@ -61,6 +62,19 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const getClusterNameError = (value: string): string | undefined => {
+    if (!value.trim()) {
+      return 'Cluster name is required';
+    }
+    if (initialData?.clusterName === value) {
+      return undefined;
+    }
+    if (!isValidKubernetesLabelValue(value)) {
+      return 'Use 1–63 letters, numbers, hyphens, underscores, or periods; start and end with a letter or number.';
+    }
+    return undefined;
+  };
+
   const handleKubeconfigFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -85,9 +99,8 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!clusterName.trim()) {
-      newErrors.clusterName = 'Cluster name is required';
-    }
+    const clusterNameError = getClusterNameError(clusterName);
+    if (clusterNameError) newErrors.clusterName = clusterNameError;
 
     switch (secretType) {
       case 'kubeconfig':
@@ -133,7 +146,7 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
 
     try {
       const data: CreateTargetRequest = {
-        clusterName: clusterName.trim(),
+        clusterName: initialData?.clusterName === clusterName ? clusterName : clusterName.trim(),
         secretType,
       };
 
@@ -195,7 +208,20 @@ export function TargetForm({ initialData, onSubmit, onCancel }: TargetFormProps)
         <TextInput
           id="cluster-name"
           value={clusterName}
-          onChange={(_event, value) => setClusterName(value)}
+          onChange={(_event, value) => {
+            setClusterName(value);
+            setErrors((currentErrors) => {
+              if (!currentErrors.clusterName) return currentErrors;
+              const nextErrors = { ...currentErrors };
+              const clusterNameError = getClusterNameError(value);
+              if (clusterNameError) {
+                nextErrors.clusterName = clusterNameError;
+              } else {
+                delete nextErrors.clusterName;
+              }
+              return nextErrors;
+            });
+          }}
           isRequired
           validated={errors.clusterName ? 'error' : 'default'}
         />

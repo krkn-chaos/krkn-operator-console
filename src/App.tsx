@@ -9,6 +9,8 @@ import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio, ElasticsearchDataView } from './components';
 import { FileManagementPage } from './components/FileManagement';
+import { CategoryManagementPage } from './components/CategoryManagement';
+import { ResiliencyHistoryPage } from './components/ResiliencyHistory';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
 import { useRole } from './hooks/useRole';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
@@ -21,6 +23,7 @@ import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
 import { KrknAIPage } from './components/KrknAI/KrknAIPage';
+import { buildRerunIntent } from './utils/rerunIntent';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -137,6 +140,10 @@ function App() {
     }
   };
 
+  const handleReplayWorkflow = (workflow: import('./types/api').StudioWorkflow, categories?: string[]) => {
+    dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow, categories } });
+  };
+
   const handleCreateJob = () => {
     const proceed = async () => {
       // Create initial target for fetching clusters
@@ -169,22 +176,7 @@ function App() {
     try {
       const config = await operatorApi.getJobConfig(jobId);
 
-      const clusters = Object.entries(config.targetClusters).flatMap(
-        ([operatorName, clusterNames]) =>
-          clusterNames.map(clusterName => ({ operatorName, clusterName }))
-      );
-
-      dispatch({
-        type: 'RERUN_SCENARIO',
-        payload: {
-          scenarioName: config.scenarioName,
-          registryName: run.registryName,
-          clusters,
-          environment: config.environment,
-          scenarioImage: config.scenarioImage,
-          kubeconfigPath: config.kubeconfigPath,
-        },
-      });
+      dispatch({ type: 'RERUN_SCENARIO', payload: buildRerunIntent(config, run) });
 
       const response = await operatorApi.createTargetRequest();
       dispatch({
@@ -237,6 +229,7 @@ function App() {
                 dispatch({ type: 'TOGGLE_GRAPH_RUN_ACCORDION', payload: { graphRunName } })
               }
               onDeleteGraphRun={handleDeleteGraphRun}
+              onReplayWorkflow={handleReplayWorkflow}
               loadingRunDetails={state.loadingRunDetails}
             />
           </PageSection>
@@ -256,6 +249,13 @@ function App() {
           </PageSection>
         );
 
+      case 'resiliency_history':
+        return (
+          <PageSection isFilled>
+            <ResiliencyHistoryPage />
+          </PageSection>
+        );
+
       case 'terminal':
         return (
           <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: '100%' }}>
@@ -272,10 +272,20 @@ function App() {
           </PageSection>
         );
 
+      case 'categories':
+        return (
+          <PageSection isFilled>
+            <CategoryManagementPage />
+          </PageSection>
+        );
+
       case 'studio':
         return (
           <PageSection>
-            <Studio />
+            <Studio
+              initialWorkflow={state.studioReplayWorkflow ?? undefined}
+              initialCategories={state.studioReplayCategories ?? undefined}
+            />
           </PageSection>
         );
 
@@ -368,8 +378,20 @@ function App() {
     proceed();
   };
 
+  const handleNavigateToCategories = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_CATEGORIES' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
   const handleNavigateToElasticsearchData = () => {
     const proceed = () => dispatch({ type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
+  const handleNavigateToResiliencyHistory = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_RESILIENCY_HISTORY' });
     if (!checkStudioGuard(proceed)) return;
     proceed();
   };
@@ -435,8 +457,10 @@ function App() {
       onRunScenario={handleCreateJob}
       onNavigateStudio={handleNavigateToStudio}
       onOpenFiles={handleNavigateToFiles}
+      onNavigateCategories={handleNavigateToCategories}
       onNavigateTerminal={handleNavigateToTerminal}
       onNavigateElasticsearchData={handleNavigateToElasticsearchData}
+      onNavigateResiliencyHistory={handleNavigateToResiliencyHistory}
       onNavigateSettings={handleNavigateToSettings}
       onEditProfile={handleEditProfile}
       onChangePassword={handleChangePassword}

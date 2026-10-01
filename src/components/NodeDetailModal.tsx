@@ -71,6 +71,8 @@ function getJobPhaseDisplay(phase: ClusterJobPhase) {
       return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
     case 'Failed':
       return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+    case 'MaxRetriesExceeded':
+      return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
     default:
       return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
   }

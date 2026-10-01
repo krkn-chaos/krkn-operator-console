@@ -20,6 +20,8 @@ const initialState: AppState = {
   // Graph runs list (GraphRun orchestration)
   graphRuns: [],
   expandedGraphRunIds: new Set<string>(),
+  studioReplayWorkflow: null,
+  studioReplayCategories: [],
 
   // Workflow state
   clusters: null,
@@ -39,8 +41,9 @@ const initialState: AppState = {
 
   // Re-run workflow
   rerunIntent: null,
+  rerunCategories: [],
   startInPreview: false,
-  rerunScenarioImage: null,
+  rerunScenario: null,
   rerunKubeconfigPath: null,
 
   // Error handling
@@ -95,17 +98,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
       if (state.rerunIntent) {
         return {
           ...state,
-          phase: 'loading_scenario_detail',
+          phase: 'selecting_clusters',
+          clusters: null,
           selectedClusters: state.rerunIntent.clusters.map(c => ({
             operatorName: c.operatorName,
             clusterName: c.clusterName,
             clusterApiUrl: '',
           })),
-          registryType: state.rerunIntent.registryName ? 'private' : 'public',
-          registryConfig: state.rerunIntent.registryName
-            ? { registryName: state.rerunIntent.registryName }
+          registryType: state.rerunIntent.scenario.private ? 'private' : 'public',
+          registryConfig: state.rerunIntent.scenario.registryName
+            ? { registryName: state.rerunIntent.scenario.registryName }
             : {},
-          selectedScenario: state.rerunIntent.scenarioName,
+          selectedScenario: state.rerunIntent.scenario.name,
           startInPreview: true,
           error: null,
         };
@@ -337,6 +341,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ),
       };
 
+    case 'OPEN_STUDIO_REPLAY':
+      return {
+        ...state,
+        phase: 'studio',
+        studioReplayWorkflow: action.payload.workflow,
+        studioReplayCategories: action.payload.categories ?? [],
+      };
+
     // Workflow control
     case 'START_CREATE_WORKFLOW':
       return {
@@ -364,8 +376,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalFormValues: null,
         globalTouchedFields: null,
         rerunIntent: null,
+        rerunCategories: [],
         startInPreview: false,
-        rerunScenarioImage: null,
+        rerunScenario: null,
         rerunKubeconfigPath: null,
         error: null,
       };
@@ -390,6 +403,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'CLUSTERS_SELECTED':
+      if (state.rerunIntent) {
+        return {
+          ...state,
+          phase: 'loading_scenario_detail',
+          registryType: state.rerunIntent.scenario.private ? 'private' : 'public',
+          registryConfig: state.rerunIntent.scenario.registryName
+            ? { registryName: state.rerunIntent.scenario.registryName }
+            : {},
+          selectedScenario: state.rerunIntent.scenario.name,
+          startInPreview: true,
+          error: null,
+        };
+      }
+
       // Proceed directly to registry configuration (no need to create targets)
       return {
         ...state,
@@ -443,12 +470,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         rerunIntent: action.payload,
+        rerunCategories: action.payload.categories ?? [],
       };
 
     case 'SELECT_SCENARIO_FOR_DETAIL':
       return {
         ...state,
         selectedScenario: action.payload.scenarioName,
+        rerunCategories: [],
         phase: 'loading_scenario_detail',
       };
 
@@ -491,7 +520,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         phase: 'configuring_scenario',
         scenarioDetail: detail,
         scenarioFormValues: formValues,
-        rerunScenarioImage: state.rerunIntent?.scenarioImage ?? null,
+        rerunScenario: state.rerunIntent?.scenario ?? null,
         rerunKubeconfigPath: state.rerunIntent?.kubeconfigPath ?? null,
         rerunIntent: null,
         error: null,
@@ -553,8 +582,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         globalFormValues: null,
         globalTouchedFields: null,
         rerunIntent: null,
+        rerunCategories: [],
         startInPreview: false,
-        rerunScenarioImage: null,
+        rerunScenario: null,
         rerunKubeconfigPath: null,
         error: null,
       };
@@ -597,6 +627,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
             phase: 'jobs_list',
           };
 
+        case 'categories':
+          // From categories → back to jobs list
+          return {
+            ...state,
+            phase: 'jobs_list',
+          };
+
         case 'elasticsearch_data':
           // From Elasticsearch telemetry data view → back to jobs list
           return {
@@ -605,6 +642,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
           };
 
         case 'krkn_ai':
+        case 'resiliency_history':
+          // From the AI or resiliency history page → back to jobs list
           return {
             ...state,
             phase: 'jobs_list',
@@ -655,8 +694,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
               globalFormValues: null,
               globalTouchedFields: null,
               rerunIntent: null,
+              rerunCategories: [],
               startInPreview: false,
-              rerunScenarioImage: null,
+              rerunScenario: null,
               rerunKubeconfigPath: null,
             };
           }
@@ -671,7 +711,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
             globalFormValues: null,
             globalTouchedFields: null,
             startInPreview: false,
-            rerunScenarioImage: null,
+            rerunScenario: null,
             rerunKubeconfigPath: null,
           };
 
@@ -708,6 +748,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         phase: 'files',
       };
 
+    case 'NAVIGATE_TO_CATEGORIES':
+      return {
+        ...state,
+        phase: 'categories',
+      };
+
     case 'NAVIGATE_TO_ELASTICSEARCH_DATA':
       return {
         ...state,
@@ -718,6 +764,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'krkn_ai',
+      };
+
+    case 'NAVIGATE_TO_RESILIENCY_HISTORY':
+      return {
+        ...state,
+        phase: 'resiliency_history',
       };
 
     // Notifications

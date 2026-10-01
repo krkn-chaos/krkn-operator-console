@@ -22,6 +22,7 @@ const makeHandlers = (): Handlers => ({
   onOpenFiles: vi.fn(),
   onNavigateTerminal: vi.fn(),
   onNavigateElasticsearchData: vi.fn(),
+  onNavigateResiliencyHistory: vi.fn(),
   onNavigateSettings: vi.fn(),
   onEditProfile: vi.fn(),
   onChangePassword: vi.fn(),
@@ -58,6 +59,7 @@ describe('AppSidebar', () => {
     expect(screen.getByText('Files')).toBeInTheDocument();
     expect(screen.getByText('Terminal')).toBeInTheDocument();
     expect(screen.getByText('ES Data')).toBeInTheDocument();
+    expect(screen.getByText('Resiliency History')).toBeInTheDocument();
   });
 
   it('hides the Settings item for non-admins', () => {
@@ -94,6 +96,9 @@ describe('AppSidebar', () => {
 
     await user.click(screen.getByText('ES Data'));
     expect(handlers.onNavigateElasticsearchData).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByText('Resiliency History'));
+    expect(handlers.onNavigateResiliencyHistory).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByText('Settings'));
     expect(handlers.onNavigateSettings).toHaveBeenCalledTimes(1);
@@ -140,6 +145,13 @@ describe('AppSidebar', () => {
     const current = container.querySelector('.pf-m-current');
     expect(current).not.toBeNull();
     expect(current).toHaveTextContent('Krkn AI');
+  });
+
+  it('marks the Resiliency History item as current for its phase', () => {
+    const { container } = renderSidebar({ activePhase: 'resiliency_history' });
+    const current = container.querySelector('.pf-m-current');
+    expect(current).not.toBeNull();
+    expect(current).toHaveTextContent('Resiliency History');
   });
 
   it('is collapsed by default and expands on hover', async () => {

@@ -5,3 +5,4 @@ export { workflowsApi } from './workflowsApi';
 export { websocketService } from './websocketService';
 export { elasticsearchApi } from './elasticsearchApi';
 export { cloudCredentialsApi } from './cloudCredentialsApi';
+export { signatureVerificationApi } from './signatureVerificationApi';
