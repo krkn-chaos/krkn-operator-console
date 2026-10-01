@@ -30,6 +30,7 @@ interface ScenarioConfigStepProps {
   onFormChange: (values: ScenarioFormValues) => void;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
   onDefaultValuesLoad?: (defaults: ScenarioFormValues) => void;
+  onLoadStatusChange?: (status: 'loading' | 'loaded' | 'error') => void;
   cloudCredentialRef?: string;
   onCloudCredentialRefChange?: (name: string) => void;
 }
@@ -43,6 +44,7 @@ export function ScenarioConfigStep({
   onFormChange,
   onGlobalFormChange,
   onDefaultValuesLoad,
+  onLoadStatusChange,
   cloudCredentialRef: cloudCredentialRefProp = '',
   onCloudCredentialRefChange,
 }: ScenarioConfigStepProps) {
@@ -76,6 +78,7 @@ export function ScenarioConfigStep({
       setLoading(true);
       setError(null);
       setScenarioDetail(null);
+      onLoadStatusChange?.('loading');
 
       try {
         // Reconstruct registryConfig from registryName to avoid closure issues
@@ -84,6 +87,7 @@ export function ScenarioConfigStep({
 
         if (mounted) {
           setScenarioDetail(detail);
+          onLoadStatusChange?.('loaded');
 
           // Extract default values from ALL fields
           const defaults: ScenarioFormValues = {};
@@ -103,6 +107,7 @@ export function ScenarioConfigStep({
       } catch (err) {
         if (mounted) {
           setError(err instanceof Error ? err.message : 'Failed to load scenario details');
+          onLoadStatusChange?.('error');
         }
       } finally {
         if (mounted) {
@@ -116,7 +121,7 @@ export function ScenarioConfigStep({
     return () => {
       mounted = false;
     };
-  }, [scenarioName, registryName, onDefaultValuesLoad]);
+  }, [scenarioName, registryName, onDefaultValuesLoad, onLoadStatusChange]);
 
   // Fetch global parameters when checkbox is toggled
   useEffect(() => {

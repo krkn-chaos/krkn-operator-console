@@ -178,4 +178,129 @@ describe('WizardStepper Enter handling', () => {
 
     expect(screen.queryByText('Second step')).not.toBeInTheDocument();
   });
+
+  it('calls the next step entry callback when Next advances', async () => {
+    const user = userEvent.setup();
+    const onEnter = vi.fn();
+
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={[
+          ...makeSteps(),
+          { id: 'second', name: 'Second', component: <div>Second step</div>, onEnter },
+        ]}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(screen.getByText('Second step')).toBeInTheDocument();
+    expect(onEnter).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the entered step callback when navigating by progress step', async () => {
+    const user = userEvent.setup();
+    const onEnter = vi.fn();
+
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={[
+          ...makeSteps(),
+          { id: 'second', name: 'Second', component: <div>Second step</div>, onEnter },
+        ]}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText('Second'));
+
+    expect(screen.getByText('Second step')).toBeInTheDocument();
+    expect(onEnter).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the previous step entry callback when Back returns to it', async () => {
+    const user = userEvent.setup();
+    const onEnter = vi.fn();
+
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={[
+          ...makeSteps(),
+          { id: 'second', name: 'Second', component: <div>Second step</div>, onEnter },
+          { id: 'third', name: 'Third', component: <div>Third step</div> },
+        ]}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(screen.getByText('Second step')).toBeInTheDocument();
+    expect(onEnter).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not enter a disabled progress step', async () => {
+    const user = userEvent.setup();
+    const onEnter = vi.fn();
+
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={[
+          ...makeSteps(),
+          {
+            id: 'second',
+            name: 'Second',
+            component: <div>Second step</div>,
+            isStepDisabled: true,
+            onEnter,
+          },
+        ]}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText('Second'));
+
+    expect(screen.getByLabelText('first input')).toBeInTheDocument();
+    expect(screen.queryByText('Second step')).not.toBeInTheDocument();
+    expect(onEnter).not.toHaveBeenCalled();
+  });
+
+  it('resets to the first step when the modal is closed and reopened', async () => {
+    const user = userEvent.setup();
+    const props = {
+      title: 'Test wizard',
+      steps: [
+        ...makeSteps(),
+        { id: 'second', name: 'Second', component: <div>Second step</div> },
+      ],
+      onClose: vi.fn(),
+      onSave: vi.fn(),
+    };
+    const { rerender } = render(<WizardStepper {...props} isOpen />);
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Second step')).toBeInTheDocument();
+
+    rerender(<WizardStepper {...props} isOpen={false} />);
+    rerender(<WizardStepper {...props} isOpen />);
+
+    expect(screen.getByLabelText('first input')).toBeInTheDocument();
+    expect(screen.queryByText('Second step')).not.toBeInTheDocument();
+  });
 });
