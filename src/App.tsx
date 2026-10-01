@@ -511,6 +511,11 @@ function App() {
     <Page header={header}>
       {appSidebar}
       <div className="app-content--with-sidebar" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingLeft: SIDEBAR_RAIL_WIDTH }}>
+        {import.meta.env.VITE_PREVIEW_MODE === 'true' && (
+          <PageSection style={{ padding: '0.75rem 1.5rem 0', flexShrink: 0 }}>
+            <Alert isInline variant="info" title="Mock preview — API data is simulated; no cluster operations are performed" />
+          </PageSection>
+        )}
         {state.notifications.length > 0 && (
           <div style={{ padding: '1rem 1rem 0 1rem' }}>
             <AlertGroup>

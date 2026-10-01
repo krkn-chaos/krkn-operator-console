@@ -147,11 +147,34 @@ While active, orchestrator logs stream with a 200-line initial tail. After a run
 finishes, the console reconnects without a tail limit to fetch the complete
 available pod log from its beginning.
 
-### Temporary GitHub Pages preview
+### Mock development and PR previews
 
-`.github/workflows/deploy-main-preview.yml` builds preview mode from `main` and publishes `dist/` to the `gh-pages` branch. In repository **Settings → Pages**, select **Deploy from a branch**, then choose `gh-pages` and `/ (root)`. The preview is available at `https://<owner>.github.io/<repository>/`; direct SPA routes are handled by the generated `404.html`.
+```bash
+npm run dev:preview       # Run with mock HTTP APIs and WebSocket streams
+npm run build:preview     # Build a backend-free preview
+```
 
-The workflow also supports manual runs from the Actions tab. Remove the workflow when sharing is complete; disable Pages as well if PR previews are no longer needed.
+Preview mode requires `VITE_PREVIEW_MODE=true`; normal builds do not start MSW.
+Unhandled preview API requests fail instead of reaching a real backend, and a
+mock-startup failure blocks the app with a reload notice.
+
+Krkn-AI includes completed and running examples, namespace/component discovery,
+editable configurations, validation/save/launch, accelerated generation progress,
+scenario results and health charts, full/streaming logs, linked child jobs, and
+valid ZIP downloads. Seeded measurements are sanitized Robot Shop examples;
+aggregate and normalized scores are simulations. No credentials, private
+endpoints, original cluster selectors, or original run logs are published.
+Created preview runs and saved configs live only in memory and reset on reload.
+
+`.github/workflows/deploy-preview.yml` builds previews for opened, updated, and
+reopened PRs. `.github/workflows/deploy-preview-publish.yml` publishes the artifact
+to `gh-pages` and updates the PR's preview comment at:
+
+`https://<owner>.github.io/<repository>/pr-preview/pr-<number>/`
+
+The build sets `VITE_BASE_URL` to that PR-specific path so assets, navigation, and
+the service worker remain scoped to the preview. Updating the PR branch triggers
+publication; local uncommitted changes do not update the hosted preview.
 
 ### Other Commands
 
