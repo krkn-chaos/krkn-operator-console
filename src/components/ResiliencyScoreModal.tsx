@@ -4,7 +4,7 @@
  * Allows users to:
  * - Set baseline score (required, float >= 0)
  * - Select file mode: same for all nodes or per-node
- * - Select metrics file(s) from available files
+ * - Select alerts file(s) from available files
  * - Override mount path (default: /etc/krkn/metrics.yaml)
  */
 
@@ -199,7 +199,7 @@ export function ResiliencyScoreModal({
           title="Resiliency Score Calculation"
           style={{ marginBottom: '1rem' }}
         >
-          Configure baseline score and metrics file for resiliency calculation during this GraphRun.
+          Configure baseline score and alerts file for resiliency calculation during this GraphRun.
         </Alert>
 
         <FormGroup label="Baseline Score" isRequired>
@@ -251,7 +251,7 @@ export function ResiliencyScoreModal({
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Path where metrics file will be mounted in container
+                   Path where alerts file will be mounted in container
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>
@@ -278,7 +278,7 @@ export function ResiliencyScoreModal({
         </FormGroup>
 
         {fileMode === 'same' ? (
-          <FormGroup label="Metrics File">
+          <FormGroup label="Alerts File">
             <Select
               isOpen={isSelectOpen}
               selected={selectedFileId}
@@ -320,7 +320,7 @@ export function ResiliencyScoreModal({
             </FormHelperText>
           </FormGroup>
         ) : (
-          <FormGroup label="Per-Node Metrics Files">
+          <FormGroup label="Per-Node Alerts Files">
             {nodeIds.length === 0 ? (
               <Alert variant="warning" isInline title="No nodes available">
                 Add nodes to the graph before selecting per-node files

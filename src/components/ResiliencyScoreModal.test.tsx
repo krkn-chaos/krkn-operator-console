@@ -46,7 +46,7 @@ describe('ResiliencyScoreModal', () => {
       );
 
       expect(screen.getByText('Configure Resiliency Score')).toBeInTheDocument();
-      expect(screen.getByText(/Configure baseline score and metrics file/i)).toBeInTheDocument();
+      expect(screen.getByText(/Configure baseline score and alerts file/i)).toBeInTheDocument();
     });
 
     it('should not render modal when isOpen is false', () => {
