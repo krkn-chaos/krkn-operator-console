@@ -12,7 +12,7 @@
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--owner {
-  flex: 0 0 20%;
+  flex: 1 0 max-content;
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--score {
