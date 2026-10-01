@@ -904,9 +904,20 @@ export function JobsList({
                                 <strong>Graph Nodes:</strong>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Label color="blue" icon={<TopologyIcon />}>
-                                  {item.summary.completedNodes} / {item.summary.totalNodes}
-                                </Label>
+                                <Tooltip
+                                  content={`${item.summary.completedNodes} completed, ${item.summary.failedNodes} failed, ${item.summary.runningNodes} running, ${item.summary.pendingNodes} pending, ${item.summary.totalNodes} total`}
+                                >
+                                  <Label color="blue" icon={<TopologyIcon />}>
+                                    <span className="jobs-list-graph-node-counts">
+                                      <span className="jobs-list-graph-node-counts__completed">
+                                        <CheckCircleIcon aria-hidden="true" />
+                                        {item.summary.completedNodes}
+                                      </span>
+                                      <span className="jobs-list-graph-node-counts__separator" aria-hidden="true">/</span>
+                                      <span className="jobs-list-graph-node-counts__total">{item.summary.totalNodes}</span>
+                                    </span>
+                                  </Label>
+                                </Tooltip>
                               </div>
                             </div>
                           </DataListCell>,
@@ -989,6 +1000,8 @@ export function JobsList({
 
               // Handle standalone ScenarioRun
               const run = item.run;
+              const customRunName = run.customRunName?.trim();
+              const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
               const scenarioCategoryKey = runCategoryKey('scenario-runs', run.scenarioRunName);
@@ -1078,17 +1091,28 @@ export function JobsList({
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Jobs:</strong>
                             </div>
-                            <div style={{ fontSize: 'var(--pf-v5-global--FontSize--lg)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                              <span style={{ color: 'var(--pf-v5-global--success-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>✓</span> {run.successfulJobs}
-                              </span>
-                              <span style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>✗</span> {run.failedJobs}
-                              </span>
-                              <span style={{ color: 'var(--pf-v5-global--info-color--100)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ fontSize: '1.25rem' }}>⟳</span> {run.runningJobs}
-                              </span>
-                            </div>
+                            <Tooltip
+                              content={`${run.successfulJobs} succeeded, ${run.failedJobs} failed, ${run.runningJobs} running`}
+                            >
+                              <Label color="blue" icon={<HiOutlineRocketLaunch />}>
+                                <span className="jobs-list-job-counts">
+                                  <span className="jobs-list-job-counts__succeeded">
+                                    <CheckCircleIcon aria-hidden="true" />
+                                    {run.successfulJobs}
+                                  </span>
+                                  <span className="jobs-list-job-counts__separator" aria-hidden="true">/</span>
+                                  <span className="jobs-list-job-counts__failed">
+                                    <ExclamationCircleIcon aria-hidden="true" />
+                                    {run.failedJobs}
+                                  </span>
+                                  <span className="jobs-list-job-counts__separator" aria-hidden="true">/</span>
+                                  <span className="jobs-list-job-counts__running">
+                                    <SyncAltIcon aria-hidden="true" />
+                                    {run.runningJobs}
+                                  </span>
+                                </span>
+                              </Label>
+                            </Tooltip>
                           </div>
                         </DataListCell>,
                         <DataListCell key="run-name" width={2} className="jobs-list-summary-cell--run-name">
@@ -1096,7 +1120,7 @@ export function JobsList({
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Run Name:</strong>
                             </div>
-                            {run.customRunName ? (
+                            {customRunName ? (
                               <>
                                 <code
                                   style={{
@@ -1108,23 +1132,25 @@ export function JobsList({
                                     display: 'inline-block',
                                     border: '1px solid var(--pf-v5-global--BorderColor--100)',
                                     whiteSpace: 'nowrap',
-                                    marginBottom: '0.25rem',
+                                    marginBottom: customRunName !== scenarioRunName ? '0.25rem' : 0,
                                   }}
                                 >
-                                  {run.customRunName}
+                                  {customRunName}
                                 </code>
-                                <div>
-                                  <code
-                                    style={{
-                                      fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                      fontSize: 'var(--pf-v5-global--FontSize--xs)',
-                                      color: 'var(--pf-v5-global--Color--200)',
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    {run.scenarioRunName}
-                                  </code>
-                                </div>
+                                {customRunName !== scenarioRunName && (
+                                  <div>
+                                    <code
+                                      style={{
+                                        fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                        fontSize: 'var(--pf-v5-global--FontSize--xs)',
+                                        color: 'var(--pf-v5-global--Color--200)',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {scenarioRunName}
+                                    </code>
+                                  </div>
+                                )}
                               </>
                             ) : (
                               <code
@@ -1139,7 +1165,7 @@ export function JobsList({
                                   whiteSpace: 'nowrap',
                                 }}
                               >
-                                {run.scenarioRunName}
+                                {scenarioRunName}
                               </code>
                             )}
                           </div>
