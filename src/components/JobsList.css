@@ -15,6 +15,14 @@
   flex: 0 0 20%;
 }
 
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--score {
+  flex: 0 0 11rem;
+}
+
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--created {
+  flex: 0 0 13rem;
+}
+
 @container jobs-list-runs (max-width: 1400px) {
   .jobs-list-summary-cell--created {
     display: none;

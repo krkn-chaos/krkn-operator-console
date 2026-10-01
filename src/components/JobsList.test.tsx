@@ -285,6 +285,25 @@ describe('JobsList - Run actions menu', () => {
     expect(jobsIndex).toBeLessThan(runNameIndex);
   });
 
+  it('keeps Resiliency Score and Created as the final columns for both run types', () => {
+    setMockJobs([
+      makeGraphJobItem('aligned-workflow', 'Completed'),
+      makeScenarioJobItem('aligned-scenario', 'Succeeded'),
+    ]);
+
+    render(<JobsList {...defaultProps} />);
+
+    const rowCells = Array.from(
+      screen.getByRole('list', { name: 'Scenario runs list' }).querySelectorAll('.pf-v5-c-data-list__item-content'),
+    ).map((content) => Array.from(content.children));
+
+    expect(rowCells).toHaveLength(2);
+    for (const cells of rowCells) {
+      expect(cells[cells.length - 2]).toHaveClass('jobs-list-summary-cell--score');
+      expect(cells[cells.length - 1]).toHaveClass('jobs-list-summary-cell--created');
+    }
+  });
+
   it('places the single run kebab menu in the dedicated row action area', () => {
     const runName = 'report-run-001';
     setMockJobs([makeScenarioJobItem(runName, 'Succeeded')]);
