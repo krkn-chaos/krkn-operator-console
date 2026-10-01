@@ -119,6 +119,7 @@ their content; later refreshes retain committed results. Scenario metadata share
 the run's metric panels. Scenario parameters and the PromQL-first fitness
 breakdown precede scenario logs and health charts; the command and raw health
 record table are not displayed. Fitness progression follows scenario executions.
+Krkn-AI listing and run details use the same padded page section as Jobs.
 
 Run details and list actions offer **Download results ZIP** via
 `GET /api/v1/krkn-ai/runs/{name}/results/download`. The operator authorizes target
@@ -135,6 +136,10 @@ The latency axis scales to measured values rather than a fixed one-second floor.
 Outcome cells are adjacent and ordered per service, without a heatmap time axis.
 Every record is retained, with readable minimum cell sizes and scrolling for dense
 rows. Hover or keyboard focus reveals timestamp, status, outcome, latency, and error.
+Application checkboxes in the legend above the plots filter both latency and
+outcome charts. All applications are initially selected; **Select all** and
+**Clear** control visibility without changing recorded data. Colors stay stable
+when applications are hidden, and selections survive refreshes of that scenario.
 
 Scenario child-job logs use
 `/api/v2/ws/scenarios/run/{scenarioRunName}/jobs/{jobID}/logs`; orchestrator

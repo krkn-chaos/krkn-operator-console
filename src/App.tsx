@@ -243,7 +243,11 @@ function App() {
       }
 
       case 'krkn_ai':
-        return <KrknAIPage initialRunName={linkedAiRunName} onInitialRunHandled={handleInitialAiRunHandled} />;
+        return (
+          <PageSection>
+            <KrknAIPage initialRunName={linkedAiRunName} onInitialRunHandled={handleInitialAiRunHandled} />
+          </PageSection>
+        );
 
       case 'settings':
         return <Settings />;

@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Tooltip } from '@patternfly/react-core';
+import { useId, useRef, useState } from 'react';
+import { Button, Checkbox, Tooltip } from '@patternfly/react-core';
 import type { KrknAIScenarioHealthCheck } from '../../services/krknAiApi';
 import './ScenarioHealthCharts.css';
 
@@ -72,6 +72,11 @@ function OutcomeMeasurement({
 }
 
 export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChartsProps) {
+  const controlId = useId();
+  const [selection, setSelection] = useState<{ scenarioId: string; hidden: Set<string> }>(
+    () => ({ scenarioId, hidden: new Set() }),
+  );
+  const hiddenApplications = selection.scenarioId === scenarioId ? selection.hidden : new Set<string>();
   if (samples.length === 0) {
     return <p className="krkn-ai-not-available">Measured health-check chart data is not available yet.</p>;
   }
@@ -99,13 +104,16 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
     else grouped.set(sample.application, [sample]);
   }
   const applications = [...grouped.keys()];
+  const visibleApplications = applications.filter((application) => !hiddenApplications.has(application));
+  const visibleSamples = measuredSamples.filter((sample) => !hiddenApplications.has(sample.application));
+  const applicationColor = (application: string) => colors[applications.indexOf(application) % colors.length];
   const width = 860;
   const responseHeight = 340;
   const responseMargin = { top: 24, right: 24, bottom: 58, left: 68 };
   const responsePlotWidth = width - responseMargin.left - responseMargin.right;
   const responsePlotHeight = responseHeight - responseMargin.top - responseMargin.bottom;
-  const timedSamples = measuredSamples.filter((sample) => sample.secondsIntoScenario !== null);
-  const latencySamples = measuredSamples.filter((sample) => sample.responseTimeSeconds !== null
+  const timedSamples = visibleSamples.filter((sample) => sample.secondsIntoScenario !== null);
+  const latencySamples = visibleSamples.filter((sample) => sample.responseTimeSeconds !== null
     && sample.responseTimeSeconds >= 0);
   const minElapsed = timedSamples.length > 0
     ? Math.min(...timedSamples.map((sample) => sample.secondsIntoScenario!))
@@ -122,12 +130,41 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
   const yTicks = Array.from({ length: 5 }, (_, index) => (maxResponse * index) / 4);
   const cellHeight = 38;
   const minCellWidth = 32;
-  const maxRowLength = Math.max(...applications.map((application) => grouped.get(application)?.length ?? 0), 1);
+  const maxRowLength = Math.max(...visibleApplications.map((application) => grouped.get(application)?.length ?? 0), 1);
   const heatmapPlotWidth = maxRowLength * minCellWidth;
-  const heatmapHeight = applications.length * cellHeight;
+  const heatmapHeight = visibleApplications.length * cellHeight;
 
   return (
     <div className="krkn-ai-health-charts">
+      <fieldset className="krkn-ai-health-chart__selection">
+        <legend>Health-check applications</legend>
+        <div className="krkn-ai-health-chart__selection-actions">
+          <Button variant="link" isInline onClick={() => setSelection({ scenarioId, hidden: new Set() })}>Select all</Button>
+          <Button variant="link" isInline onClick={() => setSelection({ scenarioId, hidden: new Set(applications) })}>Clear</Button>
+        </div>
+        <div className="krkn-ai-health-chart__legend">
+          {applications.map((application, index) => {
+            const failedCount = grouped.get(application)?.filter((sample) => sample.success === false).length ?? 0;
+            return (
+              <Checkbox
+                key={application}
+                id={`${controlId}-application-${index}`}
+                isChecked={!hiddenApplications.has(application)}
+                label={<span><i style={{ backgroundColor: applicationColor(application) }} />{application}{failedCount > 0 ? ` (${failedCount} failed)` : ''}</span>}
+                onChange={(_event, checked) => {
+                  const hidden = new Set(hiddenApplications);
+                  if (checked) hidden.delete(application);
+                  else hidden.add(application);
+                  setSelection({ scenarioId, hidden });
+                }}
+              />
+            );
+          })}
+        </div>
+      </fieldset>
+      {visibleApplications.length === 0 ? (
+        <p className="krkn-ai-not-available">Select a health-check application to display its measurements.</p>
+      ) : <>
       <figure className="krkn-ai-health-chart">
         <figcaption>Measured health-check response time</figcaption>
         <svg
@@ -155,7 +192,7 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
               Response-time measurements are not available.
             </text>
           )}
-          {applications.map((application, applicationIndex) => {
+          {visibleApplications.map((application) => {
             const applicationSamples = [...(grouped.get(application) ?? [])]
               .sort((left, right) => (left.secondsIntoScenario ?? Infinity) - (right.secondsIntoScenario ?? Infinity)
                 || left.recordedIndex - right.recordedIndex);
@@ -171,7 +208,7 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
             }
             return (
               <g key={application}>
-                <path className="krkn-ai-health-chart__line" d={path} style={{ stroke: colors[applicationIndex % colors.length] }} />
+                <path className="krkn-ai-health-chart__line" d={path} style={{ stroke: applicationColor(application) }} />
                 {applicationSamples.map((sample, index) => {
                   if (sample.secondsIntoScenario === null || sample.responseTimeSeconds === null || sample.responseTimeSeconds < 0) return null;
                   return (
@@ -180,7 +217,7 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
                       cx={x(sample.secondsIntoScenario)}
                       cy={y(sample.responseTimeSeconds)}
                       r="4"
-                      style={{ fill: colors[applicationIndex % colors.length] }}
+                      style={{ fill: applicationColor(application) }}
                     >
                       <title>{measurementDetails(sample)}</title>
                     </circle>
@@ -192,24 +229,19 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
           <text className="krkn-ai-health-chart__axis-label" x={responseMargin.left + responsePlotWidth / 2} y={responseHeight - 10} textAnchor="middle">Seconds into scenario</text>
           <text className="krkn-ai-health-chart__axis-label" x="18" y={responseMargin.top + responsePlotHeight / 2} textAnchor="middle" transform={`rotate(-90 18 ${responseMargin.top + responsePlotHeight / 2})`}>Response time (seconds)</text>
         </svg>
-        <div className="krkn-ai-health-chart__legend" aria-label="Health-check applications">
-          {applications.map((application, index) => {
-            const failedCount = grouped.get(application)?.filter((sample) => sample.success === false).length ?? 0;
-            return (
-              <span key={application}><i style={{ backgroundColor: colors[index % colors.length] }} />
-                {application}{failedCount > 0 ? ` (${failedCount} failed)` : ''}
-              </span>
-            );
-          })}
-        </div>
         <p className="krkn-ai-health-chart__guidance">Gaps indicate missing latency; HTTP errors retain measured latency. Outcome cells show failed checks.</p>
       </figure>
 
       <figure className="krkn-ai-health-chart">
         <figcaption>Measured health-check outcomes</figcaption>
+        <div className="krkn-ai-health-heatmap__legend" aria-label="Health-check result legend">
+          <span className="krkn-ai-health-heatmap__legend-success">Expected status code</span>
+          <span className="krkn-ai-health-heatmap__legend-failure">Unexpected status code</span>
+          <span className="krkn-ai-health-heatmap__legend-unknown">Outcome not recorded</span>
+        </div>
         <div role="group" className="krkn-ai-health-chart__heatmap-scroll" aria-label={`Measured health-check outcomes by application for scenario ${scenarioId}`}>
           <div className="krkn-ai-health-chart__heatmap-labels" aria-hidden="true">
-            {applications.map((application) => (
+            {visibleApplications.map((application) => (
               <div key={application} className="krkn-ai-health-chart__heatmap-label" title={application}>{application}</div>
             ))}
           </div>
@@ -222,7 +254,7 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
               role="group"
               aria-label={`Measured health-check outcome samples for scenario ${scenarioId}`}
             >
-              {applications.map((application, rowIndex) => {
+              {visibleApplications.map((application, rowIndex) => {
                 const applicationSamples = [...(grouped.get(application) ?? [])]
                   .sort((left, right) => left.timestamp.localeCompare(right.timestamp) || left.recordedIndex - right.recordedIndex);
                 const cellWidth = heatmapPlotWidth / maxRowLength;
@@ -250,12 +282,8 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
             </svg>
           </div>
         </div>
-        <div className="krkn-ai-health-heatmap__legend" aria-label="Health-check result legend">
-          <span className="krkn-ai-health-heatmap__legend-success">Expected status code</span>
-          <span className="krkn-ai-health-heatmap__legend-failure">Unexpected status code</span>
-          <span className="krkn-ai-health-heatmap__legend-unknown">Outcome not recorded</span>
-        </div>
       </figure>
+      </>}
     </div>
   );
 }

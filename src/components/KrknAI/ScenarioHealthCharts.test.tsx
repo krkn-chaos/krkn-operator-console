@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { ScenarioHealthCharts } from './ScenarioHealthCharts';
 import type { KrknAIScenarioHealthCheck } from '../../services/krknAiApi';
 
@@ -22,6 +23,34 @@ function latencyChart() {
 }
 
 describe('ScenarioHealthCharts', () => {
+  it('filters both plots while retaining application colors and allows clearing and restoring selection', async () => {
+    const user = userEvent.setup();
+    const readings = [
+      sample(0, 0.02, true, { application: 'shop' }),
+      sample(1, 0.03, true, { application: 'shop' }),
+      sample(0, 0.4, false, { application: 'ratings' }),
+    ];
+    const { rerender } = render(<ScenarioHealthCharts scenarioId="9" samples={readings} />);
+    const ratingsColor = latencyChart().querySelectorAll('circle')[2].getAttribute('style');
+    await user.click(screen.getByRole('checkbox', { name: 'shop' }));
+    expect(latencyChart().querySelectorAll('circle')).toHaveLength(1);
+    expect(latencyChart().querySelector('circle')?.getAttribute('style')).toBe(ratingsColor);
+    const outcomes = screen.getByRole('group', { name: 'Measured health-check outcome samples for scenario 9' });
+    expect(within(outcomes).getAllByRole('img').map((cell) => cell.getAttribute('aria-label')))
+      .toEqual([expect.stringContaining('ratings.')]);
+    rerender(<ScenarioHealthCharts scenarioId="9" samples={[...readings, sample(1, 0.5, true, { application: 'ratings' })]} />);
+    expect(screen.getByRole('checkbox', { name: 'shop' })).not.toBeChecked();
+    expect(latencyChart().querySelectorAll('circle')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.queryByRole('img', { name: /Measured health-check response time/ })).toBeNull();
+    expect(screen.getByText('Select a health-check application to display its measurements.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Select all' }));
+    expect(latencyChart().querySelectorAll('circle')).toHaveLength(4);
+    await user.click(screen.getByRole('checkbox', { name: 'shop' }));
+    rerender(<ScenarioHealthCharts scenarioId="10" samples={readings} />);
+    expect(screen.getByRole('checkbox', { name: 'shop' })).toBeChecked();
+  });
+
   it('breaks latency paths for missing and invalid readings while retaining measured HTTP 404 latency', () => {
     const readings = [
       sample(0, 0.02),
