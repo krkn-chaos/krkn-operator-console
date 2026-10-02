@@ -1543,11 +1543,17 @@ export interface QueryTelemetryRequest {
   // Exactly one of configName or inline must be supplied.
   configName?: string;
   inline?: InlineElasticsearchConnection;
+  // size is the page size; page is the 1-based page number. The backend computes
+  // the Elasticsearch offset as (page-1)*size.
   size?: number;
+  page?: number;
   // "yyyy-MM-dd" date bounds on the document timestamp. Omitted values fall back
   // to a default trailing window on the backend.
   startDate?: string;
   endDate?: string;
+  // Selected facet filters keyed by category (e.g. "cloud_type"). Values within a
+  // category are OR-ed, categories are AND-ed. Unknown categories are rejected.
+  filters?: Record<string, string[]>;
 }
 
 // Run-level cluster/infrastructure metadata surfaced for an expanded row. All
@@ -1632,10 +1638,21 @@ export interface TelemetryStats {
   pass_percent: number; // 0-100
 }
 
+// One selectable value for a filter category, with its document count in the
+// matched window. Populates the value multi-select.
+export interface FacetOption {
+  value: string;
+  count: number;
+}
+
 export interface QueryTelemetryResponse {
   documents: TelemetryDocument[];
   total: number;
   stats: TelemetryStats;
+  // Available filter values per category, derived from terms aggregations. Used
+  // to populate the value multi-select. Because filters are applied in the query,
+  // facets narrow as filters are selected.
+  facets?: Record<string, FacetOption[]>;
 }
 
 // Cloud Credential Types
