@@ -32,6 +32,8 @@ export interface ResiliencyScoreTooltipProps {
   scores?: GraphClusterScore[];
   /** Explicit baseline from the run configuration (takes precedence over per-cluster baselines) */
   baseline?: number;
+  /** Use the compact label treatment in dense summary rows */
+  isCompact?: boolean;
 }
 
 /** Info color used for no-baseline states */
@@ -139,12 +141,12 @@ function ScoreHeader({
  * 3. **No Baseline** - No valid baseline configured or any cluster has 'no-baseline' status (blue label)
  * 4. **Normal** - Score with color based on ratio to baseline (green/orange/red label)
  */
-export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline }: ResiliencyScoreTooltipProps) {
+export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline, isCompact = false }: ResiliencyScoreTooltipProps) {
   // No scores available
   if (!scores || scores.length === 0) {
     return (
       <Tooltip content="Resiliency score not enabled for this run">
-        <Label color="grey">N/A</Label>
+        <Label isCompact={isCompact} color="grey">N/A</Label>
       </Tooltip>
     );
   }
@@ -153,7 +155,7 @@ export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline }: R
   if (isScoreCalculating(scores)) {
     return (
       <Tooltip content="Score calculation in progress...">
-        <Label color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
+        <Label isCompact={isCompact} color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
           Calculating...
         </Label>
       </Tooltip>
@@ -194,7 +196,7 @@ export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline }: R
           </div>
         }
       >
-        <Label color="blue">
+        <Label isCompact={isCompact} color="blue">
           {formatScore(avgScore)}{isMulti ? ' (avg)' : ''} - No Baseline
         </Label>
       </Tooltip>
@@ -227,7 +229,7 @@ export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline }: R
         </div>
       }
     >
-      <Label color={labelDisplay.color} icon={labelDisplay.icon}>
+      <Label isCompact={isCompact} color={labelDisplay.color} icon={labelDisplay.icon}>
         {formatScore(avgScore)}{isMulti ? ' (avg)' : ''}
       </Label>
     </Tooltip>
