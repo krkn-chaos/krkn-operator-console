@@ -113,6 +113,7 @@ export function RunCategoryActions({
       await onReplayWorkflow();
     } catch (error) {
       setWorkflowReplayError(error instanceof Error ? error.message : 'Unable to replay workflow');
+      setIsOpen(true);
     } finally {
       setIsWorkflowReplayLoading(false);
     }
@@ -181,7 +182,7 @@ export function RunCategoryActions({
           {onReplayWorkflow && (
             <DropdownItem
               key="replay-workflow"
-              icon={isWorkflowReplayLoading ? <Spinner size="sm" /> : workflowReplayError ? <ExclamationCircleIcon /> : <RedoIcon />}
+              icon={workflowReplayError ? <ExclamationCircleIcon /> : <RedoIcon />}
               isDisabled={isWorkflowReplayDisabled || isWorkflowReplayLoading}
               title={workflowReplayError ?? undefined}
               onClick={() => {
@@ -189,7 +190,7 @@ export function RunCategoryActions({
                 void handleWorkflowReplay();
               }}
             >
-              {isWorkflowReplayLoading ? 'Loading workflow…' : workflowReplayError ? 'Replay failed — Retry' : 'Replay'}
+              {workflowReplayError ? 'Replay failed — Retry' : 'Replay'}
             </DropdownItem>
           )}
           {runId && report.error && (
@@ -306,6 +307,25 @@ export function RunCategoryActions({
           </DropdownItem>
         </DropdownList>
       </Dropdown>
+      <Modal
+        isOpen={isWorkflowReplayLoading}
+        onClose={() => undefined}
+        showClose={false}
+        title="Opening workflow in Chaos Studio"
+        variant={ModalVariant.small}
+        aria-label="Loading workflow replay"
+      >
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0' }}
+        >
+          <Spinner size="xl" aria-label="Loading workflow" />
+          <p style={{ margin: 0 }}>
+            Loading the saved workflow configuration. Chaos Studio will open when it is ready.
+          </p>
+        </div>
+      </Modal>
       {report.preview && (
         <Modal
           title={report.preview.format.toUpperCase() + ' report preview'}
