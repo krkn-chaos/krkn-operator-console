@@ -3,6 +3,8 @@ import { CopyIcon } from '@patternfly/react-icons';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { operatorApi } from '../services/operatorApi';
 import { validateCommand } from '../utils/terminalValidation';
+import { isClusterUnavailable } from '../utils/clusterAvailability';
+import { ClusterHealthIndicator } from './ClusterHealthIndicator';
 import type { TargetResponse, AvailableCommandsResponse } from '../types/api';
 import './TerminalContent.css';
 
@@ -575,13 +577,22 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         ) : [];
         if (sortedClusters.length > 0 && clusterNumber >= 1 && clusterNumber <= sortedClusters.length) {
           const cluster = sortedClusters[clusterNumber - 1];
-          setSelectedCluster(cluster);
-          setOutputLines(prev => [
-            ...prev,
-            `$ ${command}`,
-            `Connected to cluster: ${cluster.clusterName}`,
-            '',
-          ]);
+          if (isClusterUnavailable(cluster.online, cluster.clusterStatus)) {
+            const status = cluster.online === false ? 'offline' : 'unhealthy';
+            setOutputLines(prev => [
+              ...prev,
+              `$ ${command}`,
+              `Error: Cluster ${cluster.clusterName} is ${status} and cannot be selected.`,
+            ]);
+          } else {
+            setSelectedCluster(cluster);
+            setOutputLines(prev => [
+              ...prev,
+              `$ ${command}`,
+              `Connected to cluster: ${cluster.clusterName}`,
+              '',
+            ]);
+          }
         } else {
           setOutputLines(prev => [
             ...prev,
@@ -738,6 +749,12 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
                     <div key={cluster.uuid} className="cluster-item">
                       <span className="cluster-number">{globalIndex + 1}.</span>{' '}
                       <span className="cluster-name">{cluster.clusterName}</span>
+                      <ClusterHealthIndicator status={cluster.clusterStatus} />
+                      {cluster.online === false && (
+                        <span className="terminal-cluster-offline" aria-label="Cluster reachability: offline">
+                          [offline]
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -816,4 +833,3 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     </div>
   );
 }
-

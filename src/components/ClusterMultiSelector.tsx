@@ -25,6 +25,7 @@ import {
 import { DisconnectedIcon, TopologyIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
 import { ClusterHealthIndicator } from './ClusterHealthIndicator';
+import { isClusterUnavailable } from '../utils/clusterAvailability';
 
 interface ClusterMultiSelectorProps {
   clusters: { [operatorName: string]: Cluster[] } | null;
@@ -70,7 +71,7 @@ export function ClusterMultiSelector({
     const flatList: SelectedCluster[] = [];
     Object.entries(clusters).forEach(([operatorName, clusterList]) => {
       clusterList.forEach((cluster) => {
-        if (cluster.online === false || cluster['cluster-status'] === 'unhealthy') return;
+        if (isClusterUnavailable(cluster.online, cluster['cluster-status'])) return;
 
         flatList.push({
           operatorName,
@@ -88,7 +89,7 @@ export function ClusterMultiSelector({
       Object.entries(clusters)
         .flatMap(([operatorName, clusterList]) =>
           clusterList
-            .filter((cluster) => cluster.online === false || cluster['cluster-status'] === 'unhealthy')
+            .filter((cluster) => isClusterUnavailable(cluster.online, cluster['cluster-status']))
             .map((cluster) => `${operatorName}\u0000${cluster['cluster-name']}`)
         )
     );
@@ -192,8 +193,7 @@ export function ClusterMultiSelector({
                     const clusterId = `${operatorName}-${cluster['cluster-name']}`;
                     const checked = isSelected(operatorName, cluster['cluster-name']);
                     const isOffline = cluster.online === false;
-                    const isUnhealthy = cluster['cluster-status'] === 'unhealthy';
-                    const isUnavailable = isOffline || isUnhealthy;
+                    const isUnavailable = isClusterUnavailable(cluster.online, cluster['cluster-status']);
                     const offlineMessage = `Cluster is offline. Last checked: ${formatCheckedAt(cluster['checked-at'])}.`;
 
                     return (

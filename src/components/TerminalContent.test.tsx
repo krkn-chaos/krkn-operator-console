@@ -99,6 +99,75 @@ describe('TerminalContent', () => {
     });
   });
 
+  it('shows cluster health and reachability in the selection list', async () => {
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: [
+        { uuid: '1', clusterName: 'healthy-cluster', clusterAPIURL: 'https://healthy', ready: true, clusterStatus: 'healthy', online: true },
+        { uuid: '2', clusterName: 'unhealthy-cluster', clusterAPIURL: 'https://unhealthy', ready: true, clusterStatus: 'unhealthy', online: true },
+        { uuid: '3', clusterName: 'offline-cluster', clusterAPIURL: 'https://offline', ready: true, clusterStatus: 'unknown', online: false },
+      ],
+      discoveryUuid: 'test-uuid',
+      isLoading: false,
+      error: null,
+      startDiscovery: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+
+    expect(await screen.findByLabelText('Cluster status: healthy')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cluster status: unhealthy')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cluster status: unknown')).toBeInTheDocument();
+    expect(screen.getByText('[offline]')).toBeInTheDocument();
+  });
+
+  it('rejects numeric selection of unhealthy and offline clusters', async () => {
+    const user = userEvent.setup();
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: [
+        { uuid: '1', clusterName: 'a-unhealthy-cluster', clusterAPIURL: 'https://unhealthy', ready: true, clusterStatus: 'unhealthy', online: true },
+        { uuid: '2', clusterName: 'b-offline-cluster', clusterAPIURL: 'https://offline', ready: true, clusterStatus: 'unknown', online: false },
+        { uuid: '3', clusterName: 'c-healthy-cluster', clusterAPIURL: 'https://healthy', ready: true, clusterStatus: 'healthy', online: true },
+      ],
+      discoveryUuid: 'test-uuid',
+      isLoading: false,
+      error: null,
+      startDiscovery: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+    const input = screen.getByRole('textbox');
+
+    await user.type(input, '1{Enter}');
+    expect(await screen.findByText('Error: Cluster a-unhealthy-cluster is unhealthy and cannot be selected.')).toBeInTheDocument();
+
+    await user.type(input, '2{Enter}');
+    expect(await screen.findByText('Error: Cluster b-offline-cluster is offline and cannot be selected.')).toBeInTheDocument();
+    expect(screen.queryByText('Connected to cluster: a-unhealthy-cluster')).not.toBeInTheDocument();
+    expect(screen.queryByText('Connected to cluster: b-offline-cluster')).not.toBeInTheDocument();
+    expect(operatorApi.executeTerminalCommand).not.toHaveBeenCalled();
+  });
+
+  it('keeps clusters with unknown health selectable', async () => {
+    const user = userEvent.setup();
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: [
+        { uuid: '1', clusterName: 'unknown-cluster', clusterAPIURL: 'https://unknown', ready: true, clusterStatus: 'unknown', online: true },
+      ],
+      discoveryUuid: 'test-uuid',
+      isLoading: false,
+      error: null,
+      startDiscovery: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+    await user.type(screen.getByRole('textbox'), '1{Enter}');
+
+    expect(await screen.findByText('Connected to cluster: unknown-cluster')).toBeInTheDocument();
+  });
+
   it('should show help message with available commands when ? is typed', async () => {
     const user = userEvent.setup();
     render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
