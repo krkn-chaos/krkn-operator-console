@@ -64,13 +64,26 @@ import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
 import './JobsList.css';
 
-import type { CategoryResponse, ClusterJob, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
+import type {
+  CategoryResponse,
+  ClusterJob,
+  ScenarioRunState,
+  ScenarioRunPhase,
+  ClusterJobPhase,
+  GraphRunListItem,
+  GraphRunSummary,
+  GraphClusterScore,
+  UnifiedJobItem,
+} from '../types/api';
+
+const GRAPH_RUN_TERMINAL_PHASES: GraphRunListItem['phase'][] = ['Completed', 'Failed', 'PartiallyFailed'];
 
 export type UnifiedRunItem =
   | {
       type: 'graph';
       categories: string[];
       graphRunName: string;
+      graphRunPhase: GraphRunListItem['phase'];
       nodes: ScenarioRunState[];
       phase: ScenarioRunPhase;
       createdAt: string;
@@ -95,6 +108,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
         type: 'graph',
         categories: item.categories || [],
         graphRunName: item.name,
+        graphRunPhase: gr.phase,
         nodes: [],
         phase,
         createdAt: item.createdAt,
@@ -109,6 +123,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
       type: 'graph',
       categories: item.categories || [],
       graphRunName: item.name,
+      graphRunPhase: 'Pending',
       nodes: [],
       phase: 'Pending',
       createdAt: item.createdAt,
@@ -165,6 +180,7 @@ interface JobsListProps {
   onDeleteJob: (jobId: string) => Promise<void>;
   onRerunScenario: (run: ScenarioRunState, jobId: string) => void;
   onLoadRunDetails?: (run: ScenarioRunState) => void;
+  scenarioRunDetails?: ScenarioRunState[];
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
@@ -181,6 +197,7 @@ export function JobsList({
   onDeleteJob,
   onRerunScenario,
   onLoadRunDetails,
+  scenarioRunDetails = [],
   expandedGraphRunIds,
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
@@ -475,6 +492,10 @@ export function JobsList({
   const unifiedRuns = useMemo((): UnifiedRunItem[] => {
     return jobs.map(toUnifiedRunItem);
   }, [jobs]);
+  const scenarioRunDetailsByName = useMemo(
+    () => new Map(scenarioRunDetails.map((run) => [run.scenarioRunName, run])),
+    [scenarioRunDetails],
+  );
 
   // Get unique owner user IDs from current page for autocomplete
   const uniqueOwners = useMemo(() => {
@@ -1039,7 +1060,7 @@ export function JobsList({
                         },
                       onDelete: () => setConfirmDeleteRun(item.graphRunName),
                       onReplayWorkflow: onReplayWorkflow ? () => onReplayWorkflow(item.graphRunName) : undefined,
-                      isWorkflowReplayDisabled: !TERMINAL_PHASES.includes(item.phase),
+                      isWorkflowReplayDisabled: !GRAPH_RUN_TERMINAL_PHASES.includes(item.graphRunPhase),
                     })}
                     </DataListItemRow>
 
@@ -1058,7 +1079,11 @@ export function JobsList({
               }
 
               // Handle standalone ScenarioRun
-              const run = item.run;
+              const listedRun = item.run;
+              const contextRun = scenarioRunDetailsByName.get(listedRun.scenarioRunName);
+              const run = listedRun.clusterJobs.length === 0 && contextRun
+                ? { ...listedRun, ...contextRun }
+                : listedRun;
               const customRunName = run.customRunName?.trim();
               const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
@@ -1100,21 +1125,24 @@ export function JobsList({
                               </strong>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <code
-                                className="jobs-list-run-primary-value"
-                                style={{
-                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                  padding: '0.125rem 0.5rem',
-                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                  display: 'inline-block',
-                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {run.scenarioName}
-                              </code>
+                              <Tooltip content={`Run ID: ${scenarioRunName}`}>
+                                <code
+                                  className="jobs-list-run-primary-value"
+                                  aria-label={`Scenario ${run.scenarioName}; run ID ${scenarioRunName}`}
+                                  style={{
+                                    fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                    fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                    padding: '0.125rem 0.5rem',
+                                    borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                    display: 'inline-block',
+                                    border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {run.scenarioName}
+                                </code>
+                              </Tooltip>
                               {run.registryName && (
                                 <Tooltip content={<>Scenario running on <strong><em>{run.registryName}</em></strong> private registry</>}>
                                   <LockIcon
@@ -1298,7 +1326,9 @@ export function JobsList({
                       runPhase: run.phase,
                       replayJobs: run.clusterJobs,
                       isReplayJobsLoading: loadingRunDetails.has(run.scenarioRunName),
-                      onOpenReplayJobs: () => onLoadRunDetails?.(run),
+                      onOpenReplayJobs: () => {
+                        if (run.clusterJobs.length === 0) onLoadRunDetails?.(run);
+                      },
                       onReplayScenario: (jobId) => onRerunScenario(run, jobId),
                     })}
                   </DataListItemRow>

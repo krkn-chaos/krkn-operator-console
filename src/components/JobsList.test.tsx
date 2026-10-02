@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import type { ClusterJob, UnifiedJobItem, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
+import type { ClusterJob, UnifiedJobItem, ScenarioRunState, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
 import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJobsMock } from '../hooks/__mocks__/useJobs';
 
 vi.mock('../hooks/useJobs');
@@ -380,6 +380,21 @@ describe('JobsList - Run actions menu', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(ownerUserId);
   });
 
+  it('keeps the run ID available from the scenario label without adding a second visible line', async () => {
+    const user = userEvent.setup();
+    const runId = 'pod-scenarios-4c56abcd';
+    setMockJobs([makeScenarioJobItem(runId, 'Succeeded', { scenarioName: 'pod-scenarios' })]);
+
+    render(<JobsList {...defaultProps} />);
+
+    const runsList = screen.getByRole('list', { name: 'Scenario runs list' });
+    const scenarioName = runsList.querySelector('.jobs-list-run-primary-value');
+    expect(scenarioName).toHaveTextContent('pod-scenarios');
+    expect(runsList.querySelector('.jobs-list-compact-run-identity')).toBeNull();
+    await user.hover(scenarioName as HTMLElement);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(`Run ID: ${runId}`);
+  });
+
   it('keeps Resiliency Score and Created as the final columns for both run types', () => {
     setMockJobs([
       makeGraphJobItem('aligned-workflow', 'Completed'),
@@ -517,19 +532,60 @@ describe('JobsList - Replay actions', () => {
     })).not.toBeInTheDocument();
   });
 
-  it('offers direct workflow replay instead of cluster replay for graph runs', async () => {
+  it('uses cluster jobs fetched into app state when the jobs snapshot is empty', async () => {
     const user = userEvent.setup();
-    const onReplayWorkflow = vi.fn().mockResolvedValue(undefined);
-    setMockJobs([makeGraphJobItem('graphrun-001', 'Completed', {
-      completionTime: '2026-07-29T11:00:00Z',
-    })]);
-    render(<JobsList {...rerunDefaultProps} onReplayWorkflow={onReplayWorkflow} />);
+    const onLoadRunDetails = vi.fn();
+    const baseProps = {
+      ...rerunDefaultProps,
+      onLoadRunDetails,
+      scenarioRunDetails: [] as ScenarioRunState[],
+    };
+    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded')]);
+    const { rerender } = render(<JobsList {...baseProps} />);
 
-    await user.click(screen.getByRole('button', { name: 'Actions for run graphrun-001' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Replay' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
+    expect(onLoadRunDetails).toHaveBeenCalledOnce();
 
-    expect(onReplayWorkflow).toHaveBeenCalledWith('graphrun-001');
+    rerender(<JobsList {...baseProps} scenarioRunDetails={[{
+      scenarioRunName: 'run-001',
+      scenarioName: 'pod-scenarios',
+      phase: 'Succeeded',
+      totalTargets: 1,
+      successfulJobs: 1,
+      failedJobs: 0,
+      runningJobs: 0,
+      clusterJobs: [makeJob({
+        clusterName: 'loaded-cluster',
+        phase: 'Succeeded',
+        completionTime: '2026-07-29T11:00:00Z',
+      })],
+      createdAt: '2026-07-29T10:00:00Z',
+    }]} />);
+
+    expect(await screen.findByText('krkn-operator-acm/loaded-cluster', {
+      selector: '.pf-v5-c-menu__item-text',
+    })).toBeInTheDocument();
   });
+
+  it.each(['Completed', 'Failed', 'PartiallyFailed'] as const)(
+    'offers direct workflow replay for %s graph runs', async (phase) => {
+      const user = userEvent.setup();
+      const onReplayWorkflow = vi.fn().mockResolvedValue(undefined);
+      setMockJobs([makeGraphJobItem('graphrun-001', phase, {
+        completionTime: '2026-07-29T11:00:00Z',
+      })]);
+      render(<JobsList {...rerunDefaultProps} onReplayWorkflow={onReplayWorkflow} />);
+
+      await user.click(screen.getByRole('button', { name: 'Actions for run graphrun-001' }));
+      const replayItem = screen.getByRole('menuitem', { name: 'Replay' });
+      expect(replayItem).not.toBeDisabled();
+      await user.click(replayItem);
+
+      expect(onReplayWorkflow).toHaveBeenCalledWith('graphrun-001');
+    },
+  );
 });
 
 describe('JobsList - Date/Time Filter', () => {

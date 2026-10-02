@@ -232,6 +232,7 @@ function App() {
               onDeleteJob={handleDeleteJob}
               onRerunScenario={handleRerunScenario}
               onLoadRunDetails={(run) => fetchRunDetails(run.scenarioRunName, run)}
+              scenarioRunDetails={state.scenarioRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
               onToggleGraphRunAccordion={(graphRunName) =>
                 dispatch({ type: 'TOGGLE_GRAPH_RUN_ACCORDION', payload: { graphRunName } })

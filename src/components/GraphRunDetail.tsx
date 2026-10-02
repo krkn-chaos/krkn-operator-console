@@ -36,7 +36,7 @@ import {
   ExclamationCircleIcon,
   BanIcon,
 } from '@patternfly/react-icons';
-import type { GraphRunDetail, NodeStatus, ClusterResiliencyScore, GraphClusterScore, StudioWorkflow } from '../types/api';
+import type { GraphRunDetail, NodeStatus, ClusterResiliencyScore, GraphClusterScore } from '../types/api';
 import { graphRunsApi } from '../services';
 import { ScenarioRunDetailModal } from './ScenarioRunDetailModal';
 import { getScoreColor, getScoreLevel, formatScore, SCORE_CALCULATING } from '../utils/resiliency';
@@ -44,8 +44,6 @@ import { getScoreColor, getScoreLevel, formatScore, SCORE_CALCULATING } from '..
 interface GraphRunDetailProps {
   /** Name of the graph run to visualize */
   graphRunName: string;
-  /** @deprecated Workflow replay is available from the run actions menu. */
-  onReplayWorkflow?: (workflow: StudioWorkflow, categories?: string[]) => void;
 }
 
 /**

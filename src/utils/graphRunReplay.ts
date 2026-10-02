@@ -6,7 +6,15 @@ export interface GraphRunReplayPayload {
   categories: string[];
 }
 
-/** Load a graph run's saved workflow in the format used by Chaos Studio replay. */
+/**
+ * Load a graph run's saved workflow in the format used by Chaos Studio replay.
+ *
+ * @example
+ * ```ts
+ * const { workflow, categories } = await loadGraphRunReplay('graphrun-abc123');
+ * dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow, categories } });
+ * ```
+ */
 export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRunReplayPayload> {
   const [config, graphRunDetail] = await Promise.all([
     graphRunsApi.getGraphRunConfig(graphRunName),
