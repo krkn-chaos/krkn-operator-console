@@ -165,7 +165,7 @@
 }
 
 .jobs-list-compact-label {
-  --pf-v5-c-label--m-compact--FontSize: 0.796875rem;
+  --pf-v5-c-label--m-compact--FontSize: 0.8125rem;
 }
 
 @container jobs-list-runs (max-width: 1450px) {
