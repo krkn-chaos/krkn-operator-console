@@ -149,6 +149,47 @@ describe('TerminalContent', () => {
     expect(operatorApi.executeTerminalCommand).not.toHaveBeenCalled();
   });
 
+  it('blocks a command when the selected cluster becomes unavailable in the latest discovery state', async () => {
+    const user = userEvent.setup();
+    const reachableCluster = {
+      uuid: '1',
+      clusterName: 'cluster-a',
+      clusterAPIURL: 'https://api-a',
+      ready: true,
+      clusterStatus: 'healthy' as const,
+      online: true,
+    };
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: [reachableCluster],
+      discoveryUuid: 'test-uuid',
+      isLoading: false,
+      error: null,
+      startDiscovery: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    const view = render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+    const input = screen.getByRole('textbox');
+    await user.type(input, '1{Enter}');
+    expect(await screen.findByText('Connected to cluster: cluster-a')).toBeInTheDocument();
+
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: [{ ...reachableCluster, clusterStatus: 'unknown', online: false }],
+      discoveryUuid: 'test-uuid',
+      isLoading: false,
+      error: null,
+      startDiscovery: vi.fn(),
+      reset: vi.fn(),
+    });
+    view.rerender(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+
+    await user.type(screen.getByRole('textbox'), 'kubectl get pods{Enter}');
+
+    expect(await screen.findByText(/is offline; command was not sent/)).toBeInTheDocument();
+    expect(operatorApi.executeTerminalCommand).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Cluster reachability: offline')).toBeInTheDocument();
+  });
+
   it('keeps clusters with unknown health selectable', async () => {
     const user = userEvent.setup();
     mockUseClusterDiscovery.mockReturnValue({

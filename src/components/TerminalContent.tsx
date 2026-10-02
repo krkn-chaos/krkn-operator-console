@@ -262,6 +262,26 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const executeCommand = async (command: string) => {
     if (!selectedCluster || !discoveryUuid) return;
 
+    const currentCluster = clusters?.find(
+      cluster =>
+        cluster.clusterName === selectedCluster.clusterName &&
+        cluster.operatorSource === selectedCluster.operatorSource
+    );
+    if (!currentCluster || isClusterUnavailable(currentCluster.online, currentCluster.clusterStatus)) {
+      const status = !currentCluster
+        ? 'no longer available'
+        : currentCluster.online === false
+          ? 'offline'
+          : 'unhealthy';
+      setOutputLines(prev => [
+        ...prev,
+        `☸ ${selectedCluster.clusterName} $ ${command}`,
+        `Error: Cluster ${selectedCluster.clusterName} is ${status}; command was not sent.`,
+      ]);
+      setSelectedCluster(null);
+      return;
+    }
+
     setIsExecuting(true);
 
     // Add command to output immediately (with executing indicator)

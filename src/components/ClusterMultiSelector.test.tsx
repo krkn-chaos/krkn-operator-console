@@ -76,6 +76,12 @@ describe('ClusterMultiSelector cluster health', () => {
     expect(onToggle).not.toHaveBeenCalledWith(
       expect.objectContaining({ clusterName: 'unhealthy-cluster' })
     );
+    expect(onToggle).toHaveBeenCalledWith(
+      expect.objectContaining({ clusterName: 'unknown-health-cluster' })
+    );
+    expect(onToggle).toHaveBeenCalledWith(
+      expect.objectContaining({ clusterName: 'healthy-cluster' })
+    );
   });
 
   it('removes a previously selected unhealthy cluster and explains the change', () => {
