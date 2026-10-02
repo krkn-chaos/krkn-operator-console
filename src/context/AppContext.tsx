@@ -22,6 +22,7 @@ const initialState: AppState = {
   expandedGraphRunIds: new Set<string>(),
   studioReplayWorkflow: null,
   studioReplayCategories: [],
+  isWorkflowReplayLoading: false,
 
   // Workflow state
   clusters: null,
@@ -345,6 +346,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'studio',
+        isWorkflowReplayLoading: false,
         studioReplayWorkflow: action.payload.workflow,
         studioReplayCategories: action.payload.categories ?? [],
       };
@@ -352,7 +354,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'START_WORKFLOW_REPLAY':
       return {
         ...state,
-        phase: 'loading_workflow_replay',
+        isWorkflowReplayLoading: true,
         studioReplayWorkflow: null,
         studioReplayCategories: [],
       };
@@ -360,7 +362,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'WORKFLOW_REPLAY_FAILED':
       return {
         ...state,
-        phase: 'jobs_list',
+        isWorkflowReplayLoading: false,
       };
 
     // Workflow control

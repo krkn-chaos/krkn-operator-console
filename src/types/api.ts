@@ -462,7 +462,6 @@ export type AppPhase =
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
-  | 'loading_workflow_replay'
   | 'selecting_scenarios'
   | 'loading_scenario_detail'
   | 'configuring_scenario'
@@ -511,6 +510,7 @@ export interface AppState {
   studioReplayWorkflow?: StudioWorkflow | null;
   /** Categories restored when opening a graph run replay in Chaos Studio. */
   studioReplayCategories?: string[] | null;
+  isWorkflowReplayLoading?: boolean;
 
   // Workflow state (create job flow)
   clusters: ClustersResponse['targetData'] | null;
