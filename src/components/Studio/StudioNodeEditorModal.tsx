@@ -89,7 +89,7 @@ function StudioNodeEditorModalComponent({
     // Initialize from node data
     if (node.config) {
       setRegistryType(node.config.registryType);
-      setRegistryName(node.config.registryConfig.registryName || '');
+      setRegistryName(node.config.registryConfig?.registryName || '');
       setSelectedScenario(node.config.scenarioName);
       setSelectedSignatureStatus(node.config.signature_status);
       setScenarioImage(node.config.scenarioImage);

@@ -115,8 +115,9 @@ interface StudioContextType {
   deleteEdge: (edgeId: string) => void;
   validateConnection: (source: string, target: string) => { valid: boolean; error?: string; warning?: string };
   validateNodeId: (nodeId: string, excludeId?: string) => { valid: boolean; error?: string };
-  exportWorkflow: () => { graph: { [nodeId: string]: GraphScenarioNode }; metadata: { exportedAt: string; nodeCount: number } } | { error: string };
+  exportWorkflow: () => { graph: { [nodeId: string]: GraphScenarioNode }; studioLayout: StudioWorkflow; metadata: { exportedAt: string; nodeCount: number } } | { error: string };
   clearWorkflow: () => void;
+  importWorkflow: (workflow: StudioWorkflow) => void;
   setSavedWorkflow: (meta: SavedWorkflowMetadata, workflowState?: StudioWorkflow) => void;
   saveWorkflowToCluster: () => Promise<void>;
   clearSavedWorkflow: () => void;
@@ -407,8 +408,11 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     }));
   }, []);
 
-  // Export workflow to GraphRunSpec format (krknctl compatible)
-  const exportWorkflow = useCallback((): { graph: { [nodeId: string]: GraphScenarioNode }; metadata: { exportedAt: string; nodeCount: number } } | { error: string } => {
+  // Export workflow to GraphRunSpec format (krknctl compatible).
+  // The `studioLayout` carries full canvas fidelity (positions, status, config)
+  // so an exported file can be re-imported losslessly; `graph` remains the
+  // executable krknctl form.
+  const exportWorkflow = useCallback((): { graph: { [nodeId: string]: GraphScenarioNode }; studioLayout: StudioWorkflow; metadata: { exportedAt: string; nodeCount: number } } | { error: string } => {
     // Validate: all nodes must be configured
     const unconfiguredNodes = workflow.nodes.filter(n => n.status !== 'configured');
     if (unconfiguredNodes.length > 0) {
@@ -419,6 +423,7 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
 
     return {
       graph: buildGraph(workflow),
+      studioLayout: workflow,
       metadata: {
         exportedAt: new Date().toISOString(),
         nodeCount: workflow.nodes.length,
@@ -479,6 +484,27 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     clearAutosave();
   }, []);
 
+  // Import a workflow from an uploaded file as a fresh, UNSAVED workflow.
+  // Unlike loadWorkflow (cluster templates), this does not set savedWorkflow, so
+  // the imported workflow is treated as new local work until explicitly saved.
+  const importWorkflow = useCallback((newWorkflow: StudioWorkflow) => {
+    setWorkflow(newWorkflow);
+    setSavedWorkflowState(null);
+    setLastSavedSnapshot(null);
+    setIsEditingDetails(false);
+    // Clear the prior autosave, then persist the imported workflow immediately so
+    // it survives a reload before the periodic autosave interval next fires. The
+    // interval keeps saving later edits (see the autosave useEffect above).
+    clearAutosave();
+    if (newWorkflow.nodes.length > 0) {
+      saveAutosave({
+        workflow: newWorkflow,
+        timestamp: Date.now(),
+        version: AUTOSAVE_VERSION,
+      });
+    }
+  }, []);
+
   const clearWorkflow = useCallback(() => {
     setWorkflow({
       nodes: [],
@@ -509,6 +535,7 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     validateNodeId,
     exportWorkflow,
     clearWorkflow,
+    importWorkflow,
     setSavedWorkflow,
     saveWorkflowToCluster,
     clearSavedWorkflow,
@@ -534,6 +561,7 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     validateNodeId,
     exportWorkflow,
     clearWorkflow,
+    importWorkflow,
     setSavedWorkflow,
     saveWorkflowToCluster,
     clearSavedWorkflow,

@@ -38,7 +38,7 @@ vi.mock('./studioAutosave', () => ({
 }));
 
 import { workflowsApi } from '../../services/workflowsApi';
-import { saveAutosave, clearAutosave } from './studioAutosave';
+import { saveAutosave, clearAutosave, AUTOSAVE_VERSION } from './studioAutosave';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1075,6 +1075,11 @@ describe('StudioContext', () => {
         expect(exported.graph['export-a'].scenario?.name).toBe('scenario-export-a');
         expect(exported.graph['export-a'].env).toEqual({ KEY: 'val' });
         expect(exported.metadata.nodeCount).toBe(2);
+        // studioLayout carries the full canvas for lossless re-import.
+        expect(exported.studioLayout).toBe(wf);
+        expect(exported.studioLayout.nodes).toEqual([nodeA, nodeB]);
+        expect(exported.studioLayout.edges).toEqual(wf.edges);
+        expect(exported.studioLayout.nextNodeNumber).toBe(3);
       }
     });
 
@@ -1093,6 +1098,97 @@ describe('StudioContext', () => {
       if ('graph' in exported) {
         expect(exported.graph['solo-n'].depends_on).toBeUndefined();
       }
+    });
+  });
+
+  // =========================================================================
+  // 12b. importWorkflow
+  // =========================================================================
+  describe('importWorkflow', () => {
+    it('replaces the current workflow with the imported one', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+
+      const imported: StudioWorkflow = {
+        nodes: [makeConfiguredNode('imp-a'), makeConfiguredNode('imp-b')],
+        edges: [{ id: 'imp-a-imp-b', source: 'imp-a', target: 'imp-b' }],
+        nextNodeNumber: 3,
+      };
+
+      act(() => {
+        result.current.importWorkflow(imported);
+      });
+
+      expect(result.current.workflow).toEqual(imported);
+    });
+
+    it('imports as a fresh UNSAVED workflow and resets edit state', () => {
+      // Start from a saved workflow so we can assert the reset.
+      const initial: StudioWorkflow = {
+        nodes: [makeConfiguredNode('load-a')],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+      const { result } = renderHook(() => useStudioContext(), {
+        wrapper: wrapperWith(initial),
+      });
+
+      act(() => {
+        result.current.loadWorkflow(initial, makeSavedWorkflow());
+        result.current.setIsEditingDetails(true);
+      });
+      expect(result.current.savedWorkflow).not.toBeNull();
+
+      const imported: StudioWorkflow = {
+        nodes: [makeConfiguredNode('imp-x')],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+      act(() => {
+        result.current.importWorkflow(imported);
+      });
+
+      // No savedWorkflow -> treated as new local work; edit state cleared.
+      expect(result.current.savedWorkflow).toBeNull();
+      expect(result.current.isEditingDetails).toBe(false);
+      // No snapshot recorded, so the fresh import is not marked dirty.
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it('clears autosave on import of an empty workflow', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      vi.mocked(clearAutosave).mockClear();
+      vi.mocked(saveAutosave).mockClear();
+
+      act(() => {
+        result.current.importWorkflow({ nodes: [], edges: [], nextNodeNumber: 1 });
+      });
+
+      expect(clearAutosave).toHaveBeenCalled();
+      // Empty workflow: nothing worth persisting.
+      expect(saveAutosave).not.toHaveBeenCalled();
+    });
+
+    it('persists the imported workflow to autosave immediately', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      vi.mocked(clearAutosave).mockClear();
+      vi.mocked(saveAutosave).mockClear();
+
+      const imported: StudioWorkflow = {
+        nodes: [makeConfiguredNode('imp-a')],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+
+      act(() => {
+        result.current.importWorkflow(imported);
+      });
+
+      expect(clearAutosave).toHaveBeenCalled();
+      expect(saveAutosave).toHaveBeenCalledTimes(1);
+      const arg = vi.mocked(saveAutosave).mock.calls[0][0];
+      expect(arg.workflow).toEqual(imported);
+      expect(arg.version).toBe(AUTOSAVE_VERSION);
+      expect(typeof arg.timestamp).toBe('number');
     });
   });
 
