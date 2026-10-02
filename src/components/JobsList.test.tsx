@@ -493,6 +493,22 @@ describe('JobsList - Replay actions', () => {
     expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
   });
 
+  it('renders scenario runs when the jobs snapshot omits clusterJobs', async () => {
+    const user = userEvent.setup();
+    const itemWithoutClusterJobs = makeScenarioJobItem('run-001', 'Succeeded');
+    if (itemWithoutClusterJobs.scenarioRun) {
+      delete (itemWithoutClusterJobs.scenarioRun as Partial<ScenarioRunStatusResponse>).clusterJobs;
+    }
+    setMockJobs([itemWithoutClusterJobs]);
+
+    render(<JobsList {...rerunDefaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+
+    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
+  });
+
   it('replays a completed cluster from the run actions submenu', async () => {
     const user = userEvent.setup();
     setMockJobs([makeScenarioJobItem('run-001', 'Succeeded', {
@@ -567,6 +583,31 @@ describe('JobsList - Replay actions', () => {
     expect(await screen.findByText('krkn-operator-acm/loaded-cluster', {
       selector: '.pf-v5-c-menu__item-text',
     })).toBeInTheDocument();
+  });
+
+  it('handles context run details that omit clusterJobs when opening replay', async () => {
+    const user = userEvent.setup();
+    const contextRunWithoutClusterJobs = {
+      scenarioRunName: 'run-001',
+      scenarioName: 'pod-scenarios',
+      phase: 'Succeeded',
+      totalTargets: 1,
+      successfulJobs: 1,
+      failedJobs: 0,
+      runningJobs: 0,
+      createdAt: '2026-07-29T10:00:00Z',
+    } as unknown as ScenarioRunState;
+    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded')]);
+
+    render(<JobsList
+      {...rerunDefaultProps}
+      scenarioRunDetails={[contextRunWithoutClusterJobs]}
+    />);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+
+    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
   });
 
   it.each(['Completed', 'Failed', 'PartiallyFailed'] as const)(
