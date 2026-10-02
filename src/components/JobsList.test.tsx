@@ -585,6 +585,31 @@ describe('JobsList - Replay actions', () => {
     })).toBeInTheDocument();
   });
 
+  it('handles context run details that omit clusterJobs when opening replay', async () => {
+    const user = userEvent.setup();
+    const contextRunWithoutClusterJobs = {
+      scenarioRunName: 'run-001',
+      scenarioName: 'pod-scenarios',
+      phase: 'Succeeded',
+      totalTargets: 1,
+      successfulJobs: 1,
+      failedJobs: 0,
+      runningJobs: 0,
+      createdAt: '2026-07-29T10:00:00Z',
+    } as unknown as ScenarioRunState;
+    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded')]);
+
+    render(<JobsList
+      {...rerunDefaultProps}
+      scenarioRunDetails={[contextRunWithoutClusterJobs]}
+    />);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+
+    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
+  });
+
   it.each(['Completed', 'Failed', 'PartiallyFailed'] as const)(
     'offers direct workflow replay for %s graph runs', async (phase) => {
       const user = userEvent.setup();
