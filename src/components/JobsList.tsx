@@ -1102,23 +1102,16 @@ export function JobsList({
                                 </Tooltip>
                               )}
                             </div>
-                            <Tooltip
-                              content={customRunName && customRunName !== scenarioRunName
-                                ? `Run name: ${customRunName}; run ID: ${scenarioRunName}`
-                                : `Run ID: ${scenarioRunName}`}
-                            >
-                              <div
-                                className="jobs-list-compact-run-identity"
-                                aria-label={customRunName && customRunName !== scenarioRunName
-                                  ? `Run name ${customRunName}, run ID ${scenarioRunName}`
-                                  : `Run ID ${scenarioRunName}`}
-                              >
-                                {customRunName && customRunName !== scenarioRunName && (
+                            {customRunName && customRunName !== scenarioRunName && (
+                              <Tooltip content={`Run name: ${customRunName}; run ID: ${scenarioRunName}`}>
+                                <div
+                                  className="jobs-list-compact-run-identity"
+                                  aria-label={`Run name ${customRunName}`}
+                                >
                                   <code>{customRunName}</code>
-                                )}
-                                <code>{scenarioRunName}</code>
-                              </div>
-                            </Tooltip>
+                                </div>
+                              </Tooltip>
+                            )}
                           </div>
                         </DataListCell>,
                         <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
