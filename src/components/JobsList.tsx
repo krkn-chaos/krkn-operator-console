@@ -61,11 +61,10 @@ import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
-import { loadGraphRunReplay } from '../utils/graphRunReplay';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
 import './JobsList.css';
 
-import type { CategoryResponse, ClusterJob, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem, StudioWorkflow } from '../types/api';
+import type { CategoryResponse, ClusterJob, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem } from '../types/api';
 
 export type UnifiedRunItem =
   | {
@@ -169,7 +168,7 @@ interface JobsListProps {
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
-  onReplayWorkflow?: (workflow: StudioWorkflow, categories?: string[]) => void;
+  onReplayWorkflow?: (graphRunName: string) => Promise<void>;
   loadingRunDetails: Set<string>;
 }
 
@@ -1039,10 +1038,7 @@ export function JobsList({
                           void handleToggleRunCategory('graph-runs', item.graphRunName, graphCategoryNames, category);
                         },
                       onDelete: () => setConfirmDeleteRun(item.graphRunName),
-                      onReplayWorkflow: onReplayWorkflow ? async () => {
-                        const { workflow, categories } = await loadGraphRunReplay(item.graphRunName);
-                        onReplayWorkflow(workflow, categories);
-                      } : undefined,
+                      onReplayWorkflow: onReplayWorkflow ? () => onReplayWorkflow(item.graphRunName) : undefined,
                       isWorkflowReplayDisabled: !TERMINAL_PHASES.includes(item.phase),
                     })}
                     </DataListItemRow>

@@ -80,8 +80,6 @@ export function RunCategoryActions({
   const [isOpen, setIsOpen] = useState(false);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
   const hasLoadedReplayJobsForOpenMenu = useRef(false);
-  const [isWorkflowReplayLoading, setIsWorkflowReplayLoading] = useState(false);
-  const [workflowReplayError, setWorkflowReplayError] = useState<string | null>(null);
 
   const report = useReportActions({ runId, runName, runPhase });
 
@@ -105,18 +103,10 @@ export function RunCategoryActions({
     onOpenReplayJobs?.();
   };
 
-  const handleWorkflowReplay = async () => {
+  const handleWorkflowReplay = () => {
     if (!onReplayWorkflow) return;
-    setWorkflowReplayError(null);
-    setIsWorkflowReplayLoading(true);
-    try {
-      await onReplayWorkflow();
-    } catch (error) {
-      setWorkflowReplayError(error instanceof Error ? error.message : 'Unable to replay workflow');
-      setIsOpen(true);
-    } finally {
-      setIsWorkflowReplayLoading(false);
-    }
+    handleOpenChange(false);
+    void onReplayWorkflow();
   };
 
   const replayableJobs = replayJobs.filter((job) => job.completionTime);
@@ -182,15 +172,11 @@ export function RunCategoryActions({
           {onReplayWorkflow && (
             <DropdownItem
               key="replay-workflow"
-              icon={workflowReplayError ? <ExclamationCircleIcon /> : <RedoIcon />}
-              isDisabled={isWorkflowReplayDisabled || isWorkflowReplayLoading}
-              title={workflowReplayError ?? undefined}
-              onClick={() => {
-                handleOpenChange(false);
-                void handleWorkflowReplay();
-              }}
+              icon={<RedoIcon />}
+              isDisabled={isWorkflowReplayDisabled}
+              onClick={handleWorkflowReplay}
             >
-              {workflowReplayError ? 'Replay failed — Retry' : 'Replay'}
+              Replay
             </DropdownItem>
           )}
           {runId && report.error && (
@@ -307,25 +293,6 @@ export function RunCategoryActions({
           </DropdownItem>
         </DropdownList>
       </Dropdown>
-      <Modal
-        isOpen={isWorkflowReplayLoading}
-        onClose={() => undefined}
-        showClose={false}
-        title="Opening workflow in Chaos Studio"
-        variant={ModalVariant.small}
-        aria-label="Loading workflow replay"
-      >
-        <div
-          role="status"
-          aria-live="polite"
-          style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0' }}
-        >
-          <Spinner size="xl" aria-label="Loading workflow" />
-          <p style={{ margin: 0 }}>
-            Loading the saved workflow configuration. Chaos Studio will open when it is ready.
-          </p>
-        </div>
-      </Modal>
       {report.preview && (
         <Modal
           title={report.preview.format.toUpperCase() + ' report preview'}

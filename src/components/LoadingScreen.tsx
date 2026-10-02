@@ -7,7 +7,7 @@ import {
 } from '@patternfly/react-core';
 
 interface LoadingScreenProps {
-  phase: 'initializing' | 'polling' | 'loading_scenarios' | 'loading_scenario_detail';
+  phase: 'initializing' | 'polling' | 'loading_scenarios' | 'loading_workflow_replay' | 'loading_scenario_detail';
   pollAttempts?: number;
 }
 
@@ -19,6 +19,9 @@ export function LoadingScreen({ phase, pollAttempts = 0 }: LoadingScreenProps) {
     if (phase === 'loading_scenarios') {
       return 'Loading chaos scenarios from registry...';
     }
+    if (phase === 'loading_workflow_replay') {
+      return 'Loading the saved workflow configuration. Chaos Studio will open when it is ready.';
+    }
     if (phase === 'loading_scenario_detail') {
       return 'Loading scenario configuration details...';
     }
@@ -28,6 +31,7 @@ export function LoadingScreen({ phase, pollAttempts = 0 }: LoadingScreenProps) {
   const getTitle = () => {
     if (phase === 'initializing') return 'Initializing';
     if (phase === 'loading_scenarios') return 'Loading Scenarios';
+    if (phase === 'loading_workflow_replay') return 'Preparing Chaos Studio';
     if (phase === 'loading_scenario_detail') return 'Loading Scenario Detail';
     return 'Loading';
   };

@@ -349,6 +349,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
         studioReplayCategories: action.payload.categories ?? [],
       };
 
+    case 'START_WORKFLOW_REPLAY':
+      return {
+        ...state,
+        phase: 'loading_workflow_replay',
+        studioReplayWorkflow: null,
+        studioReplayCategories: [],
+      };
+
+    case 'WORKFLOW_REPLAY_FAILED':
+      return {
+        ...state,
+        phase: 'jobs_list',
+      };
+
     // Workflow control
     case 'START_CREATE_WORKFLOW':
       return {

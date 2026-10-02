@@ -23,6 +23,7 @@ import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
 import { buildRerunIntent } from './utils/rerunIntent';
+import { loadGraphRunReplay } from './utils/graphRunReplay';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -139,8 +140,15 @@ function App() {
     }
   };
 
-  const handleReplayWorkflow = (workflow: import('./types/api').StudioWorkflow, categories?: string[]) => {
-    dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow, categories } });
+  const handleReplayWorkflow = async (graphRunName: string) => {
+    dispatch({ type: 'START_WORKFLOW_REPLAY' });
+    try {
+      const { workflow, categories } = await loadGraphRunReplay(graphRunName);
+      dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow, categories } });
+    } catch (error) {
+      dispatch({ type: 'WORKFLOW_REPLAY_FAILED' });
+      showError('Failed to replay workflow', error instanceof Error ? error.message : 'Unable to load workflow');
+    }
   };
 
   const handleCreateJob = () => {
@@ -200,6 +208,9 @@ function App() {
 
       case 'polling':
         return <LoadingScreen phase="polling" pollAttempts={state.pollAttempts} />;
+
+      case 'loading_workflow_replay':
+        return <LoadingScreen phase="loading_workflow_replay" />;
 
       case 'jobs_list': {
         return (
