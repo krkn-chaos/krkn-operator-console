@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { elasticsearchApi } from './elasticsearchApi';
 import { authService } from './authService';
 import { isApiError } from '../utils/apiClient';
-import type { QueryTelemetryResponse } from '../types/api';
+import type { QueryAlertsResponse, QueryTelemetryResponse } from '../types/api';
 
 // Exercise the real queryTelemetry method (not a mocked stand-in) so that the
 // endpoint, HTTP method, serialized request body, response parsing, and error
@@ -112,5 +112,40 @@ describe('elasticsearchApi.queryTelemetry', () => {
     fetchMock.mockRejectedValue(new Error('network down'));
 
     await expect(elasticsearchApi.queryTelemetry('prod-es')).rejects.toThrow('network down');
+  });
+});
+
+describe('elasticsearchApi.queryAlerts', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    vi.mocked(authService.getToken).mockReturnValue('test-token');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('uses the shared query parameters against the alerts endpoint', async () => {
+    const response: QueryAlertsResponse = {
+      documents: [{ id: 'alert-1', source: { alertname: 'APIDown' } }],
+      total: 1,
+    };
+    fetchMock.mockResolvedValue(jsonResponse(response));
+
+    await expect(elasticsearchApi.queryAlerts('prod-es', 25, '2025-01-01', '2025-01-02')).resolves.toEqual(response);
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/v1/elasticsearch-alerts-query');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body as string)).toEqual({
+      configName: 'prod-es',
+      size: 25,
+      startDate: '2025-01-01',
+      endDate: '2025-01-02',
+    });
   });
 });
