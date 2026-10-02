@@ -49,6 +49,27 @@
   margin-inline-start: auto;
 }
 
+.run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-secondary {
+  --pf-v5-c-menu-toggle--m-secondary--BackgroundColor: var(--pf-v5-global--BackgroundColor--100);
+  --pf-v5-c-menu-toggle--m-secondary--before--BorderColor: var(--pf-v5-global--BorderColor--100);
+  --pf-v5-c-menu-toggle--m-secondary--hover--BackgroundColor: var(--pf-v5-global--BackgroundColor--200);
+  --pf-v5-c-menu-toggle--m-secondary--hover--before--BorderColor: var(--pf-v5-global--primary-color--100);
+  --pf-v5-c-menu-toggle--m-secondary--focus--BackgroundColor: var(--pf-v5-global--BackgroundColor--200);
+  --pf-v5-c-menu-toggle--m-secondary--focus--before--BorderColor: var(--pf-v5-global--primary-color--100);
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  box-shadow: var(--pf-v5-global--BoxShadow--sm);
+  transition: box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-secondary:hover,
+.run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-secondary:focus-visible,
+.run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-secondary.pf-m-expanded {
+  box-shadow: var(--pf-v5-global--BoxShadow--md);
+}
+
 .jobs-list-owner-id,
 .jobs-list-run-primary-value,
 .jobs-list-compact-run-identity code {

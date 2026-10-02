@@ -13,7 +13,7 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { DownloadIcon, EllipsisVIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
+import { DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
 import type { CategoryResponse } from '../types/api';
 
@@ -93,15 +93,13 @@ export function RunCategoryActions({
         toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
           <MenuToggle
             ref={toggleRef}
-            variant="plain"
+            className="run-category-actions__toggle"
+            variant="secondary"
             aria-label={`Actions for run ${runName}`}
             isExpanded={isOpen}
             isDisabled={isDeleting || isCategoryUpdating}
-            style={{ width: '2.5rem', height: '2.5rem', padding: 0 }}
             onClick={() => handleOpenChange(!isOpen)}
-          >
-            <EllipsisVIcon style={{ fontSize: '1.25rem' }} />
-          </MenuToggle>
+          />
         )}
       >
         <DropdownList aria-label={`Run actions for ${runName}`}>
