@@ -28,6 +28,37 @@
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content {
   flex-wrap: nowrap;
   min-width: 0;
+  padding-block-end: 0;
+}
+
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-row {
+  align-items: center;
+}
+
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--primary,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--owner,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--jobs,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--graph-nodes,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--run-name,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--score,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--created {
+  display: flex;
+}
+
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status > div,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--primary > div,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--owner > div,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--jobs > div,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--graph-nodes > div,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--run-name > div,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--score > div,
+.jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--created > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 3.25rem;
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .pf-v5-c-data-list__cell:not(:last-child):not(.pf-m-icon) {
