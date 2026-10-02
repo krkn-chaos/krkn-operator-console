@@ -20,6 +20,7 @@ export interface SidebarNavProps {
 
   // Navigation / feature handlers (reuse existing App.tsx handlers)
   onNavigateJobs: () => void;
+  onNavigateKrknAI: () => void;
   onRunScenario: () => void;
   onNavigateStudio: () => void;
   onOpenFiles: () => void;

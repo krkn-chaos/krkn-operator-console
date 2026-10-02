@@ -1,6 +1,6 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
@@ -22,6 +22,7 @@ import { graphRunsApi } from './services';
 import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
+import { KrknAIPage } from './components/KrknAI/KrknAIPage';
 import { buildRerunIntent } from './utils/rerunIntent';
 
 function App() {
@@ -32,6 +33,8 @@ function App() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
+  const [linkedAiRunName, setLinkedAiRunName] = useState<string | null>(null);
+  const handleInitialAiRunHandled = useCallback(() => setLinkedAiRunName(null), []);
   const { isAdmin } = useRole();
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -229,11 +232,22 @@ function App() {
               }
               onDeleteGraphRun={handleDeleteGraphRun}
               onReplayWorkflow={handleReplayWorkflow}
+              onOpenKrknAIRun={(name) => {
+                setLinkedAiRunName(name);
+                dispatch({ type: 'NAVIGATE_TO_KRKN_AI' });
+              }}
               loadingRunDetails={state.loadingRunDetails}
             />
           </PageSection>
         );
       }
+
+      case 'krkn_ai':
+        return (
+          <PageSection>
+            <KrknAIPage initialRunName={linkedAiRunName} onInitialRunHandled={handleInitialAiRunHandled} />
+          </PageSection>
+        );
 
       case 'settings':
         return <Settings />;
@@ -346,6 +360,12 @@ function App() {
     return true;
   };
 
+
+  const handleNavigateToKrknAI = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_KRKN_AI' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
   const handleNavigateToSettings = () => {
     const proceed = () => dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
     if (!checkStudioGuard(proceed)) return;
@@ -443,6 +463,7 @@ function App() {
       userName={`${authState.user?.name ?? ''} ${authState.user?.surname ?? ''}`.trim()}
       isDarkTheme={isDarkTheme}
       onNavigateJobs={handleNavigateToHome}
+      onNavigateKrknAI={handleNavigateToKrknAI}
       onRunScenario={handleCreateJob}
       onNavigateStudio={handleNavigateToStudio}
       onOpenFiles={handleNavigateToFiles}
@@ -494,6 +515,11 @@ function App() {
     <Page header={header}>
       {appSidebar}
       <div className="app-content--with-sidebar" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingLeft: SIDEBAR_RAIL_WIDTH }}>
+        {import.meta.env.VITE_PREVIEW_MODE === 'true' && (
+          <PageSection style={{ padding: '0.75rem 1.5rem 0', flexShrink: 0 }}>
+            <Alert isInline variant="info" title="Mock preview — API data is simulated; no cluster operations are performed" />
+          </PageSection>
+        )}
         {state.notifications.length > 0 && (
           <div style={{ padding: '1rem 1rem 0 1rem' }}>
             <AlertGroup>

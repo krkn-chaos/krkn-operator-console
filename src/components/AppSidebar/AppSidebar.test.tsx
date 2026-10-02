@@ -16,6 +16,7 @@ type Handlers = Omit<SidebarNavProps, 'activePhase' | 'expanded' | 'isAdmin' | '
 
 const makeHandlers = (): Handlers => ({
   onNavigateJobs: vi.fn(),
+  onNavigateKrknAI: vi.fn(),
   onRunScenario: vi.fn(),
   onNavigateStudio: vi.fn(),
   onOpenFiles: vi.fn(),
@@ -52,6 +53,7 @@ describe('AppSidebar', () => {
   it('renders all primary navigation items', () => {
     renderSidebar();
     expect(screen.getByText('Jobs')).toBeInTheDocument();
+    expect(screen.getByText('Krkn AI')).toBeInTheDocument();
     expect(screen.getByText('Run Scenario')).toBeInTheDocument();
     expect(screen.getByText('Chaos Studio')).toBeInTheDocument();
     expect(screen.getByText('Files')).toBeInTheDocument();
@@ -76,6 +78,9 @@ describe('AppSidebar', () => {
 
     await user.click(screen.getByText('Jobs'));
     expect(handlers.onNavigateJobs).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByText('Krkn AI'));
+    expect(handlers.onNavigateKrknAI).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByText('Run Scenario'));
     expect(handlers.onRunScenario).toHaveBeenCalledTimes(1);
@@ -133,6 +138,13 @@ describe('AppSidebar', () => {
     const current = container.querySelector('.pf-m-current');
     expect(current).not.toBeNull();
     expect(current).toHaveTextContent('ES Data');
+  });
+
+  it('marks the Krkn AI item as current for its phase', () => {
+    const { container } = renderSidebar({ activePhase: 'krkn_ai' });
+    const current = container.querySelector('.pf-m-current');
+    expect(current).not.toBeNull();
+    expect(current).toHaveTextContent('Krkn AI');
   });
 
   it('marks the Resiliency History item as current for its phase', () => {

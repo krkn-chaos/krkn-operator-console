@@ -1,6 +1,6 @@
 import { Nav, NavItem, NavList, NavExpandable } from '@patternfly/react-core';
 import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon, TagsIcon } from '@patternfly/react-icons';
-import { MdWork } from 'react-icons/md';
+import { MdAutoAwesome, MdWork } from 'react-icons/md';
 import { FiBarChart2 } from 'react-icons/fi';
 import type { ReactNode } from 'react';
 import type { SidebarNavProps } from './types';
@@ -23,6 +23,7 @@ import './SidebarPFNav.css';
  * @param userName - Display name shown in the Account expandable section
  * @param isDarkTheme - Current theme; controls the theme toggle label and icon
  * @param onNavigateJobs - Called when Jobs menu item is clicked
+ * @param onNavigateKrknAI - Called when Krkn AI menu item is clicked
  * @param onRunScenario - Called when Run Scenario menu item is clicked
  * @param onNavigateStudio - Called when Chaos Studio menu item is clicked
  * @param onOpenFiles - Called when Files menu item is clicked
@@ -45,6 +46,7 @@ import './SidebarPFNav.css';
  *   userName="Alice Smith"
  *   isDarkTheme={false}
  *   onNavigateJobs={() => console.log('jobs')}
+ *   onNavigateKrknAI={() => console.log('krkn AI')}
  *   onRunScenario={() => console.log('run')}
  *   onNavigateStudio={() => console.log('studio')}
  *   onOpenFiles={() => console.log('files')}
@@ -64,6 +66,7 @@ export function SidebarPFNav({
   userName,
   isDarkTheme,
   onNavigateJobs,
+  onNavigateKrknAI,
   onRunScenario,
   onNavigateStudio,
   onOpenFiles,
@@ -90,6 +93,9 @@ export function SidebarPFNav({
         <NavList>
           <NavItem isActive={activePhase === 'jobs_list'} onClick={onNavigateJobs} aria-label="Jobs">
             {item(<MdWork />, 'Jobs')}
+          </NavItem>
+          <NavItem isActive={activePhase === 'krkn_ai'} onClick={onNavigateKrknAI} aria-label="Krkn AI">
+            {item(<MdAutoAwesome />, 'Krkn AI')}
           </NavItem>
           <NavItem onClick={onRunScenario} aria-label="Run Scenario">{item(<PlayIcon />, 'Run Scenario')}</NavItem>
           <NavItem isActive={activePhase === 'studio'} onClick={onNavigateStudio} aria-label="Chaos Studio">

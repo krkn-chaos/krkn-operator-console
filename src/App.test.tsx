@@ -66,6 +66,9 @@ vi.mock('./components', () => ({
   Studio: () => <div>Studio</div>,
   ElasticsearchDataView: () => <div data-testid="elasticsearch-data-view">ElasticsearchDataView</div>,
 }));
+vi.mock('./components/KrknAI/KrknAIPage', () => ({
+  KrknAIPage: () => <div data-testid="krkn-ai-page">KrknAIPage</div>,
+}));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
 vi.mock('./components/ResiliencyHistory', () => ({
   ResiliencyHistoryPage: () => <div data-testid="resiliency-history-page">ResiliencyHistoryPage</div>,
@@ -133,14 +136,36 @@ describe('scenario replay handoff', () => {
   });
 });
 
+describe('App Krkn AI navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+    });
+  });
+
+  it('renders the Krkn AI page from the sidebar destination', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    expect(screen.queryByTestId('krkn-ai-page')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Krkn AI'));
+    await waitFor(() => expect(screen.getByTestId('krkn-ai-page')).toBeInTheDocument());
+  });
+});
+
 describe('App Resiliency History navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => void store.set(k, v),
-      removeItem: (k: string) => void store.delete(k),
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
       clear: () => store.clear(),
     });
   });
