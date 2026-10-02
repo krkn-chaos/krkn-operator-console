@@ -57,7 +57,7 @@
   width: 2.5rem;
   min-width: 2.5rem;
   height: 2rem;
-  color: var(--pf-v5-global--primary-color--100);
+  color: var(--pf-v5-global--Color--200);
   background: var(--pf-v5-global--BackgroundColor--200);
   border: 1px solid var(--pf-v5-global--BorderColor--100);
   border-radius: var(--pf-v5-global--BorderRadius--sm);
@@ -73,6 +73,7 @@
 .run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-plain:not(.pf-m-text):hover,
 .run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-plain:not(.pf-m-text):focus-visible,
 .run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-plain:not(.pf-m-text).pf-m-expanded {
+  color: var(--pf-v5-global--primary-color--100);
   background: var(--pf-v5-global--BackgroundColor--100);
   border-color: var(--pf-v5-global--primary-color--100);
   box-shadow: var(--pf-v5-global--BoxShadow--lg);
