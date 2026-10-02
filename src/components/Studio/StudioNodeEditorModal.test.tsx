@@ -22,6 +22,7 @@ vi.mock('./WizardStepper', () => ({
     steps: Array<{
       component: ReactNode;
       isNextDisabled?: boolean;
+      isNextLoading?: boolean;
       isStepDisabled?: boolean;
       onEnter?: () => void;
     }>;
@@ -32,7 +33,7 @@ vi.mock('./WizardStepper', () => ({
     const currentStep = steps[activeStep];
     const isLastStep = activeStep === steps.length - 1;
     const handleNext = () => {
-      if (currentStep.isNextDisabled) return;
+      if (currentStep.isNextDisabled || currentStep.isNextLoading) return;
       if (isLastStep) {
         onSave();
       } else {
@@ -68,8 +69,15 @@ vi.mock('./WizardStepper', () => ({
             Back
           </button>
         )}
-        <button onClick={handleNext} disabled={currentStep.isNextDisabled}>
-          {isLastStep ? 'Save Configuration' : 'Next'}
+        <button
+          onClick={handleNext}
+          disabled={currentStep.isNextDisabled || currentStep.isNextLoading}
+        >
+          {currentStep.isNextLoading
+            ? 'Loading…'
+            : isLastStep
+              ? 'Save Configuration'
+              : 'Next'}
         </button>
         {validationWarnings.map((warning) => <div key={warning}>{warning}</div>)}
       </>
@@ -104,14 +112,22 @@ const configuredNode = (weight?: number, registryType: 'public' | 'private' = 'p
   },
 });
 
-function renderEditor(node: StudioNode, onSave = vi.fn(), fetchScenarios = vi.fn(), loading = false) {
+function renderEditor(
+  node: StudioNode,
+  onSave = vi.fn(),
+  fetchScenarios = vi.fn(),
+  loading = false,
+  scenarios: Array<{ name: string }> = [{ name: 'pod-delete' }],
+  loaded = scenarios.length > 0,
+) {
   vi.mocked(useStudioContext).mockReturnValue({
     validateNodeId: vi.fn(() => ({ valid: true })),
   } as unknown as ReturnType<typeof useStudioContext>);
   vi.mocked(useScenariosFetch).mockReturnValue({
-    scenarios: [{ name: 'pod-delete' }],
+    scenarios,
     loading,
     error: null,
+    loaded,
     fetchScenarios,
     resetScenarios: vi.fn(),
   } as unknown as ReturnType<typeof useScenariosFetch>);
@@ -182,12 +198,40 @@ describe('StudioNodeEditorModal resiliency weight', () => {
 
   it('loads scenarios from the selected registry only after advancing from registry selection', async () => {
     const fetchScenarios = vi.fn();
-    renderEditor(configuredNode(undefined, 'private', 'corp-registry'), undefined, fetchScenarios);
+    renderEditor(configuredNode(undefined, 'private', 'corp-registry'), undefined, fetchScenarios, false, []);
 
     expect(fetchScenarios).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(fetchScenarios).toHaveBeenCalledWith({ registryName: 'corp-registry' });
+  });
+
+  it('does not refetch scenarios when they are already loaded for the registry', async () => {
+    const fetchScenarios = vi.fn();
+    // Non-empty scenarios simulate an already-loaded list for the current
+    // registry. Navigating back and forth must not trigger a refetch.
+    renderEditor(configuredNode(undefined, 'private', 'corp-registry'), undefined, fetchScenarios);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(fetchScenarios).not.toHaveBeenCalled();
+  });
+
+  it('does not refetch when a prior fetch returned no scenarios', async () => {
+    const fetchScenarios = vi.fn();
+    // Empty list but loaded === true: a completed fetch that found nothing must
+    // not be mistaken for an un-fetched registry and refetched.
+    renderEditor(configuredNode(undefined, 'private', 'corp-registry'), undefined, fetchScenarios, false, [], true);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Go to step 0' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(fetchScenarios).not.toHaveBeenCalled();
   });
 
   it('requires a registry selection before advancing in private mode', () => {
@@ -201,7 +245,7 @@ describe('StudioNodeEditorModal resiliency weight', () => {
     renderEditor(configuredNode(), undefined, vi.fn(), true);
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
   });
 
   it('does not allow configured nodes to advance before scenario details load', async () => {
@@ -210,7 +254,30 @@ describe('StudioNodeEditorModal resiliency weight', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Go to step 3' })).toBeDisabled();
+  });
+
+  it('shows the configuration step Next as loading and blocks advancing while it loads', async () => {
+    scenarioConfigMockState.loadStatus = 'loading';
+    renderEditor(configuredNode());
+    const user = userEvent.setup();
+
+    // Advance: registry -> scenario -> configuration.
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    const nextButton = screen.getByRole('button', { name: 'Loading…' });
+    expect(nextButton).toBeDisabled();
+
+    // Clicking the loading Next must not reach the node-settings step.
+    await user.click(nextButton);
+    expect(screen.queryByRole('spinbutton', { name: 'Resiliency weight' })).not.toBeInTheDocument();
+
+    // Once the scenario config reports loaded, Next becomes available again.
+    scenarioConfigMockState.loadStatus = 'loaded';
+    await user.click(screen.getByRole('button', { name: 'Go to step 1' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled());
   });
 });

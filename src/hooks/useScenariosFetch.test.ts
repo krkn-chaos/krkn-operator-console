@@ -53,4 +53,40 @@ describe('useScenariosFetch', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.scenarios).toEqual([{ name: 'current-scenario' }]);
   });
+
+  it('marks loaded true for an empty successful response', async () => {
+    const request = deferred<{ scenarios: Array<{ name: string }> }>();
+    vi.mocked(operatorApi.getScenarios).mockReturnValueOnce(request.promise);
+
+    const { result } = renderHook(() => useScenariosFetch());
+    expect(result.current.loaded).toBe(false);
+
+    let fetch!: Promise<void>;
+    act(() => {
+      fetch = result.current.fetchScenarios({ registryName: 'empty-registry' });
+    });
+
+    request.resolve({ scenarios: [] });
+    await act(async () => fetch);
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.scenarios).toEqual([]);
+    expect(result.current.loaded).toBe(true);
+  });
+
+  it('keeps loaded false after an error and resets it on resetScenarios', async () => {
+    vi.mocked(operatorApi.getScenarios).mockRejectedValueOnce(new Error('boom'));
+
+    const { result } = renderHook(() => useScenariosFetch());
+    await act(async () => {
+      await result.current.fetchScenarios({ registryName: 'bad-registry' });
+    });
+
+    expect(result.current.error).toBe('boom');
+    expect(result.current.loaded).toBe(false);
+
+    act(() => result.current.resetScenarios());
+    expect(result.current.loaded).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
 });

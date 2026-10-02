@@ -13,6 +13,13 @@ interface UseScenariosFetchResult {
   scenarios: ScenarioTag[];
   loading: boolean;
   error: string | null;
+  /**
+   * True once a fetch for the current registry completed successfully,
+   * independent of how many scenarios it returned. An empty successful
+   * response still sets this, so callers can distinguish "fetched, none found"
+   * from "not fetched yet". Reset by resetScenarios (e.g. on registry change).
+   */
+  loaded: boolean;
   fetchScenarios: (request: ScenariosRequest) => Promise<void>;
   resetScenarios: () => void;
 }
@@ -21,18 +28,21 @@ export function useScenariosFetch(): UseScenariosFetchResult {
   const [scenarios, setScenarios] = useState<ScenarioTag[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const requestId = useRef(0);
 
   const fetchScenarios = useCallback(async (request: ScenariosRequest) => {
     const currentRequestId = ++requestId.current;
     setLoading(true);
     setError(null);
+    setLoaded(false);
     setScenarios([]); // Clear previous scenarios
 
     try {
       const response = await operatorApi.getScenarios(request);
       if (requestId.current === currentRequestId) {
         setScenarios(response.scenarios);
+        setLoaded(true);
       }
     } catch (err) {
       if (requestId.current === currentRequestId) {
@@ -52,13 +62,15 @@ export function useScenariosFetch(): UseScenariosFetchResult {
     setScenarios([]);
     setLoading(false);
     setError(null);
+    setLoaded(false);
   }, []);
 
   return useMemo(() => ({
     scenarios,
     loading,
     error,
+    loaded,
     fetchScenarios,
     resetScenarios,
-  }), [scenarios, loading, error, fetchScenarios, resetScenarios]);
+  }), [scenarios, loading, error, loaded, fetchScenarios, resetScenarios]);
 }
