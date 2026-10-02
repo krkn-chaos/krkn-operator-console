@@ -45,7 +45,6 @@ import {
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
   TrashIcon,
-  RedoIcon,
   LockIcon,
   TopologyIcon,
 } from '@patternfly/react-icons';
@@ -62,10 +61,11 @@ import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
+import { loadGraphRunReplay } from '../utils/graphRunReplay';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
 import './JobsList.css';
 
-import type { CategoryResponse, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem, StudioWorkflow } from '../types/api';
+import type { CategoryResponse, ClusterJob, ScenarioRunState, ScenarioRunPhase, ClusterJobPhase, GraphRunSummary, GraphClusterScore, UnifiedJobItem, StudioWorkflow } from '../types/api';
 
 export type UnifiedRunItem =
   | {
@@ -165,6 +165,7 @@ interface JobsListProps {
   onDeleteScenarioRun: (scenarioRunName: string) => Promise<void>;
   onDeleteJob: (jobId: string) => Promise<void>;
   onRerunScenario: (run: ScenarioRunState, jobId: string) => void;
+  onLoadRunDetails?: (run: ScenarioRunState) => void;
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
@@ -180,6 +181,7 @@ export function JobsList({
   onDeleteScenarioRun,
   onDeleteJob,
   onRerunScenario,
+  onLoadRunDetails,
   expandedGraphRunIds,
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
@@ -528,6 +530,12 @@ export function JobsList({
     onDelete,
     runId,
     runPhase,
+    replayJobs,
+    isReplayJobsLoading,
+    onOpenReplayJobs,
+    onReplayScenario,
+    onReplayWorkflow,
+    isWorkflowReplayDisabled,
   }: {
     actionType: 'graph' | 'run';
     runName: string;
@@ -537,6 +545,12 @@ export function JobsList({
     onDelete: () => void;
     runId?: string;
     runPhase?: string;
+    replayJobs?: ClusterJob[];
+    isReplayJobsLoading?: boolean;
+    onOpenReplayJobs?: () => void;
+    onReplayScenario?: (jobId: string) => void;
+    onReplayWorkflow?: () => Promise<void>;
+    isWorkflowReplayDisabled?: boolean;
   }) => (
     <DataListAction
       id={`actions-${actionType}-${runName}`}
@@ -558,6 +572,12 @@ export function JobsList({
         onOpenCategories={() => { void loadCategories(); }}
         onToggleCategory={onToggleCategory}
         onDelete={onDelete}
+        replayJobs={replayJobs}
+        isReplayJobsLoading={isReplayJobsLoading}
+        onOpenReplayJobs={onOpenReplayJobs}
+        onReplayScenario={onReplayScenario}
+        onReplayWorkflow={onReplayWorkflow}
+        isWorkflowReplayDisabled={isWorkflowReplayDisabled}
       />
     </DataListAction>
   );
@@ -1018,8 +1038,13 @@ export function JobsList({
                         onToggleCategory: (category) => {
                           void handleToggleRunCategory('graph-runs', item.graphRunName, graphCategoryNames, category);
                         },
-                        onDelete: () => setConfirmDeleteRun(item.graphRunName),
-                      })}
+                      onDelete: () => setConfirmDeleteRun(item.graphRunName),
+                      onReplayWorkflow: onReplayWorkflow ? async () => {
+                        const { workflow, categories } = await loadGraphRunReplay(item.graphRunName);
+                        onReplayWorkflow(workflow, categories);
+                      } : undefined,
+                      isWorkflowReplayDisabled: !TERMINAL_PHASES.includes(item.phase),
+                    })}
                     </DataListItemRow>
 
                     {/* GraphRun Expanded Content - Show DAG visualization */}
@@ -1029,7 +1054,7 @@ export function JobsList({
                       isHidden={!isGraphExpanded}
                     >
                       {isGraphExpanded && (
-                        <GraphRunDetail graphRunName={item.graphRunName} onReplayWorkflow={onReplayWorkflow} />
+                        <GraphRunDetail graphRunName={item.graphRunName} />
                       )}
                     </DataListContent>
                   </DataListItem>
@@ -1275,6 +1300,10 @@ export function JobsList({
                       onDelete: () => setConfirmDeleteRun(run.scenarioRunName),
                       runId: run.scenarioRunName,
                       runPhase: run.phase,
+                      replayJobs: run.clusterJobs,
+                      isReplayJobsLoading: loadingRunDetails.has(run.scenarioRunName),
+                      onOpenReplayJobs: () => onLoadRunDetails?.(run),
+                      onReplayScenario: (jobId) => onRerunScenario(run, jobId),
                     })}
                   </DataListItemRow>
 
@@ -1367,15 +1396,6 @@ export function JobsList({
                                           </DataListCell>,
                                           <DataListCell key="actions" width={1}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '0.25rem' }}>
-                                              {job.completionTime && (
-                                                <Button
-                                                  variant="plain"
-                                                  aria-label="Re-run scenario"
-                                                  onClick={() => onRerunScenario(run, job.jobId)}
-                                                  icon={<RedoIcon style={{ fontSize: '1.2rem' }} />}
-                                                  style={{ color: 'var(--pf-v5-global--link--Color)' }}
-                                                />
-                                              )}
                                               {job.phase === 'Running' && (
                                                 <Button
                                                   variant="plain"

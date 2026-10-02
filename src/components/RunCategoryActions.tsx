@@ -13,9 +13,9 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { CaretDownIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
+import { CaretDownIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
-import type { CategoryResponse } from '../types/api';
+import type { CategoryResponse, ClusterJob } from '../types/api';
 
 interface RunCategoryActionsProps {
   runName: string;
@@ -32,6 +32,12 @@ interface RunCategoryActionsProps {
   runId?: string;
   /** Used to stop polling once the run completes. */
   runPhase?: string;
+  replayJobs?: ClusterJob[];
+  isReplayJobsLoading?: boolean;
+  onOpenReplayJobs?: () => void;
+  onReplayScenario?: (jobId: string) => void;
+  onReplayWorkflow?: () => Promise<void>;
+  isWorkflowReplayDisabled?: boolean;
 }
 
 /**
@@ -64,9 +70,18 @@ export function RunCategoryActions({
   onDelete,
   runId,
   runPhase,
+  replayJobs = [],
+  isReplayJobsLoading = false,
+  onOpenReplayJobs,
+  onReplayScenario,
+  onReplayWorkflow,
+  isWorkflowReplayDisabled = false,
 }: RunCategoryActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
+  const hasLoadedReplayJobsForOpenMenu = useRef(false);
+  const [isWorkflowReplayLoading, setIsWorkflowReplayLoading] = useState(false);
+  const [workflowReplayError, setWorkflowReplayError] = useState<string | null>(null);
 
   const report = useReportActions({ runId, runName, runPhase });
 
@@ -74,6 +89,7 @@ export function RunCategoryActions({
     setIsOpen(open);
     if (!open) {
       hasLoadedCategoriesForOpenMenu.current = false;
+      hasLoadedReplayJobsForOpenMenu.current = false;
     }
   };
 
@@ -82,6 +98,27 @@ export function RunCategoryActions({
     hasLoadedCategoriesForOpenMenu.current = true;
     onOpenCategories();
   };
+
+  const handleReplayFlyout = () => {
+    if (hasLoadedReplayJobsForOpenMenu.current) return;
+    hasLoadedReplayJobsForOpenMenu.current = true;
+    onOpenReplayJobs?.();
+  };
+
+  const handleWorkflowReplay = async () => {
+    if (!onReplayWorkflow) return;
+    setWorkflowReplayError(null);
+    setIsWorkflowReplayLoading(true);
+    try {
+      await onReplayWorkflow();
+    } catch (error) {
+      setWorkflowReplayError(error instanceof Error ? error.message : 'Unable to replay workflow');
+    } finally {
+      setIsWorkflowReplayLoading(false);
+    }
+  };
+
+  const replayableJobs = replayJobs.filter((job) => job.completionTime);
 
   return (
     <>
@@ -105,6 +142,56 @@ export function RunCategoryActions({
         )}
       >
         <DropdownList aria-label={`Run actions for ${runName}`}>
+          {onReplayScenario && (
+            <DropdownItem
+              key="replay-scenario"
+              icon={<RedoIcon />}
+              onShowFlyout={handleReplayFlyout}
+              flyoutMenu={(
+                <Menu id={`replay-clusters-${runName}`}>
+                  <MenuContent>
+                    <MenuList aria-label={`Replay ${runName} on a cluster`} aria-busy={isReplayJobsLoading}>
+                      {isReplayJobsLoading ? (
+                        <MenuItem key="replay-clusters-loading" isDisabled icon={<Spinner size="sm" />}>
+                          Loading clusters…
+                        </MenuItem>
+                      ) : replayableJobs.length > 0 ? replayableJobs.map((job) => (
+                        <MenuItem
+                          key={job.jobId}
+                          onClick={() => {
+                            handleOpenChange(false);
+                            onReplayScenario(job.jobId);
+                          }}
+                        >
+                          {job.providerName}/{job.clusterName}
+                        </MenuItem>
+                      )) : (
+                        <MenuItem key="replay-clusters-empty" isDisabled>
+                          No completed clusters to replay
+                        </MenuItem>
+                      )}
+                    </MenuList>
+                  </MenuContent>
+                </Menu>
+              )}
+            >
+              Replay
+            </DropdownItem>
+          )}
+          {onReplayWorkflow && (
+            <DropdownItem
+              key="replay-workflow"
+              icon={isWorkflowReplayLoading ? <Spinner size="sm" /> : workflowReplayError ? <ExclamationCircleIcon /> : <RedoIcon />}
+              isDisabled={isWorkflowReplayDisabled || isWorkflowReplayLoading}
+              title={workflowReplayError ?? undefined}
+              onClick={() => {
+                handleOpenChange(false);
+                void handleWorkflowReplay();
+              }}
+            >
+              {isWorkflowReplayLoading ? 'Loading workflow…' : workflowReplayError ? 'Replay failed — Retry' : 'Replay'}
+            </DropdownItem>
+          )}
           {runId && report.error && (
             <DropdownItem
               key="report-error"
