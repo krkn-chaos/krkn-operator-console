@@ -46,7 +46,7 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
       };
     }),
     edges: Object.entries(config.graph)
-      .filter(([, node]) => node.depends_on && !node.depends_on.startsWith('_'))
+      .filter(([nodeId, node]) => !nodeId.startsWith('_') && node.depends_on && !node.depends_on.startsWith('_'))
       .map(([nodeId, node]) => ({ id: `${node.depends_on}-${nodeId}`, source: node.depends_on!, target: nodeId })),
     nextNodeNumber: (() => {
       const nodeIds = new Set(Object.keys(config.graph));

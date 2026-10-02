@@ -370,7 +370,10 @@ describe('JobsList - Run actions menu', () => {
     expect(runsList.querySelector('.jobs-list-summary-cell--status')).toHaveTextContent('Failed');
     const compactIdentity = runsList.querySelector('.jobs-list-compact-run-identity');
     expect(compactIdentity).toHaveTextContent('distinctive-label');
-    expect(compactIdentity).toHaveTextContent('distinctive-run-id');
+    expect(compactIdentity).not.toHaveTextContent('distinctive-run-id');
+    expect(compactIdentity).toHaveAttribute('aria-label', 'Run name distinctive-label');
+    await user.hover(compactIdentity as HTMLElement);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Run name: distinctive-label; run ID: distinctive-run-id');
     const owner = runsList.querySelector('.jobs-list-owner-id');
     expect(owner).toHaveTextContent(ownerUserId);
     await user.hover(owner as HTMLElement);
@@ -404,9 +407,9 @@ describe('JobsList - Run actions menu', () => {
 
     const actionsButton = screen.getByRole('button', { name: `Actions for run ${runName}` });
     expect(actionsButton).toBeInTheDocument();
+    expect(actionsButton).toHaveClass('run-category-actions__toggle');
     expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).not.toBeNull();
     expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).toHaveStyle({ alignItems: 'center' });
-    expect(actionsButton).toHaveStyle({ width: '2.5rem', height: '2.5rem' });
   });
 
   it('places the workflow kebab menu in the same dedicated row action area', () => {
@@ -417,13 +420,13 @@ describe('JobsList - Run actions menu', () => {
 
     const actionsButton = screen.getByRole('button', { name: `Actions for run ${runName}` });
     expect(actionsButton).toBeInTheDocument();
+    expect(actionsButton).toHaveClass('run-category-actions__toggle');
     expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).not.toBeNull();
     expect(actionsButton.closest('.pf-v5-c-data-list__item-action')).toHaveStyle({ alignItems: 'center' });
-    expect(actionsButton).toHaveStyle({ width: '2.5rem', height: '2.5rem' });
   });
 });
 
-describe('JobsList - Re-run button', () => {
+describe('JobsList - Replay actions', () => {
   const mockOnRerunScenario = vi.fn();
 
   const makeJob = (overrides: Partial<ClusterJob> = {}): ClusterJob => ({
@@ -455,48 +458,47 @@ describe('JobsList - Re-run button', () => {
     setMockIsLoading(false);
   });
 
-  it('should not show Re-run button for a running job', () => {
+  it('shows no completed clusters to replay for a running job', async () => {
+    const user = userEvent.setup();
     setMockJobs([makeScenarioJobItem('run-001', 'Running', { clusterJobs: [makeJob({ phase: 'Running' })] })]);
     render(<JobsList {...rerunDefaultProps} />);
-    expect(screen.queryByLabelText('Re-run scenario')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
   });
 
-  it('should not show Re-run button for a pending job', () => {
+  it('shows no completed clusters to replay for a pending job', async () => {
+    const user = userEvent.setup();
     setMockJobs([makeScenarioJobItem('run-001', 'Pending', { clusterJobs: [makeJob({ phase: 'Pending' })] })]);
     render(<JobsList {...rerunDefaultProps} />);
-    expect(screen.queryByLabelText('Re-run scenario')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
   });
 
-  it('should show Re-run button for a completed job', () => {
+  it('replays a completed cluster from the run actions submenu', async () => {
+    const user = userEvent.setup();
     setMockJobs([makeScenarioJobItem('run-001', 'Succeeded', {
       clusterJobs: [makeJob({ phase: 'Succeeded', completionTime: '2026-07-29T11:00:00Z' })],
     })]);
     render(<JobsList {...rerunDefaultProps} />);
-    expect(screen.getByLabelText('Re-run scenario')).toBeInTheDocument();
-  });
 
-  it('should show Re-run button for a failed job with completionTime', () => {
-    setMockJobs([makeScenarioJobItem('run-001', 'Failed', {
-      clusterJobs: [makeJob({ phase: 'Failed', completionTime: '2026-07-29T11:00:00Z', message: 'OOM' })],
-    })]);
-    render(<JobsList {...rerunDefaultProps} />);
-    expect(screen.getByLabelText('Re-run scenario')).toBeInTheDocument();
-  });
-
-  it('should call onRerunScenario with correct args', async () => {
-    const user = userEvent.setup();
-    const jobs = [makeJob({ phase: 'Succeeded', completionTime: '2026-07-29T11:00:00Z' })];
-    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded', { clusterJobs: jobs, createdAt: '2026-07-29T10:00:00Z' })]);
-    render(<JobsList {...rerunDefaultProps} />);
-
-    await user.click(screen.getByLabelText('Re-run scenario'));
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+    const replayCluster = await screen.findByText('krkn-operator-acm/managed-cluster-1', {
+      selector: '.pf-v5-c-menu__item-text',
+    });
+    await user.click(replayCluster);
     expect(mockOnRerunScenario).toHaveBeenCalledTimes(1);
     const [calledRun, calledJobId] = mockOnRerunScenario.mock.calls[0];
     expect(calledRun.scenarioRunName).toBe('run-001');
     expect(calledJobId).toBe('job-001');
   });
 
-  it('should show Re-run only for completed jobs in a mixed-status run', () => {
+  it('only lists completed clusters for replay in a mixed-status run', async () => {
+    const user = userEvent.setup();
     setMockJobs([makeScenarioJobItem('run-001', 'Running', {
       clusterJobs: [
         makeJob({ jobId: 'job-running', phase: 'Running' }),
@@ -504,16 +506,29 @@ describe('JobsList - Re-run button', () => {
       ],
     })]);
     render(<JobsList {...rerunDefaultProps} />);
-    const rerunButtons = screen.getAllByLabelText('Re-run scenario');
-    expect(rerunButtons).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+
+    expect(await screen.findByText('krkn-operator-acm/cluster-2', {
+      selector: '.pf-v5-c-menu__item-text',
+    })).toBeInTheDocument();
+    expect(screen.queryByText('krkn-operator-acm/managed-cluster-1', {
+      selector: '.pf-v5-c-menu__item-text',
+    })).not.toBeInTheDocument();
   });
 
-  it('should not show Re-run button for graph runs', () => {
+  it('offers direct workflow replay instead of cluster replay for graph runs', async () => {
+    const user = userEvent.setup();
+    const onReplayWorkflow = vi.fn().mockResolvedValue(undefined);
     setMockJobs([makeGraphJobItem('graphrun-001', 'Completed', {
       completionTime: '2026-07-29T11:00:00Z',
     })]);
-    render(<JobsList {...rerunDefaultProps} expandedGraphRunIds={new Set(['graphrun-001'])} />);
-    expect(screen.queryByLabelText('Re-run scenario')).not.toBeInTheDocument();
+    render(<JobsList {...rerunDefaultProps} onReplayWorkflow={onReplayWorkflow} />);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run graphrun-001' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Replay' }));
+
+    expect(onReplayWorkflow).toHaveBeenCalledWith('graphrun-001');
   });
 });
 
