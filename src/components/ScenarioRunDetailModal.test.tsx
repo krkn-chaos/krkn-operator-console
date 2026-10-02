@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetScenarioRunStatus = vi.fn();
@@ -79,5 +80,37 @@ describe('ScenarioRunDetailModal report controls', () => {
       expect(screen.getAllByText('Max retries exceeded')).toHaveLength(2);
     });
     expect(screen.getAllByText('Max retries exceeded').every(label => label.closest('.pf-v5-c-label')?.classList.contains('pf-m-red'))).toBe(true);
+  });
+
+  it('only shows failed-job diagnostics after expanding the job', async () => {
+    mockGetScenarioRunStatus.mockResolvedValueOnce({
+      scenarioRunName: 'scenario-run-001',
+      scenarioName: 'pod-disruption',
+      phase: 'Failed',
+      totalTargets: 1,
+      successfulJobs: 0,
+      failedJobs: 1,
+      runningJobs: 0,
+      clusterJobs: [{
+        providerName: 'local',
+        clusterName: 'cluster-1',
+        jobId: 'job-failed',
+        podName: 'pod-failed',
+        phase: 'Failed',
+        message: 'ImagePullBackOff: failed to pull image',
+      }],
+    });
+
+    const user = userEvent.setup();
+    render(<ScenarioRunDetailModal scenarioRunName="scenario-run-001" isOpen onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getAllByText('Failed').length).toBeGreaterThan(0));
+    expect(screen.queryByText('Job failure reason')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('log-viewer')).not.toBeInTheDocument();
+
+    await user.click(document.getElementById('toggle-job-job-failed')!);
+
+    expect(screen.getByText('Job failure reason')).toBeInTheDocument();
+    expect(screen.getByTestId('log-viewer')).toBeInTheDocument();
   });
 });

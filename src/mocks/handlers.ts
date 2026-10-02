@@ -425,7 +425,7 @@ const mockFiles = [
   { fileId: 'file-001', fileName: 'kubeconfig-staging', availableToAll: false, groups: ['chaos-engineers'], filePurpose: 'file' },
   { fileId: 'file-002', fileName: 'metrics.yaml', description: 'Prometheus metrics config', availableToAll: true, filePurpose: 'file' },
   { fileId: 'file-003', fileName: 'workflow.json', workflowName: 'chaos-daily-suite', description: 'Daily chaos workflow', availableToAll: true, filePurpose: 'workflow-template' },
-  { fileId: 'file-004', fileName: 'alerts-custom.yaml', description: 'Custom alerting rules', availableToAll: false, groups: ['platform-team'], filePurpose: 'file' },
+  { fileId: 'file-004', fileName: 'alerts-custom.yaml', description: 'Custom alerting rules', availableToAll: false, groups: ['platform-team'], filePurpose: 'resiliency-score' },
 ];
 
 const mockCategories: CategoryResponse[] = [
