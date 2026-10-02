@@ -164,6 +164,10 @@
   font-weight: 600;
 }
 
+.jobs-list-compact-label {
+  --pf-v5-c-label--m-compact--FontSize: 0.771875rem;
+}
+
 @container jobs-list-runs (max-width: 1450px) {
   .jobs-list-summary-cell--created {
     display: none;

@@ -34,6 +34,8 @@ export interface ResiliencyScoreTooltipProps {
   baseline?: number;
   /** Use the compact label treatment in dense summary rows */
   isCompact?: boolean;
+  /** Optional class for styling the rendered label */
+  labelClassName?: string;
 }
 
 /** Info color used for no-baseline states */
@@ -141,12 +143,17 @@ function ScoreHeader({
  * 3. **No Baseline** - No valid baseline configured or any cluster has 'no-baseline' status (blue label)
  * 4. **Normal** - Score with color based on ratio to baseline (green/orange/red label)
  */
-export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline, isCompact = false }: ResiliencyScoreTooltipProps) {
+export function ResiliencyScoreTooltip({
+  scores,
+  baseline: explicitBaseline,
+  isCompact = false,
+  labelClassName,
+}: ResiliencyScoreTooltipProps) {
   // No scores available
   if (!scores || scores.length === 0) {
     return (
       <Tooltip content="Resiliency score not enabled for this run">
-        <Label isCompact={isCompact} color="grey">N/A</Label>
+        <Label className={labelClassName} isCompact={isCompact} color="grey">N/A</Label>
       </Tooltip>
     );
   }
@@ -155,7 +162,7 @@ export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline, isC
   if (isScoreCalculating(scores)) {
     return (
       <Tooltip content="Score calculation in progress...">
-        <Label isCompact={isCompact} color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
+        <Label className={labelClassName} isCompact={isCompact} color="grey" icon={<SyncAltIcon className="pf-m-spin" />}>
           Calculating...
         </Label>
       </Tooltip>
@@ -196,7 +203,7 @@ export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline, isC
           </div>
         }
       >
-        <Label isCompact={isCompact} color="blue">
+        <Label className={labelClassName} isCompact={isCompact} color="blue">
           {formatScore(avgScore)}{isMulti ? ' (avg)' : ''} - No Baseline
         </Label>
       </Tooltip>
@@ -229,7 +236,7 @@ export function ResiliencyScoreTooltip({ scores, baseline: explicitBaseline, isC
         </div>
       }
     >
-      <Label isCompact={isCompact} color={labelDisplay.color} icon={labelDisplay.icon}>
+      <Label className={labelClassName} isCompact={isCompact} color={labelDisplay.color} icon={labelDisplay.icon}>
         {formatScore(avgScore)}{isMulti ? ' (avg)' : ''}
       </Label>
     </Tooltip>

@@ -889,7 +889,7 @@ export function JobsList({
                               <div style={{ marginBottom: '0.25rem' }}>
                                 <strong>Status:</strong>
                               </div>
-                              <Label isCompact color={phaseDisplay.color} icon={phaseDisplay.icon}>
+                              <Label className="jobs-list-compact-label" isCompact color={phaseDisplay.color} icon={phaseDisplay.icon}>
                                 {phaseDisplay.label}
                               </Label>
                             </div>
@@ -955,7 +955,7 @@ export function JobsList({
                                 <Tooltip
                                   content={`${item.summary.completedNodes} completed, ${item.summary.failedNodes} failed, ${item.summary.runningNodes} running, ${item.summary.pendingNodes} pending, ${item.summary.totalNodes} total`}
                                 >
-                                  <Label isCompact color="blue" icon={<TopologyIcon />}>
+                                  <Label className="jobs-list-compact-label" isCompact color="blue" icon={<TopologyIcon />}>
                                     <span className="jobs-list-graph-node-counts">
                                       <span className="jobs-list-graph-node-counts__completed">
                                         <CheckCircleIcon aria-hidden="true" />
@@ -981,6 +981,7 @@ export function JobsList({
                               </div>
                               <ResiliencyScoreTooltip
                                 isCompact
+                                labelClassName="jobs-list-compact-label"
                                 scores={item.resiliencyScores}
                                 baseline={item.resiliencyScoreBaseline}
                               />
@@ -1064,7 +1065,7 @@ export function JobsList({
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>Status:</strong>
                             </div>
-                            <Label isCompact color={runPhaseDisplay.color} icon={runPhaseDisplay.icon}>
+                            <Label className="jobs-list-compact-label" isCompact color={runPhaseDisplay.color} icon={runPhaseDisplay.icon}>
                               {runPhaseDisplay.label}
                             </Label>
                           </div>
@@ -1153,7 +1154,7 @@ export function JobsList({
                             <Tooltip
                               content={`${run.successfulJobs} succeeded, ${run.failedJobs} failed, ${run.runningJobs} running`}
                             >
-                              <Label isCompact color="blue" icon={<HiOutlineRocketLaunch />}>
+                              <Label className="jobs-list-compact-label" isCompact color="blue" icon={<HiOutlineRocketLaunch />}>
                                 <span className="jobs-list-job-counts">
                                   <span className="jobs-list-job-counts__succeeded">
                                     <CheckCircleIcon aria-hidden="true" />
@@ -1236,6 +1237,7 @@ export function JobsList({
                             </div>
                             <ResiliencyScoreTooltip
                               isCompact
+                              labelClassName="jobs-list-compact-label"
                               scores={
                                 run.resiliencyScores
                                   ? toGraphClusterScores(run.resiliencyScores)
