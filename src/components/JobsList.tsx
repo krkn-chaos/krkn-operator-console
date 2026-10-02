@@ -143,7 +143,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
         successfulJobs: sr.successfulJobs,
         failedJobs: sr.failedJobs,
         runningJobs: sr.runningJobs,
-        clusterJobs: sr.clusterJobs,
+        clusterJobs: sr.clusterJobs ?? [],
         createdAt: item.createdAt,
         ownerUserId: sr.ownerUserId,
         registryName: sr.registryName,
@@ -1082,7 +1082,7 @@ export function JobsList({
               const listedRun = item.run;
               const contextRun = scenarioRunDetailsByName.get(listedRun.scenarioRunName);
               const run = listedRun.clusterJobs.length === 0 && contextRun
-                ? { ...listedRun, ...contextRun }
+                ? { ...listedRun, ...contextRun, clusterJobs: contextRun.clusterJobs ?? [] }
                 : listedRun;
               const customRunName = run.customRunName?.trim();
               const scenarioRunName = run.scenarioRunName.trim();

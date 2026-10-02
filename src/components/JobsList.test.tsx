@@ -493,6 +493,22 @@ describe('JobsList - Replay actions', () => {
     expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
   });
 
+  it('renders scenario runs when the jobs snapshot omits clusterJobs', async () => {
+    const user = userEvent.setup();
+    const itemWithoutClusterJobs = makeScenarioJobItem('run-001', 'Succeeded');
+    if (itemWithoutClusterJobs.scenarioRun) {
+      delete (itemWithoutClusterJobs.scenarioRun as Partial<ScenarioRunStatusResponse>).clusterJobs;
+    }
+    setMockJobs([itemWithoutClusterJobs]);
+
+    render(<JobsList {...rerunDefaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
+    await user.hover(screen.getByText('Replay'));
+
+    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
+  });
+
   it('replays a completed cluster from the run actions submenu', async () => {
     const user = userEvent.setup();
     setMockJobs([makeScenarioJobItem('run-001', 'Succeeded', {
