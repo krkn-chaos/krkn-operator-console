@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { elasticsearchApi } from './elasticsearchApi';
 import { authService } from './authService';
 import { isApiError } from '../utils/apiClient';
-import type { QueryTelemetryResponse } from '../types/api';
+import type { QueryTelemetryResponse, InlineElasticsearchConnection } from '../types/api';
 
 // Exercise the real queryTelemetry method (not a mocked stand-in) so that the
 // endpoint, HTTP method, serialized request body, response parsing, and error
@@ -57,7 +57,14 @@ describe('elasticsearchApi.queryTelemetry', () => {
   it('POSTs to the query endpoint with the serialized parameters and auth header', async () => {
     fetchMock.mockResolvedValue(jsonResponse(mockResponse));
 
-    const result = await elasticsearchApi.queryTelemetry('prod-es', 50, '2025-01-01', '2025-01-02');
+    const result = await elasticsearchApi.queryTelemetry(
+      'prod-es',
+      50,
+      1,
+      '2025-01-01',
+      '2025-01-02',
+      { cloud_type: ['aws'] },
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -67,8 +74,10 @@ describe('elasticsearchApi.queryTelemetry', () => {
     expect(JSON.parse(options.body as string)).toEqual({
       configName: 'prod-es',
       size: 50,
+      page: 1,
       startDate: '2025-01-01',
       endDate: '2025-01-02',
+      filters: { cloud_type: ['aws'] },
     });
 
     const headers = new Headers(options.headers);
@@ -112,5 +121,72 @@ describe('elasticsearchApi.queryTelemetry', () => {
     fetchMock.mockRejectedValue(new Error('network down'));
 
     await expect(elasticsearchApi.queryTelemetry('prod-es')).rejects.toThrow('network down');
+  });
+});
+
+describe('elasticsearchApi.queryTelemetryInline', () => {
+  const fetchMock = vi.fn();
+
+  const inline: InlineElasticsearchConnection = {
+    host: 'https://es.example.com',
+    port: 9200,
+    username: 'user',
+    password: 'secret',
+    telemetryIndex: 'krkn-telemetry',
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    vi.mocked(authService.getToken).mockReturnValue('test-token');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('POSTs the inline connection with paging and filters, and returns the parsed response', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(mockResponse));
+
+    const result = await elasticsearchApi.queryTelemetryInline(
+      inline,
+      20,
+      2,
+      '2025-01-01',
+      '2025-01-02',
+      { scenario_type: ['pod_disruption_scenarios'], cloud_type: ['aws'] },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+
+    expect(url).toBe('/api/v1/elasticsearch-query');
+    expect(options.method).toBe('POST');
+    // Inline connection is nested under `inline`; no configName is sent.
+    expect(JSON.parse(options.body as string)).toEqual({
+      inline,
+      size: 20,
+      page: 2,
+      startDate: '2025-01-01',
+      endDate: '2025-01-02',
+      filters: { scenario_type: ['pod_disruption_scenarios'], cloud_type: ['aws'] },
+    });
+
+    const headers = new Headers(options.headers);
+    expect(headers.get('Authorization')).toBe('Bearer test-token');
+    expect(headers.get('Content-Type')).toBe('application/json');
+
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('omits undefined optional parameters from the serialized body', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(mockResponse));
+
+    await elasticsearchApi.queryTelemetryInline(inline);
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    // size/page/startDate/endDate/filters are undefined and dropped by JSON.stringify.
+    expect(JSON.parse(options.body as string)).toEqual({ inline });
   });
 });

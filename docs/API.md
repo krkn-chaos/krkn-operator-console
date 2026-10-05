@@ -405,8 +405,13 @@ Retrieves telemetry documents from Elasticsearch for a given time range. Support
 {
   "configName": "my-es-config",
   "size": 100,
+  "page": 1,
   "startDate": "2024-01-01",
-  "endDate": "2024-01-31"
+  "endDate": "2024-01-31",
+  "filters": {
+    "scenario_type": ["pod_disruption_scenarios"],
+    "cloud_type": ["aws"]
+  }
 }
 ```
 
@@ -421,8 +426,12 @@ Retrieves telemetry documents from Elasticsearch for a given time range. Support
     "telemetryIndex": "krkn-telemetry"
   },
   "size": 50,
+  "page": 2,
   "startDate": "2024-01-01",
-  "endDate": "2024-01-31"
+  "endDate": "2024-01-31",
+  "filters": {
+    "scenario_type": ["pod_disruption_scenarios"]
+  }
 }
 ```
 
@@ -434,8 +443,13 @@ curl -X POST http://localhost:8080/api/v1/elasticsearch-query \
   -d '{
     "configName": "my-es-config",
     "size": 100,
+    "page": 1,
     "startDate": "2024-01-01",
-    "endDate": "2024-01-31"
+    "endDate": "2024-01-31",
+    "filters": {
+      "scenario_type": ["pod_disruption_scenarios"],
+      "cloud_type": ["aws"]
+    }
   }'
 ```
 
@@ -456,8 +470,12 @@ const response = await fetch('http://localhost:8080/api/v1/elasticsearch-query',
       telemetryIndex: 'krkn-telemetry'
     },
     size: 50,
+    page: 2,
     startDate: '2024-01-01',
-    endDate: '2024-01-31'
+    endDate: '2024-01-31',
+    filters: {
+      scenario_type: ['pod_disruption_scenarios']
+    }
   })
 });
 
@@ -482,9 +500,11 @@ if (response.ok) {
   - `username` (string, optional) - Basic auth username
   - `password` (string, optional) - Basic auth password
   - `telemetryIndex` (string, required) - Index to query
-- `size` (integer, optional) - Max documents to return (default: 50, max: 500)
+- `size` (integer, optional) - Page size: max documents returned per page (default: 50, max: 500)
+- `page` (integer, optional) - 1-based page number for server-side pagination (default: 1)
 - `startDate` (string, optional) - Start date in "yyyy-MM-dd" format
 - `endDate` (string, optional) - End date in "yyyy-MM-dd" format
+- `filters` (object, optional) - Facet filters as category key → array of allowed values. Documents match when each listed category matches one of its values. Allowed categories: `scenario_type`, `job_status`, `cloud_infrastructure`, `cloud_type`, `major_version`, `network_plugins`. Unknown filter categories are rejected with `400 Bad Request`.
 
 **Note:** Exactly one of `configName` or `inline` must be provided.
 
@@ -562,6 +582,15 @@ if (response.ok) {
     "pass": 85,
     "fail": 15,
     "pass_percent": 85.0
+  },
+  "facets": {
+    "scenario_type": [
+      { "value": "pod_disruption_scenarios", "count": 70 },
+      { "value": "node_disruption_scenarios", "count": 30 }
+    ],
+    "cloud_type": [
+      { "value": "aws", "count": 100 }
+    ]
   }
 }
 ```
@@ -613,6 +642,9 @@ if (response.ok) {
   - `pass` (integer) - Total passing runs
   - `fail` (integer) - Total failing runs
   - `pass_percent` (number) - Pass percentage (0-100)
+- `facets` (object, optional) - Available filter values per category, derived from terms aggregations over the matched window. Maps each category key (same keys accepted by request `filters`) to an array of options. Because `filters` are applied to the query, facet counts narrow as filters are selected. Use to populate filter controls.
+  - `value` (string) - Selectable filter value
+  - `count` (integer) - Documents with this value in the matched window
 
 **Note:** Stats counts apply to entire matched window, not just returned page. `stats.pass + stats.fail` may exceed `total`.
 

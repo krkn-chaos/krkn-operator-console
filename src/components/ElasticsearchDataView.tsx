@@ -28,6 +28,13 @@ import {
   HelperTextItem,
   Grid,
   GridItem,
+  Select,
+  SelectList,
+  SelectOption,
+  MenuToggle,
+  Badge,
+  Pagination,
+  PaginationVariant,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td, ExpandableRowContent } from '@patternfly/react-table';
 import { Chart, ChartAxis, ChartBar, ChartGroup, ChartLegend, ChartThreshold } from '@patternfly/react-charts';
@@ -44,11 +51,34 @@ import type {
   TelemetryScenarioDetail,
   RecoveredPod,
   TelemetryStats,
+  FacetOption,
   CreateElasticsearchConfigRequest,
   UpdateElasticsearchConfigRequest,
   InlineElasticsearchConnection,
   QueryTelemetryResponse,
 } from '../types/api';
+
+// Filter categories shown in the single-select category dropdown. Each key must
+// match a facet key returned by the backend (see facetFields in the operator's
+// pkg/elasticsearch/client.go); the value multi-select is populated from the
+// response facets for the selected key.
+const FILTER_CATEGORIES: { key: string; label: string }[] = [
+  { key: 'scenario_type', label: 'Scenario Type' },
+  { key: 'job_status', label: 'Job Status' },
+  { key: 'cloud_infrastructure', label: 'Cloud Infrastructure' },
+  { key: 'cloud_type', label: 'Cloud Type' },
+  { key: 'major_version', label: 'Major Version' },
+  { key: 'network_plugins', label: 'Network Plugins' },
+];
+
+// Page-size options for the telemetry table pagination. The query is capped
+// server-side (MaxQuerySize), so these stay within a sane range.
+const PER_PAGE_OPTIONS = [10, 20, 50, 100];
+
+// Elasticsearch's default index.max_result_window. Offsets (page * size) past
+// this are rejected, so pagination caps itemCount here to keep later pages
+// unselectable.
+const MAX_RESULT_WINDOW = 10000;
 
 /**
  * Formats an epoch-seconds timestamp as "MMM DD, YYYY, h:mm:ss AM/PM".
@@ -70,33 +100,6 @@ function isoDate(daysAgo = 0): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-// Bounds for the "Max results" limit. The query is capped server-side, so the
-// UI enforces a sane positive-integer range rather than forwarding arbitrary
-// input.
-const MIN_SIZE = 1;
-const MAX_SIZE = 10000;
-
-/**
- * Validates the raw "Max results" input. An empty value is allowed and means
- * "no explicit limit" (the limit is omitted from the query). Any non-empty value
- * must be a whole number within [MIN_SIZE, MAX_SIZE]; otherwise an inline error
- * message is returned.
- */
-function validateSize(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (trimmed === '') {
-    return null;
-  }
-  if (!/^\d+$/.test(trimmed)) {
-    return 'Max results must be a whole number';
-  }
-  const value = Number(trimmed);
-  if (value < MIN_SIZE || value > MAX_SIZE) {
-    return `Max results must be between ${MIN_SIZE} and ${MAX_SIZE}`;
-  }
-  return null;
 }
 
 /**
@@ -417,6 +420,10 @@ function PodRecoveryChart({ scenario }: { scenario: TelemetryScenarioDetail }) {
  * browser: the backend resolves them from the named config and performs the
  * search server-side.
  *
+ * Results are paginated server-side (perPage/page sent as size/page) and can be
+ * narrowed with faceted filters whose available values come from the last
+ * response's facets.
+ *
  * Takes no props; all state is internal. Mount it directly for the
  * `elasticsearch_data` phase.
  *
@@ -434,7 +441,12 @@ export function ElasticsearchDataView() {
   const { showError } = useNotifications();
   const [configs, setConfigs] = useState<ElasticsearchConfig[]>([]);
   const [selectedConfig, setSelectedConfig] = useState('');
-  const [size, setSize] = useState('50');
+  // Server-side pagination: perPage is the page size sent as `size`, page is the
+  // 1-based page number, and total is the whole-window match count from the last
+  // response used to compute the page count.
+  const [perPage, setPerPage] = useState(50);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [startDate, setStartDate] = useState(isoDate(10));
   const [endDate, setEndDate] = useState(isoDate(0));
   const [documents, setDocuments] = useState<TelemetryDocument[]>([]);
@@ -457,21 +469,55 @@ export function ElasticsearchDataView() {
   // Per-row expansion state, keyed by run_uuid (or row index fallback).
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
+  // Faceted filtering: `filterCategory` is the category currently being edited in
+  // the value dropdown; `activeFilters` accumulates the selected values across
+  // every category (category key → values), so multiple categories can be
+  // filtered at once. `facets` are the available values from the most recent
+  // response. Selecting values re-queries automatically; facets narrow with
+  // filters because the backend applies them in the query.
+  const [filterCategory, setFilterCategory] = useState('');
+  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
+  const [facets, setFacets] = useState<Record<string, FacetOption[]>>({});
+  const [isValueSelectOpen, setIsValueSelectOpen] = useState(false);
+  // Tracks whether the value multi-select changed the current category's
+  // selection while open. The query is deferred until the dropdown closes, so
+  // this guards against re-querying when it closes without any change.
+  const valueSelectionDirty = useRef(false);
+  // Snapshot of activeFilters taken when the value multi-select opens, so a
+  // failed deferred re-query can restore the pre-edit selection.
+  const filtersBeforeEditRef = useRef<Record<string, string[]>>({});
+
   // Monotonic id identifying the most recent query. Each run captures the id it
   // started with; a response only updates the table if its id still matches, so
   // stale responses (from criteria that have since changed) are discarded.
   const latestRequestId = useRef(0);
+
+  // Runner for the last-executed query path (saved config or inline). Pagination
+  // and filter controls re-run the same path with new page/filter criteria, so
+  // the runner is captured on each explicit "Run Query" and reused thereafter.
+  const lastRunnerRef = useRef<
+    ((size: number, pageNum: number, filters?: Record<string, string[]>) => Promise<QueryTelemetryResponse>) | null
+  >(null);
 
   // Clears any displayed results and invalidates in-flight requests. Called
   // whenever the query criteria change so the table never shows telemetry that
   // no longer matches the current config, date range, or result limit.
   const invalidateResults = useCallback(() => {
     latestRequestId.current += 1;
+    lastRunnerRef.current = null;
     setDocuments([]);
     setStats(null);
+    setTotal(0);
+    setPage(1);
     setHasQueried(false);
     setQuerying(false);
     setExpandedRows({});
+    // Filters and facets are derived from a query response, so they must not
+    // outlive a change to the config, date range, or result limit.
+    setFilterCategory('');
+    setActiveFilters({});
+    setFacets({});
+    setIsValueSelectOpen(false);
   }, []);
 
   const fetchConfigs = useCallback(async () => {
@@ -495,54 +541,69 @@ export function ElasticsearchDataView() {
   const startAfterEnd = !!startDate && !!endDate && startDate > endDate;
   const endInFuture = !!endDate && endDate > today;
   const invalidDateRange = startAfterEnd || endInFuture;
-  const sizeError = validateSize(size);
 
-  // Shared date/size validation for both the saved-config and inline query
-  // paths. Returns the validated size (or undefined) when valid, or null after
-  // surfacing an error so the caller can abort.
-  const validatedQueryArgs = (): { sizeNum: number | undefined } | null => {
+  // Shared date validation for both the saved-config and inline query paths.
+  // Returns false after surfacing an error so the caller can abort.
+  const validateDates = (): boolean => {
     if (startAfterEnd) {
       showError('Invalid date range', 'Start date must not be after end date');
-      return null;
+      return false;
     }
     if (endInFuture) {
       showError('Invalid date range', 'End date must not be in the future');
-      return null;
+      return false;
     }
-    if (sizeError) {
-      showError('Invalid max results', sizeError);
-      return null;
-    }
-    // An empty input intentionally omits the limit; a validated value is a
-    // bounded positive integer.
-    const trimmedSize = size.trim();
-    return { sizeNum: trimmedSize === '' ? undefined : Number(trimmedSize) };
+    return true;
   };
 
-  // Runs a telemetry query via the supplied fetcher, applying the monotonic
-  // request-id guard so stale responses are discarded. Shared by the saved
-  // config and inline connection paths.
+  // buildFilters drops empty value slices so an empty filter set is sent as
+  // undefined (unfiltered query).
+  const buildFilters = (
+    map: Record<string, string[]>,
+  ): Record<string, string[]> | undefined => {
+    const entries = Object.entries(map).filter(([, values]) => values.length > 0);
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  };
+
+  // Runs a telemetry query via the supplied runner, applying the monotonic
+  // request-id guard so stale responses are discarded and updating the paging,
+  // facet, and result state on success. Shared by the saved config and inline
+  // connection paths and by the pagination/filter re-run controls. The runner is
+  // stored so pagination/filter controls can re-run the same path.
   const executeQuery = async (
-    runner: (sizeNum: number | undefined) => Promise<QueryTelemetryResponse>,
+    runner: (size: number, pageNum: number, filters?: Record<string, string[]>) => Promise<QueryTelemetryResponse>,
+    pageArg: number,
+    perPageArg: number,
+    filtersArg?: Record<string, string[]>,
+    // Rollback invoked when this run fails while still current. Pagination and
+    // filter controls apply their criteria optimistically and pass a rollback so
+    // a failed re-query restores the prior page/perPage/filters, keeping the
+    // controls consistent with the still-displayed prior results.
+    onError?: () => void,
   ) => {
-    const args = validatedQueryArgs();
-    if (!args) return;
+    if (!validateDates()) return;
+    lastRunnerRef.current = runner;
     // Snapshot this run's id; only the latest run may commit its response.
     const requestId = latestRequestId.current + 1;
     latestRequestId.current = requestId;
     setQuerying(true);
     try {
-      const result = await runner(args.sizeNum);
+      const result = await runner(perPageArg, pageArg, filtersArg);
       // Ignore responses superseded by a newer run or by a criteria change.
       if (latestRequestId.current !== requestId) return;
       setDocuments(result.documents || []);
       setStats(result.stats ?? null);
+      setTotal(result.total ?? 0);
+      setFacets(result.facets ?? {});
       setHasQueried(true);
       // Fresh results: start with all rows collapsed.
       setExpandedRows({});
     } catch (err) {
       if (latestRequestId.current !== requestId) return;
       showError('Query failed', err instanceof Error ? err.message : 'Could not query Elasticsearch');
+      // Restore the criteria this run changed so the controls keep describing the
+      // prior results that remain on screen.
+      onError?.();
     } finally {
       if (latestRequestId.current === requestId) {
         setQuerying(false);
@@ -550,18 +611,41 @@ export function ElasticsearchDataView() {
     }
   };
 
+  // Re-runs the last-executed query path with new paging/filter criteria. Used
+  // by the pagination and faceted-filter controls, which never change the
+  // connection, only the page, page size, or filters. `onError` restores the
+  // caller's optimistically-applied criteria if the re-query fails.
+  const rerun = (
+    pageArg: number,
+    perPageArg: number,
+    filtersArg?: Record<string, string[]>,
+    onError?: () => void,
+  ) => {
+    const runner = lastRunnerRef.current;
+    if (!runner) return;
+    void executeQuery(runner, pageArg, perPageArg, filtersArg, onError);
+  };
+
   const handleRunQuery = async () => {
     if (!selectedConfig) {
       showError('No config selected', 'Please select an Elasticsearch config to query');
       return;
     }
-    await executeQuery((sizeNum) =>
-      elasticsearchApi.queryTelemetry(
-        selectedConfig,
-        sizeNum,
-        startDate || undefined,
-        endDate || undefined,
-      ),
+    // A fresh run always starts at the first page.
+    setPage(1);
+    await executeQuery(
+      (size, pageNum, filters) =>
+        elasticsearchApi.queryTelemetry(
+          selectedConfig,
+          size,
+          pageNum,
+          startDate || undefined,
+          endDate || undefined,
+          filters,
+        ),
+      1,
+      perPage,
+      buildFilters(activeFilters),
     );
   };
 
@@ -585,15 +669,77 @@ export function ElasticsearchDataView() {
       ...(inlineUsername.trim() !== '' ? { username: inlineUsername.trim() } : {}),
       ...(inlinePassword !== '' ? { password: inlinePassword } : {}),
     };
-    await executeQuery((sizeNum) =>
-      elasticsearchApi.queryTelemetryInline(
-        inline,
-        sizeNum,
-        startDate || undefined,
-        endDate || undefined,
-      ),
+    // A fresh run always starts at the first page.
+    setPage(1);
+    await executeQuery(
+      (size, pageNum, filters) =>
+        elasticsearchApi.queryTelemetryInline(
+          inline,
+          size,
+          pageNum,
+          startDate || undefined,
+          endDate || undefined,
+          filters,
+        ),
+      1,
+      perPage,
+      buildFilters(activeFilters),
     );
   };
+
+  // Switching category only changes which category the value dropdown edits.
+  // Existing selections in other categories are kept (multiple categories can be
+  // filtered at once). Closing the value dropdown flushes any pending selection
+  // for the previous category as a deferred query.
+  const handleCategoryChange = (category: string) => {
+    setFilterCategory(category);
+    handleValueSelectOpenChange(false);
+  };
+
+  // Toggling a value updates the current category's selection within
+  // activeFilters and keeps the multi-select open. The query is deferred until
+  // the dropdown closes (see handleValueSelectOpenChange) so multiple values can
+  // be picked in one interaction without a re-query per click.
+  const handleValueToggle = (value: string) => {
+    if (!filterCategory) return;
+    const current = activeFilters[filterCategory] ?? [];
+    const nextValues = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    const next = { ...activeFilters, [filterCategory]: nextValues };
+    setActiveFilters(next);
+    // Mark the selection dirty; the deferred query runs on close.
+    valueSelectionDirty.current = true;
+  };
+
+  // Runs the deferred filter query when the value multi-select closes (toggle
+  // click or focus/click outside). Only re-queries if the selection changed
+  // while open, so opening and closing without a change is a no-op.
+  const handleValueSelectOpenChange = (isOpen: boolean) => {
+    setIsValueSelectOpen(isOpen);
+    if (isOpen) {
+      // Capture the pre-edit selection so a failed re-query can restore it.
+      filtersBeforeEditRef.current = activeFilters;
+      return;
+    }
+    if (!valueSelectionDirty.current) return;
+    valueSelectionDirty.current = false;
+    const prevFilters = filtersBeforeEditRef.current;
+    const prevPage = page;
+    // A filter change resets to the first page of the new result set.
+    setPage(1);
+    rerun(1, perPage, buildFilters(activeFilters), () => {
+      setActiveFilters(prevFilters);
+      setPage(prevPage);
+    });
+  };
+
+  const selectedValues = filterCategory ? activeFilters[filterCategory] ?? [] : [];
+  const valueOptions = filterCategory ? facets[filterCategory] ?? [] : [];
+  const activeFilterCount = Object.values(activeFilters).reduce(
+    (sum, values) => sum + values.length,
+    0,
+  );
 
   const handleCreateConfig = async (
     data: CreateElasticsearchConfigRequest | UpdateElasticsearchConfigRequest,
@@ -621,7 +767,7 @@ export function ElasticsearchDataView() {
     <div style={{ marginTop: '1.5rem' }}>
       <JobStatsSummary
         stats={{
-          // Whole matched window: response.total counts only the returned page.
+          // Whole matched window; the stats aggregate the full result set.
           totalJobs: stats.pass + stats.fail,
           succeededJobs: stats.pass,
           failedJobs: stats.fail,
@@ -637,10 +783,172 @@ export function ElasticsearchDataView() {
     </div>
   );
 
+  // Faceted filter controls. Values come from the last response's facets, so
+  // they appear only after a query has run. Selecting a category populates the
+  // value multi-select; toggling values auto re-queries.
+  const filterSection = hasQueried && (
+    <>
+      <Flex
+        alignItems={{ default: 'alignItemsFlexEnd' }}
+        spaceItems={{ default: 'spaceItemsMd' }}
+        style={{ marginTop: '1rem' }}
+      >
+        <FlexItem>
+          <FormGroup label="Filter category" fieldId="es-filter-category" style={{ width: '18em' }}>
+            <FormSelect
+              id="es-filter-category"
+              value={filterCategory}
+              onChange={(_e, v) => handleCategoryChange(v)}
+              aria-label="Select a filter category"
+            >
+              <FormSelectOption value="" label="Select a category…" />
+              {FILTER_CATEGORIES.map((c) => (
+                <FormSelectOption key={c.key} value={c.key} label={c.label} />
+              ))}
+            </FormSelect>
+          </FormGroup>
+        </FlexItem>
+        <FlexItem>
+          <FormGroup label="Filter values" fieldId="es-filter-values">
+            <Select
+              id="es-filter-values"
+              role="menu"
+              isOpen={isValueSelectOpen}
+              onOpenChange={handleValueSelectOpenChange}
+              selected={selectedValues}
+              onSelect={(_e, value) => handleValueToggle(value as string)}
+              toggle={(toggleRef) => (
+                <MenuToggle
+                  ref={toggleRef}
+                  onClick={() => handleValueSelectOpenChange(!isValueSelectOpen)}
+                  isExpanded={isValueSelectOpen}
+                  isDisabled={!filterCategory || valueOptions.length === 0}
+                  style={{ width: '22em' }}
+                >
+                  {selectedValues.length > 0 ? 'Values' : 'Select values…'}
+                  {selectedValues.length > 0 && (
+                    <Badge isRead style={{ marginLeft: '0.5rem' }}>
+                      {selectedValues.length}
+                    </Badge>
+                  )}
+                </MenuToggle>
+              )}
+            >
+              <SelectList>
+                {valueOptions.map((opt) => (
+                  <SelectOption
+                    key={opt.value}
+                    value={opt.value}
+                    hasCheckbox
+                    isSelected={selectedValues.includes(opt.value)}
+                  >
+                    {opt.value} ({opt.count})
+                  </SelectOption>
+                ))}
+              </SelectList>
+            </Select>
+          </FormGroup>
+        </FlexItem>
+        {activeFilterCount > 0 && (
+          <FlexItem>
+            <Button
+              variant="link"
+              isInline
+              onClick={() => {
+                const prevFilters = activeFilters;
+                const prevCategory = filterCategory;
+                const prevPage = page;
+                setFilterCategory('');
+                setActiveFilters({});
+                setIsValueSelectOpen(false);
+                setPage(1);
+                rerun(1, perPage, undefined, () => {
+                  setActiveFilters(prevFilters);
+                  setFilterCategory(prevCategory);
+                  setPage(prevPage);
+                });
+              }}
+            >
+              Clear all filters
+            </Button>
+          </FlexItem>
+        )}
+      </Flex>
+
+      {/* Active filter chips across all categories, so applied filters from
+          categories other than the one currently being edited stay visible.
+          Removing a value re-queries with the updated set. */}
+      {activeFilterCount > 0 && (
+        <Flex spaceItems={{ default: 'spaceItemsSm' }} style={{ marginTop: '0.75rem' }}>
+          {Object.entries(activeFilters).flatMap(([category, values]) =>
+            values.map((value) => {
+              const label =
+                FILTER_CATEGORIES.find((c) => c.key === category)?.label ?? category;
+              return (
+                <FlexItem key={`${category}:${value}`}>
+                  <Label
+                    color="blue"
+                    onClose={() => {
+                      const prevFilters = activeFilters;
+                      const prevPage = page;
+                      const nextValues = (activeFilters[category] ?? []).filter((v) => v !== value);
+                      const next = { ...activeFilters, [category]: nextValues };
+                      setActiveFilters(next);
+                      setPage(1);
+                      rerun(1, perPage, buildFilters(next), () => {
+                        setActiveFilters(prevFilters);
+                        setPage(prevPage);
+                      });
+                    }}
+                  >
+                    {label}: {value}
+                  </Label>
+                </FlexItem>
+              );
+            }),
+          )}
+        </Flex>
+      )}
+    </>
+  );
+
+  // Pagination control reused above and below the table. `variant` distinguishes
+  // the top and bottom instances. itemCount is capped to Elasticsearch's default
+  // 10000-result window (index.max_result_window); offsets past it are rejected
+  // server-side, so pages beyond it must not be selectable.
+  const paginationControl = (variant: PaginationVariant) => (
+    <Pagination
+      itemCount={Math.min(total, MAX_RESULT_WINDOW)}
+      perPage={perPage}
+      page={page}
+      onSetPage={(_evt, newPage) => {
+        const prevPage = page;
+        setPage(newPage);
+        rerun(newPage, perPage, buildFilters(activeFilters), () => setPage(prevPage));
+      }}
+      onPerPageSelect={(_evt, newPerPage) => {
+        // Changing page size returns to the first page.
+        const prevPage = page;
+        const prevPerPage = perPage;
+        setPerPage(newPerPage);
+        setPage(1);
+        rerun(1, newPerPage, buildFilters(activeFilters), () => {
+          setPerPage(prevPerPage);
+          setPage(prevPage);
+        });
+      }}
+      variant={variant}
+      isCompact={variant === PaginationVariant.top}
+      perPageOptions={PER_PAGE_OPTIONS.map((n) => ({ title: String(n), value: n }))}
+      {...(variant === PaginationVariant.bottom ? { style: { marginTop: '1rem' } } : {})}
+    />
+  );
+
   // Shared results region: spinner while querying, an info prompt before the
   // first run, an empty state when a query returned nothing, or the table.
   const resultsSection = (
     <>
+      {filterSection}
       {statsSection}
       <div style={{ marginTop: '1.5rem' }}>
         {querying ? (
@@ -662,109 +970,114 @@ export function ElasticsearchDataView() {
             </EmptyStateBody>
           </EmptyState>
         ) : (
-          <Table isStriped={true} aria-label="Telemetry documents">
-            <Thead>
-              <Tr>
-                <Th screenReaderText="Row expansion" />
-                <Th>UUID</Th>
-                <Th>Scenario Type</Th>
-                <Th>Start Time</Th>
-                <Th>End Time</Th>
-                <Th>Namespace</Th>
-                <Th>Status</Th>
-              </Tr>
-            </Thead>
-            {documents.map((doc, rowIndex) => {
-              const rowKey = doc.run_uuid || String(rowIndex);
-              const isExpanded = !!expandedRows[rowKey];
-              const hasMetadata = doc.metadata !== undefined && doc.metadata !== null;
-              const hasPodDisruption = (doc.scenarios ?? []).some(
-                s => s.scenario_type === POD_DISRUPTION_TYPE && s.affected_pods
-              );
-              const isExpandable = hasMetadata || hasPodDisruption;
-              return (
-                <Tbody key={rowKey} isExpanded={isExpanded}>
-                  <Tr>
-                    {isExpandable ? (
-                      <Td
-                        expand={{
-                          rowIndex,
-                          isExpanded,
-                          onToggle: () =>
-                            setExpandedRows((prev) => ({ ...prev, [rowKey]: !prev[rowKey] })),
-                          expandId: `es-row-${rowKey}`,
-                        }}
-                      />
-                    ) : (
-                      <Td />
-                    )}
-                    <Td dataLabel="UUID">
-                      <code>{doc.run_uuid ? doc.run_uuid.slice(0, 7) : '—'}</code>
-                    </Td>
-                    <Td dataLabel="Scenario Type">{doc.scenario_type || '—'}</Td>
-                    <Td dataLabel="Start Time">{formatTimestamp(doc.start_timestamp)}</Td>
-                    <Td dataLabel="End Time">{formatTimestamp(doc.end_timestamp)}</Td>
-                    <Td dataLabel="Namespace">{doc.namespace || '—'}</Td>
-                    <Td dataLabel="Status">
-                      <Label color={doc.status ? 'green' : 'red'}>
-                        {doc.status ? 'Pass' : 'Fail'}
-                      </Label>
-                    </Td>
-                  </Tr>
-                  {isExpandable && (
-                    <Tr isExpanded={isExpanded}>
-                      <Td dataLabel="Run details" colSpan={7}>
-                        <ExpandableRowContent>
-                          <Grid hasGutter>
-                            <GridItem span={6}>
-                              <Card>
-                                <CardTitle style={{ borderBottom: '1px solid var(--pf-global--BorderColor--100)' }}>
-                                  Cluster Config
-                                </CardTitle>
-                                <CardBody style={{ padding: 0 }}>
-                                  <ClusterConfigTable doc={doc} />
-                                </CardBody>
-                              </Card>
-                            </GridItem>
-                            <GridItem span={6}>
-                              <Card>
-                                <CardTitle style={{ borderBottom: '1px solid var(--pf-global--BorderColor--100)' }}>
-                                  Node summary
-                                </CardTitle>
-                                <CardBody style={{ padding: 0 }}>
-                                  <NodeSummaryTable metadata={doc.metadata} />
-                                </CardBody>
-                              </Card>
-                              {(doc.scenarios ?? []).map((scenario) =>
-                                scenario.scenario_type === POD_DISRUPTION_TYPE ? (
-                                  <Card key={scenario.scenario_type}>
-                                    <CardTitle style={{ borderBottom: '1px solid var(--pf-global--BorderColor--100)' }}>
-                                      Pod-Recovery Analysis
-                                    </CardTitle>
-                                    <CardBody style={{ padding: 0 }}>
-                                      <PodRecoveryChart scenario={scenario} />
-                                    </CardBody>
-                                  </Card>
-                                ) : null
-                              )}
-                            </GridItem>
-                          </Grid>
-                        </ExpandableRowContent>
+          <>
+            {paginationControl(PaginationVariant.top)}
+            <Table isStriped={true} aria-label="Telemetry documents">
+              <Thead>
+                <Tr>
+                  <Th screenReaderText="Row expansion" />
+                  <Th>UUID</Th>
+                  <Th>Scenario Type</Th>
+                  <Th>Start Time</Th>
+                  <Th>End Time</Th>
+                  <Th>Namespace</Th>
+                  <Th>Status</Th>
+                </Tr>
+              </Thead>
+              {documents.map((doc, rowIndex) => {
+                const rowKey = doc.run_uuid || String(rowIndex);
+                const isExpanded = !!expandedRows[rowKey];
+                const hasMetadata = doc.metadata !== undefined && doc.metadata !== null;
+                const hasPodDisruption = (doc.scenarios ?? []).some(
+                  s => s.scenario_type === POD_DISRUPTION_TYPE && s.affected_pods
+                );
+                const isExpandable = hasMetadata || hasPodDisruption;
+                return (
+                  <Tbody key={rowKey} isExpanded={isExpanded}>
+                    <Tr>
+                      {isExpandable ? (
+                        <Td
+                          expand={{
+                            rowIndex,
+                            isExpanded,
+                            onToggle: () =>
+                              setExpandedRows((prev) => ({ ...prev, [rowKey]: !prev[rowKey] })),
+                            expandId: `es-row-${rowKey}`,
+                          }}
+                        />
+                      ) : (
+                        <Td />
+                      )}
+                      <Td dataLabel="UUID">
+                        <code>{doc.run_uuid ? doc.run_uuid.slice(0, 7) : '—'}</code>
+                      </Td>
+                      <Td dataLabel="Scenario Type">{doc.scenario_type || '—'}</Td>
+                      <Td dataLabel="Start Time">{formatTimestamp(doc.start_timestamp)}</Td>
+                      <Td dataLabel="End Time">{formatTimestamp(doc.end_timestamp)}</Td>
+                      <Td dataLabel="Namespace">{doc.namespace || '—'}</Td>
+                      <Td dataLabel="Status">
+                        <Label color={doc.status ? 'green' : 'red'}>
+                          {doc.status ? 'Pass' : 'Fail'}
+                        </Label>
                       </Td>
                     </Tr>
-                  )}
-                </Tbody>
-              );
-            })}
-          </Table>
+                    {isExpandable && (
+                      <Tr isExpanded={isExpanded}>
+                        <Td dataLabel="Run details" colSpan={7}>
+                          <ExpandableRowContent>
+                            <Grid hasGutter>
+                              <GridItem span={6}>
+                                <Card>
+                                  <CardTitle style={{ borderBottom: '1px solid var(--pf-global--BorderColor--100)' }}>
+                                    Cluster Config
+                                  </CardTitle>
+                                  <CardBody style={{ padding: 0 }}>
+                                    <ClusterConfigTable doc={doc} />
+                                  </CardBody>
+                                </Card>
+                              </GridItem>
+                              <GridItem span={6}>
+                                <Card>
+                                  <CardTitle style={{ borderBottom: '1px solid var(--pf-global--BorderColor--100)' }}>
+                                    Node summary
+                                  </CardTitle>
+                                  <CardBody style={{ padding: 0 }}>
+                                    <NodeSummaryTable metadata={doc.metadata} />
+                                  </CardBody>
+                                </Card>
+                                {(doc.scenarios ?? []).map((scenario) =>
+                                  scenario.scenario_type === POD_DISRUPTION_TYPE ? (
+                                    <Card key={scenario.scenario_type}>
+                                      <CardTitle style={{ borderBottom: '1px solid var(--pf-global--BorderColor--100)' }}>
+                                        Pod-Recovery Analysis
+                                      </CardTitle>
+                                      <CardBody style={{ padding: 0 }}>
+                                        <PodRecoveryChart scenario={scenario} />
+                                      </CardBody>
+                                    </Card>
+                                  ) : null
+                                )}
+                              </GridItem>
+                            </Grid>
+                          </ExpandableRowContent>
+                        </Td>
+                      </Tr>
+                    )}
+                  </Tbody>
+                );
+              })}
+            </Table>
+            {paginationControl(PaginationVariant.bottom)}
+          </>
         )}
       </div>
     </>
   );
 
-  // Date-range and max-results controls shared by the saved-config and inline
-  // query forms.
-  const dateAndSizeControls = (
+  // Date-range controls shared by the saved-config and inline query forms.
+  // Result-set size is controlled by the table pagination (perPage), not a
+  // separate max-results input.
+  const dateControls = (
     <>
       <FlexItem>
         <FormGroup label="Start Date" fieldId="es-data-start-date">
@@ -785,28 +1098,6 @@ export function ElasticsearchDataView() {
             onChange={(_event, str, date) => { setEndDate(parseDateInput(str, date)); invalidateResults(); }}
             aria-label="End date"
           />
-        </FormGroup>
-      </FlexItem>
-      <FlexItem>
-        <FormGroup label="Max results" fieldId="es-data-size">
-          <TextInput
-            id="es-data-size"
-            type="number"
-            min={MIN_SIZE}
-            max={MAX_SIZE}
-            value={size}
-            onChange={(_e, v) => { setSize(v); invalidateResults(); }}
-            validated={sizeError ? 'error' : 'default'}
-            aria-label="Max results"
-            style={{ width: '7rem' }}
-          />
-          {sizeError && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{sizeError}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )}
         </FormGroup>
       </FlexItem>
     </>
@@ -899,13 +1190,13 @@ export function ElasticsearchDataView() {
                   />
                 </FormGroup>
                 <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }}>
-                  {dateAndSizeControls}
+                  {dateControls}
                   <FlexItem>
                     <FormGroup label="" fieldId="run-inline-query-btn">
                       <Button
                         variant="primary"
                         onClick={handleRunInlineQuery}
-                        isDisabled={querying || !inlineComplete || invalidDateRange || !!sizeError}
+                        isDisabled={querying || !inlineComplete || invalidDateRange}
                         isLoading={querying}
                       >
                         Run Query
@@ -936,13 +1227,13 @@ export function ElasticsearchDataView() {
                     </FormSelect>
                   </FormGroup>
                 </FlexItem>
-                {dateAndSizeControls}
+                {dateControls}
                 <FlexItem>
                     <FormGroup label="" fieldId="run-query-btn">
                   <Button
                     variant="primary"
                     onClick={handleRunQuery}
-                    isDisabled={querying || !selectedConfig || invalidDateRange || !!sizeError}
+                    isDisabled={querying || !selectedConfig || invalidDateRange}
                     isLoading={querying}
                   >
                     Run Query
