@@ -38,6 +38,37 @@ const mockJobsSnapshot = {
       scenarioRun: mockScenarioRunUpdate,
     },
     {
+      type: 'scenarioRun',
+      name: 'node-cpu-hog-run-02',
+      createdAt: '2026-07-02T09:30:00Z',
+      scenarioRun: {
+        scenarioRunName: 'node-cpu-hog-run-02',
+        scenarioName: 'node-cpu-hog',
+        phase: 'Failed',
+        totalTargets: 1,
+        successfulJobs: 0,
+        failedJobs: 1,
+        runningJobs: 0,
+        clusterJobs: [
+          {
+            providerName: 'gcp',
+            clusterName: 'prod-us-central1',
+            jobId: 'job-failed-001',
+            podName: 'krkn-node-cpu-hog-ghi',
+            phase: 'Failed',
+            startTime: '2026-07-02T09:30:00Z',
+            completionTime: '2026-07-02T09:32:10Z',
+            message: 'OOMKilled: scenario container exited with status 137',
+            containerImage: 'quay.io/krkn-chaos/krkn-hub:latest',
+          },
+        ],
+        ownerUserId: 'admin@preview.local',
+        registryName: 'default',
+        resiliencyScoreEnabled: true,
+        resiliencyScores: [{ clusterName: 'prod-us-central1', score: 62.1 }],
+      },
+    },
+    {
       type: 'graphRun',
       name: 'chaos-workflow-daily',
       createdAt: '2026-07-02T08:00:00Z',
@@ -72,8 +103,8 @@ const mockJobsSnapshot = {
       },
     },
   ],
-  pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
-  stats: { totalJobs: 2, succeededJobs: 1, failedJobs: 0 },
+  pagination: { page: 1, limit: 20, total: 3, totalPages: 1 },
+  stats: { totalJobs: 3, succeededJobs: 1, failedJobs: 1 },
 };
 
 const mockGraphRunUpdate = {
@@ -108,6 +139,28 @@ const runsWs = ws.link('*/api/v2/ws/runs');
 const graphrunsWs = ws.link('*/api/v2/ws/graphruns');
 const dashboardWs = ws.link('*/api/v2/ws/dashboard/active-runs');
 const logsWs = ws.link('*/api/v2/ws/scenarios/run/*/jobs/*/logs*');
+
+export function getMockLogLines(jobId: string): string[] {
+  if (jobId === 'job-failed-001') {
+    return [
+      'time="2026-07-02T09:30:01Z" level=info msg="Starting node CPU hog scenario"',
+      'time="2026-07-02T09:30:02Z" level=info msg="Connecting to target cluster prod-us-central1"',
+      'time="2026-07-02T09:30:03Z" level=info msg="Applying CPU stress to worker nodes"',
+      'time="2026-07-02T09:32:10Z" level=error msg="Scenario container terminated: OOMKilled"',
+      'time="2026-07-02T09:32:10Z" level=error msg="Process exited with status 137"',
+    ];
+  }
+
+  return [
+    'time="2026-07-02T10:10:01Z" level=info msg="Starting chaos scenario"',
+    'time="2026-07-02T10:10:02Z" level=info msg="Connecting to target cluster staging-us-east-1"',
+    'time="2026-07-02T10:10:03Z" level=info msg="Target pods identified: 3"',
+    'time="2026-07-02T10:10:04Z" level=info msg="Injecting network latency: 200ms"',
+    'time="2026-07-02T10:10:05Z" level=info msg="Monitoring pod health..."',
+    '\x1b[32mtime="2026-07-02T10:10:10Z" level=info msg="All pods recovered successfully"\x1b[0m',
+    'time="2026-07-02T10:10:11Z" level=info msg="Scenario complete"',
+  ];
+}
 
 type RunsSubscription = 'jobs' | 'run' | 'run-detail';
 
@@ -237,15 +290,8 @@ const dashboardHandler = dashboardWs.addEventListener('connection', ({ client })
 });
 
 const logsHandler = logsWs.addEventListener('connection', ({ client }) => {
-  const mockLines = [
-    'time="2026-07-02T10:10:01Z" level=info msg="Starting chaos scenario"',
-    'time="2026-07-02T10:10:02Z" level=info msg="Connecting to target cluster staging-us-east-1"',
-    'time="2026-07-02T10:10:03Z" level=info msg="Target pods identified: 3"',
-    'time="2026-07-02T10:10:04Z" level=info msg="Injecting network latency: 200ms"',
-    'time="2026-07-02T10:10:05Z" level=info msg="Monitoring pod health..."',
-    '\x1b[32mtime="2026-07-02T10:10:10Z" level=info msg="All pods recovered successfully"\x1b[0m',
-    'time="2026-07-02T10:10:11Z" level=info msg="Scenario complete"',
-  ];
+  const isFailedJob = (client as unknown as { url?: string }).url?.includes('job-failed-001') === true;
+  const mockLines = getMockLogLines(isFailedJob ? 'job-failed-001' : 'job-ghi-001');
 
   let lineIndex = 0;
   const interval = setInterval(() => {
