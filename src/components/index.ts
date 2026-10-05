@@ -25,3 +25,4 @@ export { Studio } from './Studio';
 export { FileManagementPage } from './FileManagement';
 export { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 export { ElasticsearchDataView } from './ElasticsearchDataView';
+export { ElasticsearchAlertsTab } from './ElasticsearchAlertsTab';

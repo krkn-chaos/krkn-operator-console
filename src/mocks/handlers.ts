@@ -1024,7 +1024,7 @@ export const handlers = [
   http.get(`${BASE}/elasticsearch-configs`, () =>
     HttpResponse.json({
       configs: [
-        { name: 'prod-es', host: 'https://es.example.com', port: 9200, telemetryIndex: 'krkn-telemetry' },
+         { name: 'prod-es', host: 'https://es.example.com', port: 9200, telemetryIndex: 'krkn-telemetry', alertsIndex: 'krkn-alerts' },
       ],
       total: 1,
     }),
@@ -1045,6 +1045,52 @@ export const handlers = [
       ],
       total: 1,
       stats: { pass: 1, fail: 0, pass_percent: 100 },
+    }),
+  ),
+  http.post(`${BASE}/elasticsearch-alerts-query`, () =>
+    HttpResponse.json({
+      documents: [
+        {
+          id: 'alert-001',
+          source: {
+            run_uuid: 'abc1234-rest-of-uuid',
+            phase: 'Running',
+            created_at: '2026-09-25T14:32:18Z',
+            severity: 'critical',
+            alertname: 'KubeAPIServerLatencyHigh',
+            alertstate: 'firing',
+            namespace: 'openshift-kube-apiserver',
+            labels: { component: 'apiserver', priority: 'P1' },
+          },
+        },
+        {
+          id: 'alert-002',
+          source: {
+            run_uuid: 'abc1234-rest-of-uuid',
+            phase: 'Completed',
+            created_at: '2026-09-24T09:15:42Z',
+            severity: 'warning',
+            alertname: 'NodeFilesystemAlmostFull',
+            alertstate: 'resolved',
+            namespace: 'openshift-monitoring',
+            labels: { component: 'node-exporter', node: 'worker-02' },
+          },
+        },
+        {
+          id: 'alert-003',
+          source: {
+            run_uuid: 'def5678-rest-of-uuid',
+            phase: 'Failed',
+            created_at: '2026-09-22T18:47:05Z',
+            severity: 'error',
+            alertname: 'EtcdMembersDown',
+            alertstate: 'firing',
+            namespace: 'openshift-etcd',
+            labels: { component: 'etcd', zone: 'us-east-1a' },
+          },
+        },
+      ],
+      total: 3,
     }),
   ),
   // ─── BACKUPS ───

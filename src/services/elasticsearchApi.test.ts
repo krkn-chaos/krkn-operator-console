@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { elasticsearchApi } from './elasticsearchApi';
 import { authService } from './authService';
 import { isApiError } from '../utils/apiClient';
-import type { QueryTelemetryResponse, InlineElasticsearchConnection } from '../types/api';
+import type { QueryTelemetryResponse, QueryAlertsResponse } from '../types/api';
 
 // Exercise the real queryTelemetry method (not a mocked stand-in) so that the
 // endpoint, HTTP method, serialized request body, response parsing, and error
@@ -124,16 +124,8 @@ describe('elasticsearchApi.queryTelemetry', () => {
   });
 });
 
-describe('elasticsearchApi.queryTelemetryInline', () => {
+describe('elasticsearchApi.queryAlerts', () => {
   const fetchMock = vi.fn();
-
-  const inline: InlineElasticsearchConnection = {
-    host: 'https://es.example.com',
-    port: 9200,
-    username: 'user',
-    password: 'secret',
-    telemetryIndex: 'krkn-telemetry',
-  };
 
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock);
@@ -146,47 +138,23 @@ describe('elasticsearchApi.queryTelemetryInline', () => {
     vi.clearAllMocks();
   });
 
-  it('POSTs the inline connection with paging and filters, and returns the parsed response', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(mockResponse));
+  it('uses the shared query parameters against the alerts endpoint', async () => {
+    const response: QueryAlertsResponse = {
+      documents: [{ id: 'alert-1', source: { alertname: 'APIDown' } }],
+      total: 1,
+    };
+    fetchMock.mockResolvedValue(jsonResponse(response));
 
-    const result = await elasticsearchApi.queryTelemetryInline(
-      inline,
-      20,
-      2,
-      '2025-01-01',
-      '2025-01-02',
-      { scenario_type: ['pod_disruption_scenarios'], cloud_type: ['aws'] },
-    );
+    await expect(elasticsearchApi.queryAlerts('prod-es', 25, '2025-01-01', '2025-01-02')).resolves.toEqual(response);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-
-    expect(url).toBe('/api/v1/elasticsearch-query');
+    expect(url).toBe('/api/v1/elasticsearch-alerts-query');
     expect(options.method).toBe('POST');
-    // Inline connection is nested under `inline`; no configName is sent.
     expect(JSON.parse(options.body as string)).toEqual({
-      inline,
-      size: 20,
-      page: 2,
+      configName: 'prod-es',
+      size: 25,
       startDate: '2025-01-01',
       endDate: '2025-01-02',
-      filters: { scenario_type: ['pod_disruption_scenarios'], cloud_type: ['aws'] },
     });
-
-    const headers = new Headers(options.headers);
-    expect(headers.get('Authorization')).toBe('Bearer test-token');
-    expect(headers.get('Content-Type')).toBe('application/json');
-
-    expect(result).toEqual(mockResponse);
-  });
-
-  it('omits undefined optional parameters from the serialized body', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(mockResponse));
-
-    await elasticsearchApi.queryTelemetryInline(inline);
-
-    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    // size/page/startDate/endDate/filters are undefined and dropped by JSON.stringify.
-    expect(JSON.parse(options.body as string)).toEqual({ inline });
   });
 });

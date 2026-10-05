@@ -6,6 +6,7 @@ import type {
   ListElasticsearchConfigsResponse,
   ElasticsearchConfigOperationResponse,
   QueryTelemetryResponse,
+  QueryAlertsResponse,
   InlineElasticsearchConnection,
 } from '../types/api';
 
@@ -113,6 +114,19 @@ class ElasticsearchApi extends BaseApiClient {
     return this.fetchJson<QueryTelemetryResponse>('/elasticsearch-query', {
       method: 'POST',
       body: JSON.stringify({ inline, size, page, startDate, endDate, filters }),
+    });
+  }
+
+  /** Queries raw documents from the alerts index of a saved config. */
+  async queryAlerts(
+    configName: string,
+    size?: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<QueryAlertsResponse> {
+    return this.fetchJson<QueryAlertsResponse>('/elasticsearch-alerts-query', {
+      method: 'POST',
+      body: JSON.stringify({ configName, size, startDate, endDate }),
     });
   }
 }
