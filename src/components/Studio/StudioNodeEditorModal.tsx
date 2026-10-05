@@ -36,6 +36,7 @@ function StudioNodeEditorModalComponent({
     scenarios,
     loading: loadingScenarios,
     error: scenariosError,
+    loaded: scenariosLoaded,
     fetchScenarios,
     resetScenarios,
   } = useScenariosFetch();
@@ -69,6 +70,11 @@ function StudioNodeEditorModalComponent({
   // Track if we've initialized to prevent repeated initialization
   const hasInitialized = useRef(false);
 
+  // Identifies the current modal session. Bumped on each open so the scenario
+  // detail cache can distinguish within-session step navigation (reuse) from a
+  // new modal session (validate by digest before reuse).
+  const [editSessionId, setEditSessionId] = useState(0);
+
   // Initialize when modal opens
   useEffect(() => {
     if (!isOpen) {
@@ -83,6 +89,7 @@ function StudioNodeEditorModalComponent({
     }
 
     hasInitialized.current = true;
+    setEditSessionId((id) => id + 1);
     resetScenarios();
     setScenarioConfigStatus('idle');
 
@@ -162,8 +169,16 @@ function StudioNodeEditorModalComponent({
       resetScenarios();
       return;
     }
+    // Registry changes call resetScenarios (clearing `scenariosLoaded`), so a
+    // completed fetch belongs to the current registry. Skip refetch when the
+    // list is already loaded (or loading) to avoid reloading on back-and-forth
+    // navigation with no registry change. `scenariosLoaded` tracks a successful
+    // fetch independent of count, so an empty result is not refetched.
+    if (loadingScenarios || (scenariosLoaded && !scenariosError)) {
+      return;
+    }
     void fetchScenarios(getSelectedRegistryConfig());
-  }, [fetchScenarios, getSelectedRegistryConfig, registryName, registryType, resetScenarios]);
+  }, [fetchScenarios, getSelectedRegistryConfig, loadingScenarios, registryName, registryType, resetScenarios, scenariosLoaded, scenariosError]);
 
   const retryFetchScenarios = useCallback(() => {
     loadScenariosForSelectedRegistry();
@@ -278,9 +293,10 @@ function StudioNodeEditorModalComponent({
 
   if (!node) return null;
 
-  const selectedScenarioIsAvailable = !!selectedScenario && scenarios.some(
-    (scenario) => scenario.name === selectedScenario,
-  );
+  const selectedScenarioTag = selectedScenario
+    ? scenarios.find((scenario) => scenario.name === selectedScenario)
+    : undefined;
+  const selectedScenarioIsAvailable = !!selectedScenarioTag;
   const scenarioListIsReady = !loadingScenarios && !scenariosError && selectedScenarioIsAvailable;
 
   const steps: WizardStepConfig[] = [
@@ -311,6 +327,7 @@ function StudioNodeEditorModalComponent({
         />
       ),
       isNextDisabled: !scenarioListIsReady,
+      isNextLoading: loadingScenarios,
       isStepDisabled: registryType === 'private' && !registryName,
       onEnter: loadScenariosForSelectedRegistry,
     },
@@ -319,6 +336,7 @@ function StudioNodeEditorModalComponent({
       name: 'Configuration',
       isStepDisabled: !scenarioListIsReady,
       isNextDisabled: scenarioConfigStatus !== 'loaded',
+      isNextLoading: scenarioConfigStatus === 'loading',
       onEnter: startScenarioConfigLoad,
       component: selectedScenario ? (
         <ScenarioConfigStep
@@ -334,6 +352,8 @@ function StudioNodeEditorModalComponent({
           onLoadStatusChange={handleScenarioConfigLoadStatusChange}
           cloudCredentialRef={cloudCredentialRef}
           onCloudCredentialRefChange={setCloudCredentialRef}
+          sessionId={editSessionId}
+          expectedDigest={selectedScenarioTag?.digest}
         />
       ) : null,
     },

@@ -79,6 +79,31 @@ describe('WizardStepper Enter handling', () => {
     expect(screen.queryByText('Second step')).not.toBeInTheDocument();
   });
 
+  it('shows a loading label and blocks advance while the step is loading', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <WizardStepper
+        isOpen
+        title="Test wizard"
+        steps={[
+          ...makeSteps({ isNextLoading: true }),
+          { id: 'second', name: 'Second', component: <div>Second step</div> },
+        ]}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    );
+
+    const nextButton = screen.getByText('Loading…').closest('button');
+    expect(nextButton).toBeDisabled();
+
+    await user.click(screen.getByLabelText('first input'));
+    await user.keyboard('{Enter}');
+
+    expect(screen.queryByText('Second step')).not.toBeInTheDocument();
+  });
+
   it('does not advance for Shift+Enter', async () => {
     const user = userEvent.setup();
 
