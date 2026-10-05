@@ -1,0 +1,19 @@
+.log-terminal {
+  max-height: 31.25rem;
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid #4f5255;
+  border-radius: 6px;
+  background: #151515;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  color: #f0f0f0;
+  font: 0.75rem/1.5 var(--pf-v5-global--font-family--monospace, monospace);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.log-terminal--compact {
+  max-height: 18.75rem;
+  padding: 0.75rem;
+  font-size: 0.6875rem;
+}

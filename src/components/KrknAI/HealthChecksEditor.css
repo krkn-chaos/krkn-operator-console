@@ -1,0 +1,67 @@
+.krkn-ai-health-check-table-wrap {
+  max-width: 100%;
+  max-height: 32rem;
+  overflow: auto;
+}
+
+.krkn-ai-health-check-table {
+  width: 100%;
+  min-width: 54rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.krkn-ai-health-check-table th,
+.krkn-ai-health-check-table td {
+  padding: 0.75rem 1rem;
+  border-block-end: 1px solid var(--krkn-ai-border);
+  vertical-align: top;
+}
+
+.krkn-ai-health-check-table thead th {
+  color: var(--krkn-ai-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--krkn-ai-surface, #fff);
+}
+
+.krkn-ai-health-check-table tbody th {
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+}
+
+.krkn-ai-health-check-table td:nth-child(2) {
+  max-width: 26rem;
+  overflow-wrap: anywhere;
+}
+
+.krkn-ai-health-check-table__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.krkn-ai-health-check-table__actions .pf-v5-c-button + .pf-v5-c-button {
+  margin-inline-start: 0.5rem;
+}
+
+.krkn-ai-health-check-modal-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+
+@media (max-width: 36rem) {
+  .krkn-ai-health-check-modal-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .krkn-ai-health-check-modal-fields > .pf-v5-c-form__group {
+    max-width: none;
+  }
+}

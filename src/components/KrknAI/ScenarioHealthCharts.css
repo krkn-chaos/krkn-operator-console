@@ -1,0 +1,88 @@
+.krkn-ai-health-chart__selection {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--krkn-ai-border);
+  border-radius: 6px;
+}
+
+.krkn-ai-health-chart__selection legend {
+  padding-inline: 0.25rem;
+  font-weight: 600;
+}
+
+.krkn-ai-health-chart__selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block-end: 0.75rem;
+}
+
+.krkn-ai-health-chart__selection .krkn-ai-health-chart__legend {
+  margin-block: 0;
+}
+
+.krkn-ai-health-chart__selection .pf-v5-c-check__label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.krkn-ai-health-chart__guidance {
+  margin-block: 0.75rem 0;
+  color: var(--krkn-ai-muted);
+  font-size: 0.875rem;
+}
+
+.krkn-ai-health-chart__heatmap-scroll {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  max-height: 30rem;
+  overflow-y: auto;
+  border: 1px solid var(--krkn-ai-border);
+  scrollbar-gutter: stable;
+}
+
+.krkn-ai-health-chart__heatmap-labels {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 0;
+  background: var(--krkn-ai-surface, #fff);
+  border-inline-end: 1px solid var(--krkn-ai-border);
+}
+
+.krkn-ai-health-chart__heatmap-label {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding-inline: 0.5rem;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.krkn-ai-health-chart__heatmap-viewport {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.krkn-ai-health-chart .krkn-ai-health-chart__heatmap-plot {
+  display: block;
+  max-width: none;
+}
+
+.krkn-ai-health-chart__heatmap-sample:focus {
+  outline: none;
+}
+
+.krkn-ai-health-chart__heatmap-sample:focus rect {
+  stroke: var(--pf-v5-global--primary-color--100, #0066cc);
+  stroke-width: 3px;
+}
+
+@media (max-width: 640px) {
+  .krkn-ai-health-chart__heatmap-scroll {
+    grid-template-columns: 6rem minmax(0, 1fr);
+  }
+}

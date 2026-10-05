@@ -1,0 +1,66 @@
+.krkn-ai-fitness-table-scroll {
+  max-width: 100%;
+  max-height: 32rem;
+  overflow: auto;
+}
+
+.krkn-ai-fitness-table {
+  width: 100%;
+  min-width: 38rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.krkn-ai-fitness-table th,
+.krkn-ai-fitness-table td {
+  padding: 0.75rem 1rem;
+  border-block-end: 1px solid var(--krkn-ai-border);
+  vertical-align: top;
+}
+
+.krkn-ai-fitness-table thead th {
+  color: var(--krkn-ai-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--krkn-ai-surface, #fff);
+}
+
+.krkn-ai-fitness-table-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.krkn-ai-fitness-table-actions .pf-v5-c-button + .pf-v5-c-button {
+  margin-inline-start: 0.5rem;
+}
+
+.krkn-ai-fitness-query-summary {
+  display: block;
+  max-width: 42rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 0.8125rem;
+}
+
+.krkn-ai-fitness-item-editor {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+  border: 0;
+}
+
+.krkn-ai-fitness-item-editor > .pf-v5-c-form__group {
+  max-width: none;
+}
+
+
+@media (max-width: 36rem) {
+  .krkn-ai-fitness-item-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

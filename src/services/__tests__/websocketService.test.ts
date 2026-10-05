@@ -475,5 +475,13 @@ describe('WebSocketService', () => {
       const url = websocketService.buildJobLogsUrl('my-run', 'job-123', false);
       expect(url).not.toContain('follow');
     });
+    it('builds an encoded Krkn-AI orchestrator URL with terminal query options', () => {
+      const parsed = new URL(websocketService.buildAiRunLogsUrl('run/name', false, 17, true));
+      expect(parsed.pathname).toBe('/api/v2/ws/krkn-ai/runs/run%2Fname/logs');
+      expect(parsed.searchParams.get('follow')).toBe('false');
+      expect(parsed.searchParams.get('tailLines')).toBe('17');
+      expect(parsed.searchParams.get('timestamps')).toBe('true');
+    });
+
   });
 });

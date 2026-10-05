@@ -52,6 +52,39 @@ cp .env.example .env.local
 | `VITE_POLL_TIMEOUT`  | `60000`   | Poll timeout (ms)         |
 | `VITE_DEBUG_MODE`    | `false`   | Enable debug logging      |
 
+### Krkn-AI run integration
+
+Enable `krknAI.enabled: true` in the operator chart and deploy matching
+Krkn-AI service, orchestrator, and operator images.
+
+The wizard configures discovered components and settings, with an editable YAML
+preview before creation. VMI controls appear only when discovery finds VMIs.
+Run details include searchable scenarios, fitness and health charts, live logs,
+and downloadable ZIPs with complete results.
+Scenario sorting covers all matching result pages; sorting and paging use the
+loaded rows without refetching. Large runs require fetching each matching page.
+
+### Mock development and PR previews
+
+```bash
+npm run dev:preview       # Run with mock HTTP APIs and WebSocket streams
+npm run build:preview     # Build a backend-free preview
+```
+
+Preview mode uses mock APIs and logs without a backend, including workflow replay
+and Krkn-AI run creation and results. Data is simulated and resets on reload.
+Normal builds do not enable mocks.
+
+`.github/workflows/deploy-preview.yml` builds previews for opened, updated, and
+reopened PRs. `.github/workflows/deploy-preview-publish.yml` publishes the artifact
+to `gh-pages` and updates the PR's preview comment at:
+
+`https://<owner>.github.io/<repository>/pr-preview/pr-<number>/`
+
+The build sets `VITE_BASE_URL` to that PR-specific path so assets, navigation, and
+the service worker remain scoped to the preview. Updating the PR branch triggers
+publication; local uncommitted changes do not update the hosted preview.
+
 ### Other Commands
 
 ```bash

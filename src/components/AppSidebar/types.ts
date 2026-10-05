@@ -17,9 +17,12 @@ export interface SidebarNavProps {
   userName: string;
   /** Current theme, controls the light/dark toggle label + icon */
   isDarkTheme: boolean;
+  /** Whether the operator deployment enabled the Krkn-AI feature. */
+  showKrknAI?: boolean;
 
   // Navigation / feature handlers (reuse existing App.tsx handlers)
   onNavigateJobs: () => void;
+  onNavigateKrknAI: () => void;
   onRunScenario: () => void;
   onNavigateStudio: () => void;
   onOpenFiles: () => void;
