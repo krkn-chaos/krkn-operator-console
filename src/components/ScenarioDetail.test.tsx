@@ -137,6 +137,14 @@ describe('ScenarioDetail', () => {
     );
   };
 
+  const waitForSignatureVerification = async () => {
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Image signature verification in progress' }),
+      ).not.toBeInTheDocument();
+    });
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getClusters).mockResolvedValue({
@@ -813,6 +821,8 @@ describe('ScenarioDetail', () => {
         rerunCategories: ['network', 'no-longer-visible'],
       });
 
+      await waitForSignatureVerification();
+
       const toggle = await screen.findByRole('button', { name: /assign categories to this run/i });
       await waitFor(() => expect(toggle).toHaveTextContent('1 category selected'));
       await user.click(toggle);
@@ -842,6 +852,7 @@ describe('ScenarioDetail', () => {
         rerunCategories: ['network'],
       });
 
+      await waitForSignatureVerification();
       await waitFor(() => expect(screen.getByText('Categories could not be loaded')).toBeInTheDocument());
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
@@ -1215,6 +1226,7 @@ describe('ScenarioDetail', () => {
         scenarioFormValues: { NAMESPACE: 'default' },
       });
 
+      await waitForSignatureVerification();
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
@@ -1242,6 +1254,7 @@ describe('ScenarioDetail', () => {
         scenarioFormValues: { NAMESPACE: 'default' },
       });
 
+      await waitForSignatureVerification();
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
@@ -1264,6 +1277,7 @@ describe('ScenarioDetail', () => {
         scenarioFormValues: { NAMESPACE: 'default' },
       });
 
+      await waitForSignatureVerification();
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
