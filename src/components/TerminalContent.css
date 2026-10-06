@@ -136,7 +136,9 @@
 .terminal-cluster-offline {
   margin-left: 0.5rem;
   color: var(--pf-v5-global--danger-color--100);
-  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 /* Terminal prompt */

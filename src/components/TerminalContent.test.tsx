@@ -99,6 +99,18 @@ describe('TerminalContent', () => {
     });
   });
 
+  it('renders only populated cluster columns with correct order and numbering', () => {
+    const { container } = render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+    const columns = container.querySelectorAll('.cluster-column');
+
+    expect(columns).toHaveLength(1);
+    expect(
+      Array.from(columns[0].querySelectorAll('.cluster-item')).map((item) =>
+        item.textContent?.replace(/\s+/g, ' ').trim()
+      )
+    ).toEqual(['1. cluster-a', '2. cluster-b']);
+  });
+
   it('shows cluster health and reachability in the selection list', async () => {
     mockUseClusterDiscovery.mockReturnValue({
       clusters: [
@@ -118,7 +130,7 @@ describe('TerminalContent', () => {
     expect(await screen.findByLabelText('Cluster status: healthy')).toBeInTheDocument();
     expect(screen.getByLabelText('Cluster status: unhealthy')).toBeInTheDocument();
     expect(screen.getByLabelText('Cluster status: unknown')).toBeInTheDocument();
-    expect(screen.getByText('[offline]')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Cluster reachability: offline' })).toBeInTheDocument();
   });
 
   it('rejects numeric selection of unhealthy and offline clusters', async () => {
