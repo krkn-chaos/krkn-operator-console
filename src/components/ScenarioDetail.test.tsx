@@ -165,6 +165,28 @@ describe('ScenarioDetail', () => {
     vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
   });
 
+  describe('Signature verification loading', () => {
+    it('keeps the loading status focusable while verification is pending', async () => {
+      let resolveScenarios!: (response: { scenarios: { name: string; signature_status: 'signed' }[] }) => void;
+      vi.mocked(operatorApi.getScenarios).mockImplementationOnce(
+        () => new Promise((resolve) => { resolveScenarios = resolve; }),
+      );
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        scenarios: null,
+      });
+
+      const loadingStatus = await screen.findByRole('status', { hidden: true });
+      expect(loadingStatus).toHaveAttribute('tabindex', '0');
+
+      resolveScenarios({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+      });
+      await waitForSignatureVerification();
+    });
+  });
+
   describe('Component Loading', () => {
     it('should show loading spinner when scenario detail is null', () => {
       renderWithContext({ scenarioDetail: null });
