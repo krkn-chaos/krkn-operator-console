@@ -137,6 +137,14 @@ describe('ScenarioDetail', () => {
     );
   };
 
+  const waitForSignatureVerification = async () => {
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Image signature verification in progress' }),
+      ).not.toBeInTheDocument();
+    });
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getClusters).mockResolvedValue({
@@ -155,6 +163,28 @@ describe('ScenarioDetail', () => {
     vi.mocked(operatorApi.getCategories).mockResolvedValue({ categories: [], total: 0 });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
     vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
+  });
+
+  describe('Signature verification loading', () => {
+    it('keeps the loading status focusable while verification is pending', async () => {
+      let resolveScenarios!: (response: { scenarios: { name: string; signature_status: 'signed' }[] }) => void;
+      vi.mocked(operatorApi.getScenarios).mockImplementationOnce(
+        () => new Promise((resolve) => { resolveScenarios = resolve; }),
+      );
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        scenarios: null,
+      });
+
+      const loadingStatus = await screen.findByRole('status', { hidden: true });
+      expect(loadingStatus).toHaveAttribute('tabindex', '0');
+
+      resolveScenarios({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+      });
+      await waitForSignatureVerification();
+    });
   });
 
   describe('Component Loading', () => {
@@ -813,6 +843,8 @@ describe('ScenarioDetail', () => {
         rerunCategories: ['network', 'no-longer-visible'],
       });
 
+      await waitForSignatureVerification();
+
       const toggle = await screen.findByRole('button', { name: /assign categories to this run/i });
       await waitFor(() => expect(toggle).toHaveTextContent('1 category selected'));
       await user.click(toggle);
@@ -842,6 +874,7 @@ describe('ScenarioDetail', () => {
         rerunCategories: ['network'],
       });
 
+      await waitForSignatureVerification();
       await waitFor(() => expect(screen.getByText('Categories could not be loaded')).toBeInTheDocument());
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
@@ -1215,6 +1248,7 @@ describe('ScenarioDetail', () => {
         scenarioFormValues: { NAMESPACE: 'default' },
       });
 
+      await waitForSignatureVerification();
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
@@ -1242,6 +1276,7 @@ describe('ScenarioDetail', () => {
         scenarioFormValues: { NAMESPACE: 'default' },
       });
 
+      await waitForSignatureVerification();
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
@@ -1264,6 +1299,7 @@ describe('ScenarioDetail', () => {
         scenarioFormValues: { NAMESPACE: 'default' },
       });
 
+      await waitForSignatureVerification();
       await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 

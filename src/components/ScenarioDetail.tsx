@@ -96,7 +96,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const signatureSettingsLoading = signatureVerificationLoading ||
     (signatureVerificationEnabled === null && !signatureVerificationError);
   const scenarioImageSignatureLoading = rerunSignatureLoading ||
-    (rerunSignatureStatus === null && !rerunSignatureError);
+    (state.scenarios === null && rerunSignatureStatus === null && !rerunSignatureError);
   const replaySignatureCheckLoading = Boolean(
     rerunScenario && (signatureSettingsLoading || scenarioImageSignatureLoading),
   );
@@ -1233,6 +1233,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         <div
           role="status"
           aria-live="polite"
+          tabIndex={0}
           style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}
         >
           <Spinner size="lg" aria-label="Loading image signature verification" />
