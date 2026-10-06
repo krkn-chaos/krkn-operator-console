@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { CopyIcon } from '@patternfly/react-icons';
+import { CopyIcon, DisconnectedIcon } from '@patternfly/react-icons';
+import { Tooltip } from '@patternfly/react-core';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { operatorApi } from '../services/operatorApi';
 import { validateCommand } from '../utils/terminalValidation';
@@ -746,7 +747,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const sortedClusters = [...clusters].sort((a, b) =>
     a.clusterName.localeCompare(b.clusterName)
   );
-  const columns = formatClustersGrid(sortedClusters);
+  const columns = formatClustersGrid(sortedClusters).filter((column) => column.length > 0);
   const totalPages = Math.ceil(sortedClusters.length / CLUSTERS_PER_PAGE);
   const hasNextPage = currentPage < totalPages - 1;
 
@@ -771,9 +772,11 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
                       <span className="cluster-name">{cluster.clusterName}</span>
                       <ClusterHealthIndicator status={cluster.clusterStatus} />
                       {cluster.online === false && (
-                        <span className="terminal-cluster-offline" aria-label="Cluster reachability: offline">
-                          [offline]
-                        </span>
+                        <Tooltip content="Cluster is offline" position="top">
+                          <span className="terminal-cluster-offline" aria-label="Cluster reachability: offline">
+                            <DisconnectedIcon aria-hidden="true" />
+                          </span>
+                        </Tooltip>
                       )}
                     </div>
                   );

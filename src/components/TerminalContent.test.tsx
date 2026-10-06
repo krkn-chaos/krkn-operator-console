@@ -118,7 +118,7 @@ describe('TerminalContent', () => {
     expect(await screen.findByLabelText('Cluster status: healthy')).toBeInTheDocument();
     expect(screen.getByLabelText('Cluster status: unhealthy')).toBeInTheDocument();
     expect(screen.getByLabelText('Cluster status: unknown')).toBeInTheDocument();
-    expect(screen.getByText('[offline]')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cluster reachability: offline')).toBeInTheDocument();
   });
 
   it('rejects numeric selection of unhealthy and offline clusters', async () => {
