@@ -529,6 +529,7 @@ export interface AppState {
   globalTouchedFields: TouchedFields | null;
 
   // Re-run workflow
+  isRerunFlow: boolean;
   rerunIntent: RerunIntent | null;
   /** Categories restored from a run config for a scenario replay. */
   rerunCategories: string[];

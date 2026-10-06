@@ -41,6 +41,7 @@ const initialState: AppState = {
   globalTouchedFields: null,
 
   // Re-run workflow
+  isRerunFlow: false,
   rerunIntent: null,
   rerunCategories: [],
   startInPreview: false,
@@ -70,6 +71,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         uuid: null,
         clusters: null,
         pollAttempts: 0,
+        isRerunFlow: false,
         error: null,
       };
 
@@ -149,6 +151,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         phase: 'jobs_list',
         scenarioRunsRefreshTrigger: state.scenarioRunsRefreshTrigger + 1, // Force immediate refresh
+        isRerunFlow: false,
+        rerunIntent: null,
+        rerunCategories: [],
+        startInPreview: false,
+        rerunScenario: null,
+        rerunKubeconfigPath: null,
         error: null,
       };
 
@@ -391,6 +399,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         scenarioGlobals: null,
         globalFormValues: null,
         globalTouchedFields: null,
+        isRerunFlow: false,
         rerunIntent: null,
         rerunCategories: [],
         startInPreview: false,
@@ -485,6 +494,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'RERUN_SCENARIO':
       return {
         ...state,
+        isRerunFlow: true,
         rerunIntent: action.payload,
         rerunCategories: action.payload.categories ?? [],
       };
@@ -597,6 +607,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         scenarioGlobals: null,
         globalFormValues: null,
         globalTouchedFields: null,
+        isRerunFlow: false,
         rerunIntent: null,
         rerunCategories: [],
         startInPreview: false,
@@ -692,7 +703,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'loading_scenario_detail':
         case 'configuring_scenario':
-          if (!state.scenarios) {
+          if (state.isRerunFlow) {
             // Came from rerun — go back to jobs list
             return {
               ...state,
@@ -708,6 +719,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
               scenarioGlobals: null,
               globalFormValues: null,
               globalTouchedFields: null,
+              isRerunFlow: false,
               rerunIntent: null,
               rerunCategories: [],
               startInPreview: false,
@@ -725,6 +737,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
             scenarioGlobals: null,
             globalFormValues: null,
             globalTouchedFields: null,
+            isRerunFlow: false,
             startInPreview: false,
             rerunScenario: null,
             rerunKubeconfigPath: null,

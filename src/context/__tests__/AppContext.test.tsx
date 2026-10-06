@@ -79,6 +79,38 @@ describe('AppContext reducer', () => {
     });
   });
 
+  describe('GO_BACK from rerun detail', () => {
+    it('returns to the jobs list when cached scenarios are stale', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({
+          type: 'SCENARIOS_SUCCESS',
+          payload: { scenarios: [{ name: 'stale-scenario' }] },
+        });
+        capturedDispatch({
+          type: 'RERUN_SCENARIO',
+          payload: {
+            scenario: { name: 'pod-scenarios', private: false },
+            clusters: [{ operatorName: 'operator', clusterName: 'cluster' }],
+            environment: {},
+            kubeconfigPath: '/tmp/kubeconfig',
+          },
+        });
+        capturedDispatch({ type: 'SCENARIO_DETAIL_LOADING' });
+      });
+
+      expect(capturedState.isRerunFlow).toBe(true);
+      expect(capturedState.scenarios).toEqual([{ name: 'stale-scenario' }]);
+
+      act(() => capturedDispatch({ type: 'GO_BACK' }));
+
+      expect(capturedState.phase).toBe('jobs_list');
+      expect(capturedState.isRerunFlow).toBe(false);
+      expect(capturedState.scenarios).toEqual([{ name: 'stale-scenario' }]);
+    });
+  });
+
   describe('SET_RUN_DETAILS_LOADING', () => {
     it('adds a run name when loading is true', () => {
       renderWithProvider();

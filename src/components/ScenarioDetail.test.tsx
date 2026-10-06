@@ -99,6 +99,7 @@ describe('ScenarioDetail', () => {
     scenarioGlobals: null,
     globalFormValues: null,
     globalTouchedFields: null,
+    isRerunFlow: false,
     scenarios: null,
     selectedScenarios: null,
     selectedScenario: null,
@@ -325,9 +326,42 @@ describe('ScenarioDetail', () => {
     });
 
     it('should render back button', () => {
-      renderWithContext();
+      renderWithContext({ scenarios: [{ name: 'test-scenario' }] });
 
       expect(screen.getByRole('button', { name: /Back to Scenarios List/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Cancel Button', () => {
+    it('should render a cancel button and ask for confirmation', async () => {
+      const user = userEvent.setup();
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+
+      expect(screen.getByText(/cancel scenario configuration/i)).toBeInTheDocument();
+      expect(screen.getByText(/are you sure you want to cancel/i)).toBeInTheDocument();
+    });
+
+    it('dispatches CANCEL_WORKFLOW when cancellation is confirmed', async () => {
+      const user = userEvent.setup();
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+      await user.click(screen.getByRole('button', { name: /yes, cancel/i }));
+
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'CANCEL_WORKFLOW' });
+    });
+
+    it('dismisses the confirmation without leaving the page', async () => {
+      const user = userEvent.setup();
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+      await user.click(screen.getByRole('button', { name: /no, continue editing/i }));
+
+      expect(screen.queryByText(/cancel scenario configuration/i)).not.toBeInTheDocument();
+      expect(mockDispatch).not.toHaveBeenCalledWith({ type: 'CANCEL_WORKFLOW' });
     });
   });
 
@@ -844,7 +878,6 @@ describe('ScenarioDetail', () => {
       });
 
       await waitForSignatureVerification();
-
       const toggle = await screen.findByRole('button', { name: /assign categories to this run/i });
       await waitFor(() => expect(toggle).toHaveTextContent('1 category selected'));
       await user.click(toggle);
@@ -1487,12 +1520,31 @@ describe('ScenarioDetail', () => {
   describe('Back Navigation', () => {
     it('should dispatch go back action when back button clicked', async () => {
       const user = userEvent.setup();
-      renderWithContext();
+      renderWithContext({ scenarios: [{ name: 'test-scenario' }] });
 
       const backButton = screen.getByRole('button', { name: /Back to Scenarios List/i });
       await user.click(backButton);
 
       expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    });
+
+    it('should render the job list back button in replay flow', async () => {
+      const user = userEvent.setup();
+      renderWithContext({
+        isRerunFlow: true,
+        scenarios: [{ name: 'stale-scenario' }],
+      });
+
+      const backButton = screen.getByRole('button', { name: /Back to Job List/i });
+      await user.click(backButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    });
+
+    it('keeps the scenario-list label when the scenario cache is empty outside replay', () => {
+      renderWithContext({ isRerunFlow: false, scenarios: null });
+
+      expect(screen.getByRole('button', { name: /Back to Scenarios List/i })).toBeInTheDocument();
     });
   });
 
