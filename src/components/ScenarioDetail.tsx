@@ -641,7 +641,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
           if (field.type === 'file') {
             if (value && value instanceof File) {
-              files.push({ name: value.name, content: await readFileAsBase64(value) });
+              files.push({
+                name: value.name,
+                content: await readFileAsBase64(value),
+                mountPath: field.mount_path,
+              });
             }
           } else if (field.type === 'file_base64') {
             if (value && value instanceof File) {
