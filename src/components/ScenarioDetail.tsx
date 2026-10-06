@@ -93,6 +93,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [rerunSignatureLoading, setRerunSignatureLoading] = useState(false);
   const [rerunSignatureError, setRerunSignatureError] = useState<string | null>(null);
   const [selectedRunCategories, setSelectedRunCategories] = useState<string[]>(state.rerunCategories);
+  const signatureSettingsLoading = signatureVerificationLoading ||
+    (signatureVerificationEnabled === null && !signatureVerificationError);
+  const scenarioImageSignatureLoading = rerunSignatureLoading ||
+    (rerunSignatureStatus === null && !rerunSignatureError);
+  const replaySignatureCheckLoading = Boolean(
+    rerunScenario && (signatureSettingsLoading || scenarioImageSignatureLoading),
+  );
+  const replaySignatureLoadingMessage = signatureSettingsLoading && scenarioImageSignatureLoading
+    ? 'Loading signature verification settings and checking the scenario image signature…'
+    : signatureSettingsLoading
+      ? 'Loading image signature verification settings…'
+      : 'Checking the scenario image signature…';
   const visibleCategories = useVisibleCategories();
 
   useEffect(() => {
@@ -1185,7 +1197,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
           {/* Run Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-            <Button variant="primary" size="lg" onClick={handleRunScenario} isDisabled={isSubmitting} isLoading={isSubmitting}>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleRunScenario}
+              isDisabled={isSubmitting || replaySignatureCheckLoading}
+              isLoading={isSubmitting}
+            >
               {isSubmitting ? 'Running...' : 'Run Scenarios'}
             </Button>
           </div>
@@ -1202,6 +1220,25 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           onContinue={handleConflictContinue}
         />
       )}
+
+      <Modal
+        variant={ModalVariant.small}
+        title="Checking image signature"
+        aria-label="Image signature verification in progress"
+        isOpen={replaySignatureCheckLoading}
+        onClose={() => undefined}
+        onEscapePress={() => undefined}
+        showClose={false}
+      >
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}
+        >
+          <Spinner size="lg" aria-label="Loading image signature verification" />
+          <span>{replaySignatureLoadingMessage}</span>
+        </div>
+      </Modal>
     </div>
   );
 }
