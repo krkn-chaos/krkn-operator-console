@@ -177,7 +177,7 @@ export function WizardStepper({
     <>
       <Modal
         variant={ModalVariant.large}
-        isOpen={isOpen}
+        isOpen={isOpen && !showCancelConfirmation}
         onClose={handleModalClose}
         aria-label={title}
       >

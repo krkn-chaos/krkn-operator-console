@@ -43,6 +43,7 @@ describe('RegistrySelector', () => {
     providerConfigUuid: null,
     providerConfigStatus: 'idle',
     providerConfigData: null,
+    isRerunFlow: false,
     rerunIntent: null,
     rerunCategories: [],
     startInPreview: false,

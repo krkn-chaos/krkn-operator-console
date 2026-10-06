@@ -99,6 +99,7 @@ describe('ScenarioDetail', () => {
     scenarioGlobals: null,
     globalFormValues: null,
     globalTouchedFields: null,
+    isRerunFlow: false,
     scenarios: null,
     selectedScenarios: null,
     selectedScenario: null,
@@ -877,7 +878,6 @@ describe('ScenarioDetail', () => {
       });
 
       await waitForSignatureVerification();
-
       const toggle = await screen.findByRole('button', { name: /assign categories to this run/i });
       await waitFor(() => expect(toggle).toHaveTextContent('1 category selected'));
       await user.click(toggle);
@@ -1530,12 +1530,21 @@ describe('ScenarioDetail', () => {
 
     it('should render the job list back button in replay flow', async () => {
       const user = userEvent.setup();
-      renderWithContext({ scenarios: null });
+      renderWithContext({
+        isRerunFlow: true,
+        scenarios: [{ name: 'stale-scenario' }],
+      });
 
       const backButton = screen.getByRole('button', { name: /Back to Job List/i });
       await user.click(backButton);
 
       expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    });
+
+    it('keeps the scenario-list label when the scenario cache is empty outside replay', () => {
+      renderWithContext({ isRerunFlow: false, scenarios: null });
+
+      expect(screen.getByRole('button', { name: /Back to Scenarios List/i })).toBeInTheDocument();
     });
   });
 

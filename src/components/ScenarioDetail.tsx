@@ -67,7 +67,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     error: signatureVerificationError,
     isLoading: signatureVerificationLoading,
   } = useSignatureVerification();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, rerunScenario, rerunKubeconfigPath, scenarios } = state;
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, isRerunFlow, rerunScenario, rerunKubeconfigPath, scenarios } = state;
   const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
   const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
@@ -97,7 +97,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const signatureSettingsLoading = signatureVerificationLoading ||
     (signatureVerificationEnabled === null && !signatureVerificationError);
   const scenarioImageSignatureLoading = rerunSignatureLoading ||
-    (state.scenarios === null && rerunSignatureStatus === null && !rerunSignatureError);
+    (scenarios === null && rerunSignatureStatus === null && !rerunSignatureError);
   const replaySignatureCheckLoading = Boolean(
     rerunScenario && (signatureSettingsLoading || scenarioImageSignatureLoading),
   );
@@ -848,7 +848,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       {/* Navigation Buttons */}
       <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Button variant="link" onClick={handleBack}>
-          ← {scenarios ? 'Back to Scenarios List' : 'Back to Job List'}
+          ← {isRerunFlow ? 'Back to Job List' : 'Back to Scenarios List'}
         </Button>
         <Button variant="secondary" onClick={handleCancelClick}>
           Cancel
