@@ -773,7 +773,11 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
                       <ClusterHealthIndicator status={cluster.clusterStatus} />
                       {cluster.online === false && (
                         <Tooltip content="Cluster is offline" position="top">
-                          <span className="terminal-cluster-offline" aria-label="Cluster reachability: offline">
+                          <span
+                            className="terminal-cluster-offline"
+                            role="img"
+                            aria-label="Cluster reachability: offline"
+                          >
                             <DisconnectedIcon aria-hidden="true" />
                           </span>
                         </Tooltip>
