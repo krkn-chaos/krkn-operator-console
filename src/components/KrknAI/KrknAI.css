@@ -800,6 +800,10 @@
 .krkn-ai-scenario-detail__identity-item code {
   color: inherit;
 }
+.krkn-ai-scenario-detail__identity-key {
+  color: var(--pf-v5-global--Color--100, #151515);
+  font-weight: 600;
+}
 
 .krkn-ai-scenario-detail__section h3 {
   margin-block: 0 0.75rem;
