@@ -190,11 +190,11 @@ function ScenarioDetail({
     <div className="krkn-ai-scenario-detail">
       <div className="krkn-ai-scenario-detail__heading">
         <div className="krkn-ai-scenario-detail__identity">
-          <p className="krkn-ai-scenario-detail__pod">
-            Scenario run: <code>{row.childRunName ?? 'Not created yet'}</code>
+          <p className="krkn-ai-scenario-detail__identity-item">
+            <span>Scenario run:</span> <code>{row.childRunName ?? 'Not created yet'}</code>
           </p>
-          {row.jobId && <p>Job ID: <code>{row.jobId}</code></p>}
-          {row.podName && <p>Pod: <code>{row.podName}</code></p>}
+          {row.jobId && <p className="krkn-ai-scenario-detail__identity-item"><span>Job ID:</span> <code>{row.jobId}</code></p>}
+          {row.podName && <p className="krkn-ai-scenario-detail__identity-item"><span>Pod:</span> <code>{row.podName}</code></p>}
         </div>
         <div className="krkn-ai-scenario-detail__labels">
           <Label color={statusColor(status)} isCompact>{status}</Label>

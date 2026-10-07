@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
     validateConfig: vi.fn(),
     createConfig: vi.fn(),
     createRun: vi.fn(),
+    deleteRun: vi.fn(),
   },
   operator: {
     createTargetRequest: vi.fn(),
@@ -250,6 +251,7 @@ describe('Krkn-AI real run lifecycle', () => {
     mocks.ai.validateConfig.mockResolvedValue({ valid: true });
     mocks.ai.createConfig.mockResolvedValue({ configId: 'saved-config-uuid' });
     mocks.ai.createRun.mockImplementation(async (request: { name: string }) => makeRun(request.name, 'Pending'));
+    mocks.ai.deleteRun.mockResolvedValue(undefined);
     mocks.operator.createTargetRequest.mockResolvedValue({ uuid: 'target-request-1' });
     mocks.operator.getTargetStatus.mockResolvedValue(200);
     mocks.operator.getClusters.mockResolvedValue({
@@ -310,6 +312,22 @@ describe('Krkn-AI real run lifecycle', () => {
     await user.click(discover);
     expect(screen.getByRole('alert')).toHaveTextContent('Run name is required.');
     expect(mocks.ai.discover).not.toHaveBeenCalled();
+  });
+
+  it('deletes a Krkn-AI run through the existing API and removes it from the list', async () => {
+    const user = userEvent.setup();
+    const run = makeRun('delete-confirm-run', 'Succeeded');
+    mocks.ai.listRuns.mockResolvedValueOnce([run]).mockResolvedValue([]);
+    render(<KrknAIPage />);
+    await flushReact();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Krkn-AI run delete-confirm-run' }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByText(/also deletes its scenario executions/)).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: 'Delete run' }));
+
+    await waitFor(() => expect(mocks.ai.deleteRun).toHaveBeenCalledWith('delete-confirm-run'));
+    await waitFor(() => expect(screen.queryByRole('row', { name: /Open run delete-confirm-run/ })).not.toBeInTheDocument());
   });
 
   it('searches the server index for matches outside the currently loaded page', async () => {

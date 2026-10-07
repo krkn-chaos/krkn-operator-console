@@ -250,6 +250,10 @@ export function KrknAIPage({
   }, [listVisible, updateRuns]);
 
   const handleRefresh = useCallback(() => refreshRef.current('manual'), []);
+  const handleDeleteRun = useCallback(async (runName: string) => {
+    await krknAiApi.deleteRun(runName);
+    updateRuns(runsRef.current.filter((entry) => entry.resource.metadata.name !== runName));
+  }, [updateRuns]);
 
   const handleStart = useCallback((run: KrknAIRunResource) => {
     const existing = runsRef.current.filter((entry) => entry.resource.metadata.name !== run.metadata.name);
@@ -304,6 +308,7 @@ export function KrknAIPage({
         onCreate={handleCreateRun}
         onRefresh={handleRefresh}
         onSelect={setSelectedRun}
+        onDelete={handleDeleteRun}
       />
     </div>
   );

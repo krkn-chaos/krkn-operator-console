@@ -8,11 +8,14 @@ import {
   EmptyStateBody,
   EmptyStateIcon,
   Label,
+  Modal,
+  ModalVariant,
   Spinner,
   Tooltip,
   Title,
 } from '@patternfly/react-core';
-import { EyeIcon, TopologyIcon } from '@patternfly/react-icons';
+import { EyeIcon, TopologyIcon, TrashIcon } from '@patternfly/react-icons';
+import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { KrknAIRunResource, KrknAIRunSummary } from '../../services/krknAiApi';
 import { formatDateTime } from '../../utils/dateTime';
@@ -34,6 +37,7 @@ interface RunListProps {
   onCreate: () => void;
   onRefresh: () => void;
   onSelect: (run: KrknAIRunResource) => void;
+  onDelete: (runName: string) => Promise<void>;
 }
 
 function phaseColor(phase: string): 'blue' | 'cyan' | 'green' | 'grey' | 'red' {
@@ -59,7 +63,29 @@ export function RunList({
   onCreate,
   onRefresh,
   onSelect,
+  onDelete,
 }: RunListProps) {
+  const [pendingDeleteName, setPendingDeleteName] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const closeDeleteDialog = () => {
+    if (deleting) return;
+    setPendingDeleteName(null);
+    setDeleteError(null);
+  };
+  const confirmDelete = async () => {
+    if (!pendingDeleteName || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete(pendingDeleteName);
+      setPendingDeleteName(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Unable to delete Krkn-AI run.');
+    } finally {
+      setDeleting(false);
+    }
+  };
   const handleRowKeyDown = (
     event: KeyboardEvent<HTMLTableRowElement>,
     run: KrknAIRunResource,
@@ -184,6 +210,19 @@ export function RunList({
                             />
                           </Tooltip>
                           <ResultsDownloadButton runName={name} runPhase={phase} compact />
+                          <Tooltip content={`Delete Krkn-AI run ${name}`} position="top">
+                            <Button
+                              variant="plain"
+                              className="krkn-ai-run-action--delete"
+                              aria-label={`Delete Krkn-AI run ${name}`}
+                              icon={<TrashIcon />}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setPendingDeleteName(name);
+                                setDeleteError(null);
+                              }}
+                            />
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>
@@ -194,6 +233,26 @@ export function RunList({
           </table>
         </div>
       </CardBody>
+      <Modal
+        variant={ModalVariant.small}
+        title="Delete Krkn-AI run?"
+        isOpen={pendingDeleteName !== null}
+        onClose={closeDeleteDialog}
+        actions={[
+          <Button key="delete" variant="danger" onClick={() => void confirmDelete()} isLoading={deleting} isDisabled={deleting}>
+            Delete run
+          </Button>,
+          <Button key="cancel" variant="link" onClick={closeDeleteDialog} isDisabled={deleting}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          Deleting Krkn-AI run <strong>{pendingDeleteName}</strong> also deletes its scenario executions. This action cannot be undone.
+        </p>
+        <p>Download the results ZIP first if you may need its artifacts for later analysis.</p>
+        {deleteError && <Alert variant="danger" title="Unable to delete Krkn-AI run" isInline>{deleteError}</Alert>}
+      </Modal>
     </Card>
   );
 }

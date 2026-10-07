@@ -442,6 +442,10 @@
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+.krkn-ai-run-actions .krkn-ai-run-action--delete,
+.krkn-ai-run-actions .krkn-ai-run-action--delete:hover {
+  color: var(--pf-v5-global--danger-color--100, #c9190b);
+}
 
 .krkn-ai-run-detail__toolbar {
   justify-content: space-between;
@@ -787,10 +791,14 @@
   gap: 0.5rem;
 }
 
-.krkn-ai-scenario-detail__pod {
-  margin-block: 0;
+.krkn-ai-scenario-detail__identity-item {
+  margin: 0;
   color: var(--krkn-ai-muted);
   font-weight: 400;
+}
+
+.krkn-ai-scenario-detail__identity-item code {
+  color: inherit;
 }
 
 .krkn-ai-scenario-detail__section h3 {

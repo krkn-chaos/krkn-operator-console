@@ -1,7 +1,18 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import type { KrknAIRunResource } from '../../services/krknAiApi';
 import { RunList } from './RunList';
+
+function makeRun(name: string, phase: string): KrknAIRunResource {
+  return {
+    apiVersion: 'krkn.dev/v1alpha1',
+    kind: 'KrknAIRun',
+    metadata: { name, uid: `${name}-uid`, creationTimestamp: '2026-10-07T10:00:00Z' },
+    spec: { targetRequestId: 'target-request', targetClusters: { 'krkn-operator': ['staging'] } },
+    status: { phase },
+  };
+}
 
 describe('RunList', () => {
   it('keeps the table visible and shows a creation empty state when no runs exist', () => {
@@ -14,6 +25,7 @@ describe('RunList', () => {
         onCreate={vi.fn()}
         onRefresh={vi.fn()}
         onSelect={vi.fn()}
+        onDelete={vi.fn().mockResolvedValue(undefined)}
       />,
     );
     expect(screen.getByRole('heading', { name: 'AI runs', level: 1 })).toBeInTheDocument();
@@ -29,18 +41,7 @@ describe('RunList', () => {
     expect(emptyRow.querySelector('td')).toHaveAttribute('colspan', '8');
   });
   it('disables the compact results download for active runs', () => {
-    const resource: KrknAIRunResource = {
-      metadata: {
-        name: 'active-run',
-        uid: 'active-run-uid',
-        creationTimestamp: '2026-10-07T10:00:00Z',
-      },
-      spec: {
-        targetRequestId: 'target-request',
-        targetClusters: { 'krkn-operator': ['staging'] },
-      },
-      status: { phase: 'Running' },
-    };
+    const resource = makeRun('active-run', 'Running');
 
     render(
       <RunList
@@ -51,9 +52,40 @@ describe('RunList', () => {
         onCreate={vi.fn()}
         onRefresh={vi.fn()}
         onSelect={vi.fn()}
+        onDelete={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
     expect(screen.getByRole('button', { name: 'Download complete results for run active-run' })).toBeDisabled();
+  });
+  it('confirms run and scenario deletion and recommends downloading results first', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    render(
+      <RunList
+        runs={[{ resource: makeRun('delete-me', 'Succeeded'), summary: null, updating: false }]}
+        loading={false}
+        refreshing={false}
+        error={null}
+        onCreate={vi.fn()}
+        onRefresh={vi.fn()}
+        onSelect={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+    const deleteButton = screen.getByRole('button', { name: 'Delete Krkn-AI run delete-me' });
+
+    await user.click(deleteButton);
+    let dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByText(/also deletes its scenario executions/)).toBeInTheDocument();
+    expect(dialog.getByText(/Download the results ZIP first/)).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: 'Cancel' }));
+    expect(onDelete).not.toHaveBeenCalled();
+
+    await user.click(deleteButton);
+    dialog = within(screen.getByRole('dialog'));
+    await user.click(dialog.getByRole('button', { name: 'Delete run' }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith('delete-me'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

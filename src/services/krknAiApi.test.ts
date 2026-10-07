@@ -47,6 +47,30 @@ describe('krknAiApi.downloadResults', () => {
       statusText: 'Service Unavailable',
     });
   });
+  it('deletes an encoded run name through the existing Krkn-AI API route', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 204, statusText: 'No Content' });
+
+    await expect(krknAiApi.deleteRun('run / with spaces')).resolves.toBeUndefined();
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${config.apiBaseUrl}/krkn-ai/runs/run%20%2F%20with%20spaces`,
+      expect.objectContaining({ method: 'DELETE', headers: expect.any(Headers) }),
+    );
+  });
+
+  it('surfaces API errors when run deletion is denied', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: vi.fn().mockResolvedValue({ message: 'Run cancellation is not authorized' }),
+    });
+
+    await expect(krknAiApi.deleteRun('protected-run')).rejects.toMatchObject({
+      message: 'Run cancellation is not authorized',
+      status: 403,
+    });
+  });
+
 });
 describe('krknAiApi.getStatus', () => {
   const originalFetch = global.fetch;

@@ -247,6 +247,14 @@ class KrknAIApiClient extends BaseApiClient {
   getRun(name: string, { signal }: KrknAIApiRequestOptions = {}): Promise<KrknAIRunResource> {
     return this.fetchJson<KrknAIRunResource>(`/krkn-ai/runs/${encodeURIComponent(name)}`, { signal });
   }
+  async deleteRun(name: string, { signal }: KrknAIApiRequestOptions = {}): Promise<void> {
+    const response = await this.fetch(`/krkn-ai/runs/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      signal,
+    });
+    if (!response.ok) throw await createKrknAIHttpError(response);
+  }
+
 
   getRunSummary(name: string, { signal }: KrknAIApiRequestOptions = {}): Promise<KrknAIRunSummary> {
     return this.fetchJson<KrknAIRunSummary>(`/krkn-ai/runs/${encodeURIComponent(name)}/results/summary`, { signal });
