@@ -1,24 +1,32 @@
 .krkn-ai-health-chart__selection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 1rem;
   min-width: 0;
-  padding: 1rem;
-  border: 1px solid var(--krkn-ai-border);
-  border-radius: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .krkn-ai-health-chart__selection legend {
-  padding-inline: 0.25rem;
+  grid-column: 1;
+  padding: 0;
   font-weight: 600;
 }
 
 .krkn-ai-health-chart__selection-actions {
   display: flex;
+  grid-column: 2;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-block-end: 0.75rem;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 0;
 }
 
 .krkn-ai-health-chart__selection .krkn-ai-health-chart__legend {
-  margin-block: 0;
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .krkn-ai-health-chart__selection .pf-v5-c-check__label > span {

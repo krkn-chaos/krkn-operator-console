@@ -9,9 +9,10 @@ import {
   EmptyStateIcon,
   Label,
   Spinner,
+  Tooltip,
   Title,
 } from '@patternfly/react-core';
-import { TopologyIcon } from '@patternfly/react-icons';
+import { EyeIcon, TopologyIcon } from '@patternfly/react-icons';
 import type { KeyboardEvent } from 'react';
 import type { KrknAIRunResource, KrknAIRunSummary } from '../../services/krknAiApi';
 import { formatDateTime } from '../../utils/dateTime';
@@ -72,7 +73,9 @@ export function RunList({
 
   return (
     <Card className="krkn-ai-run-list">
-      <CardTitle>AI runs</CardTitle>
+      <CardTitle>
+        <Title headingLevel="h1" size="lg">AI runs</Title>
+      </CardTitle>
       <CardBody>
         <div className="krkn-ai-run-list__toolbar">
           <Button variant="secondary" onClick={onRefresh} isDisabled={refreshing}>
@@ -83,10 +86,12 @@ export function RunList({
           </Button>
         </div>
 
+        <p className="krkn-ai-run-list__description">
+          Krkn-AI explores chaos experiments guided by your SLOs and health checks to evaluate system resilience.
+        </p>
         {error && <Alert variant="danger" title="Unable to load Krkn-AI runs" isInline>{error}</Alert>}
         <div className="krkn-ai-run-list__table-wrap" style={{ overflowX: 'auto' }}>
-          <table className="krkn-ai-run-list__table">
-            <caption>Krkn-AI run progress</caption>
+          <table className="krkn-ai-run-list__table" aria-label="Krkn-AI runs">
             <thead>
               <tr>
                 <th scope="col">Run</th>
@@ -167,17 +172,18 @@ export function RunList({
                       <td>{summary?.completedScenarios ?? 'Not available yet'}</td>
                       <td>
                         <div className="krkn-ai-run-actions">
-                          <Button
-                            variant="secondary"
-                            aria-label={`View run ${name}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onSelect(resource);
-                            }}
-                          >
-                            View run
-                          </Button>
-                          <ResultsDownloadButton runName={name} compact />
+                          <Tooltip content={`View run ${name}`} position="top">
+                            <Button
+                              variant="plain"
+                              aria-label={`View run ${name}`}
+                              icon={<EyeIcon />}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onSelect(resource);
+                              }}
+                            />
+                          </Tooltip>
+                          <ResultsDownloadButton runName={name} runPhase={phase} compact />
                         </div>
                       </td>
                     </tr>

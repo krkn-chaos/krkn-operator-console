@@ -6,6 +6,67 @@
   min-width: 0;
   max-width: 100%;
 }
+.krkn-ai-scenario-detail__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-block-end: 0.75rem;
+  padding-block-end: 0.75rem;
+  border-block-end: 1px solid var(--krkn-ai-border);
+}
+
+.krkn-ai-scenario-detail__identity {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 1.25rem;
+}
+
+.krkn-ai-scenario-detail__identity p {
+  margin: 0;
+}
+
+.krkn-ai-scenario-detail__labels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.krkn-ai-scenario-detail__tabs [role="tablist"] {
+  gap: 0.5rem;
+  border-block-end: 1px solid var(--krkn-ai-border);
+}
+
+.krkn-ai-scenario-detail__tabs [role="tab"] {
+  padding: 0.7rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.krkn-ai-scenario-detail__tabs [role="tab"][aria-selected="true"] {
+  font-weight: 700;
+}
+
+.krkn-ai-scenario-modal.pf-v5-c-modal-box .pf-v5-c-modal-box__close {
+  z-index: 3;
+  inset-inline-end: 1.25rem;
+}
+
+.krkn-ai-scenario-modal.pf-v5-c-modal-box .pf-v5-c-modal-box__close .pf-v5-c-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  justify-content: center;
+}
+
+.krkn-ai-scenario-detail__health-description {
+  margin: -0.25rem 0 0.75rem;
+  color: var(--krkn-ai-muted);
+}
 
 .krkn-ai-scenario-detail__loading {
   display: flex;
@@ -99,13 +160,14 @@
 
 .krkn-ai-scenario-fitness-table {
   width: 100%;
-  min-width: 58rem;
+  min-width: 64rem;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
 .krkn-ai-scenario-fitness-table th,
 .krkn-ai-scenario-fitness-table td {
+  box-sizing: border-box;
   padding: 0.75rem;
   border-block-end: 1px solid var(--krkn-ai-border);
   text-align: start;
@@ -118,28 +180,25 @@
   white-space: nowrap;
 }
 
-.krkn-ai-scenario-fitness-table th:first-child,
-.krkn-ai-scenario-fitness-table__query {
-  width: 46%;
+.krkn-ai-scenario-fitness-table__query-column {
+  width: 58%;
 }
 
-.krkn-ai-scenario-fitness-table th:nth-child(2) {
-  width: 17%;
+.krkn-ai-scenario-fitness-table__type-column {
+  width: 12%;
 }
 
-.krkn-ai-scenario-fitness-table th:nth-child(3),
+.krkn-ai-scenario-fitness-table__score-column {
+  width: 15%;
+}
+
 .krkn-ai-scenario-fitness-table th:nth-child(4) {
-  width: 18.5%;
+  white-space: normal;
 }
 
 .krkn-ai-scenario-fitness-table__query {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.krkn-ai-scenario-fitness-table__number {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .krkn-ai-scenario-query {
@@ -151,8 +210,27 @@
 .krkn-ai-scenario-query code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: normal;
 }
+
+.krkn-ai-scenario-modal.pf-v5-c-modal-box .pf-v5-c-modal-box__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--pf-v5-global--BackgroundColor--100, #fff);
+}
+.krkn-ai-scenario-detail__section h3 {
+  font-weight: 700;
+}
+
+
+.krkn-ai-scenario-fitness-table__number {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 
 .krkn-ai-scenario-detail__updating {
   display: flex;
@@ -167,6 +245,14 @@
 }
 
 @media (max-width: 768px) {
+  .krkn-ai-scenario-detail__heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .krkn-ai-scenario-detail__labels {
+    justify-content: flex-start;
+  }
+
   .krkn-ai-scenario-detail__section {
     min-width: 0;
     padding: 0.9rem;

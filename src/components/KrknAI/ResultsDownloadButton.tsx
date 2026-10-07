@@ -2,10 +2,24 @@ import { useState } from 'react';
 import { Alert, Button, Tooltip } from '@patternfly/react-core';
 import { DownloadIcon } from '@patternfly/react-icons';
 import { krknAiApi } from '../../services/krknAiApi';
+import type { KrknAIRunPhase } from '../../services/krknAiApi';
 
-export function ResultsDownloadButton({ runName, compact = false }: { runName: string; compact?: boolean }) {
+const ACTIVE_RUN_PHASES: Record<string, true> = {
+  Pending: true,
+  Provisioning: true,
+  Running: true,
+};
+
+interface ResultsDownloadButtonProps {
+  runName: string;
+  runPhase: KrknAIRunPhase;
+  compact?: boolean;
+}
+
+export function ResultsDownloadButton({ runName, runPhase, compact = false }: ResultsDownloadButtonProps) {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isActive = ACTIVE_RUN_PHASES[runPhase] === true;
   const download = async () => {
     if (downloading) return;
     setDownloading(true);
@@ -26,13 +40,13 @@ export function ResultsDownloadButton({ runName, compact = false }: { runName: s
   };
   return (
     <div className="krkn-ai-results-download" onClick={(event) => event.stopPropagation()}>
-      <Tooltip content="Download all committed run results as a ZIP archive">
+      <Tooltip content={isActive ? 'Results are available after the run completes' : 'Download all committed run results as a ZIP archive'}>
         <Button
           variant={compact ? 'control' : 'secondary'}
           icon={<DownloadIcon />}
           aria-label={`Download complete results for run ${runName}`}
           isLoading={downloading}
-          isDisabled={downloading}
+          isDisabled={downloading || isActive}
           onClick={() => void download()}
         >
           {!compact && (downloading ? 'Preparing ZIP…' : 'Download results ZIP')}

@@ -40,11 +40,13 @@ function HealthCheckField({
   field,
   error,
   onChange,
+  onTouch,
 }: {
   check: HealthCheckDraft;
   field: HealthCheckFieldDescriptor;
   error?: string;
   onChange: (key: HealthCheckFieldKey, value: string) => void;
+  onTouch: () => void;
 }) {
   const id = healthCheckFieldId(check.key, field.key);
   return (
@@ -56,6 +58,7 @@ function HealthCheckField({
         step={field.step}
         value={check[field.key]}
         onChange={(_event, value) => onChange(field.key, value)}
+        onBlur={onTouch}
         validated={error ? 'error' : 'default'}
         aria-label={`Health check ${check.key} ${field.accessibleName}`}
         aria-required="true"
@@ -80,27 +83,46 @@ const createHealthCheck = (key: number): HealthCheckDraft => ({
   interval: '2',
 });
 
+const untouchedHealthCheckFields = (): Record<HealthCheckFieldKey, boolean> => ({
+  name: false,
+  url: false,
+  statusCode: false,
+  timeout: false,
+  interval: false,
+});
+
 export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEditorProps) {
   const [pendingRemovalKey, setPendingRemovalKey] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingHealthCheck, setEditingHealthCheck] = useState<HealthCheckDraft | null>(null);
+  const [showEntryErrors, setShowEntryErrors] = useState(false);
+  const [touchedFields, setTouchedFields] = useState(untouchedHealthCheckFields);
 
   const editHealthCheck = (check: HealthCheckDraft) => {
     setEditingHealthCheck({ ...check });
     setIsAdding(false);
+    setShowEntryErrors(false);
+    setTouchedFields(untouchedHealthCheckFields());
   };
 
   const addHealthCheck = () => {
     const nextKey = draft.healthChecks.reduce((maximum, check) => Math.max(maximum, check.key), -1) + 1;
     setEditingHealthCheck(createHealthCheck(nextKey));
     setIsAdding(true);
+    setShowEntryErrors(false);
+    setTouchedFields(untouchedHealthCheckFields());
   };
 
   const closeHealthCheckEditor = () => {
     setEditingHealthCheck(null);
     setIsAdding(false);
+    setShowEntryErrors(false);
+    setTouchedFields(untouchedHealthCheckFields());
   };
 
+  const touchField = (field: HealthCheckFieldKey) => {
+    setTouchedFields((current) => ({ ...current, [field]: true }));
+  };
 
   const confirmRemoval = () => {
     if (pendingRemovalKey !== null) {
@@ -116,7 +138,11 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
   const itemErrorPrefix = editingHealthCheck ? `healthCheck.${editingHealthCheck.key}.` : '';
   const hasEntryErrors = Object.keys(entryErrors).some((field) => field.startsWith(itemErrorPrefix));
   const saveHealthCheck = () => {
-    if (!editingHealthCheck || hasEntryErrors) return;
+    if (!editingHealthCheck) return;
+    if (hasEntryErrors) {
+      setShowEntryErrors(true);
+      return;
+    }
     const exists = draft.healthChecks.some((check) => check.key === editingHealthCheck.key);
     if (!isAdding && !exists) {
       closeHealthCheckEditor();
@@ -217,7 +243,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
         isOpen={editingHealthCheck !== null}
         onClose={closeHealthCheckEditor}
         actions={[
-          <Button key="save" variant="primary" onClick={saveHealthCheck} isDisabled={hasEntryErrors}>
+          <Button key="save" variant="primary" onClick={saveHealthCheck}>
             Save
           </Button>,
           <Button key="cancel" variant="link" onClick={closeHealthCheckEditor}>
@@ -235,8 +261,10 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
                   key={field.key}
                   check={check}
                   field={field}
-                  error={entryErrors[`${itemKey}.${field.key}`]}
+                  error={(showEntryErrors || touchedFields[field.key]) ? entryErrors[`${itemKey}.${field.key}`] : undefined}
+                  onTouch={() => touchField(field.key)}
                   onChange={(fieldKey, value) => {
+                    touchField(fieldKey);
                     setEditingHealthCheck((current) => current ? { ...current, [fieldKey]: value } : current);
                   }}
                 />

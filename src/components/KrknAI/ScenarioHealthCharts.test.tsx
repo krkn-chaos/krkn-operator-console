@@ -110,11 +110,22 @@ describe('ScenarioHealthCharts', () => {
     const fastCells = outcomeSamples.filter((cell) => cell.getAttribute('aria-label')?.startsWith('fast.'));
     const slowCells = outcomeSamples.filter((cell) => cell.getAttribute('aria-label')?.startsWith('slow.'));
     expect(fastCells.map((cell) => cell.querySelector('text')?.textContent)).toEqual(['202', '404', '201']);
-    expect(fastCells.map((cell) => Number(cell.querySelector('rect')?.getAttribute('x')))).toEqual([0, 32, 64]);
-    expect(slowCells.map((cell) => Number(cell.querySelector('rect')?.getAttribute('x')))).toEqual([0, 32]);
+    const cellWidth = Number(fastCells[0].querySelector('rect')?.getAttribute('width'));
+    expect(fastCells.map((cell) => Number(cell.querySelector('rect')?.getAttribute('x')))).toEqual([0, cellWidth, cellWidth * 2]);
+    expect(slowCells.map((cell) => Number(cell.querySelector('rect')?.getAttribute('x')))).toEqual([0, cellWidth]);
     expect(slowCells[0].getAttribute('aria-label')).toContain('Elapsed: not recorded');
     expect(plot.querySelector('.krkn-ai-health-chart__heatmap-tick')).toBeNull();
     expect(plot.querySelector('.krkn-ai-health-chart__axis-label')).toBeNull();
+  });
+
+
+  it('uses natural cell widths for sparse health-check samples', () => {
+    render(<ScenarioHealthCharts scenarioId="9" samples={[sample(0, 0.2), sample(1, 0.3)]} />);
+    const plot = screen.getByRole('group', { name: 'Measured health-check outcome samples for scenario 9' });
+
+    expect(plot.getAttribute('viewBox')).toBe('0 0 96 38');
+    expect(plot.querySelector('rect')).toHaveAttribute('width', '48');
+    expect(plot.getAttribute('style')).toContain('width: 96px');
   });
 
   it('preserves every dense record in adjacent overflow cells', () => {

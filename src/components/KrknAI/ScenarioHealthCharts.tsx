@@ -131,7 +131,8 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
   const cellHeight = 38;
   const minCellWidth = 32;
   const maxRowLength = Math.max(...visibleApplications.map((application) => grouped.get(application)?.length ?? 0), 1);
-  const heatmapPlotWidth = maxRowLength * minCellWidth;
+  const heatmapCellWidth = Math.min(48, Math.max(minCellWidth, Math.floor(width / maxRowLength)));
+  const heatmapPlotWidth = maxRowLength * heatmapCellWidth;
   const heatmapHeight = visibleApplications.length * cellHeight;
 
   return (
@@ -250,14 +251,14 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
               className="krkn-ai-health-chart__heatmap-plot"
               viewBox={`0 0 ${heatmapPlotWidth} ${heatmapHeight}`}
               preserveAspectRatio="none"
-              style={{ width: `min(100%, ${maxRowLength * 48}px)`, minWidth: `${heatmapPlotWidth}px`, height: `${heatmapHeight}px` }}
+              style={{ width: `${heatmapPlotWidth}px`, height: `${heatmapHeight}px` }}
               role="group"
               aria-label={`Measured health-check outcome samples for scenario ${scenarioId}`}
             >
               {visibleApplications.map((application, rowIndex) => {
                 const applicationSamples = [...(grouped.get(application) ?? [])]
                   .sort((left, right) => left.timestamp.localeCompare(right.timestamp) || left.recordedIndex - right.recordedIndex);
-                const cellWidth = heatmapPlotWidth / maxRowLength;
+                const cellWidth = heatmapCellWidth;
                 return applicationSamples.map((sample, sampleIndex) => {
                   const label = measurementDetails(sample);
                   const outcomeClass = sample.success === null

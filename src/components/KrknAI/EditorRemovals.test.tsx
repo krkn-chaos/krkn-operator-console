@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { parseDocument } from 'yaml';
@@ -80,6 +80,21 @@ describe('wizard table editing and removal', () => {
     expect(screen.getByText('second_metric')).toBeInTheDocument();
   });
 
+  it('filters fitness rows by PromQL text while keeping icon actions accessible', () => {
+    render(<Editors kind="fitness" />);
+    const search = screen.getByRole('searchbox', { name: 'Search PromQL queries' });
+
+    fireEvent.change(search, { target: { value: 'SECOND' } });
+    expect(screen.queryByText('first_metric')).not.toBeInTheDocument();
+    expect(screen.getByText('second_metric')).toBeInTheDocument();
+
+    const secondRow = screen.getByText('second_metric').closest('tr')!;
+    expect(within(secondRow).getByRole('button', { name: 'Edit fitness item 9' })).toBeInTheDocument();
+    expect(within(secondRow).getByRole('button', { name: 'Remove fitness item 9' })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: '' } });
+    expect(screen.getByText('first_metric')).toBeInTheDocument();
+  });
+
   it('preserves the health row on cancellation and removes only the confirmed endpoint', async () => {
     const user = userEvent.setup();
     render(<Editors kind="health" />);
@@ -146,7 +161,20 @@ describe('wizard table editing and removal', () => {
     expect(validateConfigDraft(validDraft)).not.toHaveProperty('stopTimeout');
   });
 
-  it('exposes required health fields and prevents saving a zero timeout', async () => {
+  it('shows health-check errors after touching fields or attempting to save', async () => {
+    const user = userEvent.setup();
+    render(<Editors kind="health" />);
+    await user.click(screen.getByRole('button', { name: 'Add health check' }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.queryByRole('alert')).not.toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: 'Save' })).toBeEnabled();
+
+    await user.click(dialog.getByRole('button', { name: 'Save' }));
+    expect(dialog.getByRole('alert')).toHaveTextContent('URL');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('exposes required health fields and blocks saving a zero timeout', async () => {
     const user = userEvent.setup();
     render(<Editors kind="health" />);
     await user.click(screen.getByRole('button', { name: 'Edit health check shop' }));
@@ -166,8 +194,10 @@ describe('wizard table editing and removal', () => {
 
     await user.clear(timeout);
     await user.type(timeout, '0');
-    expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(dialog.getByRole('button', { name: 'Save' })).toBeEnabled();
     expect(dialog.getByRole('alert')).toHaveTextContent('at least 1');
+    await user.click(dialog.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('serializes the unused genetic budget choice as null to suppress model defaults', () => {

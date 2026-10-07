@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, CardBody, CardTitle, Checkbox, Label, Spinner, Title } from '@patternfly/react-core';
 import {
+  ArrowLeftIcon,
   CalendarAltIcon,
   ChartLineIcon,
   ClipboardListIcon,
@@ -211,7 +212,6 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
     name,
     scenarioFilters.search.trim(),
     scenarioFilters.generation,
-    scenarioFilters.scenarioType.trim(),
   ]);
   const indexPending = scenarioIndexIdentity !== queryIdentity && !indexError;
   const visibleScenarioIndex = scenarioIndexIdentity === queryIdentity ? scenarioIndex : null;
@@ -330,7 +330,6 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         const filters = {
           limit: SCENARIO_PAGE_LIMIT,
           generation: scenarioFilters.generation ?? undefined,
-          scenarioType: scenarioFilters.scenarioType.trim() || undefined,
           search: scenarioFilters.search.trim() || undefined,
         };
         const first = await krknAiApi.getScenarioIndex(name, { ...filters, page: 1 }, options);
@@ -457,7 +456,7 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
       controller?.abort();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [deleted, fetchScenarioDetail, name, queryIdentity, scenarioFilters.generation, scenarioFilters.scenarioType, scenarioFilters.search]);
+  }, [deleted, fetchScenarioDetail, name, queryIdentity, scenarioFilters.generation, scenarioFilters.search]);
 
   useEffect(() => () => {
     detailControllers.current.forEach((request) => request.abort());
@@ -501,7 +500,7 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
   if (deleted) {
     return (
       <section className="krkn-ai-run-detail" aria-labelledby="krkn-ai-deleted-title">
-        <Button variant="secondary" onClick={onBack}>Back to runs</Button>
+        <Button variant="link" icon={<ArrowLeftIcon />} isInline onClick={onBack} style={{ marginBottom: '0.5rem', paddingLeft: 0 }}>Back to Runs</Button>
         <Title id="krkn-ai-deleted-title" headingLevel="h1">Run is no longer available</Title>
         <p>The operator no longer returns {name}. Refresh the run list to discover current runs.</p>
       </section>
@@ -511,7 +510,7 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
   if (initialLoading) {
     return (
       <main className="krkn-ai-run-detail">
-        <Button variant="secondary" onClick={onBack} className="krkn-ai-run-detail__back">Back to runs</Button>
+        <Button variant="link" icon={<ArrowLeftIcon />} isInline onClick={onBack} className="krkn-ai-run-detail__back" style={{ marginBottom: '0.5rem', paddingLeft: 0 }}>Back to Runs</Button>
         <div className="krkn-ai-results-loading" role="status"><Spinner size="xl" aria-label="Loading run results" /><p>Loading run results…</p></div>
       </main>
     );
@@ -521,8 +520,8 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
     <main className="krkn-ai-run-detail">
       <header className="krkn-ai-run-detail__header">
         <div className="krkn-ai-run-actions krkn-ai-run-detail__toolbar">
-          <Button variant="secondary" onClick={onBack}>Back to runs</Button>
-          <ResultsDownloadButton runName={name} />
+          <Button variant="link" icon={<ArrowLeftIcon />} isInline onClick={onBack} style={{ marginBottom: '0.5rem', paddingLeft: 0 }}>Back to Runs</Button>
+          <ResultsDownloadButton runName={name} runPhase={phase} />
         </div>
         <div className="krkn-ai-run-detail__title-row">
           <div>

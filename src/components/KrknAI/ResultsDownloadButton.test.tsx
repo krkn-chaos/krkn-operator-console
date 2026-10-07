@@ -33,7 +33,7 @@ describe('ResultsDownloadButton', () => {
     const archive = new Blob(['archive'], { type: 'application/zip' });
     vi.mocked(krknAiApi.downloadResults).mockResolvedValueOnce(archive);
 
-    render(<ResultsDownloadButton runName="daily-run" />);
+    render(<ResultsDownloadButton runName="daily-run" runPhase="Succeeded" />);
     fireEvent.click(screen.getByRole('button', { name: 'Download complete results for run daily-run' }));
 
     await waitFor(() => expect(clickAnchor).toHaveBeenCalledTimes(1));
@@ -45,6 +45,18 @@ describe('ResultsDownloadButton', () => {
     expect(anchor.isConnected).toBe(false);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:results-archive');
   });
+  it.each(['Pending', 'Provisioning', 'Running'] as const)(
+    'disables results downloads while a run is %s',
+    (runPhase) => {
+      render(<ResultsDownloadButton runName="active-run" runPhase={runPhase} />);
+      const button = screen.getByRole('button', { name: 'Download complete results for run active-run' });
+
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(krknAiApi.downloadResults).not.toHaveBeenCalled();
+    },
+  );
+
 
   it('prevents duplicate downloads while a request is in flight', async () => {
     let resolveDownload!: (blob: Blob) => void;
@@ -52,8 +64,8 @@ describe('ResultsDownloadButton', () => {
       new Promise<Blob>((resolve) => { resolveDownload = resolve; }),
     );
 
-    render(<ResultsDownloadButton runName="in-progress-run" />);
-    const button = screen.getByRole('button', { name: 'Download complete results for run in-progress-run' });
+    render(<ResultsDownloadButton runName="duplicate-run" runPhase="Succeeded" />);
+    const button = screen.getByRole('button', { name: 'Download complete results for run duplicate-run' });
     fireEvent.click(button);
     expect(button).toBeDisabled();
     fireEvent.click(button);
@@ -67,7 +79,7 @@ describe('ResultsDownloadButton', () => {
   it('shows the download failure to the user', async () => {
     vi.mocked(krknAiApi.downloadResults).mockRejectedValueOnce(new Error('Archive service unavailable'));
 
-    render(<ResultsDownloadButton runName="failed-run" />);
+    render(<ResultsDownloadButton runName="failed-run" runPhase="Failed" />);
     fireEvent.click(screen.getByRole('button', { name: 'Download complete results for run failed-run' }));
 
     expect(await screen.findByText('Archive service unavailable')).toBeInTheDocument();

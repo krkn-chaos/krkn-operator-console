@@ -6,11 +6,13 @@ import {
   FormSelectOption,
   Modal,
   ModalVariant,
+  Tooltip,
   TextInput,
 } from '@patternfly/react-core';
 import type { ConfigValidationErrors, EditableConfigDraft, FitnessItemDraft } from './configModel';
 import { validateConfigDraft } from './configModel';
 import './FitnessFunctionEditor.css';
+import { PencilAltIcon, TrashIcon } from '@patternfly/react-icons';
 
 interface FitnessFunctionEditorProps {
   draft: EditableConfigDraft;
@@ -22,6 +24,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
   const [editingItem, setEditingItem] = useState<FitnessItemDraft | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [showEntryErrors, setShowEntryErrors] = useState(false);
+  const [queryFilter, setQueryFilter] = useState('');
   const [pendingRemovalKey, setPendingRemovalKey] = useState<number | null>(null);
 
   const openAdd = () => {
@@ -87,19 +90,31 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
   };
 
   const pendingRemovalItem = draft.fitnessItems.find((item) => item.key === pendingRemovalKey);
+  const normalizedQueryFilter = queryFilter.trim().toLowerCase();
+  const visibleItems = draft.fitnessItems.filter((item) =>
+    item.query.toLowerCase().includes(normalizedQueryFilter),
+  );
 
   return (
     <div className="krkn-ai-fitness-editor">
-      <p className="krkn-ai-muted">Fitness queries are evaluated by the configured Prometheus service. Item weights are non-negative relative weights normalized during scoring.</p>
 
       <div className="krkn-ai-editor-heading">
         <div>
           <h3>Fitness function items</h3>
-          <p className="krkn-ai-muted">Edit each item’s ID, PromQL query, aggregation type, and weight.</p>
+          <p className="krkn-ai-muted">PromQL queries used to score each scenario.</p>
         </div>
         <Button variant="secondary" onClick={openAdd}>Add fitness item</Button>
       </div>
       {errors.fitnessItems && <p className="krkn-ai-field-error" role="alert">{errors.fitnessItems}</p>}
+      <FormGroup label="Search PromQL queries" fieldId="krkn-ai-fitness-query-search">
+        <TextInput
+          id="krkn-ai-fitness-query-search"
+          type="search"
+          value={queryFilter}
+          onChange={(_event, value) => setQueryFilter(value)}
+          placeholder="Filter by query text"
+        />
+      </FormGroup>
       <div className="krkn-ai-fitness-table-scroll">
         <table className="krkn-ai-fitness-table">
           <thead>
@@ -111,24 +126,38 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
             </tr>
           </thead>
           <tbody>
-            {draft.fitnessItems.map((item) => (
+            {visibleItems.map((item) => (
               <tr key={item.key}>
                 <td><code className="krkn-ai-fitness-query-summary">{item.query || 'No query entered'}</code></td>
                 <td>{item.type}</td>
                 <td>{item.weight}</td>
                 <td className="krkn-ai-fitness-table-actions">
-                  <Button size="sm" variant="secondary" onClick={() => openEdit(item)} aria-label={`Edit fitness item ${item.id}`}>Edit</Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    isDisabled={draft.fitnessItems.length === 1}
-                    onClick={() => setPendingRemovalKey(item.key)}
-                    aria-label={`Remove fitness item ${item.id}`}
-                  >Remove</Button>
+                  <div className="krkn-ai-fitness-table-actions__group">
+                    <Tooltip content={`Edit fitness item ${item.id}`} position="top">
+                      <Button
+                        size="sm"
+                        variant="plain"
+                        onClick={() => openEdit(item)}
+                        aria-label={`Edit fitness item ${item.id}`}
+                        icon={<PencilAltIcon />}
+                      />
+                    </Tooltip>
+                    <Tooltip content={`Remove fitness item ${item.id}`} position="top">
+                      <Button
+                        size="sm"
+                        variant="plain"
+                        isDisabled={draft.fitnessItems.length === 1}
+                        onClick={() => setPendingRemovalKey(item.key)}
+                        aria-label={`Remove fitness item ${item.id}`}
+                        icon={<TrashIcon />}
+                      />
+                    </Tooltip>
+                  </div>
                 </td>
               </tr>
             ))}
             {!draft.fitnessItems.length && <tr><td colSpan={4}>No fitness items. Add an item to configure a PromQL query.</td></tr>}
+            {draft.fitnessItems.length > 0 && visibleItems.length === 0 && <tr><td colSpan={4}>No queries match “{queryFilter}”.</td></tr>}
           </tbody>
         </table>
       </div>

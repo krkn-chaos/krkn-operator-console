@@ -165,6 +165,8 @@ export function CreateRun({
 }: CreateRunProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [runName, setRunName] = useState('');
+  const [runNameTouched, setRunNameTouched] = useState(false);
+  const [discoveryAttempted, setDiscoveryAttempted] = useState(false);
   const [selectedClusterValue, setSelectedClusterValue] = useState('');
   const [availableNamespaces, setAvailableNamespaces] = useState<string[]>([]);
   const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
@@ -250,6 +252,7 @@ export function CreateRun({
       : existingNames.some((name) => name.toLowerCase() === trimmedName.toLowerCase())
         ? 'A run with this name already exists.'
         : undefined;
+  const visibleNameError = (runNameTouched || discoveryAttempted) ? nameError : undefined;
   const configErrors = draft ? validateConfigDraft(draft) : {};
   const sectionIndex = configurationSections.findIndex((section) => section.id === configurationSection);
   const previousSection = configurationSections[sectionIndex - 1];
@@ -258,6 +261,8 @@ export function CreateRun({
   const namespacePattern = selectedNamespaces.map(escapeRegex).join(',');
   const noAuthorizedClusters = !!targetRequestId && !targetLoading && !targetError && discoveredClusters.length === 0;
   const canDiscover = !!selectedCluster && !!targetRequestId && !targetLoading && !nameError
+    && selectedNamespaces.length > 0 && !namespaceLoading && !namespaceError && !discoveryLoading;
+  const canAttemptDiscovery = !!selectedCluster && !!targetRequestId && !targetLoading && !targetError
     && selectedNamespaces.length > 0 && !namespaceLoading && !namespaceError && !discoveryLoading;
   const canSaveConfig = !!draft && !!documentRef.current && !!selectedCluster && !nameError && !yamlError
     && !Object.keys(configErrors).length && !actionLoading && !discoveryLoading
@@ -305,6 +310,7 @@ export function CreateRun({
   };
 
   const handleDiscover = async () => {
+    setDiscoveryAttempted(true);
     if (!canDiscover || !selectedCluster) return;
     setDiscoveryLoading(true);
     setDiscoveryError('');
@@ -476,8 +482,15 @@ export function CreateRun({
             </CardTitle>
             <CardBody className="krkn-ai-target-fields">
               <FormGroup label="Run name" fieldId="krkn-ai-run-name" isRequired>
-                <TextInput id="krkn-ai-run-name" value={runName} onChange={(_event, value) => { abortActiveRequest(); setRunName(value); setCreatedConfig(null); }} validated={nameError ? 'error' : 'default'} aria-invalid={!!nameError} />
-                {nameError && <p className="krkn-ai-field-error" role="alert">{nameError}</p>}
+                <TextInput
+                  id="krkn-ai-run-name"
+                  value={runName}
+                  onChange={(_event, value) => { abortActiveRequest(); setRunName(value); setCreatedConfig(null); }}
+                  onBlur={() => setRunNameTouched(true)}
+                  validated={visibleNameError ? 'error' : 'default'}
+                  aria-invalid={!!visibleNameError}
+                />
+                {visibleNameError && <p className="krkn-ai-field-error" role="alert">{visibleNameError}</p>}
               </FormGroup>
               {targetLoading && <Alert variant="info" title="Loading available clusters" isInline>Cluster discovery runs automatically. Select a cluster when it completes.</Alert>}
               {targetError && <Alert variant="danger" title="Cluster discovery unavailable" isInline>{targetError}</Alert>}
@@ -513,7 +526,7 @@ export function CreateRun({
             onRetry={() => setNamespaceRetry((current) => current + 1)}
           />
           {discoveryError && <Alert variant="danger" title="Krkn AI discovery failed" isInline>{discoveryError}</Alert>}
-          <div className="krkn-ai-actions"><Button variant="secondary" onClick={cancel}>Cancel</Button><Button variant="primary" isDisabled={!canDiscover} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>
+          <div className="krkn-ai-actions"><Button variant="secondary" onClick={cancel}>Cancel</Button><Button variant="primary" isDisabled={!canAttemptDiscovery} isLoading={discoveryLoading} onClick={() => void handleDiscover()}>{discoveryLoading ? 'Discovering…' : 'Discover components'}</Button></div>
 
         </>
       )}

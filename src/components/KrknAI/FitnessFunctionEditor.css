@@ -29,12 +29,14 @@
 }
 
 .krkn-ai-fitness-table-actions {
-  white-space: nowrap;
   text-align: right;
+  white-space: nowrap;
 }
 
-.krkn-ai-fitness-table-actions .pf-v5-c-button + .pf-v5-c-button {
-  margin-inline-start: 0.5rem;
+.krkn-ai-fitness-table-actions__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .krkn-ai-fitness-query-summary {

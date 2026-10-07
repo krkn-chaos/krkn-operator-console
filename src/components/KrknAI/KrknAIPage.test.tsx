@@ -285,6 +285,33 @@ describe('Krkn-AI real run lifecycle', () => {
     else Reflect.deleteProperty(document, 'hidden');
   });
 
+  it('shows the required run-name error only after the field is touched', async () => {
+    const user = userEvent.setup();
+    render(<KrknAIPage />);
+    await flushReact();
+    await user.click(screen.getByRole('button', { name: 'Create run' }));
+
+    const runName = screen.getByRole('textbox', { name: 'Run name' });
+    expect(screen.queryByText('Run name is required.')).not.toBeInTheDocument();
+    fireEvent.blur(runName);
+    expect(screen.getByRole('alert')).toHaveTextContent('Run name is required.');
+  });
+
+  it('reveals a missing run name when discovery is attempted with a namespace selected', async () => {
+    const user = userEvent.setup();
+    render(<KrknAIPage />);
+    await flushReact();
+    await user.click(screen.getByRole('button', { name: 'Create run' }));
+    const namespace = await screen.findByRole('checkbox', { name: 'shop' });
+    await user.click(namespace);
+    const discover = screen.getByRole('button', { name: 'Discover components' });
+    await waitFor(() => expect(discover).toBeEnabled());
+
+    await user.click(discover);
+    expect(screen.getByRole('alert')).toHaveTextContent('Run name is required.');
+    expect(mocks.ai.discover).not.toHaveBeenCalled();
+  });
+
   it('searches the server index for matches outside the currently loaded page', async () => {
     const run = makeRun('server-search-run');
     const firstPageRow = makeScenarioRow({ scenarioId: 'first-page-only' });
@@ -324,6 +351,27 @@ describe('Krkn-AI real run lifecycle', () => {
       expect.objectContaining({ page: 1, search: 'later-page-match' }),
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+  });
+
+  it('filters scenario types case-insensitively across the complete index', async () => {
+    const run = makeRun('scenario-type-filter-run');
+    const podScenario = makeScenarioRow({ scenarioId: 'pod-result', scenarioType: 'pod-scenarios' });
+    const containerScenario = makeScenarioRow({ scenarioId: 'container-result', scenarioType: 'container-scenarios' });
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([podScenario, containerScenario]));
+
+    render(<RunDetail run={run} onBack={vi.fn()} />);
+    await flushReact();
+    expect(screen.getByRole('row', { name: /pod-result/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /container-result/ })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Scenario type' }), { target: { value: 'POD' } });
+    expect(screen.getByRole('row', { name: /pod-result/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /container-result/ })).not.toBeInTheDocument();
+    expect(screen.getByText('1 observed scenario rows')).toBeInTheDocument();
+    const lastIndexFilters = mocks.ai.getScenarioIndex.mock.calls[
+      mocks.ai.getScenarioIndex.mock.calls.length - 1
+    ]?.[1];
+    expect(lastIndexFilters).not.toHaveProperty('scenarioType');
   });
 
   it('offers generation filters from run metadata beyond the loaded scenario page', async () => {
@@ -454,6 +502,17 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(screen.getByRole('button', { name: 'Download complete results for run bounded-log-run' })).toBeInTheDocument();
   });
 
+  it('disables the results ZIP action while the run is active', async () => {
+    const run = makeRun('active-download-run', 'Running');
+    mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Running'));
+    render(<RunDetail run={run} onBack={vi.fn()} />);
+    await flushReact();
+
+    expect(screen.getByRole('button', {
+      name: 'Download complete results for run active-download-run',
+    })).toBeDisabled();
+  });
+
   it('withholds initial run and scenario content until their result requests settle', async () => {
     let resolveSummary!: (summary: KrknAIRunSummary) => void;
     let resolveDetail!: (detail: KrknAIScenarioDetail) => void;
@@ -472,7 +531,12 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(dialog.getByRole('status')).toBeInTheDocument();
     expect(dialog.queryByText('Scenario parameters')).not.toBeInTheDocument();
     expect(dialog.queryByText('Fitness function result')).not.toBeInTheDocument();
+    expect(dialog.queryByText(/available when .*result is committed/i)).not.toBeInTheDocument();
     await act(async () => resolveDetail(makeScenarioDetail(75, 'final')));
+    expect(dialog.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
+    expect(dialog.getByRole('tab', { name: 'Fitness' })).toBeInTheDocument();
+    expect(dialog.getByRole('tab', { name: 'Health checks' })).toBeInTheDocument();
+    fireEvent.click(dialog.getByRole('tab', { name: 'Fitness' }));
     expect(dialog.getByText('75 / 100')).toBeInTheDocument();
     expect(dialog.queryByRole('status')).not.toBeInTheDocument();
   });
@@ -667,6 +731,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     fireEvent.click(screen.getByRole('row', { name: 'Open baseline scenario details' }));
     await flushReact();
+    fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
     expect(screen.getByText('12 / 100')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Raw score' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Normalized score (0–1)' })).toBeInTheDocument();
@@ -674,6 +739,7 @@ describe('Krkn-AI real run lifecycle', () => {
     const fitnessTable = screen.getByRole('table', { name: 'Measured fitness components' });
     expect(fitnessTable.textContent).toContain('up{job="krkn"}');
     expect(screen.getByRole('cell', { name: 'point' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
     expect(screen.getByText('Run type')).toBeInTheDocument();
     expect(screen.getByText('baseline-child-run')).toBeInTheDocument();
   });
@@ -883,6 +949,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
+    fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
     expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
     expect(screen.getByText(/Calculating generation fitness/)).toBeInTheDocument();
     expect(screen.queryByText('3 / 100')).not.toBeInTheDocument();
@@ -937,6 +1004,7 @@ describe('Krkn-AI real run lifecycle', () => {
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
+    fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
 
     expect(screen.getByText('Not finalized', { selector: 'strong' })).toBeInTheDocument();
     const scores = screen.getByRole('table', { name: 'Measured fitness components' });
@@ -975,6 +1043,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     setDocumentHidden(false);
     await flushReact();
+    fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
     expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ })).toBeInTheDocument();
