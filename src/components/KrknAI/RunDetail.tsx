@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Card, CardBody, CardTitle, Checkbox, Label, Spinner, Title } from '@patternfly/react-core';
 import {
   ArrowLeftIcon,
@@ -40,30 +40,6 @@ const ORCHESTRATOR_LOG_WINDOW = 500;
 
 type ConfigState = 'loading' | 'available' | 'unavailable' | 'error';
 
-function mergeIndexWhileActive(
-  previous: KrknAIScenarioIndexResponse | null,
-  next: KrknAIScenarioIndexResponse,
-  active: boolean,
-  previousIdentity: string | null,
-  nextIdentity: string,
-): KrknAIScenarioIndexResponse {
-  if (!active || !previous || previousIdentity !== nextIdentity) return next;
-  const visible = new Set(next.scenarios.map((row) => scenarioKey(row.generation, row.scenarioId)));
-  const scenarios = [
-    ...next.scenarios,
-    ...previous.scenarios.filter((row) => !visible.has(scenarioKey(row.generation, row.scenarioId))),
-  ];
-  const total = Math.max(next.pagination.total, scenarios.length);
-  return {
-    ...next,
-    scenarios,
-    pagination: {
-      ...next.pagination,
-      total,
-      totalPages: Math.max(next.pagination.totalPages, Math.ceil(total / next.pagination.limit)),
-    },
-  };
-}
 
 
 function errorStatus(error: unknown): number | undefined {
@@ -197,22 +173,28 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
   const [configRetry, setConfigRetry] = useState(0);
   const detailControllers = useRef(new Map<string, AbortController>());
   const indexRef = useRef(scenarioIndex);
-  const indexIdentityRef = useRef<string | null>(null);
+  const indexIdentityRef = useRef(scenarioIndexIdentity);
   const phaseRef = useRef(run.status?.phase ?? 'Pending');
   const selectedScenarioRef = useRef(selectedScenario);
   const scenarioDetailsRef = useRef(scenarioDetails);
   const scenarioUpdatingRef = useRef(scenarioUpdating);
   const missingRunCount = useRef(0);
   indexRef.current = scenarioIndex;
+  indexIdentityRef.current = scenarioIndexIdentity;
   phaseRef.current = summary?.phase ?? run.status?.phase ?? 'Pending';
   selectedScenarioRef.current = selectedScenario;
   scenarioDetailsRef.current = scenarioDetails;
   scenarioUpdatingRef.current = scenarioUpdating;
-  const queryIdentity = JSON.stringify([
-    name,
-    scenarioFilters.search.trim(),
-    scenarioFilters.generation,
-  ]);
+  const indexFilters = useMemo(() => ({
+    page,
+    limit: SCENARIO_PAGE_LIMIT,
+    generation: scenarioFilters.generation ?? undefined,
+    search: scenarioFilters.search.trim() || undefined,
+    scenarioType: scenarioFilters.scenarioType.trim() || undefined,
+    sort: scenarioFilters.sort,
+    direction: scenarioFilters.direction,
+  }), [page, scenarioFilters.generation, scenarioFilters.search, scenarioFilters.scenarioType, scenarioFilters.sort, scenarioFilters.direction]);
+  const queryIdentity = JSON.stringify([name, indexFilters]);
   const indexPending = scenarioIndexIdentity !== queryIdentity && !indexError;
   const visibleScenarioIndex = scenarioIndexIdentity === queryIdentity ? scenarioIndex : null;
 
@@ -317,80 +299,52 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
       }
     };
 
-    const refresh = async () => {
-      if (disposed || document.hidden || deleted) return;
-      if (inFlight) return;
+    const refresh = async (refreshSummary = true) => {
+      if (disposed || document.hidden || deleted || inFlight) return;
       clearTimer();
       inFlight = true;
       controller = new AbortController();
       const options = { signal: controller.signal };
-      // Read every matching page before sorting: the operator also overlays child
-      // runs, so a page may contain rows outside the artifact service's ordering.
-      const loadScenarioIndex = async () => {
-        const filters = {
-          limit: SCENARIO_PAGE_LIMIT,
-          generation: scenarioFilters.generation ?? undefined,
-          search: scenarioFilters.search.trim() || undefined,
-        };
-        const first = await krknAiApi.getScenarioIndex(name, { ...filters, page: 1 }, options);
-        const rows = new Map(first.scenarios.map((row) => [scenarioKey(row.generation, row.scenarioId), row]));
-        for (let nextPage = 2; nextPage <= first.pagination.totalPages; nextPage++) {
-          const next = await krknAiApi.getScenarioIndex(name, { ...filters, page: nextPage }, options);
-          for (const row of next.scenarios) rows.set(scenarioKey(row.generation, row.scenarioId), row);
-        }
-        return {
-          scenarios: [...rows.values()],
-          pagination: {
-            page: 1,
-            limit: first.pagination.limit,
-            total: rows.size,
-            totalPages: Math.ceil(rows.size / first.pagination.limit),
-          },
-        };
-      };
-      const [summaryResult, indexResult] = await Promise.allSettled([
-        krknAiApi.getRunSummary(name, options),
-        loadScenarioIndex(),
-      ]);
-      if (disposed) return;
-      initialLoadCompleted = true;
+      const previousIndex = indexRef.current;
+      const previousIdentity = indexIdentityRef.current;
+      let summaryStatus: number | undefined;
+      let indexStatus: number | undefined;
+      let generationCompleted = false;
+      let detailRefreshed = false;
 
-      const summaryStatus = summaryResult.status === 'rejected' ? errorStatus(summaryResult.reason) : undefined;
-      const indexStatus = indexResult.status === 'rejected' ? errorStatus(indexResult.reason) : undefined;
-      const nextPhase = summaryResult.status === 'fulfilled' ? summaryResult.value.phase : phaseRef.current;
-      phaseRef.current = nextPhase || 'Pending';
-      const generationCompleted = summaryResult.status === 'fulfilled'
-        && summaryRef.current?.completedGenerations !== summaryResult.value.completedGenerations;
-
-      if (summaryResult.status === 'fulfilled') {
+      const summaryRequest = refreshSummary ? krknAiApi.getRunSummary(name, options).then((nextSummary) => {
+        if (disposed) return;
+        generationCompleted = summaryRef.current !== null
+          && summaryRef.current.completedGenerations !== nextSummary.completedGenerations;
+        phaseRef.current = nextSummary.phase || 'Pending';
         missingRunCount.current = 0;
-        const nextSummary = summaryResult.value;
         summaryRef.current = nextSummary;
         setSummary(nextSummary);
         setSummaryError(null);
         setDeleted(false);
-      } else {
-        const failure = summaryResult.reason;
+        setInitialLoading(false);
+      }, (failure: unknown) => {
+        if (disposed) return;
+        summaryStatus = errorStatus(failure);
         const cacheMiss = summaryStatus === 404 && ACTIVE_PHASES[phaseRef.current] === true;
         setSummaryError(cacheMiss ? 'Run results are not visible in the operator cache yet; retrying while the run is active.' : errorText(failure));
         if (summaryStatus === 404) {
           missingRunCount.current += 1;
-          if (missingRunCount.current >= 2 || TERMINAL_PHASES[phaseRef.current] === true) {
-            setDeleted(true);
-          }
+          if (missingRunCount.current >= 2 || TERMINAL_PHASES[phaseRef.current] === true) setDeleted(true);
         } else {
           missingRunCount.current = 0;
         }
-      }
-      if (indexResult.status === 'fulfilled') {
+        setInitialLoading(false);
+      }) : Promise.resolve();
+
+      const indexRequest = krknAiApi.getScenarioIndex(name, indexFilters, options).then((nextIndex) => {
+        if (disposed) return;
+        const lastPage = Math.max(nextIndex.pagination.totalPages, 1);
+        if (indexFilters.page > lastPage) {
+          setPage(lastPage);
+          return;
+        }
         const oldIndex = indexRef.current;
-        const nextIndex = mergeIndexWhileActive(
-          oldIndex,
-          indexResult.value,
-          ACTIVE_PHASES[phaseRef.current] === true,
-          indexIdentityRef.current,
-          queryIdentity,
-        );
         const selected = selectedScenarioRef.current;
         if (selected) {
           const key = scenarioKey(selected.generation, selected.scenarioId);
@@ -399,8 +353,8 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
           if (newRow) {
             selectedScenarioRef.current = newRow;
             setSelectedScenario(newRow);
-            if (fitnessChanged(oldRow, newRow) || scenarioUpdatingRef.current[key]
-              || (generationCompleted && newRow.generation < (summaryRef.current?.completedGenerations ?? 0))) {
+            if (fitnessChanged(oldRow, newRow) || scenarioUpdatingRef.current[key]) {
+              detailRefreshed = true;
               void fetchScenarioDetail(newRow, true);
             }
           }
@@ -410,15 +364,30 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
         setScenarioIndexIdentity(queryIdentity);
         indexIdentityRef.current = queryIdentity;
         setIndexError(null);
-      } else {
+      }, (failure: unknown) => {
+        if (disposed) return;
+        indexStatus = errorStatus(failure);
         const cacheMiss = indexStatus === 404 && ACTIVE_PHASES[phaseRef.current] === true;
-        setIndexError(cacheMiss ? 'Scenario results are not visible in the operator cache yet; retrying while the run is active.' : errorText(indexResult.reason));
-      }
+        setIndexError(cacheMiss ? 'Scenario results are not visible in the operator cache yet; retrying while the run is active.' : errorText(failure));
+      });
 
+      await Promise.all([summaryRequest, indexRequest]);
+      if (disposed) return;
+      initialLoadCompleted = true;
       const transientFailure = summaryStatus === 503 || indexStatus === 503
         || (ACTIVE_PHASES[phaseRef.current] === true && (summaryStatus === 404 || indexStatus === 404));
+      if (ACTIVE_PHASES[phaseRef.current] === true
+        && previousIndex && previousIdentity === queryIdentity && indexRef.current?.pagination.total === 0) {
+        indexRef.current = previousIndex;
+        setScenarioIndex(previousIndex);
+      }
+      const selected = selectedScenarioRef.current;
+      if (!detailRefreshed && selected
+        && (scenarioUpdatingRef.current[scenarioKey(selected.generation, selected.scenarioId)]
+          || (generationCompleted && selected.generation < (summaryRef.current?.completedGenerations ?? 0)))) {
+        void fetchScenarioDetail(selected, true);
+      }
       setUpdating(transientFailure);
-      setInitialLoading(false);
       inFlight = false;
       controller = null;
 
@@ -448,7 +417,7 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
       }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
-    if (!document.hidden) void refresh();
+    if (!document.hidden) void refresh(!summaryRef.current || summaryRef.current.name !== name);
 
     return () => {
       disposed = true;
@@ -456,7 +425,7 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
       controller?.abort();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [deleted, fetchScenarioDetail, name, queryIdentity, scenarioFilters.generation, scenarioFilters.search]);
+  }, [deleted, fetchScenarioDetail, indexFilters, name, queryIdentity]);
 
   useEffect(() => () => {
     detailControllers.current.forEach((request) => request.abort());
@@ -507,14 +476,6 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
     );
   }
 
-  if (initialLoading) {
-    return (
-      <main className="krkn-ai-run-detail">
-        <Button variant="link" icon={<ArrowLeftIcon />} isInline onClick={onBack} className="krkn-ai-run-detail__back" style={{ marginBottom: '0.5rem', paddingLeft: 0 }}>Back to Runs</Button>
-        <div className="krkn-ai-results-loading" role="status"><Spinner size="xl" aria-label="Loading run results" /><p>Loading run results…</p></div>
-      </main>
-    );
-  }
 
   return (
     <main className="krkn-ai-run-detail">
@@ -529,6 +490,7 @@ export function RunDetail({ run, onBack }: RunDetailProps) {
             <p className="krkn-ai-run-detail__cluster"><TopologyIcon aria-hidden="true" />Cluster: {cluster}</p>
           </div>
         </div>
+        {initialLoading && <div className="krkn-ai-results-loading" role="status"><Spinner size="sm" aria-label="Loading run results" /><p>Loading run results…</p></div>}
         <div className="krkn-ai-run-detail__metadata-groups">
           <MetadataPanel id="krkn-ai-run-overview" title="Run" icon={<CalendarAltIcon aria-hidden="true" />} className="krkn-ai-run-detail__metadata-group--run" items={[
             { label: 'Status', value: <Label color={phase === 'Succeeded' ? 'green' : phase === 'Failed' ? 'red' : phase === 'Running' ? 'blue' : 'grey'}>{phase}</Label> },

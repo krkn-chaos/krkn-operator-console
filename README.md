@@ -61,8 +61,10 @@ The wizard configures discovered components and settings, with an editable YAML
 preview before creation. VMI controls appear only when discovery finds VMIs.
 Run details include searchable scenarios, fitness and health charts, live logs,
 and downloadable ZIPs with complete results.
-Scenario sorting covers all matching result pages; sorting and paging use the
-loaded rows without refetching. Large runs require fetching each matching page.
+Run metadata appears before summaries finish. Summaries and scenario pages load
+independently; the operator filters, sorts, and paginates the complete result and
+child-job index. The console fetches only the requested page and loads scenario
+details when selected.
 
 ### Mock development and PR previews
 

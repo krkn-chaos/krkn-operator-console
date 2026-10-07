@@ -60,7 +60,7 @@ const scenarioSortValue: Record<string, (row: KrknAIScenarioIndexRow) => string 
   scenarioId: (row) => row.scenarioId,
   scenarioType: (row) => row.scenarioType,
   fitnessScore: (row) => row.fitnessScore,
-  outcome: (row) => row.outcome,
+  outcome: (row) => row.phase ?? (row.outcome === 'succeeded' ? 'Succeeded' : row.outcome === 'failed' ? 'Failed' : 'Result pending'),
   durationSeconds: (row) => row.durationSeconds,
 };
 
@@ -431,13 +431,20 @@ export function sortAndFilterPreviewScenarios(run: PreviewKrknAIRun, params: URL
   let rows = [...run.scenarios];
   const generation = params.get('generation');
   if (generation !== null && generation !== '') rows = rows.filter((row) => row.generation === Number(generation));
-  const type = params.get('scenarioType');
-  if (type) rows = rows.filter((row) => row.scenarioType === type);
+  const type = params.get('scenarioType')?.toLowerCase();
+  if (type) rows = rows.filter((row) => row.scenarioType?.toLowerCase().includes(type));
   const search = params.get('search')?.toLowerCase();
-  if (search) rows = rows.filter((row) => [row.scenarioId, row.scenarioType, row.outcome].some((value) => value?.toLowerCase().includes(search)));
+  if (search) rows = rows.filter((row) => [row.scenarioId, row.scenarioType].some((value) => value?.toLowerCase().includes(search)));
   const sortDirection = params.get('direction') === 'desc' ? -1 : 1;
   const sortValue = scenarioSortValue[params.get('sort') ?? 'generation'] ?? scenarioSortValue.generation;
   rows.sort((left, right) => {
+    const sort = params.get('sort') ?? 'generation';
+    if ((sort === 'generation' && left.generation === right.generation) || sort === 'scenarioId') {
+      if ((left.scenarioId === 'baseline') !== (right.scenarioId === 'baseline')) {
+        const baselineOrder = left.scenarioId === 'baseline' ? -1 : 1;
+        return sort === 'generation' ? baselineOrder : baselineOrder * sortDirection;
+      }
+    }
     const a = sortValue(left); const b = sortValue(right);
     if (a === null || a === undefined) return b === null || b === undefined ? 0 : 1;
     if (b === null || b === undefined) return -1;
@@ -447,7 +454,7 @@ export function sortAndFilterPreviewScenarios(run: PreviewKrknAIRun, params: URL
   const requestedPage = Number(params.get('page'));
   const requestedLimit = Number(params.get('limit'));
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
-  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.max(1, Math.floor(requestedLimit)) : 20;
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(500, Math.max(1, Math.floor(requestedLimit))) : 100;
   const total = rows.length;
   return { scenarios: rows.slice((page - 1) * limit, page * limit), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 }

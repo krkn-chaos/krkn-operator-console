@@ -160,46 +160,50 @@ export function KrknAIPage({
 
         const previousByName = new Map(runsRef.current.map((entry) => [entry.resource.metadata.name, entry]));
         const fetchAllSummaries = reason === 'entry' || reason === 'manual' || reason === 'visibility';
-        const nextEntries = await Promise.all(resources.map(async (resource): Promise<KrknAIRunListEntry> => {
+        const entries = resources.map((resource): KrknAIRunListEntry => {
+          const previous = previousByName.get(resource.metadata.name);
+          const sameRun = previous?.resource.metadata.uid === resource.metadata.uid;
+          return {
+            resource,
+            summary: sameRun ? previous.summary : null,
+            summaryError: sameRun ? previous.summaryError : undefined,
+            updating: sameRun ? previous.updating : false,
+          };
+        });
+        updateRuns(entries);
+        setLoading(false);
+        initialLoadCompleted = true;
+
+        await Promise.all(entries.map(async ({ resource }) => {
           const name = resource.metadata.name;
           const previous = previousByName.get(name);
           const previousPhase = previous ? phaseOf(previous.resource) : '';
           const currentPhase = phaseOf(resource);
           const transitionedTerminal = ACTIVE_PHASES[previousPhase] === true && isTerminal(currentPhase);
           const shouldFetchSummary = fetchAllSummaries
+            || !previous
+            || previous.resource.metadata.uid !== resource.metadata.uid
             || isActive(resource)
             || transitionedTerminal
             || Boolean(previous?.updating);
 
-          if (!shouldFetchSummary) {
-            return {
-              resource,
-              summary: previous?.summary ?? null,
-              summaryError: previous?.summaryError,
-              updating: previous?.updating ?? false,
-            };
-          }
+          if (!shouldFetchSummary) return;
 
           try {
             const summary = await krknAiApi.getRunSummary(name, { signal: controller?.signal });
-            return {
-              resource: mergeSummaryIntoRun(resource, summary),
-              summary,
-              updating: false,
-            };
+            if (disposed) return;
+            updateRuns(runsRef.current.map((entry) => entry.resource.metadata.uid === resource.metadata.uid
+              ? { resource: mergeSummaryIntoRun(entry.resource, summary), summary, updating: false }
+              : entry));
           } catch (summaryError) {
+            if (disposed) return;
             const status = errorStatus(summaryError);
-            return {
-              resource,
-              summary: previous?.summary ?? null,
-              summaryError: errorText(summaryError),
-              updating: status === 503,
-            };
+            updateRuns(runsRef.current.map((entry) => entry.resource.metadata.uid === resource.metadata.uid
+              ? { ...entry, summaryError: errorText(summaryError), updating: status === 503 }
+              : entry));
           }
         }));
 
-        if (!disposed) updateRuns(nextEntries);
-        initialLoadCompleted = true;
       } catch (listError) {
         if (!disposed && !(listError instanceof Error && listError.name === 'AbortError')) {
           setError(errorText(listError));

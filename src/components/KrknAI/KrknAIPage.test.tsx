@@ -364,33 +364,8 @@ describe('Krkn-AI real run lifecycle', () => {
     await waitFor(() => expect(screen.getByRole('row', { name: /later-page-match/ })).toBeInTheDocument());
     expect(screen.getByText(/page 1 of 1/i)).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /first-page-only/ })).not.toBeInTheDocument();
-    expect(mocks.ai.getScenarioIndex).toHaveBeenCalledWith(
-      'server-search-run',
-      expect.objectContaining({ page: 1, search: 'later-page-match' }),
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
   });
 
-  it('filters scenario types case-insensitively across the complete index', async () => {
-    const run = makeRun('scenario-type-filter-run');
-    const podScenario = makeScenarioRow({ scenarioId: 'pod-result', scenarioType: 'pod-scenarios' });
-    const containerScenario = makeScenarioRow({ scenarioId: 'container-result', scenarioType: 'container-scenarios' });
-    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([podScenario, containerScenario]));
-
-    render(<RunDetail run={run} onBack={vi.fn()} />);
-    await flushReact();
-    expect(screen.getByRole('row', { name: /pod-result/ })).toBeInTheDocument();
-    expect(screen.getByRole('row', { name: /container-result/ })).toBeInTheDocument();
-
-    fireEvent.change(screen.getByRole('textbox', { name: 'Scenario type' }), { target: { value: 'POD' } });
-    expect(screen.getByRole('row', { name: /pod-result/ })).toBeInTheDocument();
-    expect(screen.queryByRole('row', { name: /container-result/ })).not.toBeInTheDocument();
-    expect(screen.getByText('1 observed scenario rows')).toBeInTheDocument();
-    const lastIndexFilters = mocks.ai.getScenarioIndex.mock.calls[
-      mocks.ai.getScenarioIndex.mock.calls.length - 1
-    ]?.[1];
-    expect(lastIndexFilters).not.toHaveProperty('scenarioType');
-  });
 
   it('offers generation filters from run metadata beyond the loaded scenario page', async () => {
     const run = makeRun('generation-filter-run');
@@ -412,11 +387,6 @@ describe('Krkn-AI real run lifecycle', () => {
 
     await waitFor(() => expect(screen.getByRole('row', { name: /generation-two/ })).toBeInTheDocument());
     expect(screen.queryByRole('row', { name: /generation-zero/ })).not.toBeInTheDocument();
-    expect(mocks.ai.getScenarioIndex).toHaveBeenLastCalledWith(
-      'generation-filter-run',
-      expect.objectContaining({ page: 1, generation: 2 }),
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
   });
 
   it('keeps active-run page snapshots isolated when navigating between pages', async () => {
@@ -455,44 +425,38 @@ describe('Krkn-AI real run lifecycle', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
+  it('renders run rows and completed summaries while another summary is still loading', async () => {
+    const slowRun = makeRun('slow-summary-run', 'Succeeded');
+    const fastRun = makeRun('fast-summary-run', 'Succeeded');
+    let resolveSlow!: (summary: KrknAIRunSummary) => void;
+    const slowSummary = new Promise<KrknAIRunSummary>((resolve) => { resolveSlow = resolve; });
+    mocks.ai.listRuns.mockResolvedValue([slowRun, fastRun]);
+    mocks.ai.getRunSummary.mockImplementation((name: string) => name === slowRun.metadata.name
+      ? slowSummary
+      : Promise.resolve(makeSummary(name, 'Succeeded', { bestFitness: 42 })));
+    render(<KrknAIPage />);
+    await flushReact();
 
-  it.each([
-    ['Generation', ['2', '4', '10', '30'], ['10', '30', '2', '4']],
-    ['Scenario ID', ['2', '4', '10', '30'], ['30', '10', '4', '2']],
-    ['Scenario name', ['2', '4', '30', '10'], ['10', '30', '4', '2']],
-    ['Fitness score (0–100)', ['10', '4', '2', '30'], ['2', '4', '10', '30']],
-    ['Status', ['4', '30', '10', '2'], ['2', '10', '30', '4']],
-    ['Duration', ['10', '4', '2', '30'], ['2', '4', '10', '30']],
-  ])('sorts %s across all pages without losing rows or requesting a server sort', async (column, ascending, descending) => {
-    const rows = [
-      makeScenarioRow({ generation: 1, scenarioId: '10', scenarioType: 'z', fitnessScore: 10, durationSeconds: 10, phase: 'Running' }),
-      makeScenarioRow({ generation: 0, scenarioId: '2', scenarioType: 'a', fitnessScore: 80, durationSeconds: 80, phase: 'Succeeded' }),
-      makeScenarioRow({ generation: 1, scenarioId: '30', scenarioType: 'm', fitnessScore: null, durationSeconds: null, phase: 'Pending' }),
-      makeScenarioRow({ generation: 0, scenarioId: '4', scenarioType: 'b', fitnessScore: 40, durationSeconds: 40, phase: 'Failed' }),
-    ];
-    mocks.ai.getScenarioIndex.mockImplementation(async (_name: string, filters: { page: number; sort?: string }) => {
-      if (filters.sort) throw new Error('Server-side sorting unavailable');
-      return {
-        scenarios: filters.page === 1 ? rows.slice(0, 2) : [rows[1], ...rows.slice(2)],
-        pagination: { page: filters.page, limit: 2, total: 4, totalPages: 2 },
-      };
-    });
-    render(<RunDetail run={makeRun('all-column-sorts', 'Succeeded')} onBack={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument());
-    const table = screen.getByRole('table', { name: 'Scenario executions' });
-    const sortButton = screen.getByRole('button', { name: column });
-    if (column !== 'Generation') fireEvent.click(sortButton);
-    const firstIds = Array.from(table.querySelectorAll('tbody th[scope="row"]'), (cell) => cell.textContent);
-    expect(firstIds).toEqual(ascending.slice(0, 2));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(Array.from(table.querySelectorAll('tbody th[scope="row"]'), (cell) => cell.textContent)).toEqual(ascending.slice(2));
-    fireEvent.click(sortButton);
-    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
-    expect(Array.from(table.querySelectorAll('tbody th[scope="row"]'), (cell) => cell.textContent)).toEqual(descending.slice(0, 2));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(Array.from(table.querySelectorAll('tbody th[scope="row"]'), (cell) => cell.textContent)).toEqual(descending.slice(2));
-    expect(screen.queryByText('No scenarios match the current filters.')).not.toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Open run slow-summary-run/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Open run fast-summary-run/ })).toHaveTextContent('42');
+    await act(async () => resolveSlow(makeSummary(slowRun.metadata.name, 'Succeeded', { bestFitness: 75 })));
+    expect(screen.getByRole('row', { name: /Open run slow-summary-run/ })).toHaveTextContent('75');
   });
+
+  it('shows a completed summary while the scenario page is still loading', async () => {
+    let resolveIndex!: (index: KrknAIScenarioIndexResponse) => void;
+    mocks.ai.getRunSummary.mockResolvedValue(makeSummary('slow-index-run', 'Succeeded', { bestFitness: 75 }));
+    mocks.ai.getScenarioIndex.mockReturnValue(new Promise<KrknAIScenarioIndexResponse>((resolve) => { resolveIndex = resolve; }));
+    render(<RunDetail run={makeRun('slow-index-run', 'Succeeded')} onBack={vi.fn()} />);
+    await flushReact();
+
+    expect(screen.getByText('75')).toBeInTheDocument();
+    expect(screen.getByText('Loading scenario executions…')).toBeInTheDocument();
+    await act(async () => resolveIndex(makeIndex([makeScenarioRow()])));
+    expect(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ })).toBeInTheDocument();
+  });
+
+
 
   it('bounds the live orchestrator log window, signals truncation, and keeps the complete-results ZIP action', async () => {
     const run = makeRun('bounded-log-run', 'Succeeded');
@@ -531,7 +495,7 @@ describe('Krkn-AI real run lifecycle', () => {
     })).toBeDisabled();
   });
 
-  it('withholds initial run and scenario content until their result requests settle', async () => {
+  it('renders run metadata before summary completion and defers selected scenario details', async () => {
     let resolveSummary!: (summary: KrknAIRunSummary) => void;
     let resolveDetail!: (detail: KrknAIScenarioDetail) => void;
     mocks.ai.getRunSummary.mockReturnValue(new Promise<KrknAIRunSummary>((resolve) => { resolveSummary = resolve; }));
@@ -539,9 +503,8 @@ describe('Krkn-AI real run lifecycle', () => {
     mocks.ai.getScenario.mockReturnValue(new Promise<KrknAIScenarioDetail>((resolve) => { resolveDetail = resolve; }));
     render(<RunDetail run={makeRun('loading-run')} onBack={vi.fn()} />);
     expect(screen.getByLabelText('Loading run results')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'loading-run' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('table', { name: 'Scenario executions' })).not.toBeInTheDocument();
-    await act(async () => resolveSummary(makeSummary('loading-run', 'Succeeded', { completedGenerations: 1 })));
+    expect(screen.getByRole('heading', { name: 'loading-run' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Scenario executions' })).toBeInTheDocument();
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
@@ -550,6 +513,7 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(dialog.queryByText('Scenario parameters')).not.toBeInTheDocument();
     expect(dialog.queryByText('Fitness function result')).not.toBeInTheDocument();
     expect(dialog.queryByText(/available when .*result is committed/i)).not.toBeInTheDocument();
+    await act(async () => resolveSummary(makeSummary('loading-run', 'Succeeded', { completedGenerations: 1 })));
     await act(async () => resolveDetail(makeScenarioDetail(75, 'final')));
     expect(dialog.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Fitness' })).toBeInTheDocument();

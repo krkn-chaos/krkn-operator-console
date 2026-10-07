@@ -101,16 +101,6 @@ function statusColor(status: string): 'blue' | 'green' | 'grey' | 'orange' | 're
   return 'grey';
 }
 
-function sortValue(row: KrknAIScenarioIndexRow, key: ScenarioSortKey): string | number | null {
-  switch (key) {
-    case 'generation': return row.generation;
-    case 'scenarioId': return row.scenarioId;
-    case 'scenarioType': return row.scenarioType ?? null;
-    case 'fitnessScore': return row.fitnessScore ?? null;
-    case 'outcome': return rowStatus(row);
-    case 'durationSeconds': return row.durationSeconds ?? null;
-  }
-}
 
 function scenarioKey(row: KrknAIScenarioIndexRow): string {
   return `${row.generation}:${row.scenarioId}`;
@@ -380,13 +370,6 @@ export function ScenarioExplorer({
   currentGeneration,
   completedGenerations,
 }: ScenarioExplorerProps) {
-  const normalizedScenarioType = filters.scenarioType.trim().toLocaleLowerCase();
-  const filteredScenarios = useMemo(
-    () => normalizedScenarioType
-      ? scenarios.filter((scenario) => scenario.scenarioType?.toLocaleLowerCase().includes(normalizedScenarioType))
-      : scenarios,
-    [normalizedScenarioType, scenarios],
-  );
   const generationCount = Math.max(
     configuredGenerations ?? 0,
     completedGenerations ?? 0,
@@ -397,27 +380,8 @@ export function ScenarioExplorer({
     () => Array.from({ length: generationCount }, (_, generation) => generation),
     [generationCount],
   );
-  const filteredTotalPages = Math.ceil(filteredScenarios.length / pagination.limit);
-  const visiblePage = Math.min(page, Math.max(filteredTotalPages, 1));
-  const visibleScenarios = useMemo(() => {
-    const sorted = [...filteredScenarios].sort((left, right) => {
-      const a = sortValue(left, filters.sort);
-      const b = sortValue(right, filters.sort);
-      // Missing measurements stay last in either direction.
-      if (a === null) return b === null ? 0 : 1;
-      if (b === null) return -1;
-      const comparison = typeof a === 'number' && typeof b === 'number'
-        ? a - b
-        : String(a).localeCompare(String(b), undefined, { numeric: true });
-      if (comparison !== 0) return filters.direction === 'asc' ? comparison : -comparison;
-      if (filters.sort === 'generation' && (left.scenarioId === 'baseline') !== (right.scenarioId === 'baseline')) {
-        return left.scenarioId === 'baseline' ? -1 : 1;
-      }
-      return left.generation - right.generation || left.scenarioId.localeCompare(right.scenarioId, undefined, { numeric: true });
-    });
-    const start = (visiblePage - 1) * pagination.limit;
-    return sorted.slice(start, start + pagination.limit);
-  }, [filteredScenarios, filters.sort, filters.direction, visiblePage, pagination.limit]);
+  const totalPages = pagination.totalPages;
+  const visiblePage = page;
   return (
     <section className="krkn-ai-scenario-explorer" aria-labelledby="krkn-ai-scenario-explorer-heading">
       <div className="krkn-ai-scenario-explorer__heading">
@@ -425,7 +389,7 @@ export function ScenarioExplorer({
           <Title headingLevel="h2" size="xl"><span id="krkn-ai-scenario-explorer-heading">Scenario executions</span></Title>
           <p className="krkn-ai-scenario-explorer__intro">Observed scenario results and child-job status for this run.</p>
         </div>
-        <span>{filteredScenarios.length} observed scenario rows</span>
+        <span>{pagination.total} observed scenario rows</span>
       </div>
       <>
           <div className="krkn-ai-scenario-explorer__filters">
@@ -466,7 +430,7 @@ export function ScenarioExplorer({
           </div>
           <div className="krkn-ai-scenario-table-wrap" tabIndex={0} aria-label="Scrollable scenario executions table">
             <table className="krkn-ai-scenario-table" aria-label="Scenario executions">
-              <caption>Observed scenario executions for this Krkn-AI run, page {visiblePage} of {Math.max(filteredTotalPages, 1)}</caption>
+              <caption>Observed scenario executions for this Krkn-AI run, page {visiblePage} of {Math.max(totalPages, 1)}</caption>
               <thead><tr>
                 {columns.map((column) => (
                   <th key={column.key} scope="col" aria-sort={filters.sort === column.key ? (filters.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
@@ -484,7 +448,7 @@ export function ScenarioExplorer({
                 <th scope="col">Actions</th>
               </tr></thead>
               <tbody>
-                {visibleScenarios.map((scenario) => {
+                {scenarios.map((scenario) => {
                   const status = rowStatus(scenario);
                   const finalized = isGenerationFinalized(scenario, completedGenerations);
                   const calculationPending = isCalculationPending(scenario, runPhase, currentGeneration, completedGenerations);
@@ -535,13 +499,13 @@ export function ScenarioExplorer({
               </tbody>
             </table>
             {loading ? <p className="krkn-ai-scenario-table__empty" role="status">Loading scenario executions…</p>
-              : !error && visibleScenarios.length === 0 && <p className="krkn-ai-scenario-table__empty">No scenarios match the current filters.</p>}
+              : !error && scenarios.length === 0 && <p className="krkn-ai-scenario-table__empty">No scenarios match the current filters.</p>}
           </div>
-          {filteredTotalPages > 1 && (
+          {totalPages > 1 && (
             <div className="krkn-ai-pagination" aria-label="Scenario result pages">
-              <Button variant="secondary" isDisabled={visiblePage <= 1} onClick={() => onPageChange(visiblePage - 1)}>Previous</Button>
-              <span>Page {visiblePage} of {filteredTotalPages}</span>
-              <Button variant="secondary" isDisabled={visiblePage >= filteredTotalPages} onClick={() => onPageChange(visiblePage + 1)}>Next</Button>
+              <Button variant="secondary" isDisabled={loading || visiblePage <= 1} onClick={() => onPageChange(visiblePage - 1)}>Previous</Button>
+              <span>Page {visiblePage} of {totalPages}</span>
+              <Button variant="secondary" isDisabled={loading || visiblePage >= totalPages} onClick={() => onPageChange(visiblePage + 1)}>Next</Button>
             </div>
           )}
       </>
