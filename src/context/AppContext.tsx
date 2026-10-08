@@ -47,6 +47,7 @@ const initialState: AppState = {
   startInPreview: false,
   rerunScenario: null,
   rerunKubeconfigPath: null,
+  rerunCloudCredentialRef: null,
 
   // Error handling
   error: null,
@@ -157,6 +158,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         startInPreview: false,
         rerunScenario: null,
         rerunKubeconfigPath: null,
+        rerunCloudCredentialRef: null,
         error: null,
       };
 
@@ -548,6 +550,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         scenarioFormValues: formValues,
         rerunScenario: state.rerunIntent?.scenario ?? null,
         rerunKubeconfigPath: state.rerunIntent?.kubeconfigPath ?? null,
+        rerunCloudCredentialRef: state.rerunIntent?.cloudCredentialRef ?? null,
         rerunIntent: null,
         error: null,
       };
@@ -613,6 +616,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         startInPreview: false,
         rerunScenario: null,
         rerunKubeconfigPath: null,
+        rerunCloudCredentialRef: null,
         error: null,
       };
 
@@ -725,6 +729,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
               startInPreview: false,
               rerunScenario: null,
               rerunKubeconfigPath: null,
+              rerunCloudCredentialRef: null,
             };
           }
           // Normal flow — back to scenarios list
@@ -741,6 +746,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
             startInPreview: false,
             rerunScenario: null,
             rerunKubeconfigPath: null,
+            rerunCloudCredentialRef: null,
           };
 
         default:

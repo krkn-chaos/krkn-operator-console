@@ -15,6 +15,7 @@ export function buildRerunIntent(config: JobConfigResponse, run: ScenarioRunStat
     clusters,
     environment: config.environment,
     kubeconfigPath: config.kubeconfigPath,
+    ...(config.cloudCredentialRef ? { cloudCredentialRef: config.cloudCredentialRef } : {}),
     categories: config.categories,
   };
 }

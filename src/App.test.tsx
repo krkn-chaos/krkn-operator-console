@@ -119,6 +119,7 @@ describe('scenario replay handoff', () => {
       scenario: { name: 'pod-scenarios', private: false },
       kubeconfigPath: '/tmp/kubeconfig',
       environment: { NAMESPACE: 'default' },
+      cloudCredentialRef: 'aws-ci',
       categories: ['network', 'reliability'],
     };
     const run = { scenarioRunName: 'run-1', scenarioName: 'pod-scenarios' } as ScenarioRunState;
@@ -128,6 +129,7 @@ describe('scenario replay handoff', () => {
       clusters: [{ operatorName: 'operator', clusterName: 'cluster-1' }],
       environment: { NAMESPACE: 'default' },
       kubeconfigPath: '/tmp/kubeconfig',
+      cloudCredentialRef: 'aws-ci',
       categories: ['network', 'reliability'],
     });
   });

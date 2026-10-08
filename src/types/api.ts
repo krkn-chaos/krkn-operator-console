@@ -132,6 +132,8 @@ export interface RerunIntent {
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
   kubeconfigPath: string;
+  /** Saved cloud credential restored for the replayed scenario run. */
+  cloudCredentialRef?: string;
   /** Visible category assignments restored from the run configuration. */
   categories?: string[];
 }
@@ -146,6 +148,8 @@ export interface JobConfigResponse {
   scenarioName?: string;
   kubeconfigPath: string;
   environment: { [key: string]: string };
+  /** Saved cloud credential used by the original scenario run. */
+  cloudCredentialRef?: string;
   /** Categories visible to the current user and restored for replay. */
   categories?: string[];
 }
@@ -538,6 +542,7 @@ export interface AppState {
   startInPreview: boolean;
   rerunScenario: ScenarioReference | null;
   rerunKubeconfigPath: string | null;
+  rerunCloudCredentialRef: string | null;
 
   // Error handling
   error: AppError | null;
@@ -1155,6 +1160,8 @@ export interface StudioWorkflow {
   nextNodeNumber: number;
   /** Resiliency scoring configuration restored when replaying a workflow. */
   resiliencyScoreConfig?: ResiliencyScoreConfig;
+  /** Default cloud credential restored for workflow replay. */
+  cloudCredentialRef?: string;
 }
 
 /**

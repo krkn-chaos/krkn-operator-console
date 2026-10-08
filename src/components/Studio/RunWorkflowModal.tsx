@@ -3,6 +3,21 @@
  *
  * Uses ClusterMultiSelector to let users choose target clusters,
  * then submits the workflow as a GraphRun.
+ *
+ * @example
+ * ```tsx
+ * <StudioProvider initialWorkflow={workflow}>
+ *   <RunWorkflowModal
+ *     isOpen={isRunWorkflowOpen}
+ *     onClose={handleClose}
+ *     onSuccess={handleSuccess}
+ *     targetFetchState={targetFetch.state}
+ *   />
+ * </StudioProvider>
+ * ```
+ *
+ * The workflow context supplies the graph and saved credential references;
+ * `targetFetchState` must be `ready` with a target request UUID before submit.
  */
 
 import { useState, useEffect } from 'react';
@@ -207,6 +222,7 @@ export function RunWorkflowModal({
       graph,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
+      cloudCredentialRef: workflow.cloudCredentialRef,
       maxRetries,
       categories,
     };

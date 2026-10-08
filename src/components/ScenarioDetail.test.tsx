@@ -125,6 +125,7 @@ describe('ScenarioDetail', () => {
     startInPreview: false,
     rerunScenario: null,
     rerunKubeconfigPath: null,
+    rerunCloudCredentialRef: null,
     notifications: [],
   };
 
@@ -1357,6 +1358,36 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.getScenarios).toHaveBeenCalledWith({});
         expect(operatorApi.runScenario).toHaveBeenCalled();
+      });
+    });
+
+    it('resubmits the saved cloud credential when replaying a signed scenario', async () => {
+      const user = userEvent.setup();
+      vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValueOnce([
+        { name: 'aws-ci', provider: 'aws', description: 'AWS test credential' },
+      ]);
+      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        rerunCloudCredentialRef: 'aws-ci',
+        scenarios: null,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitForSignatureVerification();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ cloudCredentialRef: 'aws-ci' }),
+        );
       });
     });
 

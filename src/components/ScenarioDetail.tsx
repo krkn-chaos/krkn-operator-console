@@ -60,6 +60,26 @@ interface ScenarioDetailProps {
   registryConfig: ScenariosRequest | null;
 }
 
+/**
+ * Renders the scenario configuration form from AppContext state.
+ *
+ * Replay callers should dispatch the saved credential with the replay intent;
+ * the reducer exposes it as `rerunCloudCredentialRef` and this component sends
+ * it back on the next run request.
+ *
+ * @example
+ * dispatch({
+ *   type: 'RERUN_SCENARIO',
+ *   payload: {
+ *     scenario: { name: 'pod-scenarios', private: false },
+ *     clusters: [{ operatorName: 'krkn-operator', clusterName: 'cluster1' }],
+ *     environment: { NAMESPACE: 'default' },
+ *     kubeconfigPath: '/home/krkn/.kube/config',
+ *     cloudCredentialRef: 'aws-ci',
+ *   },
+ * });
+ * return <ScenarioDetail scenarioName="pod-scenarios" registryConfig={null} />;
+ */
 export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailProps) {
   const { state, dispatch } = useAppContext();
   const {
@@ -67,7 +87,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     error: signatureVerificationError,
     isLoading: signatureVerificationLoading,
   } = useSignatureVerification();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, isRerunFlow, rerunScenario, rerunKubeconfigPath, scenarios } = state;
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, isRerunFlow, rerunScenario, rerunKubeconfigPath, rerunCloudCredentialRef, scenarios } = state;
   const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
   const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
@@ -175,8 +195,20 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
   const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
+  const [cloudCredentialsLoaded, setCloudCredentialsLoaded] = useState(false);
   const [selectedCloudCredName, setSelectedCloudCredName] = useState('');
   const [appliedCloudCredName, setAppliedCloudCredName] = useState('');
+
+  useEffect(() => {
+    if (!cloudCredentialsLoaded || !rerunCloudCredentialRef) return;
+    if (cloudCredentials.some(credential => credential.name === rerunCloudCredentialRef)) {
+      setSelectedCloudCredName(rerunCloudCredentialRef);
+      setAppliedCloudCredName(rerunCloudCredentialRef);
+    } else {
+      setSelectedCloudCredName('');
+      setAppliedCloudCredName('');
+    }
+  }, [cloudCredentials, cloudCredentialsLoaded, rerunCloudCredentialRef]);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {
@@ -260,7 +292,18 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   // are typically declared as scenario-specific required/optional fields, not global fields,
   // so this list must be available before the user ever expands Global Parameters.
   useEffect(() => {
-    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
+    let mounted = true;
+    cloudCredentialsApi.listAvailable()
+      .then(credentials => {
+        if (mounted) setCloudCredentials(credentials);
+      })
+      .catch(() => { })
+      .finally(() => {
+        if (mounted) setCloudCredentialsLoaded(true);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Ensures fields whose variable name contains "PASSWORD" are always rendered as secret inputs,
