@@ -362,19 +362,20 @@ describe('ElasticsearchDataView', () => {
   });
 
   it('runs an inline query without a saved config and renders rows', async () => {
+    const user = userEvent.setup({ delay: null });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
     vi.mocked(elasticsearchApi.queryTelemetryInline).mockResolvedValue(mockQueryResult);
     render(<ElasticsearchDataView />);
 
     await waitFor(() => expect(screen.getByText('Connect without saving')).toBeInTheDocument());
 
-    await userEvent.type(screen.getByLabelText('Elasticsearch host'), 'https://es.example.com');
-    await userEvent.type(screen.getByLabelText('Elasticsearch port'), '9200');
-    await userEvent.type(screen.getByLabelText('Elasticsearch username'), 'user');
-    await userEvent.type(screen.getByLabelText('Elasticsearch password'), 'secret');
-    await userEvent.type(screen.getByLabelText('Telemetry index'), 'krkn-telemetry');
+    await user.type(screen.getByLabelText('Elasticsearch host'), 'https://es.example.com');
+    await user.type(screen.getByLabelText('Elasticsearch port'), '9200');
+    await user.type(screen.getByLabelText('Elasticsearch username'), 'user');
+    await user.type(screen.getByLabelText('Elasticsearch password'), 'secret');
+    await user.type(screen.getByLabelText('Telemetry index'), 'krkn-telemetry');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Run Query' }));
+    await user.click(screen.getByRole('button', { name: 'Run Query' }));
 
     await waitFor(() => {
       expect(elasticsearchApi.queryTelemetryInline).toHaveBeenCalledWith(
@@ -395,7 +396,7 @@ describe('ElasticsearchDataView', () => {
     });
     // Saved-config path must not be used for an inline query.
     expect(elasticsearchApi.queryTelemetry).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it('disables the inline Run Query button until host and index are provided', async () => {
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);

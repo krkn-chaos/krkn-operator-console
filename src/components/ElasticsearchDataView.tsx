@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -61,7 +61,6 @@ import type {
   InlineElasticsearchConnection,
   QueryTelemetryResponse,
 } from '../types/api';
-import { matchesFieldFilters } from '../utils/elasticsearchFieldFilters';
 
 // Filter categories shown in the single-select category dropdown. Each key must
 // match a facet key returned by the backend (see facetFields in the operator's
@@ -473,7 +472,6 @@ export function ElasticsearchDataView() {
 
   // Per-row expansion state, keyed by run_uuid (or row index fallback).
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const [telemetryFilters, setTelemetryFilters] = useState<Array<{ key: string; value: string }>>([]);
   const [activeTab, setActiveTab] = useState<string | number>(0);
 
   // Faceted filtering: `filterCategory` is the category currently being edited in
@@ -505,10 +503,6 @@ export function ElasticsearchDataView() {
   const lastRunnerRef = useRef<
     ((size: number, pageNum: number, filters?: Record<string, string[]>) => Promise<QueryTelemetryResponse>) | null
   >(null);
-  const filteredTelemetryDocuments = useMemo(
-    () => documents.filter(document => matchesFieldFilters(document, telemetryFilters)),
-    [documents, telemetryFilters],
-  );
 
   // Clears any displayed results and invalidates in-flight requests. Called
   // whenever the query criteria change so the table never shows telemetry that
@@ -606,7 +600,6 @@ export function ElasticsearchDataView() {
       // Ignore responses superseded by a newer run or by a criteria change.
       if (latestRequestId.current !== requestId) return;
       setDocuments(result.documents || []);
-      setTelemetryFilters([]);
       setStats(result.stats ?? null);
       setTotal(result.total ?? 0);
       setFacets(result.facets ?? {});
@@ -803,128 +796,116 @@ export function ElasticsearchDataView() {
   // value multi-select; toggling values auto re-queries.
   const filterSection = hasQueried && (
     <>
-      <Flex
-        alignItems={{ default: 'alignItemsFlexEnd' }}
-        spaceItems={{ default: 'spaceItemsMd' }}
-        style={{ marginTop: '1rem' }}
-      >
-        <FlexItem>
-          <FormGroup label="Filter category" fieldId="es-filter-category" style={{ width: '18em' }}>
-            <FormSelect
-              id="es-filter-category"
-              value={filterCategory}
-              onChange={(_e, v) => handleCategoryChange(v)}
-              aria-label="Select a filter category"
-            >
-              <FormSelectOption value="" label="Select a category…" />
-              {FILTER_CATEGORIES.map((c) => (
-                <FormSelectOption key={c.key} value={c.key} label={c.label} />
-              ))}
-            </FormSelect>
-          </FormGroup>
-        </FlexItem>
-        <FlexItem>
-          <FormGroup label="Filter values" fieldId="es-filter-values">
-            <Select
-              id="es-filter-values"
-              role="menu"
-              isOpen={isValueSelectOpen}
-              onOpenChange={handleValueSelectOpenChange}
-              selected={selectedValues}
-              onSelect={(_e, value) => handleValueToggle(value as string)}
-              toggle={(toggleRef) => (
-                <MenuToggle
-                  ref={toggleRef}
-                  onClick={() => handleValueSelectOpenChange(!isValueSelectOpen)}
-                  isExpanded={isValueSelectOpen}
-                  isDisabled={!filterCategory || valueOptions.length === 0}
-                  style={{ width: '22em' }}
+      <FlexItem>
+        <FormGroup label="Filter category" fieldId="es-filter-category" style={{ width: '15em' }}>
+          <FormSelect
+            id="es-filter-category"
+            value={filterCategory}
+            onChange={(_e, v) => handleCategoryChange(v)}
+            aria-label="Select a filter category"
+          >
+            <FormSelectOption value="" label="Select a category…" />
+            {FILTER_CATEGORIES.map((c) => (
+              <FormSelectOption key={c.key} value={c.key} label={c.label} />
+            ))}
+          </FormSelect>
+        </FormGroup>
+      </FlexItem>
+      <FlexItem>
+        <FormGroup label="Filter values" fieldId="es-filter-values">
+          <Select
+            id="es-filter-values"
+            role="menu"
+            isOpen={isValueSelectOpen}
+            onOpenChange={handleValueSelectOpenChange}
+            selected={selectedValues}
+            onSelect={(_e, value) => handleValueToggle(value as string)}
+            toggle={(toggleRef) => (
+              <MenuToggle
+                ref={toggleRef}
+                onClick={() => handleValueSelectOpenChange(!isValueSelectOpen)}
+                isExpanded={isValueSelectOpen}
+                isDisabled={!filterCategory || valueOptions.length === 0}
+                style={{ width: '18em' }}
+              >
+                {selectedValues.length > 0 ? 'Values' : 'Select values…'}
+                {selectedValues.length > 0 && (
+                  <Badge isRead style={{ marginLeft: '0.5rem' }}>
+                    {selectedValues.length}
+                  </Badge>
+                )}
+              </MenuToggle>
+            )}
+          >
+            <SelectList>
+              {valueOptions.map((opt) => (
+                <SelectOption
+                  key={opt.value}
+                  value={opt.value}
+                  hasCheckbox
+                  isSelected={selectedValues.includes(opt.value)}
                 >
-                  {selectedValues.length > 0 ? 'Values' : 'Select values…'}
-                  {selectedValues.length > 0 && (
-                    <Badge isRead style={{ marginLeft: '0.5rem' }}>
-                      {selectedValues.length}
-                    </Badge>
-                  )}
-                </MenuToggle>
-              )}
-            >
-              <SelectList>
-                {valueOptions.map((opt) => (
-                  <SelectOption
-                    key={opt.value}
-                    value={opt.value}
-                    hasCheckbox
-                    isSelected={selectedValues.includes(opt.value)}
-                  >
-                    {opt.value} ({opt.count})
-                  </SelectOption>
-                ))}
-              </SelectList>
-            </Select>
-          </FormGroup>
-        </FlexItem>
-        {activeFilterCount > 0 && (
-          <FlexItem>
-            <Button
-              variant="link"
-              isInline
-              onClick={() => {
-                const prevFilters = activeFilters;
-                const prevCategory = filterCategory;
-                const prevPage = page;
-                setFilterCategory('');
-                setActiveFilters({});
-                setIsValueSelectOpen(false);
-                setPage(1);
-                rerun(1, perPage, undefined, () => {
-                  setActiveFilters(prevFilters);
-                  setFilterCategory(prevCategory);
-                  setPage(prevPage);
-                });
-              }}
-            >
-              Clear all filters
-            </Button>
-          </FlexItem>
-        )}
-      </Flex>
-
-      {/* Active filter chips across all categories, so applied filters from
-          categories other than the one currently being edited stay visible.
-          Removing a value re-queries with the updated set. */}
-      {activeFilterCount > 0 && (
-        <Flex spaceItems={{ default: 'spaceItemsSm' }} style={{ marginTop: '0.75rem' }}>
-          {Object.entries(activeFilters).flatMap(([category, values]) =>
-            values.map((value) => {
-              const label =
-                FILTER_CATEGORIES.find((c) => c.key === category)?.label ?? category;
-              return (
-                <FlexItem key={`${category}:${value}`}>
-                  <Label
-                    color="blue"
-                    onClose={() => {
-                      const prevFilters = activeFilters;
-                      const prevPage = page;
-                      const nextValues = (activeFilters[category] ?? []).filter((v) => v !== value);
-                      const next = { ...activeFilters, [category]: nextValues };
-                      setActiveFilters(next);
-                      setPage(1);
-                      rerun(1, perPage, buildFilters(next), () => {
-                        setActiveFilters(prevFilters);
-                        setPage(prevPage);
-                      });
-                    }}
-                  >
-                    {label}: {value}
-                  </Label>
-                </FlexItem>
-              );
-            }),
-          )}
-        </Flex>
-      )}
+                  {opt.value} ({opt.count})
+                </SelectOption>
+              ))}
+            </SelectList>
+          </Select>
+        </FormGroup>
+      </FlexItem>
     </>
+  );
+
+  const activeFilterChips = activeFilterCount > 0 && (
+    <Flex spaceItems={{ default: 'spaceItemsSm' }} style={{ marginTop: '0.75rem' }}>
+      {Object.entries(activeFilters).flatMap(([category, values]) =>
+        values.map((value) => {
+          const label = FILTER_CATEGORIES.find((c) => c.key === category)?.label ?? category;
+          return (
+            <FlexItem key={`${category}:${value}`}>
+              <Label
+                color="blue"
+                onClose={() => {
+                  const prevFilters = activeFilters;
+                  const prevPage = page;
+                  const nextValues = (activeFilters[category] ?? []).filter((v) => v !== value);
+                  const next = { ...activeFilters, [category]: nextValues };
+                  setActiveFilters(next);
+                  setPage(1);
+                  rerun(1, perPage, buildFilters(next), () => {
+                    setActiveFilters(prevFilters);
+                    setPage(prevPage);
+                  });
+                }}
+              >
+                {label}: {value}
+              </Label>
+            </FlexItem>
+          );
+        }),
+      )}
+      <FlexItem>
+        <Button
+          variant="link"
+          isInline
+          onClick={() => {
+            const prevFilters = activeFilters;
+            const prevCategory = filterCategory;
+            const prevPage = page;
+            setFilterCategory('');
+            setActiveFilters({});
+            setIsValueSelectOpen(false);
+            setPage(1);
+            rerun(1, perPage, undefined, () => {
+              setActiveFilters(prevFilters);
+              setFilterCategory(prevCategory);
+              setPage(prevPage);
+            });
+          }}
+        >
+          Clear all filters
+        </Button>
+      </FlexItem>
+    </Flex>
   );
 
   // Pagination control reused above and below the table. `variant` distinguishes
@@ -963,7 +944,6 @@ export function ElasticsearchDataView() {
   // first run, an empty state when a query returned nothing, or the table.
   const resultsSection = (
     <>
-      {filterSection}
       {statsSection}
       <div style={{ marginTop: '1.5rem' }}>
         {querying ? (
@@ -976,10 +956,10 @@ export function ElasticsearchDataView() {
             isInline
             title="Run a query to view telemetry data."
           />
-        ) : filteredTelemetryDocuments.length === 0 ? (
+        ) : documents.length === 0 ? (
           <EmptyState>
             <EmptyStateIcon icon={DatabaseIcon} />
-            <Title headingLevel="h3" size="md">{documents.length === 0 ? 'No telemetry documents found' : 'No telemetry documents match the filters'}</Title>
+            <Title headingLevel="h3" size="md">No telemetry documents found</Title>
             <EmptyStateBody>
               The telemetry index returned no results.
             </EmptyStateBody>
@@ -1118,20 +1098,6 @@ export function ElasticsearchDataView() {
     </>
   );
 
-  const telemetryFilterChips = (
-    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-      {telemetryFilters.filter(filter => filter.key).map((filter, index) => (
-        <Label
-          key={`${filter.key}-${index}`}
-          color="blue"
-          onClose={() => setTelemetryFilters(current => current.filter((_, filterIndex) => filterIndex !== index))}
-        >
-          {filter.key === 'scenario_type' ? 'Scenario Type' : filter.key === 'run_uuid' ? 'UUID' : 'Namespace'}: {filter.value || '(any)'}
-        </Label>
-      ))}
-    </div>
-  );
-
   return (
     <>
       <Card>
@@ -1254,6 +1220,7 @@ export function ElasticsearchDataView() {
                         </FormGroup>
                         <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsMd' }}>
                           {dateControls}
+                          {filterSection}
                           <FlexItem>
                             <FormGroup label="" fieldId="run-inline-query-btn">
                               <Button
@@ -1267,7 +1234,7 @@ export function ElasticsearchDataView() {
                             </FormGroup>
                           </FlexItem>
                         </Flex>
-                        {telemetryFilterChips}
+                        {activeFilterChips}
                       </Form>
 
                       {resultsSection}
@@ -1275,8 +1242,10 @@ export function ElasticsearchDataView() {
                   ) : (
                     <>
                       <Flex alignItems={{ default: 'alignItemsFlexEnd' }}
-                        spaceItems={{ default: 'spaceItemsMd' }}>
+                        spaceItems={{ default: 'spaceItemsMd' }}
+                        style={{ marginTop: '1rem' }}>
                         {dateControls}
+                        {filterSection}
                         <FlexItem>
                           <FormGroup label="" fieldId="run-query-btn">
                             <Button
@@ -1290,7 +1259,7 @@ export function ElasticsearchDataView() {
                           </FormGroup>
                         </FlexItem>
                       </Flex>
-                      {telemetryFilterChips}
+                      {activeFilterChips}
 
                       {resultsSection}
                     </>
