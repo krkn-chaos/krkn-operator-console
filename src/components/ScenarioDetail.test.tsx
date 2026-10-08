@@ -125,6 +125,7 @@ describe('ScenarioDetail', () => {
     startInPreview: false,
     rerunScenario: null,
     rerunKubeconfigPath: null,
+    rerunCloudCredentialRef: null,
     notifications: [],
   };
 

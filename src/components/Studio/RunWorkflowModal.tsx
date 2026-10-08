@@ -207,6 +207,7 @@ export function RunWorkflowModal({
       graph,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
+      cloudCredentialRef: workflow.cloudCredentialRef,
       maxRetries,
       categories,
     };

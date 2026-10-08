@@ -67,7 +67,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     error: signatureVerificationError,
     isLoading: signatureVerificationLoading,
   } = useSignatureVerification();
-  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, isRerunFlow, rerunScenario, rerunKubeconfigPath, scenarios } = state;
+  const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, isRerunFlow, rerunScenario, rerunKubeconfigPath, rerunCloudCredentialRef, scenarios } = state;
   const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
   const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
@@ -175,8 +175,15 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
   const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
-  const [selectedCloudCredName, setSelectedCloudCredName] = useState('');
-  const [appliedCloudCredName, setAppliedCloudCredName] = useState('');
+  const [selectedCloudCredName, setSelectedCloudCredName] = useState(rerunCloudCredentialRef ?? '');
+  const [appliedCloudCredName, setAppliedCloudCredName] = useState(rerunCloudCredentialRef ?? '');
+
+  useEffect(() => {
+    if (rerunCloudCredentialRef) {
+      setSelectedCloudCredName(rerunCloudCredentialRef);
+      setAppliedCloudCredName(rerunCloudCredentialRef);
+    }
+  }, [rerunCloudCredentialRef]);
 
   useEffect(() => {
     const fetchScenarioDetail = async () => {

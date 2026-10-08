@@ -70,6 +70,7 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
           mountPath: graphRunDetail.spec.resiliencyMountPath ?? '/etc/krkn/metrics.yaml',
         }
       : undefined,
+    ...(config.cloudCredentialRef ? { cloudCredentialRef: config.cloudCredentialRef } : {}),
   };
 
   return { workflow, categories: config.categories ?? [] };
