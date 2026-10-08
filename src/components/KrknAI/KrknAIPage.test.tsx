@@ -498,9 +498,10 @@ describe('Krkn-AI real run lifecycle', () => {
   it('renders run metadata before summary completion and defers selected scenario details', async () => {
     let resolveSummary!: (summary: KrknAIRunSummary) => void;
     let resolveDetail!: (detail: KrknAIScenarioDetail) => void;
+    const user = userEvent.setup();
     mocks.ai.getRunSummary.mockReturnValue(new Promise<KrknAIRunSummary>((resolve) => { resolveSummary = resolve; }));
-    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([makeScenarioRow({ fitnessScore: 75, fitnessState: 'final' })]));
     mocks.ai.getScenario.mockReturnValue(new Promise<KrknAIScenarioDetail>((resolve) => { resolveDetail = resolve; }));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([makeScenarioRow({ fitnessScore: 75, fitnessState: 'final', phase: 'Succeeded' })]));
     render(<RunDetail run={makeRun('loading-run')} onBack={vi.fn()} />);
     expect(screen.getByLabelText('Loading run results')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'loading-run' })).toBeInTheDocument();
@@ -509,12 +510,19 @@ describe('Krkn-AI real run lifecycle', () => {
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
     const dialog = within(screen.getByRole('dialog'));
-    expect(dialog.getByRole('status')).toBeInTheDocument();
-    expect(dialog.queryByText('Scenario parameters')).not.toBeInTheDocument();
-    expect(dialog.queryByText('Fitness function result')).not.toBeInTheDocument();
-    expect(dialog.queryByText(/available when .*result is committed/i)).not.toBeInTheDocument();
+    expect(dialog.getByRole('tab', { name: 'Logs' })).toBeInTheDocument();
+    expect(dialog.getByRole('tab', { name: 'Logs' })).toHaveAttribute('aria-selected', 'true');
+    expect(dialog.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
+    expect(dialog.queryByRole('tab', { name: 'Fitness' })).not.toBeInTheDocument();
+    expect(dialog.queryByRole('tab', { name: 'Health checks' })).not.toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: 'Refresh scenario details' })).toBeInTheDocument();
+    await user.hover(dialog.getByRole('button', { name: 'Refresh scenario details' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh scenario details');
+    expect(dialog.getAllByRole('button', { name: 'Refresh scenario details' })).toHaveLength(1);
+    expect(dialog.queryByText(/scenario result is not committed yet/i)).not.toBeInTheDocument();
     await act(async () => resolveSummary(makeSummary('loading-run', 'Succeeded', { completedGenerations: 1 })));
     await act(async () => resolveDetail(makeScenarioDetail(75, 'final')));
+    expect(dialog.getByRole('tab', { name: 'Logs' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Fitness' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Health checks' })).toBeInTheDocument();
@@ -720,7 +728,7 @@ describe('Krkn-AI real run lifecycle', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
     expect(screen.getByText('12 / 100')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Raw score' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Normalized score (0–1)' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Normalized score' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'PromQL query' })).toBeInTheDocument();
     const fitnessTable = screen.getByRole('table', { name: 'Measured fitness components' });
     expect(fitnessTable.textContent).toContain('up{job="krkn"}');
@@ -907,8 +915,8 @@ describe('Krkn-AI real run lifecycle', () => {
   it('withholds scenario totals and normalization until the generation finalizes, while keeping both log streams available', async () => {
     vi.useFakeTimers();
     const run = makeRun('measured-run', 'Running');
-    const provisional = makeScenarioRow({ fitnessScore: 3, fitnessState: 'provisional' });
-    const finalized = makeScenarioRow({ fitnessScore: 75, fitnessState: 'final' });
+    const provisional = makeScenarioRow({ fitnessScore: 3, fitnessState: 'provisional', phase: 'Succeeded' });
+    const finalized = makeScenarioRow({ fitnessScore: 75, fitnessState: 'final', phase: 'Succeeded' });
     mocks.ai.listRuns.mockResolvedValue([run]);
     mocks.ai.getRunSummary
       .mockResolvedValueOnce(makeSummary('measured-run', 'Running'))
@@ -936,15 +944,19 @@ describe('Krkn-AI real run lifecycle', () => {
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
     fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
-    expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
-    expect(screen.getByText(/Calculating generation fitness/)).toBeInTheDocument();
+    const fitnessStatus = screen.getByRole('status', { name: 'Calculating generation fitness; calculation waits for generation completion.' });
+    expect(fitnessStatus).toBeInTheDocument();
+    expect(screen.queryByText(/Calculating this generation/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Calculating generation fitness/)).not.toBeInTheDocument();
     expect(screen.queryByText('3 / 100')).not.toBeInTheDocument();
     const fitnessComponents = screen.getByRole('table', { name: 'Measured fitness components' });
     expect(within(fitnessComponents).getByRole('cell', { name: '3' })).toBeInTheDocument();
-    expect(within(fitnessComponents).getByRole('cell', { name: /Normalization is pending/ })).toBeInTheDocument();
+    const normalizationStatus = within(fitnessComponents).getByRole('status', { name: 'Calculating normalized score; calculation waits for generation completion.' });
+    expect(normalizationStatus).toBeInTheDocument();
+    expect(within(fitnessComponents).queryByText(/Normalization is pending/)).not.toBeInTheDocument();
     expect(screen.getByText('Fitness provisional')).toBeInTheDocument();
     expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', true, 200, true);
-    expect(childUrl).toHaveBeenCalledWith('child-run-9', 'real-job-9', true);
+    expect(childUrl).toHaveBeenCalledWith('child-run-9', 'real-job-9', false);
     const openedPaths = [...new Set(mocks.useWebSocket.mock.calls.map((call) => new URL(String(call[1])).pathname))];
     expect(openedPaths).toHaveLength(2);
     expect(openedPaths).toContain('/api/v2/ws/krkn-ai/runs/measured-run/logs');
@@ -952,7 +964,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     await advance(10_000);
     expect(screen.getByText('Result upload is updating. Showing the last committed scenario result.')).toBeInTheDocument();
-    expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Calculating generation fitness; calculation waits for generation completion.' })).toBeInTheDocument();
     expect(screen.queryByText('3 / 100')).not.toBeInTheDocument();
     await advance(10_000);
     expect(screen.getByText('75 / 100')).toBeInTheDocument();
@@ -962,6 +974,54 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(4);
     expect(mocks.ai.getScenarioIndex).toHaveBeenCalledTimes(3);
     expect(mocks.ai.getScenario).toHaveBeenCalledTimes(3);
+  });
+
+  it('explains pending fitness and score headers on hover', async () => {
+    const user = userEvent.setup();
+    const run = makeRun('pending-fitness-run', 'Running');
+    const provisional = makeScenarioRow({ fitnessScore: 3, fitnessState: 'provisional', phase: 'Succeeded' });
+    mocks.ai.listRuns.mockResolvedValue([run]);
+    mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Running'));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([provisional]));
+    mocks.ai.getScenario.mockResolvedValue(makeScenarioDetail(3, 'provisional'));
+
+    render(<KrknAIPage />);
+    await flushReact();
+    fireEvent.click(screen.getByRole('row', { name: /Open run pending-fitness-run/ }));
+    await flushReact();
+
+    const scenarioTable = screen.getByRole('table', { name: 'Scenario executions' });
+    const scenarioRow = within(scenarioTable).getByRole('row', { name: /Open generation 1 scenario 9 details/ });
+    const generationExplanation = 'Calculating generation fitness; calculation waits for generation completion.';
+    const generationStatus = within(scenarioRow).getByRole('status', { name: generationExplanation });
+    expect(screen.queryByText(/Calculating generation fitness/)).not.toBeInTheDocument();
+    const generationTrigger = generationStatus.querySelector('span[tabindex="0"]');
+    expect(generationTrigger).toBeTruthy();
+    await user.hover(generationTrigger as HTMLElement);
+    expect(await screen.findByText(generationExplanation)).toBeInTheDocument();
+    await user.unhover(generationTrigger as HTMLElement);
+    await waitFor(() => expect(screen.queryByText(generationExplanation)).not.toBeInTheDocument());
+
+    fireEvent.click(scenarioRow);
+    await flushReact();
+    fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
+    const fitnessComponents = screen.getByRole('table', { name: 'Measured fitness components' });
+    const normalizationExplanation = 'Calculating normalized score; calculation waits for generation completion.';
+    const normalizationStatus = within(fitnessComponents).getByRole('status', { name: normalizationExplanation });
+    expect(within(fitnessComponents).queryByText(/Normalization is pending/)).not.toBeInTheDocument();
+    await user.hover(normalizationStatus.querySelector('span[tabindex="0"]') as HTMLElement);
+    expect(await screen.findByText(normalizationExplanation)).toBeInTheDocument();
+
+    const headerTooltips = [
+      ['PromQL query', 'Prometheus query used to measure this fitness component.'],
+      ['Query type', 'How the query is evaluated, such as a point or range query.'],
+      ['Raw score', 'Score produced by the query before normalization.'],
+      ['Normalized score', "This is the fitness component's normalized value on a 0–1 scale."],
+    ];
+    for (const [header, tooltip] of headerTooltips) {
+      await user.hover(within(fitnessComponents).getByText(header));
+      expect(await screen.findByText(tooltip)).toBeInTheDocument();
+    }
   });
 
   it('shows terminal incomplete fitness as not finalized without a calculation spinner', async () => {
@@ -1020,7 +1080,11 @@ describe('Krkn-AI real run lifecycle', () => {
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
-    expect(screen.getByText('The scenario result is not committed yet. Will retry when run results refresh.')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Logs' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Fitness' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Health checks' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/scenario result is not committed yet/i)).not.toBeInTheDocument();
 
     setDocumentHidden(true);
     await advance(20_000);
@@ -1029,8 +1093,8 @@ describe('Krkn-AI real run lifecycle', () => {
 
     setDocumentHidden(false);
     await flushReact();
-    fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
-    expect(screen.getByText(/Calculating this generation/)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Logs' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Fitness' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ })).toBeInTheDocument();
     expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(3);

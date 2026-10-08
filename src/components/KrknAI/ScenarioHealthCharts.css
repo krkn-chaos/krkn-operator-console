@@ -1,8 +1,4 @@
 .krkn-ai-health-chart__selection {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.25rem 1rem;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -10,22 +6,30 @@
 }
 
 .krkn-ai-health-chart__selection legend {
-  grid-column: 1;
+  margin-block-end: 0.25rem;
   padding: 0;
   font-weight: 600;
 }
 
+.krkn-ai-health-chart__selection-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
 .krkn-ai-health-chart__selection-actions {
   display: flex;
-  grid-column: 2;
+  align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 0.5rem;
-  margin: 0;
 }
 
 .krkn-ai-health-chart__selection .krkn-ai-health-chart__legend {
-  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
   margin: 0;
 }
 
@@ -43,7 +47,7 @@
 
 .krkn-ai-health-chart__heatmap-scroll {
   display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr);
+  grid-template-columns: fit-content(18rem) minmax(0, 1fr);
   max-height: 30rem;
   overflow-y: auto;
   border: 1px solid var(--krkn-ai-border);
@@ -64,8 +68,11 @@
   align-items: center;
   height: 38px;
   padding-inline: 0.5rem;
+}
+
+.krkn-ai-health-chart__heatmap-label span {
+  min-width: 0;
   overflow: hidden;
-  font-size: 0.8125rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -80,17 +87,26 @@
   max-width: none;
 }
 
-.krkn-ai-health-chart__heatmap-sample:focus {
+.krkn-ai-health-chart__heatmap-sample:focus,
+.krkn-ai-health-chart__response-point:focus {
   outline: none;
 }
 
-.krkn-ai-health-chart__heatmap-sample:focus rect {
+.krkn-ai-health-chart__heatmap-sample:focus rect,
+.krkn-ai-health-chart__response-point:focus {
   stroke: var(--pf-v5-global--primary-color--100, #0066cc);
   stroke-width: 3px;
 }
 
+.krkn-ai-health-chart__tooltip {
+  text-align: left;
+  white-space: normal;
+}
+
+
 @media (max-width: 640px) {
   .krkn-ai-health-chart__heatmap-scroll {
-    grid-template-columns: 6rem minmax(0, 1fr);
+    grid-template-columns: fit-content(12rem) minmax(0, 1fr);
   }
 }
+

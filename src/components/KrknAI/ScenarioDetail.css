@@ -93,21 +93,6 @@
   margin-block: 0 0.75rem;
 }
 
-.krkn-ai-scenario-detail__uncommitted {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-block: 1rem;
-  padding: 0.75rem 1rem;
-  border-inline-start: 4px solid var(--pf-v5-global--warning-color--100, #f0ab00);
-  background: var(--pf-v5-global--BackgroundColor--200, #f5f5f5);
-}
-
-.krkn-ai-scenario-detail__uncommitted p {
-  margin: 0;
-}
 
 .krkn-ai-scenario-detail__fitness-total {
   display: flex;
@@ -179,6 +164,16 @@
   font-size: 0.8125rem;
   white-space: nowrap;
 }
+.krkn-ai-scenario-fitness-table th span[tabindex="0"] {
+  cursor: help;
+  text-decoration: underline dotted var(--krkn-ai-muted);
+  text-underline-offset: 0.2em;
+}
+
+.krkn-ai-scenario-fitness-table th span[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--pf-v5-global--focus--Color, #0066cc);
+  outline-offset: 2px;
+}
 
 .krkn-ai-scenario-fitness-table__query-column {
   width: 58%;
@@ -192,9 +187,6 @@
   width: 15%;
 }
 
-.krkn-ai-scenario-fitness-table th:nth-child(4) {
-  white-space: normal;
-}
 
 .krkn-ai-scenario-fitness-table__query {
   overflow-wrap: break-word;
@@ -232,12 +224,10 @@
 }
 
 
+
 .krkn-ai-scenario-detail__updating {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  margin-block: 0.75rem;
+  color: var(--krkn-ai-muted);
 }
 
 .krkn-ai-scenario-detail__updating p {
