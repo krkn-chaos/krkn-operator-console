@@ -508,7 +508,17 @@ describe('Krkn-AI real run lifecycle', () => {
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
-    const dialog = within(screen.getByRole('dialog'));
+    const dialogElement = screen.getByRole('dialog');
+    const dialog = within(dialogElement);
+    const identityItems = Array.from(dialogElement.querySelectorAll<HTMLDivElement>('.krkn-ai-scenario-detail__identity-item'));
+    expect(identityItems.map((item) => [
+      item.querySelector('dt')?.textContent,
+      item.querySelector('dd')?.textContent,
+    ])).toEqual([
+      ['Scenario run:', 'child-run-9'],
+      ['Job ID:', 'real-job-9'],
+      ['Pod:', 'scenario-pod-9'],
+    ]);
     expect(dialog.getByRole('tab', { name: 'Logs' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Logs' })).toHaveAttribute('aria-selected', 'true');
     expect(dialog.getByText('Succeeded')).toBeInTheDocument();
