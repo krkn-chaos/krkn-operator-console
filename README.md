@@ -59,6 +59,10 @@ Krkn-AI service, orchestrator, and operator images.
 
 The wizard configures discovered components and settings, with an editable YAML
 preview before creation. VMI controls appear only when discovery finds VMIs.
+
+Health-check and fitness tables use icon-only edit/remove actions with accessible
+labels and tooltips; add actions use primary plus-icon buttons. Scenario details
+open through a labeled eye-icon button with a tooltip.
 Run details include searchable scenarios, fitness and health charts, live logs,
 and downloadable ZIPs with complete results.
 Run metadata appears before summaries finish. Summaries and scenario pages load
