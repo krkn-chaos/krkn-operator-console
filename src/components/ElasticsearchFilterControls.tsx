@@ -11,6 +11,7 @@ import type { ElasticsearchFieldFilter } from '../utils/elasticsearchFieldFilter
 export interface ElasticsearchFilterOption {
   key: string;
   label: string;
+  values?: string[];
 }
 
 interface ElasticsearchFilterControlsProps {
@@ -32,11 +33,11 @@ export function ElasticsearchFilterControls({
   return (
     <>
       <FlexItem>
-        <FormGroup label="Filter" fieldId={`${idPrefix}-filter-key`}>
+        <FormGroup label="Filter category" fieldId={`${idPrefix}-filter-key`} style={{ width: '15em' }}>
           <FormSelect
             id={`${idPrefix}-filter-key`}
             value={draftFilter.key}
-            onChange={(_event, value) => onDraftChange({ ...draftFilter, key: value })}
+              onChange={(_event, value) => onDraftChange({ key: value, value: '' })}
           >
             <FormSelectOption value="" label="Select field…" />
             {options.map(option => <FormSelectOption key={option.key} value={option.key} label={option.label} />)}
@@ -44,17 +45,33 @@ export function ElasticsearchFilterControls({
         </FormGroup>
       </FlexItem>
       <FlexItem>
-        <FormGroup label="Value" fieldId={`${idPrefix}-filter-value`}>
-          <TextInput
-            id={`${idPrefix}-filter-value`}
-            value={draftFilter.value}
-            onChange={(_event, value) => onDraftChange({ ...draftFilter, value })}
-            isDisabled={!draftFilter.key}
-          />
+          <FormGroup label="Filter values" fieldId={`${idPrefix}-filter-value`}>
+          {options.find(option => option.key === draftFilter.key)?.values ? (
+            <FormSelect
+              id={`${idPrefix}-filter-value`}
+              value={draftFilter.value}
+              style={{ width: '18em' }}
+              onChange={(_event, value) => onDraftChange({ ...draftFilter, value })}
+              isDisabled={!draftFilter.key}
+            >
+              <FormSelectOption value="" label="Select value…" />
+              {options.find(option => option.key === draftFilter.key)?.values?.map(value => (
+                <FormSelectOption key={value} value={value} label={value} />
+              ))}
+            </FormSelect>
+          ) : (
+            <TextInput
+              id={`${idPrefix}-filter-value`}
+              value={draftFilter.value}
+              style={{ width: '18em' }}
+              onChange={(_event, value) => onDraftChange({ ...draftFilter, value })}
+              isDisabled={!draftFilter.key}
+            />
+          )}
         </FormGroup>
       </FlexItem>
       <FlexItem>
-        <Button variant="link" onClick={onAddFilter} isDisabled={!draftFilter.key}>Add filter</Button>
+        <Button variant="link" isInline onClick={onAddFilter} isDisabled={!draftFilter.key}>Add filter</Button>
       </FlexItem>
     </>
   );

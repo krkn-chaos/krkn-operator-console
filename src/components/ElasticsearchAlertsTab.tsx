@@ -39,7 +39,8 @@ const SUMMARY_FIELDS = new Set(['run_uuid', 'phase', 'created_at', 'severity']);
 type AlertSortColumn = 'uuid' | 'phase' | 'created_at' | 'severity' | 'document';
 const ALERT_FILTER_OPTIONS = [
   { key: 'run_uuid', label: 'UUID' },
-  { key: 'severity', label: 'Severity' },
+  { key: 'severity', label: 'Severity', values: ['critical', 'error', 'warning', 'info'] },
+  { key: 'phase', label: 'Phase', values: ['pre', 'during', 'post'] },
   { key: 'alertname', label: 'Alert' },
 ];
 
@@ -274,20 +275,28 @@ export function ElasticsearchAlertsTab({
         </FlexItem>
       </Flex>
 
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+      <Flex spaceItems={{ default: 'spaceItemsSm' }} style={{ marginTop: '0.75rem' }}>
         {filters.filter(filter => filter.key).map((filter, index) => {
           const label = ALERT_FILTER_OPTIONS.find(option => option.key === filter.key)?.label || filter.key;
           return (
-            <Label
-              key={`${filter.key}-${index}`}
-              color="blue"
-              onClose={() => setFilters(current => current.filter((_, filterIndex) => filterIndex !== index))}
-            >
-              {label}: {filter.value || '(any)'}
-            </Label>
+            <FlexItem key={`${filter.key}-${index}`}>
+              <Label
+                color="blue"
+                onClose={() => setFilters(current => current.filter((_, filterIndex) => filterIndex !== index))}
+              >
+                {label}: {filter.value || '(any)'}
+              </Label>
+            </FlexItem>
           );
         })}
-      </div>
+        {filters.length > 0 && (
+          <FlexItem>
+            <Button variant="link" isInline onClick={() => setFilters([])}>
+              Clear all filters
+            </Button>
+          </FlexItem>
+        )}
+      </Flex>
 
       <div style={{ marginTop: '1.5rem' }}>
         {querying ? (

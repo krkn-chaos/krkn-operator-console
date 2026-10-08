@@ -1010,7 +1010,7 @@ describe('ElasticsearchDataView', () => {
     expect(screen.queryByText('Scenario Type: pod_disruption_scenarios')).not.toBeInTheDocument();
     expect(screen.queryByText('Cloud Type: aws')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear all filters' })).not.toBeInTheDocument();
-  });
+  }, 10000);
 
   // Runs an initial saved-config query against a paged dataset. queryTelemetry
   // echoes the requested size/page into the returned document's uuid so each

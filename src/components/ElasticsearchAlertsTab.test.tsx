@@ -25,7 +25,7 @@ const result: QueryAlertsResponse = {
       id: 'alert-1',
       source: {
         run_uuid: 'run-1',
-        phase: 'Running',
+        phase: 'during',
         created_at: '2026-09-25T14:32:18Z',
         severity: 'critical',
         alertname: 'KubeAPIServerLatencyHigh',
@@ -36,7 +36,7 @@ const result: QueryAlertsResponse = {
       id: 'alert-2',
       source: {
         run_uuid: 'run-2',
-        phase: 'Completed',
+        phase: 'post',
         created_at: '2026-09-24T09:15:42Z',
         severity: 'warning',
         alertname: 'NodeFilesystemAlmostFull',
@@ -76,7 +76,7 @@ describe('ElasticsearchAlertsTab', () => {
 
     await waitFor(() => expect(screen.getByText('KubeAPIServerLatencyHigh')).toBeInTheDocument());
     expect(screen.getByText('run-1')).toBeInTheDocument();
-    expect(screen.getByText('Running')).toBeInTheDocument();
+    expect(screen.getByText('during')).toBeInTheDocument();
     expect(screen.getByText('critical')).toBeInTheDocument();
     expect(screen.getAllByText('labels.component:').length).toBeGreaterThan(0);
     expect(screen.getAllByText('apiserver').length).toBeGreaterThan(0);
@@ -115,8 +115,8 @@ describe('ElasticsearchAlertsTab', () => {
     await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
     await screen.findByText('KubeAPIServerLatencyHigh');
 
-    await user.selectOptions(screen.getByLabelText('Filter'), 'severity');
-    await user.type(screen.getByLabelText('Value'), 'critical');
+    await user.selectOptions(screen.getByLabelText('Filter category'), 'severity');
+    await user.selectOptions(screen.getByLabelText('Filter values'), 'critical');
     await user.click(screen.getByRole('button', { name: 'Add filter' }));
 
     expect(screen.getByText('KubeAPIServerLatencyHigh')).toBeInTheDocument();
@@ -130,12 +130,38 @@ describe('ElasticsearchAlertsTab', () => {
     await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
     await screen.findByText('KubeAPIServerLatencyHigh');
 
-    await user.selectOptions(screen.getByLabelText('Filter'), 'run_uuid');
-    await user.type(screen.getByLabelText('Value'), 'run-2');
+    await user.selectOptions(screen.getByLabelText('Filter category'), 'run_uuid');
+    await user.type(screen.getByLabelText('Filter values'), 'run-2');
     await user.click(screen.getByRole('button', { name: 'Add filter' }));
 
     expect(screen.getByText('NodeFilesystemAlmostFull')).toBeInTheDocument();
     expect(screen.queryByText('KubeAPIServerLatencyHigh')).not.toBeInTheDocument();
     expect(screen.getByText('UUID: run-2')).toBeInTheDocument();
+  });
+
+  it('filters results by phase enum', async () => {
+    const user = userEvent.setup();
+    renderAlerts();
+    await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
+    await screen.findByText('KubeAPIServerLatencyHigh');
+
+    await user.selectOptions(screen.getByLabelText('Filter category'), 'phase');
+    await user.selectOptions(screen.getByLabelText('Filter values'), 'post');
+    await user.click(screen.getByRole('button', { name: 'Add filter' }));
+
+    expect(screen.getByText('NodeFilesystemAlmostFull')).toBeInTheDocument();
+    expect(screen.queryByText('KubeAPIServerLatencyHigh')).not.toBeInTheDocument();
+    expect(screen.getByText('Phase: post')).toBeInTheDocument();
+  });
+
+  it('clears an enum value when switching filter fields', async () => {
+    const user = userEvent.setup();
+    renderAlerts();
+
+    await user.selectOptions(screen.getByLabelText('Filter category'), 'severity');
+    await user.selectOptions(screen.getByLabelText('Filter values'), 'critical');
+    await user.selectOptions(screen.getByLabelText('Filter category'), 'phase');
+
+    expect(screen.getByLabelText('Filter values')).toHaveValue('');
   });
 });
