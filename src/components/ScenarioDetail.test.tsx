@@ -810,6 +810,47 @@ describe('ScenarioDetail', () => {
       });
     });
 
+    it('preserves the declared mount path for a touched global file parameter', async () => {
+      const user = userEvent.setup();
+      const resiliencyFile = new File(['slo: {}'], 'resiliency.yaml', { type: 'application/yaml' });
+      const globalFileMountPath = '/home/krkn/resiliency-file.yaml';
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+        scenarioGlobals: {
+          ...mockScenarioGlobals,
+          fields: [{
+            name: 'resiliency-file',
+            variable: 'RESILIENCY_FILE',
+            short_description: 'Resiliency score metrics file',
+            description: 'SLO definitions for resiliency scoring',
+            type: 'file',
+            mount_path: globalFileMountPath,
+          }],
+        },
+        globalFormValues: { RESILIENCY_FILE: resiliencyFile },
+        globalTouchedFields: { RESILIENCY_FILE: true },
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({
+            files: [{
+              name: 'resiliency.yaml',
+              content: expect.any(String),
+              mountPath: globalFileMountPath,
+            }],
+          }),
+        );
+      });
+    });
+
     it('allows a scenario without required parameters to preview and run', async () => {
       const user = userEvent.setup();
       const scenarioWithoutRequiredFields: ScenarioDetailType = {

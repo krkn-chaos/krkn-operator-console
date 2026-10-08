@@ -176,6 +176,7 @@ export interface BaseField {
   variable: string;
   default?: string;
   required?: boolean;
+  mount_path?: string;
   type: FieldType;
   secret?: boolean;
   group?: string;
@@ -254,6 +255,7 @@ export interface ErrorResponse {
 export interface ScenarioFileMount {
   name: string;
   content: string; // base64 encoded
+  mountPath?: string;
 }
 
 /**
