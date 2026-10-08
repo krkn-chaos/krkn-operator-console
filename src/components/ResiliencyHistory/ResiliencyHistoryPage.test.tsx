@@ -231,6 +231,16 @@ describe('ResiliencyHistoryPage', () => {
     expect(await screen.findByRole('checkbox', { name: 'resilience' })).toBeInTheDocument();
   });
 
+  it('shows clear cluster discovery loading copy', async () => {
+    mocks.clusterDiscovery.isLoading = true;
+    mocks.clusterDiscovery.clusters = [];
+    renderPage();
+
+    expect(await screen.findByText('Discovering clusters...')).toBeInTheDocument();
+    expect(screen.getByText('Fetching clusters visible to this console.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Loading clusters')).toBeInTheDocument();
+  });
+
   it('renders category and cluster empty states', async () => {
     const user = userEvent.setup();
     vi.spyOn(operatorApi, 'getCategories').mockResolvedValue({ categories: [], total: 0 });

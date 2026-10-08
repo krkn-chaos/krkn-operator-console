@@ -233,73 +233,84 @@ export function ResiliencyHistoryPage() {
           <div className="resiliency-history__filter-grid">
             <fieldset className="resiliency-history__filter-group" aria-busy={categoriesLoading}>
               <legend>Categories</legend>
-              {categoriesLoading ? (
-                <div className="resiliency-history__loading"><Spinner size="md" aria-label="Loading categories" /></div>
-              ) : categoriesError ? (
-                <Alert variant="danger" isInline title="Unable to load categories">
-                  <p>{categoriesError}</p>
-                  <Button variant="link" onClick={() => void loadCategories()}>Retry categories</Button>
-                </Alert>
-              ) : categories.length === 0 ? (
-                <EmptyState variant="sm">
-                  <EmptyStateIcon icon={CubesIcon} />
-                  <Title headingLevel="h3" size="md">No visible categories</Title>
-                  <EmptyStateBody>Categories available to your account will appear here.</EmptyStateBody>
-                </EmptyState>
-              ) : (
-                <div className="resiliency-history__options" role="group" aria-label="Select categories">
-                  {categories.map((category, index) => (
-                    <Checkbox
-                      key={category.name}
-                      id={`resiliency-category-${index}`}
-                      label={(
-                        <span className="resiliency-history__option-label">
-                          {category.color && <span className="resiliency-history__category-color" style={{ backgroundColor: category.color }} aria-hidden="true" />}
-                          {category.name}
-                        </span>
-                      )}
-                      isChecked={selectedCategories.includes(category.name)}
-                      onChange={() => toggleCategory(category.name)}
-                    />
-                  ))}
-                </div>
-              )}
+              <div className="resiliency-history__filter-box">
+                {categoriesLoading ? (
+                  <div className="resiliency-history__loading" role="status">
+                    <Spinner size="md" aria-label="Loading categories" />
+                    <span>Loading categories...</span>
+                  </div>
+                ) : categoriesError ? (
+                  <Alert variant="danger" isInline title="Unable to load categories">
+                    <p>{categoriesError}</p>
+                    <Button variant="link" onClick={() => void loadCategories()}>Retry categories</Button>
+                  </Alert>
+                ) : categories.length === 0 ? (
+                  <EmptyState variant="sm">
+                    <EmptyStateIcon icon={CubesIcon} />
+                    <Title headingLevel="h3" size="md">No visible categories</Title>
+                    <EmptyStateBody>Categories available to your account will appear here.</EmptyStateBody>
+                  </EmptyState>
+                ) : (
+                  <div className="resiliency-history__options" role="group" aria-label="Select categories">
+                    {categories.map((category, index) => (
+                      <Checkbox
+                        key={category.name}
+                        id={`resiliency-category-${index}`}
+                        label={(
+                          <span className="resiliency-history__option-label">
+                            {category.color && <span className="resiliency-history__category-color" style={{ backgroundColor: category.color }} aria-hidden="true" />}
+                            {category.name}
+                          </span>
+                        )}
+                        isChecked={selectedCategories.includes(category.name)}
+                        onChange={() => toggleCategory(category.name)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </fieldset>
 
             <fieldset className="resiliency-history__filter-group" aria-busy={clusterDiscovery.isLoading}>
               <legend>Clusters</legend>
-              {clusterDiscovery.isLoading ? (
-                <div className="resiliency-history__loading"><Spinner size="md" aria-label="Loading clusters" /></div>
-              ) : clusterDiscovery.error ? (
-                <Alert variant="danger" isInline title="Unable to load clusters">
-                  <p>{clusterDiscovery.error}</p>
-                  <Button variant="link" onClick={() => clusterDiscovery.retry()}>Retry cluster discovery</Button>
-                </Alert>
-              ) : clusterOptions.length === 0 ? (
-                <EmptyState variant="sm">
-                  <EmptyStateIcon icon={CubesIcon} />
-                  <Title headingLevel="h3" size="md">No clusters discovered</Title>
-                  <EmptyStateBody>No clusters are currently visible to this console.</EmptyStateBody>
-                  <Button variant="link" onClick={() => void startClusterDiscovery()}>Refresh clusters</Button>
-                </EmptyState>
-              ) : (
-                <div className="resiliency-history__options" role="group" aria-label="Select clusters">
-                  {clusterOptions.map((cluster, index) => (
-                    <Checkbox
-                      key={clusterIdentity(cluster)}
-                      id={`resiliency-cluster-${index}`}
-                      label={(
-                        <span className="resiliency-history__option-label">
-                          <span>{cluster.name}</span>
-                          <small className="resiliency-history__option-detail">{cluster.providerName}</small>
-                        </span>
-                      )}
-                      isChecked={selectedClusters.includes(clusterIdentity(cluster))}
-                      onChange={() => toggleCluster(clusterIdentity(cluster))}
-                    />
-                  ))}
-                </div>
-              )}
+              <div className="resiliency-history__filter-box">
+                {clusterDiscovery.isLoading ? (
+                  <div className="resiliency-history__loading" role="status">
+                    <Spinner size="md" aria-label="Loading clusters" />
+                    <span>Discovering clusters...</span>
+                    <small>Fetching clusters visible to this console.</small>
+                  </div>
+                ) : clusterDiscovery.error ? (
+                  <Alert variant="danger" isInline title="Unable to load clusters">
+                    <p>{clusterDiscovery.error}</p>
+                    <Button variant="link" onClick={() => clusterDiscovery.retry()}>Retry cluster discovery</Button>
+                  </Alert>
+                ) : clusterOptions.length === 0 ? (
+                  <EmptyState variant="sm">
+                    <EmptyStateIcon icon={CubesIcon} />
+                    <Title headingLevel="h3" size="md">No clusters discovered</Title>
+                    <EmptyStateBody>No clusters are currently visible to this console.</EmptyStateBody>
+                    <Button variant="link" onClick={() => void startClusterDiscovery()}>Refresh clusters</Button>
+                  </EmptyState>
+                ) : (
+                  <div className="resiliency-history__options" role="group" aria-label="Select clusters">
+                    {clusterOptions.map((cluster, index) => (
+                      <Checkbox
+                        key={clusterIdentity(cluster)}
+                        id={`resiliency-cluster-${index}`}
+                        label={(
+                          <span className="resiliency-history__option-label">
+                            <span>{cluster.name}</span>
+                            <small className="resiliency-history__option-detail">{cluster.providerName}</small>
+                          </span>
+                        )}
+                        isChecked={selectedClusters.includes(clusterIdentity(cluster))}
+                        onChange={() => toggleCluster(clusterIdentity(cluster))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </fieldset>
           </div>
 

@@ -58,11 +58,6 @@
   min-width: 2.5rem;
   height: 2rem;
   color: var(--pf-v5-global--Color--200);
-  background: var(--pf-v5-global--BackgroundColor--200);
-  border: 1px solid var(--pf-v5-global--BorderColor--100);
-  border-radius: var(--pf-v5-global--BorderRadius--sm);
-  box-shadow: var(--pf-v5-global--BoxShadow--md);
-  transition: box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
 
 .run-category-actions__toggle.pf-v5-c-menu-toggle.pf-m-plain:not(.pf-m-text) > svg {

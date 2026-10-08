@@ -13,7 +13,7 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { CaretDownIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
+import { EllipsisVIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
 import type { CategoryResponse, ClusterJob } from '../types/api';
 
@@ -128,7 +128,7 @@ export function RunCategoryActions({
             isDisabled={isDeleting || isCategoryUpdating}
             onClick={() => handleOpenChange(!isOpen)}
           >
-            <CaretDownIcon aria-hidden="true" />
+            <EllipsisVIcon  aria-hidden="true" />
           </MenuToggle>
         )}
       >
