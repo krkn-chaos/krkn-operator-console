@@ -36,7 +36,6 @@ const ACTIVE_PHASES: Record<string, true> = { Pending: true, Provisioning: true,
 const TERMINAL_PHASES: Record<string, true> = { Succeeded: true, Failed: true, Cancelled: true };
 const POLL_INTERVAL_MS = 10_000;
 const SCENARIO_PAGE_LIMIT = 500;
-const ORCHESTRATOR_LOG_WINDOW = 500;
 
 type ConfigState = 'loading' | 'available' | 'unavailable' | 'error';
 
@@ -61,28 +60,14 @@ function fitnessChanged(previous: KrknAIScenarioIndexRow | undefined, next: Krkn
 }
 
 function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; podName: string; phase: string }) {
-  const [logWindow, setLogWindow] = useState<{ lines: string[]; truncated: boolean }>({
-    lines: ['Connecting to orchestrator log stream…'],
-    truncated: false,
-  });
-  const [hasConnected, setHasConnected] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
-  const everConnectedRef = useRef(false);
   const follow = TERMINAL_PHASES[phase] !== true;
   const connectionId = `krkn-ai-orchestrator-${runName}`;
-  const url = websocketService.buildAiRunLogsUrl(runName, follow, follow ? 200 : undefined, true);
+  const url = websocketService.buildAiRunLogsUrl(runName, follow, undefined, true);
   const handleMessage = useCallback((message: string) => {
-    setLogWindow((current) => {
-      const existing = current.lines.length === 1
-        && (current.lines[0].startsWith('Connecting') || current.lines[0].startsWith('Reconnecting'))
-        ? []
-        : current.lines;
-      const lines = [...existing, message];
-      return lines.length > ORCHESTRATOR_LOG_WINDOW
-        ? { lines: lines.slice(-ORCHESTRATOR_LOG_WINDOW), truncated: true }
-        : { lines, truncated: current.truncated };
-    });
+    setLogs((current) => [...current, message]);
   }, []);
   const { connectionState } = useWebSocket(connectionId, url, handleMessage, {
     disabled: !podName,
@@ -90,28 +75,20 @@ function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; po
   });
 
   useEffect(() => {
-    setLogWindow({ lines: ['Connecting to orchestrator log stream…'], truncated: false });
-    setHasConnected(false);
-    everConnectedRef.current = false;
+    setLogs([]);
   }, [url]);
 
-  useEffect(() => {
-    if (connectionState === 'reconnecting' || (connectionState === 'connecting' && everConnectedRef.current)) {
-      setLogWindow((current) => ({ lines: ['Reconnecting to orchestrator log stream…'], truncated: current.truncated }));
-      setHasConnected(false);
-      return;
-    }
-    if (connectionState === 'connected') {
-      everConnectedRef.current = true;
-      setHasConnected(true);
-    }
-  }, [connectionState]);
-
   useLayoutEffect(() => {
-    if (isFollowing && logsContainerRef.current && logWindow.lines.length > 0) {
+    if (isFollowing && logsContainerRef.current && logs.length > 0) {
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
-  }, [isFollowing, logWindow.lines]);
+  }, [isFollowing, logs]);
+
+  const connectionMessage = connectionState === 'connected'
+    ? 'Waiting for orchestrator log entries…'
+    : connectionState === 'reconnecting'
+      ? 'Reconnecting to orchestrator log stream…'
+      : 'Connecting to orchestrator log stream…';
 
   return (
     <Card className="krkn-ai-run-detail__main-logs">
@@ -123,17 +100,10 @@ function OrchestratorLogPanel({ runName, podName, phase }: { runName: string; po
         </dl>
         {!podName ? (
           <p className="krkn-ai-not-available">Orchestrator logs will connect when the operator records the Pod name.</p>
-        ) : !hasConnected && logWindow.lines.length === 0 ? (
-          <p className="krkn-ai-not-available">Connecting to the operator-authorized orchestrator log stream…</p>
+        ) : logs.length === 0 ? (
+          <p className="krkn-ai-not-available" role="status">{connectionMessage}</p>
         ) : (
-          <>
-            {logWindow.truncated && (
-              <p role="status" className="krkn-ai-log-truncation">
-                Showing only the most recent {ORCHESTRATOR_LOG_WINDOW} log entries. Download the complete results ZIP for full completed logs.
-              </p>
-            )}
-            <LogTerminal ref={logsContainerRef} logs={logWindow.lines} ariaLabel="Orchestrator log output" />
-          </>
+          <LogTerminal ref={logsContainerRef} logs={logs} ariaLabel="Orchestrator log output" />
         )}
         <div className="krkn-ai-log-follow">
           <Checkbox id={`follow-orchestrator-${runName}`} label="Follow" description="Auto-scroll to latest logs" isChecked={isFollowing} onChange={(_event, checked) => setIsFollowing(checked)} />

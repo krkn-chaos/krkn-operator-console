@@ -458,30 +458,27 @@ describe('Krkn-AI real run lifecycle', () => {
 
 
 
-  it('bounds the live orchestrator log window, signals truncation, and keeps the complete-results ZIP action', async () => {
-    const run = makeRun('bounded-log-run', 'Succeeded');
-    mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Succeeded', {
-      currentGeneration: null,
-      completedGenerations: 2,
-      artifactStatus: 'succeeded',
-    }));
+  it('keeps the full orchestrator log from its first line without a truncation notice', async () => {
+    const run = makeRun('complete-log-run', 'Running');
+    mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Running'));
+    const buildLogsUrl = vi.spyOn(websocketService, 'buildAiRunLogsUrl');
     render(<RunDetail run={run} onBack={vi.fn()} />);
     await flushReact();
     const subscription = mocks.useWebSocket.mock.calls.find(
-      ([connectionId]) => connectionId === 'krkn-ai-orchestrator-bounded-log-run',
+      ([connectionId]) => connectionId === 'krkn-ai-orchestrator-complete-log-run',
     );
     const receiveLog = subscription?.[2] as ((message: string) => void) | undefined;
     expect(receiveLog).toBeDefined();
     await act(async () => {
-      for (let index = 0; index < 550; index += 1) receiveLog!(`line-${index}`);
+      for (let index = 0; index < 501; index += 1) receiveLog!(`line-${index}`);
     });
 
-    expect(screen.getByText(/Showing only the most recent 500 log entries/)).toBeInTheDocument();
     const logOutput = screen.getByLabelText('Orchestrator log output');
-    expect(logOutput.children).toHaveLength(500);
-    expect(within(logOutput).getByText('line-549')).toBeInTheDocument();
-    expect(within(logOutput).queryByText('line-49')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Download complete results for run bounded-log-run' })).toBeInTheDocument();
+    expect(logOutput.children).toHaveLength(501);
+    expect(within(logOutput).getByText('line-0')).toBeInTheDocument();
+    expect(within(logOutput).getByText('line-500')).toBeInTheDocument();
+    expect(screen.queryByText(/Showing only the most recent/)).not.toBeInTheDocument();
+    expect(buildLogsUrl).toHaveBeenCalledWith('complete-log-run', true, undefined, true);
   });
 
   it('disables the results ZIP action while the run is active', async () => {
@@ -1005,7 +1002,7 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(scenarioDialog.getByText('Succeeded')).toBeInTheDocument();
     expect(scenarioDialog.queryByText(/Fitness (provisional|final)/)).not.toBeInTheDocument();
     expect(scenarioDialog.queryByText('Fitness state')).not.toBeInTheDocument();
-    expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', true, 200, true);
+    expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', true, undefined, true);
     expect(childUrl).toHaveBeenCalledWith('child-run-9', 'real-job-9', false);
     const openedPaths = [...new Set(mocks.useWebSocket.mock.calls.map((call) => new URL(String(call[1])).pathname))];
     expect(openedPaths).toHaveLength(2);
