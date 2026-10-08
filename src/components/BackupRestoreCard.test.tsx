@@ -41,7 +41,14 @@ describe('BackupRestoreCard', () => {
     render(<BackupRestoreCard />);
 
     expect(screen.getByText('Backup & Restore')).toBeInTheDocument();
-    expect(screen.getByText(/Download a backup of all configuration data/i)).toBeInTheDocument();
+    expect(screen.getByText(/users, user groups, targets, and secrets/i)).toBeInTheDocument();
+  });
+
+  it('should render sensitive data warning', () => {
+    render(<BackupRestoreCard />);
+
+    expect(screen.getByText('Sensitive data')).toBeInTheDocument();
+    expect(screen.getByText(/backup archive contains secrets/i)).toBeInTheDocument();
   });
 
   describe('Backup Download', () => {
@@ -107,6 +114,7 @@ describe('BackupRestoreCard', () => {
       await waitFor(() => {
         expect(screen.getByText('Select Backup Archive')).toBeInTheDocument();
         expect(screen.getByText(/This will replace backed-up configuration/i)).toBeInTheDocument();
+        expect(screen.getByText(/Current users, user groups, targets, and secrets/i)).toBeInTheDocument();
       });
     });
 
