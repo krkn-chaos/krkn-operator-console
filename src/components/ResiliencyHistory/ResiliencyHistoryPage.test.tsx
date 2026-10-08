@@ -241,6 +241,23 @@ describe('ResiliencyHistoryPage', () => {
     expect(screen.getByLabelText('Loading clusters')).toBeInTheDocument();
   });
 
+  it('shows category loading copy and spinner while retrieval is pending', async () => {
+    let resolveCategories!: (value: { categories: Array<{ name: string; availableToAll: boolean }>; total: number }) => void;
+    vi.mocked(operatorApi.getCategories).mockReturnValueOnce(
+      new Promise((resolve) => { resolveCategories = resolve; }),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Loading categories...')).toBeInTheDocument();
+    expect(screen.getByLabelText('Loading categories')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveCategories({ categories: [{ name: 'resilience', availableToAll: true }], total: 1 });
+    });
+
+    expect(await screen.findByRole('checkbox', { name: 'resilience' })).toBeInTheDocument();
+  });
+
   it('renders category and cluster empty states', async () => {
     const user = userEvent.setup();
     vi.spyOn(operatorApi, 'getCategories').mockResolvedValue({ categories: [], total: 0 });

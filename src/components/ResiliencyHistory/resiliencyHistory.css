@@ -30,6 +30,8 @@
 }
 
 .resiliency-history__filter-box {
+  display: flex;
+  flex-direction: column;
   max-height: 18rem;
   min-height: 7.5rem;
   overflow: auto;
@@ -41,6 +43,7 @@
 
 .resiliency-history__options {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 0.25rem;
 }
@@ -66,7 +69,7 @@
 
 .resiliency-history__loading {
   display: flex;
-  min-height: 100%;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
