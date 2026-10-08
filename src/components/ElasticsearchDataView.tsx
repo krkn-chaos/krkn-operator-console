@@ -797,7 +797,7 @@ export function ElasticsearchDataView() {
   const filterSection = hasQueried && (
     <>
       <FlexItem>
-        <FormGroup label="Filter category" fieldId="es-filter-category" style={{ width: '18em' }}>
+        <FormGroup label="Filter category" fieldId="es-filter-category" style={{ width: '15em' }}>
           <FormSelect
             id="es-filter-category"
             value={filterCategory}
@@ -826,7 +826,7 @@ export function ElasticsearchDataView() {
                 onClick={() => handleValueSelectOpenChange(!isValueSelectOpen)}
                 isExpanded={isValueSelectOpen}
                 isDisabled={!filterCategory || valueOptions.length === 0}
-                style={{ width: '22em' }}
+                style={{ width: '18em' }}
               >
                 {selectedValues.length > 0 ? 'Values' : 'Select values…'}
                 {selectedValues.length > 0 && (
