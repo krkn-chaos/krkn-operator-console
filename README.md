@@ -70,6 +70,8 @@ scenario is active or detail is unavailable, only Logs appears. The modal shows
 one child-job status and offers refresh only before the job is terminal.
 Pending fitness and normalization use spinner-only indicators with explanatory
 tooltips; fitness score columns have concise headings with hover/focus definitions.
+Failed scenario scores of -1 use a failure icon with a tooltip explaining that the
+  scenario did not run.
 Each health chart has a title and short description without an individual frame.
 Response points and heatmap cells expose the same multiline sample metadata.
 Application filters share a row with Select all/Clear, and long heatmap labels are

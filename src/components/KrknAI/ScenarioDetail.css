@@ -66,6 +66,20 @@
   padding: 0.3rem 0.7rem;
 }
 
+.krkn-ai-scenario-failure-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--pf-v5-global--danger-color--100, #c9190b);
+  cursor: help;
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.krkn-ai-scenario-failure-indicator:focus-visible {
+  outline: 2px solid var(--pf-v5-global--focus--Color, #0066cc);
+  outline-offset: 2px;
+}
+
 .krkn-ai-scenario-detail__tabs [role="tablist"] {
   gap: 0.5rem;
   border-block-end: 1px solid var(--krkn-ai-border);
@@ -235,7 +249,7 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--pf-v5-global--BackgroundColor--100, #fff);
+  background: var(--pf-v5-c-modal-box--BackgroundColor, var(--pf-v5-global--BackgroundColor--100, #fff));
 }
 .krkn-ai-scenario-detail__section h3 {
   font-weight: 700;

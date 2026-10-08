@@ -756,6 +756,35 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(screen.getByText('baseline-child-run')).toBeInTheDocument();
   });
 
+  it('explains a failed scenario fitness score of -1', async () => {
+    const user = userEvent.setup();
+    const run = makeRun('failed-scenario-run', 'Succeeded');
+    const failedScenario = makeScenarioRow({
+      outcome: 'failed',
+      phase: 'Failed',
+      fitnessScore: -1,
+      fitnessState: 'final',
+    });
+    mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Succeeded', {
+      currentGeneration: null,
+      completedGenerations: 1,
+    }));
+    mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([failedScenario]));
+
+    render(<RunDetail run={run} onBack={vi.fn()} />);
+    await flushReact();
+    const scenarioTable = screen.getByRole('table', { name: 'Scenario executions' });
+    const row = within(scenarioTable).getByRole('row', { name: /Open generation 1 scenario 9 details/ });
+    const failureIndicator = within(row).getByRole('img', { name: 'Scenario failed to run' });
+    expect(failureIndicator).toBeInTheDocument();
+    expect(within(row).queryByText('-1')).not.toBeInTheDocument();
+
+    await user.hover(failureIndicator);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'A -1 score means the Krkn scenario did not run. Possible causes include unavailable target pods or an invalid scenario configuration.',
+    );
+  });
+
   it('passes server validation errors through and never launches an invalid config', async () => {
     const user = userEvent.setup();
     mocks.ai.validateConfig.mockRejectedValue(new KrknAIConfigValidationError([

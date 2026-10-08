@@ -35,6 +35,12 @@ describe('RunList', () => {
     expect(within(table).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
     expect(screen.getByText('Krkn-AI explores chaos experiments guided by your SLOs and health checks to evaluate system resilience.')).toBeInTheDocument();
 
+    const header = screen.getByRole('heading', { name: 'AI runs' }).closest('.krkn-ai-run-list__heading');
+    expect(header).toBeTruthy();
+    expect(header).toContainElement(screen.getByText(/Krkn-AI explores chaos experiments/));
+    expect(header).toContainElement(screen.getByRole('button', { name: 'Refresh' }));
+    expect(header).toContainElement(screen.getByRole('button', { name: 'Create run' }));
+
     const emptyRow = within(table).getAllByRole('row')[1];
     expect(within(emptyRow).getByRole('heading', { name: 'No Krkn-AI runs yet' })).toBeInTheDocument();
     expect(within(emptyRow).getByText('Use Create run above to explore a cluster.')).toBeInTheDocument();

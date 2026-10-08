@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, ClipboardCopy, Label, Modal, ModalVariant, Spinner, Tab, TabTitleText, Tabs, Title, Tooltip } from '@patternfly/react-core';
-import { EyeIcon, SyncAltIcon } from '@patternfly/react-icons';
+import { ExclamationCircleIcon, EyeIcon, SyncAltIcon } from '@patternfly/react-icons';
 import { LogViewer } from '../LogViewer';
 import { ScenarioHealthCharts } from './ScenarioHealthCharts';
 import { MetadataPanel } from './MetadataPanel';
@@ -492,13 +492,21 @@ export function ScenarioExplorer({
                       <td>{isBaselineScenario(scenario) ? 'Baseline' : scenario.generation + 1}</td>
                       <th scope="row">{scenario.scenarioId}</th>
                       <td>{scenario.scenarioType ?? 'Not available yet'}</td>
-                      <td>{finalized && scenario.fitnessScore != null
-                        ? formatFitness(scenario.fitnessScore)
-                        : calculationPending
-                          ? <CalculationStatus label="Calculating generation fitness" />
-                          : scenario.fitnessState === 'unfinalized'
-                            ? 'Not finalized'
-                            : 'Not available'}</td>
+                      <td>{status === 'Failed' && scenario.fitnessScore === -1
+                        ? (
+                          <Tooltip content="A -1 score means the Krkn scenario did not run. Possible causes include unavailable target pods or an invalid scenario configuration." position="top">
+                            <span className="krkn-ai-scenario-failure-indicator" role="img" aria-label="Scenario failed to run" tabIndex={0}>
+                              <ExclamationCircleIcon aria-hidden="true" />
+                            </span>
+                          </Tooltip>
+                        )
+                        : finalized && scenario.fitnessScore != null
+                          ? formatFitness(scenario.fitnessScore)
+                          : calculationPending
+                            ? <CalculationStatus label="Calculating generation fitness" />
+                            : scenario.fitnessState === 'unfinalized'
+                              ? 'Not finalized'
+                              : 'Not available'}</td>
                       <td><Label color={statusColor(status)}>{status}</Label></td>
                       <td>{scenario.durationSeconds == null ? 'Not available yet' : `${scenario.durationSeconds.toLocaleString(undefined, { maximumFractionDigits: 2 })}s`}</td>
                       <td>

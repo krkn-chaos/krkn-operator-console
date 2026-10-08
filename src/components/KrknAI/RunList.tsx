@@ -100,21 +100,24 @@ export function RunList({
   return (
     <Card className="krkn-ai-run-list">
       <CardTitle>
-        <Title headingLevel="h1" size="lg">AI runs</Title>
+        <div className="krkn-ai-run-list__heading">
+          <div className="krkn-ai-run-list__heading-copy">
+            <Title headingLevel="h1" size="lg">AI runs</Title>
+            <p className="krkn-ai-run-list__description">
+              Krkn-AI explores chaos experiments guided by your SLOs and health checks to evaluate system resilience.
+            </p>
+          </div>
+          <div className="krkn-ai-run-list__toolbar">
+            <Button variant="secondary" onClick={onRefresh} isDisabled={refreshing}>
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
+            <Button variant="primary" onClick={onCreate}>
+              Create run
+            </Button>
+          </div>
+        </div>
       </CardTitle>
       <CardBody>
-        <div className="krkn-ai-run-list__toolbar">
-          <Button variant="secondary" onClick={onRefresh} isDisabled={refreshing}>
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </Button>
-          <Button variant="primary" onClick={onCreate}>
-            Create run
-          </Button>
-        </div>
-
-        <p className="krkn-ai-run-list__description">
-          Krkn-AI explores chaos experiments guided by your SLOs and health checks to evaluate system resilience.
-        </p>
         {error && <Alert variant="danger" title="Unable to load Krkn-AI runs" isInline>{error}</Alert>}
         <div className="krkn-ai-run-list__table-wrap" style={{ overflowX: 'auto' }}>
           <table className="krkn-ai-run-list__table" aria-label="Krkn-AI runs">
