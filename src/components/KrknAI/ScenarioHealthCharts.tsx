@@ -186,8 +186,7 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
 
   return (
     <div className="krkn-ai-health-charts">
-      <fieldset className="krkn-ai-health-chart__selection">
-        <legend>Health-check applications</legend>
+      <fieldset className="krkn-ai-health-chart__selection" aria-label="Health-check application filters">
         <div className="krkn-ai-health-chart__selection-controls">
           <div className="krkn-ai-health-chart__legend">
             {applications.map((application, index) => {
@@ -218,7 +217,12 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
         <p className="krkn-ai-not-available">Select a health-check application to display its measurements.</p>
       ) : <>
       <figure className="krkn-ai-health-chart">
-        <figcaption>Measured health-check response time</figcaption>
+        <figcaption>
+          <h3>Measured health-check response time</h3>
+          <p className="krkn-ai-health-chart__description">
+            Each point is one response-time sample; gaps indicate missing latency. Hover for sample details.
+          </p>
+        </figcaption>
         <svg
           viewBox={`0 0 ${width} ${responseHeight}`}
           role="img"
@@ -279,11 +283,16 @@ export function ScenarioHealthCharts({ scenarioId, samples }: ScenarioHealthChar
           <text className="krkn-ai-health-chart__axis-label" x={responseMargin.left + responsePlotWidth / 2} y={responseHeight - 10} textAnchor="middle">Seconds into scenario</text>
           <text className="krkn-ai-health-chart__axis-label" x="18" y={responseMargin.top + responsePlotHeight / 2} textAnchor="middle" transform={`rotate(-90 18 ${responseMargin.top + responsePlotHeight / 2})`}>Response time (seconds)</text>
         </svg>
-        <p className="krkn-ai-health-chart__guidance">Gaps indicate missing latency; HTTP errors retain measured latency. Outcome cells show failed checks.</p>
+
       </figure>
 
       <figure className="krkn-ai-health-chart">
-        <figcaption>Measured health-check outcomes</figcaption>
+        <figcaption>
+          <h3>Measured health-check outcomes</h3>
+          <p className="krkn-ai-health-chart__description">
+            Each cell is one check's HTTP status; hover for application, timestamp, and outcome details.
+          </p>
+        </figcaption>
         <div className="krkn-ai-health-heatmap__legend" aria-label="Health-check result legend">
           <span className="krkn-ai-health-heatmap__legend-success">Expected status code</span>
           <span className="krkn-ai-health-heatmap__legend-failure">Unexpected status code</span>

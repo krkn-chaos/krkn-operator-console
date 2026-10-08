@@ -64,14 +64,16 @@ Health-check and fitness tables use icon-only edit/remove actions with accessibl
 labels and tooltips; add actions use primary plus-icon buttons. Scenario details
 open through a labeled eye-icon button with a tooltip.
 Run details include searchable scenarios, fitness and health charts, live logs,
-and downloadable ZIPs with complete results. Scenario logs have a dedicated tab;
-while a child scenario is active or has no committed detail, Logs is the only tab.
-An icon-only refresh action retries details.
+and downloadable ZIPs with complete results. Scenario logs have a dedicated tab.
+When result tabs are available, Overview is first and Logs second; while a child
+scenario is active or detail is unavailable, only Logs appears. The modal shows
+one child-job status and offers refresh only before the job is terminal.
 Pending fitness and normalization use spinner-only indicators with explanatory
 tooltips; fitness score columns have concise headings with hover/focus definitions.
-Health-check response points and heatmap cells expose the same multiline sample
-metadata. Application filters share a row with Select all/Clear, and long heatmap
-labels are ellipsized while short names use only the width they need.
+Each health chart has a title and short description without an individual frame.
+Response points and heatmap cells expose the same multiline sample metadata.
+Application filters share a row with Select all/Clear, and long heatmap labels are
+ellipsized while short names use only the width they need.
 Run metadata appears before summaries finish. Summaries and scenario pages load
 independently; the operator filters, sorts, and paginates the complete result and
 child-job index. The console fetches only the requested page and loads scenario

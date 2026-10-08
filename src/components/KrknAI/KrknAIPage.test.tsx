@@ -498,7 +498,6 @@ describe('Krkn-AI real run lifecycle', () => {
   it('renders run metadata before summary completion and defers selected scenario details', async () => {
     let resolveSummary!: (summary: KrknAIRunSummary) => void;
     let resolveDetail!: (detail: KrknAIScenarioDetail) => void;
-    const user = userEvent.setup();
     mocks.ai.getRunSummary.mockReturnValue(new Promise<KrknAIRunSummary>((resolve) => { resolveSummary = resolve; }));
     mocks.ai.getScenario.mockReturnValue(new Promise<KrknAIScenarioDetail>((resolve) => { resolveDetail = resolve; }));
     mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([makeScenarioRow({ fitnessScore: 75, fitnessState: 'final', phase: 'Succeeded' })]));
@@ -512,13 +511,11 @@ describe('Krkn-AI real run lifecycle', () => {
     const dialog = within(screen.getByRole('dialog'));
     expect(dialog.getByRole('tab', { name: 'Logs' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Logs' })).toHaveAttribute('aria-selected', 'true');
+    expect(dialog.getByText('Succeeded')).toBeInTheDocument();
     expect(dialog.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
     expect(dialog.queryByRole('tab', { name: 'Fitness' })).not.toBeInTheDocument();
     expect(dialog.queryByRole('tab', { name: 'Health checks' })).not.toBeInTheDocument();
-    expect(dialog.getByRole('button', { name: 'Refresh scenario details' })).toBeInTheDocument();
-    await user.hover(dialog.getByRole('button', { name: 'Refresh scenario details' }));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh scenario details');
-    expect(dialog.getAllByRole('button', { name: 'Refresh scenario details' })).toHaveLength(1);
+    expect(dialog.queryByRole('button', { name: 'Refresh scenario details' })).not.toBeInTheDocument();
     expect(dialog.queryByText(/scenario result is not committed yet/i)).not.toBeInTheDocument();
     await act(async () => resolveSummary(makeSummary('loading-run', 'Succeeded', { completedGenerations: 1 })));
     await act(async () => resolveDetail(makeScenarioDetail(75, 'final')));
@@ -526,6 +523,11 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(dialog.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Fitness' })).toBeInTheDocument();
     expect(dialog.getByRole('tab', { name: 'Health checks' })).toBeInTheDocument();
+    expect(dialog.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Logs', 'Fitness', 'Health checks']);
+    expect(dialog.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    expect(dialog.queryByRole('button', { name: 'Refresh scenario details' })).not.toBeInTheDocument();
+    expect(dialog.queryByText('Fitness final')).not.toBeInTheDocument();
+    expect(dialog.queryByText('Fitness state')).not.toBeInTheDocument();
     fireEvent.click(dialog.getByRole('tab', { name: 'Fitness' }));
     expect(dialog.getByText('75 / 100')).toBeInTheDocument();
     expect(dialog.queryByRole('status')).not.toBeInTheDocument();
@@ -725,6 +727,12 @@ describe('Krkn-AI real run lifecycle', () => {
 
     await user.click(viewBaselineButton);
     await flushReact();
+    const scenarioDialog = within(screen.getByRole('dialog'));
+    expect(scenarioDialog.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Logs', 'Fitness', 'Health checks']);
+    expect(scenarioDialog.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    expect(scenarioDialog.getByText('Succeeded')).toBeInTheDocument();
+    expect(scenarioDialog.queryByRole('button', { name: 'Refresh scenario details' })).not.toBeInTheDocument();
+    expect(scenarioDialog.queryByText('Fitness final')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
     expect(screen.getByText('12 / 100')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Raw score' })).toBeInTheDocument();
@@ -943,6 +951,7 @@ describe('Krkn-AI real run lifecycle', () => {
 
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
+    const scenarioDialog = within(screen.getByRole('dialog'));
     fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
     const fitnessStatus = screen.getByRole('status', { name: 'Calculating generation fitness; calculation waits for generation completion.' });
     expect(fitnessStatus).toBeInTheDocument();
@@ -954,7 +963,9 @@ describe('Krkn-AI real run lifecycle', () => {
     const normalizationStatus = within(fitnessComponents).getByRole('status', { name: 'Calculating normalized score; calculation waits for generation completion.' });
     expect(normalizationStatus).toBeInTheDocument();
     expect(within(fitnessComponents).queryByText(/Normalization is pending/)).not.toBeInTheDocument();
-    expect(screen.getByText('Fitness provisional')).toBeInTheDocument();
+    expect(scenarioDialog.getByText('Succeeded')).toBeInTheDocument();
+    expect(scenarioDialog.queryByText(/Fitness (provisional|final)/)).not.toBeInTheDocument();
+    expect(scenarioDialog.queryByText('Fitness state')).not.toBeInTheDocument();
     expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', true, 200, true);
     expect(childUrl).toHaveBeenCalledWith('child-run-9', 'real-job-9', false);
     const openedPaths = [...new Set(mocks.useWebSocket.mock.calls.map((call) => new URL(String(call[1])).pathname))];
@@ -968,7 +979,7 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(screen.queryByText('3 / 100')).not.toBeInTheDocument();
     await advance(10_000);
     expect(screen.getByText('75 / 100')).toBeInTheDocument();
-    expect(screen.getByText('Fitness final')).toBeInTheDocument();
+    expect(scenarioDialog.queryByText(/Fitness (provisional|final)/)).not.toBeInTheDocument();
     expect(orchestratorUrl).toHaveBeenCalledWith('measured-run', false, undefined, true);
     await advance(20_000);
     expect(mocks.ai.getRunSummary).toHaveBeenCalledTimes(4);
@@ -1080,6 +1091,13 @@ describe('Krkn-AI real run lifecycle', () => {
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open generation 1 scenario 9 details/ }));
     await flushReact();
+    const retryButton = screen.getByRole('button', { name: 'Refresh scenario details' });
+    expect(retryButton).toBeInTheDocument();
+    fireEvent.mouseEnter(retryButton);
+    await advance(500);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Refresh scenario details');
+    fireEvent.mouseLeave(retryButton);
+    await advance(500);
     expect(screen.getByRole('tab', { name: 'Logs' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Fitness' })).not.toBeInTheDocument();

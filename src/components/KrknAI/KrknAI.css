@@ -827,24 +827,27 @@
 
 .krkn-ai-health-charts {
   display: grid;
-  gap: 0;
+  gap: 1.25rem;
   margin-block-start: 0;
 }
 
 .krkn-ai-health-chart {
   min-width: 0;
   margin: 0;
-  padding: 0.75rem;
-  border: 1px solid var(--krkn-ai-border);
-  border-radius: 4px;
-}
-.krkn-ai-health-chart + .krkn-ai-health-chart {
-  margin-block-start: 0.75rem;
+  padding: 0;
+  border: 0;
 }
 
 .krkn-ai-health-chart figcaption {
-  margin-block-end: 0.5rem;
-  font-weight: 600;
+  display: grid;
+  gap: 0.25rem;
+  margin-block-end: 0.75rem;
+}
+
+.krkn-ai-health-chart figcaption h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .krkn-ai-health-chart svg {

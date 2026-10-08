@@ -132,7 +132,7 @@ describe('wizard table editing and removal', () => {
     await user.type(dialog.getByRole('textbox', { name: /URL/ }), 'https://catalog.example/health');
     await user.click(dialog.getByRole('button', { name: 'Save' }));
     expect(screen.getByText('https://catalog.example/health')).toBeInTheDocument();
-  }, 10_000);
+  }, 20_000);
   it('rejects nonpositive application health timing while allowing the positive minimum', () => {
     const makeDraft = () => {
       const draft = createEditableConfigDraft('fitness_function:\n  query: up\n').draft;

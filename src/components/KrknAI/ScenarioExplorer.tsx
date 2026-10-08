@@ -57,6 +57,14 @@ const columns: Array<{ key: ScenarioSortKey; label: string }> = [
 
 const formatFitness = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 const ACTIVE_PHASES: Record<string, true> = { Creating: true, Pending: true, Provisioning: true, Running: true };
+const TERMINAL_PHASES: Record<string, true> = {
+  Cancelled: true,
+  Complete: true,
+  Completed: true,
+  Failed: true,
+  Stopped: true,
+  Succeeded: true,
+};
 
 function isGenerationFinalized(row: KrknAIScenarioIndexRow, completedGenerations: number | null): boolean {
   return row.fitnessState === 'final'
@@ -164,7 +172,7 @@ function ScenarioDetail({
   const [activeTab, setActiveTab] = useState(0);
   const status = rowStatus(row);
   const resultTabsAvailable = detail !== null && status !== 'Result pending' && !ACTIVE_PHASES[status];
-  const selectedTab = resultTabsAvailable ? activeTab : 0;
+  const selectedTab = resultTabsAvailable ? activeTab : 1;
   const parameters = detail ? parameterRows(detail.parameters) : [];
   const childLogStatus = row.phase === 'Cancelled' ? 'Stopped'
     : row.phase ?? (row.outcome === 'succeeded' ? 'Succeeded' : row.outcome === 'failed' ? 'Failed' : 'Pending');
@@ -176,35 +184,40 @@ function ScenarioDetail({
     && detail?.fitnessState === 'final'
     ? detail.fitnessResult.fitnessScore
     : null;
-  const visibleFitnessState = isGenerationFinalized(row, completedGenerations) && detail?.fitnessState === 'final'
-    ? 'final'
-    : row.fitnessState === 'unfinalized' || detail?.fitnessState === 'unfinalized'
-      ? 'unfinalized'
-      : calculationPending
-        ? 'provisional'
-        : 'Not finalized';
   return (
     <div className="krkn-ai-scenario-detail">
       <div className="krkn-ai-scenario-detail__heading">
-        <div className="krkn-ai-scenario-detail__identity">
-          <p className="krkn-ai-scenario-detail__identity-item">
-            <span className="krkn-ai-scenario-detail__identity-key">Scenario run:</span> <code>{row.childRunName ?? 'Not created yet'}</code>
-          </p>
-          {row.jobId && <p className="krkn-ai-scenario-detail__identity-item"><span className="krkn-ai-scenario-detail__identity-key">Job ID:</span> <code>{row.jobId}</code></p>}
-          {row.podName && <p className="krkn-ai-scenario-detail__identity-item"><span className="krkn-ai-scenario-detail__identity-key">Pod:</span> <code>{row.podName}</code></p>}
-        </div>
+        <dl className="krkn-ai-scenario-detail__identity">
+          <div className="krkn-ai-scenario-detail__identity-item">
+            <dt className="krkn-ai-scenario-detail__identity-key">Scenario run:</dt>
+            <dd><code>{row.childRunName ?? 'Not created yet'}</code></dd>
+          </div>
+          {row.jobId && (
+            <div className="krkn-ai-scenario-detail__identity-item">
+              <dt className="krkn-ai-scenario-detail__identity-key">Job ID:</dt>
+              <dd><code>{row.jobId}</code></dd>
+            </div>
+          )}
+          {row.podName && (
+            <div className="krkn-ai-scenario-detail__identity-item">
+              <dt className="krkn-ai-scenario-detail__identity-key">Pod:</dt>
+              <dd><code>{row.podName}</code></dd>
+            </div>
+          )}
+        </dl>
         <div className="krkn-ai-scenario-detail__labels">
-          <Label color={statusColor(status)} isCompact>{status}</Label>
-          <Tooltip content="Refresh scenario details" position="top">
-            <Button
-              variant="plain"
-              aria-label="Refresh scenario details"
-              aria-busy={updating}
-              onClick={onRetry}
-              icon={<SyncAltIcon className={updating ? 'pf-m-spin' : undefined} />}
-            />
-          </Tooltip>
-          {row.fitnessState && <Label isCompact color={visibleFitnessState === 'final' ? 'green' : visibleFitnessState === 'provisional' ? 'orange' : 'grey'}>Fitness {visibleFitnessState}</Label>}
+          <Label className="krkn-ai-scenario-detail__status" color={statusColor(status)}>{status}</Label>
+          {!TERMINAL_PHASES[status] && (
+            <Tooltip content="Refresh scenario details" position="top">
+              <Button
+                variant="plain"
+                aria-label="Refresh scenario details"
+                aria-busy={updating}
+                onClick={onRetry}
+                icon={<SyncAltIcon className={updating ? 'pf-m-spin' : undefined} />}
+              />
+            </Tooltip>
+          )}
         </div>
       </div>
       {loading && !detail && (
@@ -225,25 +238,8 @@ function ScenarioDetail({
       )}
 
       <Tabs className="krkn-ai-scenario-detail__tabs" activeKey={selectedTab} onSelect={(_event, key) => setActiveTab(key as number)} mountOnEnter>
-        <Tab eventKey={0} title={<TabTitleText>Logs</TabTitleText>}>
-          {row.childRunName && row.jobId ? (
-            <LogViewer
-              scenarioRunName={row.childRunName}
-              jobId={row.jobId}
-              clusterName={clusterName}
-              podName={row.podName ?? 'Waiting for scenario Pod'}
-              status={childLogStatus}
-              compact
-            />
-          ) : (
-            <section className="krkn-ai-log-panel" aria-label="Scenario pod log">
-              <h3>Scenario pod log</h3>
-              <p className="krkn-ai-not-available">Child job logs are available when the operator reports a child run name and job ID.</p>
-            </section>
-          )}
-        </Tab>
-        {resultTabsAvailable && detail && [
-            <Tab key="overview" eventKey={1} title={<TabTitleText>Overview</TabTitleText>}>
+        {resultTabsAvailable && detail && (
+          <Tab key="overview" eventKey={0} title={<TabTitleText>Overview</TabTitleText>}>
               <div className="krkn-ai-scenario-detail__metadata">
                 <MetadataPanel
                   id={`krkn-ai-scenario-overview-${row.generation}-${row.scenarioId}`}
@@ -265,7 +261,6 @@ function ScenarioDetail({
                   items={[
                     { label: 'Duration', value: detail.durationSeconds == null ? 'Not available' : `${detail.durationSeconds.toLocaleString(undefined, { maximumFractionDigits: 2 })} seconds` },
                     { label: 'Return code', value: detail.returnCode ?? 'Not available' },
-                    { label: 'Fitness state', value: visibleFitnessState },
                   ]}
                 />
               </div>
@@ -277,7 +272,26 @@ function ScenarioDetail({
                   </dl>
                 ) : <p className="krkn-ai-not-available">Scenario parameters are not available.</p>}
               </section>
-            </Tab>,
+          </Tab>
+        )}
+        <Tab eventKey={1} title={<TabTitleText>Logs</TabTitleText>}>
+          {row.childRunName && row.jobId ? (
+            <LogViewer
+              scenarioRunName={row.childRunName}
+              jobId={row.jobId}
+              clusterName={clusterName}
+              podName={row.podName ?? 'Waiting for scenario Pod'}
+              status={childLogStatus}
+              compact
+            />
+          ) : (
+            <section className="krkn-ai-log-panel" aria-label="Scenario pod log">
+              <h3>Scenario pod log</h3>
+              <p className="krkn-ai-not-available">Child job logs are available when the operator reports a child run name and job ID.</p>
+            </section>
+          )}
+        </Tab>
+        {resultTabsAvailable && detail && [
             <Tab key="fitness" eventKey={2} title={<TabTitleText>Fitness</TabTitleText>}>
               <section className="krkn-ai-scenario-detail__section" aria-labelledby={`krkn-ai-fitness-result-${row.generation}-${row.scenarioId}`}>
                 <h3 id={`krkn-ai-fitness-result-${row.generation}-${row.scenarioId}`}>Fitness function result</h3>
@@ -340,11 +354,7 @@ function ScenarioDetail({
               </section>
             </Tab>,
             <Tab key="health-checks" eventKey={3} title={<TabTitleText>Health checks</TabTitleText>}>
-              <section className="krkn-ai-scenario-detail__section" aria-labelledby={`krkn-ai-health-${row.generation}-${row.scenarioId}`}>
-                <h3 id={`krkn-ai-health-${row.generation}-${row.scenarioId}`}>Health-check charts</h3>
-                <p className="krkn-ai-scenario-detail__health-description">
-                  Latency distribution of health-check endpoints during the test run.
-                </p>
+              <section className="krkn-ai-scenario-detail__section" aria-label={`Health-check results for scenario ${detail.scenarioId}`}>
                 {detail.healthChecks.length > 0
                   ? <ScenarioHealthCharts scenarioId={detail.scenarioId} samples={detail.healthChecks} />
                   : <p className="krkn-ai-not-available">No health-check samples have been committed for this scenario.</p>}

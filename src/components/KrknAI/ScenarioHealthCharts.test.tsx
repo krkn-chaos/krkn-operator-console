@@ -23,6 +23,17 @@ function latencyChart() {
 }
 
 describe('ScenarioHealthCharts', () => {
+
+  it('gives each chart a title and explanatory subtitle without a redundant filter heading', () => {
+    render(<ScenarioHealthCharts scenarioId="9" samples={[sample(0, 0.2)]} />);
+
+    expect(screen.getByRole('heading', { name: 'Measured health-check response time', level: 3 })).toBeInTheDocument();
+    expect(screen.getByText('Each point is one response-time sample; gaps indicate missing latency. Hover for sample details.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Measured health-check outcomes', level: 3 })).toBeInTheDocument();
+    expect(screen.getByText("Each cell is one check's HTTP status; hover for application, timestamp, and outcome details.")).toBeInTheDocument();
+    expect(screen.queryByText('Health-check applications')).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Health-check application filters' })).toBeInTheDocument();
+  });
   it('shows the full application name while keeping short labels discoverable', () => {
     render(<ScenarioHealthCharts scenarioId="9" samples={[
       sample(0, 0.2, true, { application: 'api' }),
