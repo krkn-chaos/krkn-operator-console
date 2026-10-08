@@ -261,6 +261,10 @@
   min-height: 0;
   overflow-y: auto;
 }
+
+.krkn-ai-scenario-detail .log-terminal--compact {
+  max-height: clamp(18.75rem, 55vh, 31.25rem);
+}
 .krkn-ai-scenario-detail__section h3 {
   font-weight: 700;
 }
