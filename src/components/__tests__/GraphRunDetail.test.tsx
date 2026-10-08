@@ -419,7 +419,7 @@ describe('GraphRunDetail', () => {
       const [payload] = mockDownloadJson.mock.calls[0];
       expect(payload._studioLayout.resiliencyScoreConfig).toEqual({
         baseline: 80.0,
-        mountPath: '/etc/krkn/metrics.yaml',
+        mountPath: '/etc/krkn/alerts.yaml',
       });
     });
 

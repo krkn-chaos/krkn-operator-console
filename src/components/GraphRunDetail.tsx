@@ -751,7 +751,7 @@ export function GraphRunDetail({ graphRunName }: GraphRunDetailProps) {
       const resiliency = graphRunDetail.spec.resiliencyScoreEnabled
         ? {
             baseline: graphRunDetail.spec.resiliencyScoreBaseline ?? 0,
-            mountPath: graphRunDetail.spec.resiliencyMountPath ?? '/etc/krkn/metrics.yaml',
+            mountPath: graphRunDetail.spec.resiliencyMountPath ?? '/etc/krkn/alerts.yaml',
           }
         : undefined;
       const payload = buildStudioExport(graphRunDetail.spec.graph, { graphRunName }, resiliency);

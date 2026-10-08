@@ -993,7 +993,7 @@ export interface CreateGraphRunRequest {
 export interface ResiliencyScoreConfig {
   /** Baseline score value (float, >= 0) */
   baseline: number;
-  /** Mount path for metrics file in container (default: /etc/krkn/metrics.yaml) */
+  /** Mount path for alerts file in container (default: /etc/krkn/alerts.yaml) */
   mountPath: string;
   /** Single file ID for all nodes (when using 'same file' mode) */
   fileId?: string;

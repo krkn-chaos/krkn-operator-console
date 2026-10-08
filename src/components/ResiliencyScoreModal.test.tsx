@@ -174,7 +174,7 @@ describe('ResiliencyScoreModal', () => {
       const baselineInput = screen.getByPlaceholderText('e.g., 100.0');
       await user.type(baselineInput, '100');
 
-      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/metrics.yaml');
+      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/alerts.yaml');
       await user.clear(mountPathInput);
 
       const confirmButton = screen.getByRole('button', { name: /confirm/i });
@@ -198,7 +198,7 @@ describe('ResiliencyScoreModal', () => {
       const baselineInput = screen.getByPlaceholderText('e.g., 100.0');
       await user.type(baselineInput, '100');
 
-      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/metrics.yaml');
+      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/alerts.yaml');
       await user.clear(mountPathInput);
       await user.type(mountPathInput, 'relative/path');
 
@@ -220,7 +220,7 @@ describe('ResiliencyScoreModal', () => {
         />
       );
 
-      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/metrics.yaml');
+      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/alerts.yaml');
       await user.clear(mountPathInput);
       await user.type(mountPathInput, '/custom/path/metrics.yaml');
 
@@ -342,7 +342,7 @@ describe('ResiliencyScoreModal', () => {
 
       expect(mockOnConfirm).toHaveBeenCalledWith({
         baseline: 100,
-        mountPath: '/etc/krkn/metrics.yaml',
+        mountPath: '/etc/krkn/alerts.yaml',
         fileId: 'file-1',
       });
     });
@@ -372,7 +372,7 @@ describe('ResiliencyScoreModal', () => {
 
       expect(mockOnConfirm).toHaveBeenCalledWith({
         baseline: 100,
-        mountPath: '/etc/krkn/metrics.yaml',
+        mountPath: '/etc/krkn/alerts.yaml',
       });
     });
   });
@@ -419,7 +419,7 @@ describe('ResiliencyScoreModal', () => {
 
       expect(mockOnConfirm).toHaveBeenCalledWith({
         baseline: 100,
-        mountPath: '/etc/krkn/metrics.yaml',
+        mountPath: '/etc/krkn/alerts.yaml',
         perNodeFiles: {
           'node-1': 'file-1',
           'node-2': 'file-2',
