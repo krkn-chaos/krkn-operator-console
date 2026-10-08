@@ -6,7 +6,9 @@ import {
   Modal,
   ModalVariant,
   TextInput,
+  Tooltip,
 } from '@patternfly/react-core';
+import { PencilAltIcon, PlusCircleIcon, TrashIcon } from '@patternfly/react-icons';
 import type { ConfigValidationErrors, EditableConfigDraft, HealthCheckDraft } from './configModel';
 import { validateConfigDraft } from './configModel';
 import './HealthChecksEditor.css';
@@ -186,7 +188,7 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
           <h3>Health checks</h3>
           <p className="krkn-ai-muted">Configure the endpoint, expected status, and polling timing for each check.</p>
         </div>
-        <Button variant="secondary" onClick={addHealthCheck}>Add health check</Button>
+        <Button variant="primary" icon={<PlusCircleIcon />} onClick={addHealthCheck}>Add health check</Button>
       </div>
       {draft.healthChecks.length === 0 ? (
         <p className="krkn-ai-muted">No health checks are configured. Add a real endpoint if this run needs availability monitoring.</p>
@@ -212,22 +214,28 @@ export function HealthChecksEditor({ draft, errors, onChange }: HealthChecksEdit
                   <td>{check.timeout}</td>
                   <td>{check.interval}</td>
                   <td className="krkn-ai-health-check-table__actions">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => editHealthCheck(check)}
-                      aria-label={`Edit health check ${check.name}`}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setPendingRemovalKey(check.key)}
-                      aria-label={`Remove health check ${check.name}`}
-                    >
-                      Remove
-                    </Button>
+                    <div className="krkn-ai-health-check-table__action-group">
+                      <Tooltip content={`Edit health check ${check.name}`} position="top">
+                        <Button
+                          variant="plain"
+                          size="sm"
+                          onClick={() => editHealthCheck(check)}
+                          aria-label={`Edit health check ${check.name}`}
+                          icon={<PencilAltIcon />}
+                          className="krkn-ai-editor-action--edit"
+                        />
+                      </Tooltip>
+                      <Tooltip content={`Remove health check ${check.name}`} position="top">
+                        <Button
+                          variant="plain"
+                          size="sm"
+                          onClick={() => setPendingRemovalKey(check.key)}
+                          aria-label={`Remove health check ${check.name}`}
+                          icon={<TrashIcon />}
+                          className="krkn-ai-editor-action--remove"
+                        />
+                      </Tooltip>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -12,7 +12,7 @@ import {
 import type { ConfigValidationErrors, EditableConfigDraft, FitnessItemDraft } from './configModel';
 import { validateConfigDraft } from './configModel';
 import './FitnessFunctionEditor.css';
-import { PencilAltIcon, TrashIcon } from '@patternfly/react-icons';
+import { PencilAltIcon, PlusCircleIcon, TrashIcon } from '@patternfly/react-icons';
 
 interface FitnessFunctionEditorProps {
   draft: EditableConfigDraft;
@@ -103,7 +103,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
           <h3>Fitness function items</h3>
           <p className="krkn-ai-muted">PromQL queries used to score each scenario.</p>
         </div>
-        <Button variant="secondary" onClick={openAdd}>Add fitness item</Button>
+        <Button variant="primary" icon={<PlusCircleIcon />} onClick={openAdd}>Add fitness item</Button>
       </div>
       {errors.fitnessItems && <p className="krkn-ai-field-error" role="alert">{errors.fitnessItems}</p>}
       <FormGroup label="Search PromQL queries" fieldId="krkn-ai-fitness-query-search">
@@ -122,7 +122,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
               <th scope="col">PromQL query</th>
               <th scope="col">Type</th>
               <th scope="col">Weight</th>
-              <th scope="col">Actions</th>
+              <th scope="col" className="krkn-ai-fitness-table-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -140,6 +140,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
                         onClick={() => openEdit(item)}
                         aria-label={`Edit fitness item ${item.id}`}
                         icon={<PencilAltIcon />}
+                        className="krkn-ai-editor-action--edit"
                       />
                     </Tooltip>
                     <Tooltip content={`Remove fitness item ${item.id}`} position="top">
@@ -150,6 +151,7 @@ export function FitnessFunctionEditor({ draft, errors, onChange }: FitnessFuncti
                         onClick={() => setPendingRemovalKey(item.key)}
                         aria-label={`Remove fitness item ${item.id}`}
                         icon={<TrashIcon />}
+                        className="krkn-ai-editor-action--remove"
                       />
                     </Tooltip>
                   </div>

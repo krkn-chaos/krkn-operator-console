@@ -651,7 +651,8 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(screen.getByRole('checkbox', { name: 'Stop the health-check watcher on failure' })).toBeInTheDocument();
   });
 
-  it('shows the baseline artifact as a selectable scenario result', async () => {
+  it('opens scenario details from the accessible row action', async () => {
+    const user = userEvent.setup();
     const run = makeRun('baseline-run', 'Succeeded');
     const baseline = makeScenarioRow({
       generation: 0,
@@ -710,8 +711,11 @@ describe('Krkn-AI real run lifecycle', () => {
       'Open baseline scenario details',
     ]));
     expect(screen.getByRole('cell', { name: 'Baseline' })).toBeInTheDocument();
+    const viewBaselineButton = within(scenarioTable).getByRole('button', { name: 'View details for baseline scenario baseline' });
+    await user.hover(viewBaselineButton);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('View details for baseline scenario baseline');
 
-    fireEvent.click(screen.getByRole('row', { name: 'Open baseline scenario details' }));
+    await user.click(viewBaselineButton);
     await flushReact();
     fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
     expect(screen.getByText('12 / 100')).toBeInTheDocument();

@@ -44,8 +44,10 @@
   text-align: right;
 }
 
-.krkn-ai-health-check-table__actions .pf-v5-c-button + .pf-v5-c-button {
-  margin-inline-start: 0.5rem;
+.krkn-ai-health-check-table__action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .krkn-ai-health-check-modal-fields {

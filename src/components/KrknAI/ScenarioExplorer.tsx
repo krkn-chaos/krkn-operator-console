@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Button, ClipboardCopy, Label, Modal, ModalVariant, Spinner, Tab, TabTitleText, Tabs, Title } from '@patternfly/react-core';
+import { Button, ClipboardCopy, Label, Modal, ModalVariant, Spinner, Tab, TabTitleText, Tabs, Title, Tooltip } from '@patternfly/react-core';
+import { EyeIcon } from '@patternfly/react-icons';
 import { LogViewer } from '../LogViewer';
 import { ScenarioHealthCharts } from './ScenarioHealthCharts';
 import { MetadataPanel } from './MetadataPanel';
@@ -452,6 +453,9 @@ export function ScenarioExplorer({
                   const status = rowStatus(scenario);
                   const finalized = isGenerationFinalized(scenario, completedGenerations);
                   const calculationPending = isCalculationPending(scenario, runPhase, currentGeneration, completedGenerations);
+                  const detailLabel = isBaselineScenario(scenario)
+                    ? `View details for baseline scenario ${scenario.scenarioId}`
+                    : `View details for generation ${scenario.generation + 1} scenario ${scenario.scenarioId}`;
                   return (
                     <tr
                       key={scenarioKey(scenario)}
@@ -480,18 +484,18 @@ export function ScenarioExplorer({
                       <td><Label color={statusColor(status)}>{status}</Label></td>
                       <td>{scenario.durationSeconds == null ? 'Not available yet' : `${scenario.durationSeconds.toLocaleString(undefined, { maximumFractionDigits: 2 })}s`}</td>
                       <td>
-                        <Button
-                          variant="secondary"
-                          aria-label={isBaselineScenario(scenario)
-                            ? `View details for baseline scenario ${scenario.scenarioId}`
-                            : `View details for generation ${scenario.generation + 1} scenario ${scenario.scenarioId}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onSelect(scenario);
-                          }}
-                        >
-                          View details
-                        </Button>
+                        <Tooltip content={detailLabel} position="top">
+                          <Button
+                            variant="plain"
+                            className="krkn-ai-scenario-table__view-action"
+                            aria-label={detailLabel}
+                            icon={<EyeIcon />}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onSelect(scenario);
+                            }}
+                          />
+                        </Tooltip>
                       </td>
                     </tr>
                   );

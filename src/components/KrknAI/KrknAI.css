@@ -1109,6 +1109,24 @@
   margin-block-end: 0.75rem;
 }
 
+.krkn-ai .krkn-ai-editor-action--edit:not(:disabled),
+.krkn-ai .krkn-ai-scenario-table__view-action:not(:disabled) {
+  color: var(--pf-v5-global--primary-color--100, #0066cc);
+}
+
+.krkn-ai .krkn-ai-editor-action--edit:not(:disabled):hover,
+.krkn-ai .krkn-ai-editor-action--edit:not(:disabled):focus,
+.krkn-ai .krkn-ai-scenario-table__view-action:not(:disabled):hover,
+.krkn-ai .krkn-ai-scenario-table__view-action:not(:disabled):focus {
+  color: var(--pf-v5-global--primary-color--100, #0066cc);
+}
+
+.krkn-ai .krkn-ai-editor-action--remove:not(:disabled),
+.krkn-ai .krkn-ai-editor-action--remove:not(:disabled):hover,
+.krkn-ai .krkn-ai-editor-action--remove:not(:disabled):focus {
+  color: var(--pf-v5-global--danger-color--100, #c9190b);
+}
+
 .krkn-ai-editor-heading h3 {
   margin-block: 0 0.5rem;
 }
