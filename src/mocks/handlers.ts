@@ -1054,7 +1054,7 @@ export const handlers = [
           id: 'alert-001',
           source: {
             run_uuid: 'abc1234-rest-of-uuid',
-            phase: 'Running',
+            phase: 'during',
             created_at: '2026-09-25T14:32:18Z',
             severity: 'critical',
             alertname: 'KubeAPIServerLatencyHigh',
