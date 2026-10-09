@@ -148,10 +148,17 @@ export function BackupRestoreCard() {
           <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsLg' }}>
             <FlexItem>
               <p>
-                Download a backup of all configuration data including users, targets, providers, and
-                credentials. Upload a backup archive to restore configuration, including cross-cluster
+                Download a backup of all configuration data including users, user groups, targets, and
+                secrets. Upload a backup archive to restore configuration, including cross-cluster
                 migration.
               </p>
+            </FlexItem>
+
+            <FlexItem>
+              <Alert variant={AlertVariant.warning} title="Sensitive data" isInline isPlain>
+                The backup archive contains secrets and should be treated as sensitive information.
+                Store it securely.
+              </Alert>
             </FlexItem>
 
             <FlexItem>
@@ -225,7 +232,7 @@ export function BackupRestoreCard() {
         <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
           <FlexItem>
             <Alert variant={AlertVariant.warning} title="This will replace backed-up configuration" isInline>
-              Current users, groups, targets, providers, secrets, and credentials included in the backup
+              Current users, user groups, targets, and secrets included in the backup
               will be replaced with the backed-up versions. Restore runs asynchronously.
             </Alert>
           </FlexItem>
