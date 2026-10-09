@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockGetGraphRunConfig = vi.fn();
 const mockGetGraphRun = vi.fn();
 const mockGetScenarios = vi.fn();
+const mockListAvailableCredentials = vi.fn();
 
 vi.mock('../services', () => ({
   graphRunsApi: {
@@ -12,6 +13,9 @@ vi.mock('../services', () => ({
   operatorApi: {
     getScenarios: (...args: unknown[]) => mockGetScenarios(...args),
   },
+  cloudCredentialsApi: {
+    listAvailable: (...args: unknown[]) => mockListAvailableCredentials(...args),
+  },
 }));
 
 const { loadGraphRunReplay } = await import('./graphRunReplay');
@@ -19,6 +23,7 @@ const { loadGraphRunReplay } = await import('./graphRunReplay');
 describe('loadGraphRunReplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockListAvailableCredentials.mockResolvedValue([]);
   });
 
   it('converts the saved graph and carries its categories into a Studio workflow', async () => {
@@ -38,6 +43,7 @@ describe('loadGraphRunReplay', () => {
         _comment: { name: 'comment', depends_on: 'node-1' },
       },
       categories: ['resilience', 'network'],
+      cloudCredentialRef: 'aws-graph',
     });
     mockGetGraphRun.mockResolvedValue({
       spec: {
@@ -47,6 +53,7 @@ describe('loadGraphRunReplay', () => {
       },
     });
     mockGetScenarios.mockResolvedValue({ scenarios: [{ name: 'pod-kill', signature_status: 'signed' }] });
+    mockListAvailableCredentials.mockResolvedValue([{ name: 'aws-graph', provider: 'aws' }]);
 
     const replay = await loadGraphRunReplay('workflow-run-1');
 
@@ -71,6 +78,16 @@ describe('loadGraphRunReplay', () => {
     ]);
     expect(replay.workflow.nextNodeNumber).toBe(3);
     expect(replay.workflow.resiliencyScoreConfig).toEqual({ baseline: 80, mountPath: '/metrics.yaml' });
+    expect(replay.workflow.cloudCredentialRef).toBe('aws-graph');
+  });
+
+  it('omits an unavailable graph-level credential during replay', async () => {
+    mockGetGraphRunConfig.mockResolvedValue({ graph: {}, cloudCredentialRef: 'removed-credential' });
+    mockGetGraphRun.mockResolvedValue({ spec: { resiliencyScoreEnabled: false } });
+
+    const replay = await loadGraphRunReplay('workflow-run-removed-credential');
+
+    expect(replay.workflow.cloudCredentialRef).toBeUndefined();
   });
 
   it('keeps replay available when signature metadata cannot be loaded', async () => {

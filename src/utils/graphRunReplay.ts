@@ -1,4 +1,4 @@
-import { graphRunsApi, operatorApi } from '../services';
+import { cloudCredentialsApi, graphRunsApi, operatorApi } from '../services';
 import type { StudioWorkflow } from '../types/api';
 
 export interface GraphRunReplayPayload {
@@ -16,9 +16,10 @@ export interface GraphRunReplayPayload {
  * ```
  */
 export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRunReplayPayload> {
-  const [config, graphRunDetail] = await Promise.all([
+  const [config, graphRunDetail, availableCredentials] = await Promise.all([
     graphRunsApi.getGraphRunConfig(graphRunName),
     graphRunsApi.getGraphRun(graphRunName),
+    cloudCredentialsApi.listAvailable().catch(() => []),
   ]);
   const replayNodes = Object.entries(config.graph)
     .filter(([nodeId]) => !nodeId.startsWith('_'));
@@ -70,6 +71,9 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
           mountPath: graphRunDetail.spec.resiliencyMountPath ?? '/etc/krkn/metrics.yaml',
         }
       : undefined,
+    ...(config.cloudCredentialRef && availableCredentials.some(credential => credential.name === config.cloudCredentialRef)
+      ? { cloudCredentialRef: config.cloudCredentialRef }
+      : {}),
   };
 
   return { workflow, categories: config.categories ?? [] };
