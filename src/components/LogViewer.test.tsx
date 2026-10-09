@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { LogViewer } from './LogViewer';
 import { websocketService } from '../services/websocketService';
 
-vi.mock('../hooks/useWebSocket', () => ({ useWebSocket: vi.fn() }));
+vi.mock('../hooks/useWebSocket', () => ({
+  useWebSocket: vi.fn(() => ({ connectionState: 'disconnected' })),
+}));
 
 vi.mock('../services/authService', () => ({
   authService: {

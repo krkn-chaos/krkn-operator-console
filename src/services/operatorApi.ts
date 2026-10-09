@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { BaseApiClient, authenticatedFetch } from '../utils/apiClient';
+import type { PaginationMeta } from '../types/websocket';
 import type {
   CreateTargetResponse,
   ClustersResponse,
@@ -65,9 +66,10 @@ class OperatorApiClient extends BaseApiClient {
    * Initialize a new target request
    * @returns Promise with UUID
    */
-  async createTargetRequest(): Promise<CreateTargetResponse> {
+  async createTargetRequest(options: { signal?: AbortSignal } = {}): Promise<CreateTargetResponse> {
     return this.fetchJson<CreateTargetResponse>('/targets', {
       method: 'POST',
+      ...(options.signal ? { signal: options.signal } : {}),
     });
   }
 
@@ -77,8 +79,8 @@ class OperatorApiClient extends BaseApiClient {
    * @param uuid - Target request UUID
    * @returns HTTP status code (202 = Accepted/pending, 200 = OK/completed)
    */
-  async getTargetStatus(uuid: string): Promise<number> {
-    const response = await this.fetch(`/targets/${uuid}`);
+  async getTargetStatus(uuid: string, options: { signal?: AbortSignal } = {}): Promise<number> {
+    const response = await this.fetch(`/targets/${uuid}`, options.signal ? { signal: options.signal } : {});
     return response.status;
   }
 
@@ -113,8 +115,14 @@ class OperatorApiClient extends BaseApiClient {
 
     // Handle HTTP error status codes with custom messages
     if (response.status === 404) {
-      // Command not found
-      throw new Error(`TERMINAL_ERROR:404:${request.command}`);
+      let message: string | undefined;
+      try {
+        const payload = await response.json() as { message?: unknown };
+        if (typeof payload.message === 'string' && payload.message.trim()) message = payload.message.trim();
+      } catch {
+        // Non-JSON 404 responses (e.g., a missing route) retain the generic message.
+      }
+      throw new Error(message ?? `TERMINAL_ERROR:404:${request.command}`);
     }
     if (response.status === 403) {
       // Forbidden - user not authorized to execute this command
@@ -132,8 +140,14 @@ class OperatorApiClient extends BaseApiClient {
       throw new Error(`HTTP error ${response.status}`);
     }
 
-    const data = await response.json() as TerminalResponse;
-
+    const payload = await response.json() as Record<string, unknown>;
+    if (response.status === 400 && typeof payload.exit_code !== 'number') {
+      const message = typeof payload.message === 'string' && payload.message.trim()
+        ? payload.message.trim()
+        : 'The terminal request was rejected.';
+      throw new Error(message);
+    }
+    const data = payload as unknown as TerminalResponse;
     // Decode base64 stdout and stderr
     const stdout = data.stdout_base64 ? atob(data.stdout_base64) : '';
     const stderr = data.stderr_base64 ? atob(data.stderr_base64) : '';
@@ -162,19 +176,25 @@ class OperatorApiClient extends BaseApiClient {
    * @param uuid - Target request UUID
    * @returns Promise with clusters data
    */
-  async getClusters(uuid: string): Promise<ClustersResponse> {
-    return this.fetchJson<ClustersResponse>(`/clusters?id=${uuid}`);
+  async getClusters(uuid: string, options: { signal?: AbortSignal } = {}): Promise<ClustersResponse> {
+    return this.fetchJson<ClustersResponse>(
+      `/clusters?id=${encodeURIComponent(uuid)}`,
+      options.signal ? { signal: options.signal } : {},
+    );
   }
 
   /**
-   * GET /nodes?id={uuid}&cluster-name={clusterName}
+   * GET /nodes?id={uuid}&cluster-name={clusterName}&operator-name={operatorName}
    * Get nodes from selected cluster
    * @param uuid - Target request UUID
    * @param clusterName - Cluster name
+   * @param operatorName - Optional provider name for multi-provider targets
    * @returns Promise with nodes data
    */
-  async getNodes(uuid: string, clusterName: string): Promise<NodesResponse> {
-    return this.fetchJson<NodesResponse>(`/nodes?id=${uuid}&cluster-name=${encodeURIComponent(clusterName)}`);
+  async getNodes(uuid: string, clusterName: string, operatorName?: string): Promise<NodesResponse> {
+    const query = new URLSearchParams({ id: uuid, 'cluster-name': clusterName });
+    if (operatorName) query.set('operator-name', operatorName);
+    return this.fetchJson<NodesResponse>(`/nodes?${query.toString()}`);
   }
 
   /**
@@ -318,15 +338,16 @@ class OperatorApiClient extends BaseApiClient {
    * List all scenario runs with optional pagination.
    * When page/limit are omitted, all items are returned.
    */
-  async listScenarioRuns(page?: number, limit?: number): Promise<ScenarioRunListResponse> {
+  async listScenarioRuns(page?: number, limit?: number, options: { labelSelector?: string; signal?: AbortSignal } = {}): Promise<ScenarioRunListResponse> {
     try {
       const params = new URLSearchParams();
       if (page !== undefined) params.set('page', String(page));
       if (limit !== undefined) params.set('limit', String(limit));
+      if (options.labelSelector) params.set('labelSelector', options.labelSelector);
       const query = params.toString();
       const path = `/scenarios/run${query ? `?${query}` : ''}`;
 
-      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: import('../types/websocket').PaginationMeta }>(path);
+      const data = await this.fetchJson<{ scenarioRuns?: ScenarioRunStatusResponse[]; runs?: ScenarioRunStatusResponse[]; pagination?: PaginationMeta }>(path, { signal: options.signal });
 
       return {
         scenarioRuns: data.scenarioRuns || data.runs || [],
@@ -565,9 +586,15 @@ class OperatorApiClient extends BaseApiClient {
    * Get files available to the current user (based on groups)
    * @returns Promise with response containing minimal file info array
    */
-  async getAvailableFiles(filePurpose?: string): Promise<AvailableFilesResponse> {
+  async getAvailableFiles(
+    filePurpose?: string,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<AvailableFilesResponse> {
     const query = filePurpose ? `?filePurpose=${encodeURIComponent(filePurpose)}` : '';
-    return this.fetchJson<AvailableFilesResponse>(`/files/available${query}`);
+    return this.fetchJson<AvailableFilesResponse>(
+      `/files/available${query}`,
+      options.signal ? { signal: options.signal } : {},
+    );
   }
 
   /**
@@ -586,8 +613,11 @@ class OperatorApiClient extends BaseApiClient {
    * @param fileId - File UUID
    * @returns Promise with full file details
    */
-  async getFile(fileId: string): Promise<FileResponse> {
-    return this.fetchJson<FileResponse>(`/files/${encodeURIComponent(fileId)}`);
+  async getFile(fileId: string, options: { signal?: AbortSignal } = {}): Promise<FileResponse> {
+    return this.fetchJson<FileResponse>(
+      `/files/${encodeURIComponent(fileId)}`,
+      options.signal ? { signal: options.signal } : {},
+    );
   }
 
   /**

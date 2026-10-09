@@ -79,7 +79,7 @@ describe('EditGroupModal', () => {
     });
   });
 
-  it('should fetch group data and start cluster discovery when modal opens', async () => {
+  it('shows discovered clusters in the editor when the modal opens', async () => {
     render(
       <EditGroupModal
         isOpen={true}
@@ -90,10 +90,8 @@ describe('EditGroupModal', () => {
     );
 
     await waitFor(() => {
-      expect(vi.mocked(groupsApi).getGroup).toHaveBeenCalledWith('test-group');
-      expect(vi.mocked(operatorApi).createTargetRequest).toHaveBeenCalled();
-      expect(vi.mocked(operatorApi).getTargetStatus).toHaveBeenCalledWith('test-discovery-uuid');
-      expect(vi.mocked(operatorApi).getClusters).toHaveBeenCalledWith('test-discovery-uuid');
+      expect(screen.getByDisplayValue('test-group')).toBeInTheDocument();
+      expect(screen.getByText('cluster1')).toBeInTheDocument();
     });
   });
 

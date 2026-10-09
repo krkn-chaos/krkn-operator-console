@@ -56,6 +56,7 @@ import { JobStatsSummary } from './JobStatsSummary';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
+import { useKrknAIOrigins } from '../hooks/useKrknAIOrigins';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
@@ -186,6 +187,8 @@ interface JobsListProps {
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
   onReplayWorkflow?: (graphRunName: string) => Promise<void>;
+  onOpenKrknAIRun?: (name: string) => void;
+  krknAIEnabled?: boolean;
   loadingRunDetails: Set<string>;
 }
 
@@ -203,6 +206,8 @@ export function JobsList({
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
   onReplayWorkflow,
+  onOpenKrknAIRun,
+  krknAIEnabled = true,
   loadingRunDetails,
 }: JobsListProps) {
   const { isAdmin } = useRole();
@@ -222,6 +227,7 @@ export function JobsList({
     snapshotVersion,
     refresh: refreshJobs,
   } = useJobs(categoryFilters);
+  const { origins: aiOrigins, error: aiOriginError, refresh: refreshAiOrigins } = useKrknAIOrigins(jobs, krknAIEnabled);
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -621,6 +627,11 @@ export function JobsList({
           loading={activeRunsLoading}
           error={activeRunsError}
         />
+        {aiOriginError && (
+          <Alert variant="warning" title="Krkn-AI origins unavailable" isInline>
+            {aiOriginError} <Button variant="link" isInline onClick={refreshAiOrigins}>Retry origin lookup</Button>
+          </Alert>
+        )}
         {categoryError && (
           <Alert
             variant="danger"
@@ -1160,6 +1171,19 @@ export function JobsList({
                                 >
                                   <code>{customRunName}</code>
                                 </div>
+                              </Tooltip>
+                            )}
+                            {aiOrigins[run.scenarioRunName] && onOpenKrknAIRun && (
+                              <Tooltip content={`Triggered by Krkn-AI run ${aiOrigins[run.scenarioRunName]}`}>
+                                <Button
+                                  variant="link"
+                                  isInline
+                                  icon={<TopologyIcon />}
+                                  aria-label={`Open Krkn-AI run ${aiOrigins[run.scenarioRunName]} for scenario ${run.scenarioRunName}`}
+                                  onClick={() => onOpenKrknAIRun(aiOrigins[run.scenarioRunName])}
+                                >
+                                  Krkn-AI · {aiOrigins[run.scenarioRunName]}
+                                </Button>
                               </Tooltip>
                             )}
                           </div>
