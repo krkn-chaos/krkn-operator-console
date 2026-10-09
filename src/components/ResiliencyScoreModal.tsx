@@ -5,7 +5,7 @@
  * - Set baseline score (required, float >= 0)
  * - Select file mode: same for all nodes or per-node
  * - Select alerts file(s) from available files
- * - Override mount path (default: /etc/krkn/metrics.yaml)
+ * - Override mount path (default: /etc/krkn/alerts.yaml)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -45,7 +45,7 @@ export function ResiliencyScoreModal({
   onConfirm,
 }: ResiliencyScoreModalProps) {
   const [baseline, setBaseline] = useState<string>('');
-  const [mountPath, setMountPath] = useState<string>('/etc/krkn/metrics.yaml');
+  const [mountPath, setMountPath] = useState<string>('/etc/krkn/alerts.yaml');
   const [fileMode, setFileMode] = useState<'same' | 'per-node'>('same');
 
   // File selection state
@@ -86,7 +86,7 @@ export function ResiliencyScoreModal({
   useEffect(() => {
     if (!isOpen) {
       setBaseline('');
-      setMountPath('/etc/krkn/metrics.yaml');
+      setMountPath('/etc/krkn/alerts.yaml');
       setFileMode('same');
       setSelectedFileId('');
       setPerNodeFileIds({});
@@ -237,7 +237,7 @@ export function ResiliencyScoreModal({
             onChange={handleMountPathChange}
             validated={mountPathError ? 'error' : 'success'}
             aria-label="Mount path"
-            placeholder="/etc/krkn/metrics.yaml"
+            placeholder="/etc/krkn/alerts.yaml"
           />
           {mountPathError ? (
             <FormHelperText>

@@ -68,7 +68,7 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
     resiliencyScoreConfig: graphRunDetail.spec.resiliencyScoreEnabled
       ? {
           baseline: graphRunDetail.spec.resiliencyScoreBaseline ?? 0,
-          mountPath: graphRunDetail.spec.resiliencyMountPath ?? '/etc/krkn/metrics.yaml',
+          mountPath: graphRunDetail.spec.resiliencyMountPath ?? '/etc/krkn/alerts.yaml',
         }
       : undefined,
     ...(config.cloudCredentialRef && availableCredentials.some(credential => credential.name === config.cloudCredentialRef)
