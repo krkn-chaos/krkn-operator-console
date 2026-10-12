@@ -11,6 +11,7 @@ export interface CreateTargetResponse {
 
 export interface TerminalRequest {
   cluster_id: string;  // Cluster name from KrknTargetRequest
+  operator_name: string; // Provider name from KrknTargetRequest.targetData
   uuid: string;        // KrknTargetRequest UUID
   command: string;     // Full command (e.g., 'kubectl get pods -n default')
 }
@@ -458,6 +459,7 @@ export type AppPhase =
   | 'files' // File management page
   | 'categories' // Category management page
   | 'elasticsearch_data' // Elasticsearch telemetry data table page
+  | 'krkn_ai' // Mock Krkn AI console
   | 'resiliency_history' // Resiliency history analytics page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
@@ -626,6 +628,7 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_FILES' }
   | { type: 'NAVIGATE_TO_CATEGORIES' }
   | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
+  | { type: 'NAVIGATE_TO_KRKN_AI' }
   | { type: 'NAVIGATE_TO_RESILIENCY_HISTORY' }
 
   // Notifications

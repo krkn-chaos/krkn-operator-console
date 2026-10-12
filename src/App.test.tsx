@@ -21,6 +21,12 @@ import type { JobConfigResponse, ScenarioRunState } from './types/api';
  * navigation path rather than child-component internals or network I/O.
  */
 
+const appMocks = vi.hoisted(() => ({
+  krknAI: {
+    getStatus: vi.fn().mockResolvedValue({ enabled: true }),
+  },
+}));
+
 // Poller hooks perform network I/O on mount; stub them out.
 vi.mock('./hooks', () => ({
   useTargetPoller: vi.fn(),
@@ -51,6 +57,7 @@ vi.mock('react-router-dom', () => ({
 vi.mock('./services/operatorApi', () => ({
   operatorApi: { createTargetRequest: vi.fn() },
 }));
+vi.mock('./services/krknAiApi', () => ({ krknAiApi: appMocks.krknAI }));
 
 // Stub every child component App pulls from the barrel so the render switch is
 // observable without mounting real pages (which do their own network I/O).
@@ -65,6 +72,9 @@ vi.mock('./components', () => ({
   TerminalContent: () => <div>TerminalContent</div>,
   Studio: () => <div>Studio</div>,
   ElasticsearchDataView: () => <div data-testid="elasticsearch-data-view">ElasticsearchDataView</div>,
+}));
+vi.mock('./components/KrknAI/KrknAIPage', () => ({
+  KrknAIPage: () => <div data-testid="krkn-ai-page">KrknAIPage</div>,
 }));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
 vi.mock('./components/ResiliencyHistory', () => ({
@@ -133,14 +143,46 @@ describe('scenario replay handoff', () => {
   });
 });
 
+describe('App Krkn AI navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+    });
+  });
+
+  it('renders the Krkn AI page from the sidebar destination when enabled', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    expect(screen.queryByTestId('krkn-ai-page')).not.toBeInTheDocument();
+
+    await screen.findByText('Krkn AI');
+    await user.click(screen.getByText('Krkn AI'));
+    await waitFor(() => expect(screen.getByTestId('krkn-ai-page')).toBeInTheDocument());
+  });
+
+  it('hides the Krkn AI listing and navigation when the operator feature is disabled', async () => {
+    appMocks.krknAI.getStatus.mockResolvedValueOnce({ enabled: false });
+    renderApp();
+
+    await waitFor(() => expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Krkn AI')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('krkn-ai-page')).not.toBeInTheDocument();
+  });
+});
+
 describe('App Resiliency History navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => void store.set(k, v),
-      removeItem: (k: string) => void store.delete(k),
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
       clear: () => store.clear(),
     });
   });
