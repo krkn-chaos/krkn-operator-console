@@ -670,6 +670,26 @@ describe('StudioContext', () => {
     });
   });
 
+  describe('addTriggerNode', () => {
+    it('adds an unconfigured trigger node with the next generated id', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+
+      act(() => {
+        result.current.addTriggerNode();
+      });
+
+      expect(result.current.workflow.nodes).toEqual([
+        {
+          nodeId: 'node-1',
+          nodeType: 'trigger',
+          status: 'unconfigured',
+          position: { x: 100, y: 200 },
+        },
+      ]);
+      expect(result.current.workflow.nextNodeNumber).toBe(2);
+    });
+  });
+
   describe('updateNode', () => {
     it('updates an existing node by nodeId', () => {
       const { result } = renderHook(() => useStudioContext(), { wrapper });
@@ -776,6 +796,38 @@ describe('StudioContext', () => {
       expect(clone.status).toBe('configured');
       expect(clone.position).toEqual({ x: 150, y: 250 });
       expect(clone.config?.scenarioName).toBe('scenario-original');
+    });
+
+    it('preserves trigger identity and exports the clone as a trigger', () => {
+      const conditionConfig = JSON.stringify([{ type: 'http', url: 'https://service.example/health' }]);
+      const trigger = makeConfiguredNode('wait-node', {
+        nodeType: 'trigger',
+        config: {
+          nodeType: 'trigger',
+          registryType: 'public',
+          registryConfig: {},
+          scenarioName: 'trigger',
+          scenarioImage: 'quay.io/krkn-chaos/krkn-hub:trigger',
+          scenarioFormValues: { TRIGGERS_CONDITIONS_JSON: conditionConfig },
+          resiliencyWeight: 2,
+        },
+      });
+      const { result } = renderHook(() => useStudioContext(), {
+        wrapper: wrapperWith({ nodes: [trigger], edges: [], nextNodeNumber: 2 }),
+      });
+
+      act(() => {
+        result.current.cloneNode('wait-node', 'wait-node-copy');
+      });
+
+      const clone = result.current.workflow.nodes.find(node => node.nodeId === 'wait-node-copy');
+      expect(clone?.nodeType).toBe('trigger');
+      expect(clone?.config?.scenarioFormValues.TRIGGERS_CONDITIONS_JSON).toBe(conditionConfig);
+
+      const graph = buildGraph(result.current.workflow);
+      expect(graph['wait-node-copy'].nodeType).toBe('trigger');
+      expect(graph['wait-node-copy'].env?.TRIGGERS_CONDITIONS_JSON).toBe(conditionConfig);
+      expect(graph['wait-node-copy'].resiliencyWeight).toBeUndefined();
     });
 
     it('does not clone an unconfigured node', () => {
@@ -1353,6 +1405,40 @@ describe('StudioContext', () => {
       expect(graph['cloud-node'].env).toEqual({ ACTION: 'node_stop_start_scenario' });
       expect(graph['cloud-node'].env?.AWS_ACCESS_KEY_ID).toBeUndefined();
       expect(graph['cloud-node'].env?.CLOUD_TYPE).toBeUndefined();
+    });
+
+    it('serializes a configured trigger node without adding a resiliency weight', () => {
+      const conditions = JSON.stringify([
+        { type: 'http', url: 'https://service.example/health' },
+        { type: 'k8s', apiVersion: 'apps/v1', kind: 'Deployment' },
+      ]);
+      const trigger: StudioNode = {
+        nodeId: 'wait-node',
+        nodeType: 'trigger',
+        status: 'configured',
+        position: { x: 100, y: 200 },
+        config: {
+          nodeType: 'trigger',
+          registryType: 'public',
+          registryConfig: {},
+          scenarioName: 'trigger',
+          scenarioImage: 'quay.io/krkn-chaos/krkn-hub:trigger',
+          scenarioFormValues: {
+            TRIGGERS_CONDITIONS_JSON: conditions,
+            TRIGGERS_MODE: 'all_of',
+          },
+        },
+      };
+
+      const graph = buildGraph({ nodes: [trigger], edges: [], nextNodeNumber: 2 });
+
+      expect(graph['wait-node'].nodeType).toBe('trigger');
+      expect(graph['wait-node'].scenario).toEqual({ name: 'trigger', private: false });
+      expect(graph['wait-node'].env).toEqual({
+        TRIGGERS_CONDITIONS_JSON: conditions,
+        TRIGGERS_MODE: 'all_of',
+      });
+      expect(graph['wait-node'].resiliencyWeight).toBeUndefined();
     });
   });
 });

@@ -188,6 +188,7 @@ export interface BaseField {
   type: FieldType;
   secret?: boolean;
   group?: string;
+  trigger_type?: string;
   mutually_excludes?: string;
 }
 
@@ -850,6 +851,8 @@ export interface AvailableRegistriesResponse {
 export interface GraphScenarioNode {
   workspace?: WorkspaceSelection;
   rollbackEnabled?: boolean;
+  /** Explicit built-in graph node type; trigger nodes wait on event conditions. */
+  nodeType?: 'scenario' | 'trigger';
   /** Optional comment describing the scenario */
   _comment?: string;
   /** Registry-independent scenario identity sent to the operator. */
@@ -1175,8 +1178,10 @@ export interface StudioNode {
   nodeId: string;
   /** Configuration status of the node */
   status: StudioNodeStatus;
+  nodeType?: 'scenario' | 'trigger';
   /** Node configuration (only present when status === 'configured') */
   config?: {
+    nodeType?: 'scenario' | 'trigger';
     /** Registry type (public or private) */
     registryType: 'public' | 'private';
     /** Registry configuration (contains registryName for private registries) */

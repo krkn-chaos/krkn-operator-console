@@ -22,6 +22,22 @@ interface StudioNodeConfigModalProps {
 function formatValue(key: string, value: string | number | boolean | File): string {
   if (SENSITIVE_PATTERNS.test(key)) return '********';
   if (value instanceof File) return value.name;
+  if (key === 'TRIGGERS_CONDITIONS_JSON') {
+    try {
+      const conditions: unknown = JSON.parse(String(value));
+      if (Array.isArray(conditions)) {
+        const types = conditions
+          .map(condition => condition && typeof condition === 'object'
+            ? (condition as Record<string, unknown>).type
+            : undefined)
+          .filter((type): type is string => typeof type === 'string');
+        return `${types.length} condition(s): ${types.join(', ')}`;
+      }
+    } catch {
+      return 'Configured trigger conditions';
+    }
+    return 'Configured trigger conditions';
+  }
   return String(value);
 }
 

@@ -114,7 +114,7 @@ export function StudioNode({ data }: NodeProps) {
           {/* Scenario name or placeholder */}
           <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
             {isConfigured && node.config
-              ? node.config.scenarioName
+              ? node.nodeType === 'trigger' ? 'Wait for Trigger' : node.config.scenarioName
               : 'Right-click to configure'}
           </div>
 
@@ -129,7 +129,7 @@ export function StudioNode({ data }: NodeProps) {
             {node.nodeId}
           </div>
 
-          {isConfigured && node.config && (
+          {isConfigured && node.config && node.nodeType !== 'trigger' && (
             <div style={{ fontSize: '11px', color: 'var(--pf-v5-global--Color--200)' }}>
               Weight: {node.config.resiliencyWeight ?? 1}
             </div>
