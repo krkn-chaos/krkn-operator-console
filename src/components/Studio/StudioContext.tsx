@@ -80,6 +80,7 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
       }
 
       graph[node.nodeId] = {
+        ...(node.nodeType === 'trigger' ? { nodeType: 'trigger' as const } : {}),
         scenario: {
           name: node.config.scenarioName,
           private: node.config.registryType === 'private',
@@ -92,7 +93,7 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
         workspace: node.config.workspace,
         rollbackEnabled: node.config.rollbackEnabled,
         depends_on: incomingEdge?.source,
-        resiliencyWeight: node.config.resiliencyWeight ?? 1,
+        ...(node.nodeType !== 'trigger' ? { resiliencyWeight: node.config.resiliencyWeight ?? 1 } : {}),
         cloudCredentialRef: node.config.cloudCredentialRef,
       };
     }
@@ -110,6 +111,7 @@ interface StudioContextType {
   setCategoryCatalog: (categories: CategoryResponse[], status: CategoryLoadStatus) => void;
   savedWorkflow: SavedWorkflowMetadata | null;
   addNode: () => void;
+  addTriggerNode: () => void;
   updateNode: (nodeId: string, updates: Partial<StudioNode>) => void;
   deleteNode: (nodeId: string) => void;
   cloneNode: (sourceNodeId: string, newNodeId: string) => void;
@@ -231,6 +233,16 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     }));
   }, [workflow.nextNodeNumber]);
 
+  const addTriggerNode = useCallback(() => {
+    const newNode: StudioNode = {
+      nodeId: `node-${workflow.nextNodeNumber}`,
+      nodeType: 'trigger',
+      status: 'unconfigured',
+      position: { x: 100 + (workflow.nextNodeNumber - 1) * 300, y: 200 },
+    };
+    setWorkflow(prev => ({ ...prev, nodes: [...prev.nodes, newNode], nextNodeNumber: prev.nextNodeNumber + 1 }));
+  }, [workflow.nextNodeNumber]);
+
   // Update node (used for configuration, position changes, etc.)
   const updateNode = useCallback((nodeId: string, updates: Partial<StudioNode>) => {
     setWorkflow(prev => {
@@ -285,6 +297,7 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
 
       const clonedNode: StudioNode = {
         nodeId: newNodeId,
+        nodeType: sourceNode.nodeType ?? sourceNode.config?.nodeType,
         status: 'configured',
         config: sourceNode.config ? { ...sourceNode.config } : undefined,
         position: {
@@ -528,6 +541,7 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     setCategoryCatalog,
     savedWorkflow,
     addNode,
+    addTriggerNode,
     updateNode,
     deleteNode,
     cloneNode,
@@ -554,6 +568,7 @@ export function StudioProvider({ children, initialWorkflow, initialCategories = 
     setCategoryCatalog,
     savedWorkflow,
     addNode,
+    addTriggerNode,
     updateNode,
     deleteNode,
     cloneNode,

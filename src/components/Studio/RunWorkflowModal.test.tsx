@@ -59,6 +59,21 @@ const unsignedNode: StudioNode = {
   },
 };
 
+const triggerNode: StudioNode = {
+  nodeId: 'wait-node',
+  nodeType: 'trigger',
+  status: 'configured',
+  position: { x: 0, y: 0 },
+  config: {
+    nodeType: 'trigger',
+    registryType: 'public',
+    registryConfig: {},
+    scenarioName: 'trigger',
+    scenarioImage: 'quay.io/krkn-chaos/krkn-hub:trigger',
+    scenarioFormValues: { TRIGGERS_CONDITIONS_JSON: '[]' },
+  },
+};
+
 function renderModal(node = unsignedNode) {
   vi.mocked(useStudioContext).mockReturnValue({
     workflow: { nodes: [node], edges: [], nextNodeNumber: 2 },
@@ -113,6 +128,15 @@ describe('RunWorkflowModal signature gates', () => {
 
     expect(screen.getByRole('button', { name: /Run Workflow on/ })).not.toBeDisabled();
     expect(screen.queryByText('Workflow cannot run with unsigned images')).not.toBeInTheDocument();
+  });
+
+  it('does not block a trigger node with no per-node signature status', async () => {
+    renderModal(triggerNode);
+    await userEvent.click(screen.getByRole('button', { name: 'Select cluster' }));
+
+    expect(screen.getByRole('button', { name: /Run Workflow on/ })).not.toBeDisabled();
+    expect(screen.queryByText('Workflow cannot run with unsigned images')).not.toBeInTheDocument();
+    expect(screen.queryByText('trigger: select a signed image before running.')).not.toBeInTheDocument();
   });
 });
 
