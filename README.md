@@ -52,6 +52,56 @@ cp .env.example .env.local
 | `VITE_POLL_TIMEOUT`  | `60000`   | Poll timeout (ms)         |
 | `VITE_DEBUG_MODE`    | `false`   | Enable debug logging      |
 
+### Krkn-AI run integration
+
+Enable `krknAI.enabled: true` in the operator chart and deploy matching
+Krkn-AI service, orchestrator, and operator images.
+
+The wizard configures discovered components and settings, with an editable YAML
+preview before creation. VMI controls appear only when discovery finds VMIs.
+
+Health-check and fitness tables use icon-only edit/remove actions with accessible
+labels and tooltips; add actions use primary plus-icon buttons. Scenario details
+open through a labeled eye-icon button with a tooltip.
+Run details include searchable scenarios, fitness and health charts, live logs,
+and downloadable ZIPs with complete results. Scenario logs have a dedicated tab.
+When result tabs are available, Overview is first and Logs second; while a child
+scenario is active or detail is unavailable, only Logs appears. The modal shows
+one child-job status and offers refresh only before the job is terminal.
+Pending fitness and normalization use spinner-only indicators with explanatory
+tooltips; fitness score columns have concise headings with hover/focus definitions.
+Failed scenario scores of -1 use a failure icon with a tooltip explaining that the
+  scenario did not run.
+Each health chart has a title and short description without an individual frame.
+Response points and heatmap cells expose the same multiline sample metadata.
+Application filters share a row with Select all/Clear, and long heatmap labels are
+ellipsized while short names use only the width they need.
+Run metadata appears before summaries finish. Summaries and scenario pages load
+independently; the operator filters, sorts, and paginates the complete result and
+child-job index. The console fetches only the requested page and loads scenario
+details when selected.
+
+### Mock development and PR previews
+
+```bash
+npm run dev:preview       # Run with mock HTTP APIs and WebSocket streams
+npm run build:preview     # Build a backend-free preview
+```
+
+Preview mode uses mock APIs and logs without a backend, including workflow replay
+and Krkn-AI run creation and results. Data is simulated and resets on reload.
+Normal builds do not enable mocks.
+
+`.github/workflows/deploy-preview.yml` builds previews for opened, updated, and
+reopened PRs. `.github/workflows/deploy-preview-publish.yml` publishes the artifact
+to `gh-pages` and updates the PR's preview comment at:
+
+`https://<owner>.github.io/<repository>/pr-preview/pr-<number>/`
+
+The build sets `VITE_BASE_URL` to that PR-specific path so assets, navigation, and
+the service worker remain scoped to the preview. Updating the PR branch triggers
+publication; local uncommitted changes do not update the hosted preview.
+
 ### Other Commands
 
 ```bash
