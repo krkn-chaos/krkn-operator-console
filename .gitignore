@@ -33,3 +33,8 @@ yarn-error.log*
 
 # Docker
 *.tar
+
+# Graphify local state
+graphify-out/cache/
+graphify-out/.graphify_*
+graphify-out/cost.json
