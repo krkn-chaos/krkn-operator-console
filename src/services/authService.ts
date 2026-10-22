@@ -2,7 +2,7 @@
  * Authentication service for krkn-operator-console
  *
  * Handles user authentication, registration, and session management.
- * Uses sessionStorage for security (cleared on tab close).
+ * Uses localStorage so an authenticated session is shared across tabs.
  */
 
 import type {
@@ -19,11 +19,72 @@ import { AUTH_STORAGE_KEYS, RateLimitError } from '../types/auth';
 import { config } from '../config';
 
 const API_BASE = `${config.apiBaseUrl}/auth`;
+const AUTH_STORAGE_KEY_LIST = Object.values(AUTH_STORAGE_KEYS);
+
+function clearAuthStorage(storage: Storage): void {
+  AUTH_STORAGE_KEY_LIST.forEach(key => storage.removeItem(key));
+}
+
+function readUserFromStorage(storage: Storage): User | null {
+  const userId = storage.getItem(AUTH_STORAGE_KEYS.USER_EMAIL);
+  const name = storage.getItem(AUTH_STORAGE_KEYS.USER_NAME);
+  const surname = storage.getItem(AUTH_STORAGE_KEYS.USER_SURNAME);
+  const role = storage.getItem(AUTH_STORAGE_KEYS.USER_ROLE);
+  const organization = storage.getItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
+
+  if (!userId || !name || !surname || !role) {
+    return null;
+  }
+
+  const groupsJson = storage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
+  let groups: string[] | undefined;
+  if (groupsJson) {
+    try { groups = JSON.parse(groupsJson); } catch { /* ignore */ }
+  }
+
+  return {
+    userId,
+    name,
+    surname,
+    role: role as User['role'],
+    organization: organization || undefined,
+    groups,
+  };
+}
 
 /**
  * Authentication service class
  */
 class AuthService {
+  /**
+   * Move a valid pre-upgrade tab session into shared storage once. Incomplete
+   * or expired legacy data is discarded so it cannot restore stale auth.
+   */
+  private migrateLegacySession(): void {
+    const hasSharedAuth = AUTH_STORAGE_KEY_LIST.some(key => localStorage.getItem(key) !== null);
+    const hasLegacyAuth = AUTH_STORAGE_KEY_LIST.some(key => sessionStorage.getItem(key) !== null);
+
+    if (!hasLegacyAuth) return;
+    if (hasSharedAuth) {
+      clearAuthStorage(sessionStorage);
+      return;
+    }
+
+    const token = sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN);
+    const expiresAt = sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
+    const user = readUserFromStorage(sessionStorage);
+    const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+
+    if (token && user && Number.isFinite(expiresAtMs) && expiresAtMs > Date.now()) {
+      AUTH_STORAGE_KEY_LIST.forEach(key => {
+        const value = sessionStorage.getItem(key);
+        if (value !== null) localStorage.setItem(key, value);
+      });
+    }
+
+    clearAuthStorage(sessionStorage);
+  }
+
   /**
    * Check if an admin user is already registered
    * @returns True if admin exists, false if first admin needed
@@ -114,7 +175,7 @@ class AuthService {
 
       const data: LoginResponse = await response.json();
 
-      // Store auth data in sessionStorage
+      // Store auth data in shared localStorage
       this.setToken(data.token);
       this.setUser({
         userId: data.userId,
@@ -123,7 +184,7 @@ class AuthService {
         role: data.role,
         organization: data.organization,
       });
-      sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, data.expiresAt);
+      localStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, data.expiresAt);
 
       return data;
     } catch (error) {
@@ -137,90 +198,74 @@ class AuthService {
   logout(): void {
     this.clearToken();
     this.clearUser();
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
+    clearAuthStorage(sessionStorage);
   }
 
   /**
-   * Get JWT token from sessionStorage
+   * Get JWT token from localStorage
    * @returns JWT token or null if not found
    */
   getToken(): string | null {
-    return sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN);
+    this.migrateLegacySession();
+    return localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN);
   }
 
   /**
-   * Store JWT token in sessionStorage
+   * Store JWT token in localStorage
    * @param token - JWT token
    */
   setToken(token: string): void {
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, token);
+    localStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, token);
   }
 
   /**
-   * Clear JWT token from sessionStorage
+   * Clear JWT token from localStorage
    */
   clearToken(): void {
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN);
   }
 
   /**
-   * Get user info from sessionStorage
+   * Get user info from localStorage
    * @returns User object or null if not found
    */
   getUser(): User | null {
-    const userId = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_EMAIL);
-    const name = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_NAME);
-    const surname = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_SURNAME);
-    const role = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_ROLE);
-    const organization = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
-
-    if (!userId || !name || !surname || !role) {
-      return null;
-    }
-
-    const groupsJson = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
-    let groups: string[] | undefined;
-    if (groupsJson) {
-      try { groups = JSON.parse(groupsJson); } catch { /* ignore */ }
-    }
-
-    return {
-      userId,
-      name,
-      surname,
-      role: role as User['role'],
-      organization: organization || undefined,
-      groups,
-    };
+    this.migrateLegacySession();
+    return readUserFromStorage(localStorage);
   }
 
   /**
-   * Store user info in sessionStorage
+   * Store user info in localStorage
    * @param user - User object
    */
   setUser(user: User): void {
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_EMAIL, user.userId);
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_NAME, user.name);
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_SURNAME, user.surname);
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_ROLE, user.role);
+    localStorage.setItem(AUTH_STORAGE_KEYS.USER_EMAIL, user.userId);
+    localStorage.setItem(AUTH_STORAGE_KEYS.USER_NAME, user.name);
+    localStorage.setItem(AUTH_STORAGE_KEYS.USER_SURNAME, user.surname);
+    localStorage.setItem(AUTH_STORAGE_KEYS.USER_ROLE, user.role);
     if (user.organization) {
-      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION, user.organization);
+      localStorage.setItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION, user.organization);
+    } else {
+      localStorage.removeItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
     }
     if (user.groups) {
-      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_GROUPS, JSON.stringify(user.groups));
+      localStorage.setItem(AUTH_STORAGE_KEYS.USER_GROUPS, JSON.stringify(user.groups));
+    } else {
+      localStorage.removeItem(AUTH_STORAGE_KEYS.USER_GROUPS);
     }
   }
 
   /**
-   * Clear user info from sessionStorage
+   * Clear user info from localStorage
    */
   clearUser(): void {
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_EMAIL);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_NAME);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_SURNAME);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_ROLE);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_GROUPS);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.USER_EMAIL);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.USER_NAME);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.USER_SURNAME);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.USER_ROLE);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.USER_GROUPS);
   }
 
   /**
@@ -238,7 +283,8 @@ class AuthService {
    * @returns ISO 8601 timestamp or null
    */
   getTokenExpiresAt(): string | null {
-    return sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
+    this.migrateLegacySession();
+    return localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
   }
 
   /**
