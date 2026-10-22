@@ -1,6 +1,9 @@
 import { http, HttpResponse } from 'msw';
 import { config } from '../config';
-import type { CategoryResponse } from '../types/api';
+import type { CategoryResponse, CreateGraphRunRequest } from '../types/api';
+import { krknAiHandlers } from './krknAiHandlers';
+import { krknAiDownloadHandlers } from './krknAiDownloadHandlers';
+import { listPreviewAiChildren } from './krknAiState';
 
 const BASE = config.apiBaseUrl;
 const V2_BASE = config.apiV2BaseUrl;
@@ -537,6 +540,8 @@ const mockDummyWorkflowDetail = {
 function b64(s: string) { return btoa(s); }
 
 export const handlers = [
+  ...krknAiHandlers,
+  ...krknAiDownloadHandlers,
   // ─── AUTH ───
   http.get(`${BASE}/auth/is-registered`, () =>
     HttpResponse.json({ registered: true }),
@@ -616,12 +621,17 @@ export const handlers = [
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get('page') || '0', 10);
     const limit = parseInt(url.searchParams.get('limit') || '0', 10);
+    const aiChildren = listPreviewAiChildren();
+    const labelSelector = url.searchParams.get('labelSelector');
+    const scenarioRuns = labelSelector?.startsWith('krkn.dev/ai-run=')
+      ? aiChildren.filter((child) => child.parentRunName === labelSelector.slice('krkn.dev/ai-run='.length)).map((child) => child.run)
+      : [...mockScenarioRuns, ...aiChildren.map((child) => child.run)];
 
     if (page > 0 && limit > 0) {
-      const total = mockScenarioRuns.length;
+      const total = scenarioRuns.length;
       const totalPages = Math.max(1, Math.ceil(total / limit));
       const offset = (page - 1) * limit;
-      const pageItems = mockScenarioRuns.slice(offset, offset + limit);
+      const pageItems = scenarioRuns.slice(offset, offset + limit);
       return HttpResponse.json({
         scenarioRuns: pageItems,
         pagination: { page, limit, total, totalPages },
@@ -629,8 +639,8 @@ export const handlers = [
     }
 
     return HttpResponse.json({
-      scenarioRuns: mockScenarioRuns,
-      pagination: { page: 1, limit: mockScenarioRuns.length, total: mockScenarioRuns.length, totalPages: 1 },
+      scenarioRuns,
+      pagination: { page: 1, limit: scenarioRuns.length, total: scenarioRuns.length, totalPages: 1 },
     });
   }),
   http.post(`${BASE}/scenarios/run`, () =>
@@ -641,6 +651,9 @@ export const handlers = [
     }),
   ),
   http.get(`${BASE}/scenarios/run/:scenarioRunName`, ({ params }) => {
+    const aiChild = listPreviewAiChildren().find((child) => child.run.scenarioRunName === params.scenarioRunName);
+    if (aiChild) return HttpResponse.json(aiChild.run);
+    if (String(params.scenarioRunName).startsWith('preview-ai-child-')) return HttpResponse.json({ message: 'Preview scenario run not found' }, { status: 404 });
     const run = mockScenarioRuns.find((r) => r.scenarioRunName === params.scenarioRunName);
     return run ? HttpResponse.json(run) : HttpResponse.json(mockScenarioRuns[0]);
   }),
@@ -961,13 +974,21 @@ export const handlers = [
   ),
 
   // ─── TERMINAL ───
-  http.post(`${BASE}/terminal`, () =>
-    HttpResponse.json({
-      stdout_base64: b64('Preview mode: commands are simulated.\n$ oc get pods\nNAME                    READY   STATUS    RESTARTS   AGE\nkrkn-operator-0         1/1     Running   0          2d\n'),
+  http.post(`${BASE}/terminal`, async ({ request }) => {
+    const { command } = await request.json() as { command?: string };
+    const stdout = command === 'kubectl get namespaces -o json'
+      ? JSON.stringify({
+          apiVersion: 'v1',
+          kind: 'NamespaceList',
+          items: ['default', 'kube-system', 'shop', 'robot-shop'].map((name) => ({ metadata: { name } })),
+        })
+      : 'Preview mode: commands are simulated.\n$ oc get pods\nNAME                    READY   STATUS    RESTARTS   AGE\nkrkn-operator-0         1/1     Running   0          2d\n';
+    return HttpResponse.json({
+      stdout_base64: b64(stdout),
       stderr_base64: b64(''),
       exit_code: 0,
-    }),
-  ),
+    });
+  }),
   http.get(`${BASE}/terminal/available-commands`, () =>
     HttpResponse.json({
       commands: [
@@ -1003,20 +1024,16 @@ export const handlers = [
 
   // ─── GRAPH RUN CONFIG ───
   http.get(`${BASE}/graphruns/:graphRunName/config`, ({ params }) => {
-    const detail = mockGraphRunDetails[params.graphRunName as string] as { spec?: { targetClusters?: Record<string, string[]> } } | undefined;
+    const name = params.graphRunName as string;
+    const detail = mockGraphRunDetails[name] as { spec: CreateGraphRunRequest } | undefined;
+    if (!detail) {
+      return HttpResponse.json({ message: 'Graph run not found' }, { status: 404 });
+    }
     return HttpResponse.json({
-      targetRequestId: 'target-001',
-      targetClusters: detail?.spec?.targetClusters || { 'krkn-operator': ['staging-us-east-1'] },
-      scenarioImage: 'quay.io/krkn-chaos/krkn-hub:workflow',
-      scenarioName: params.graphRunName as string,
-      kubeconfigPath: '/root/.kube/config',
-      environment: {
-        NAMESPACE: 'default',
-        DURATION: '120',
-        LABEL_SELECTOR: 'app=chaos-target',
-        ITERATIONS: '3',
-        DAEMON_MODE: 'false',
-      },
+      graph: detail.spec.graph,
+      targetRequestId: detail.spec.targetRequestId,
+      targetClusters: detail.spec.targetClusters,
+      categories: mockGraphRuns.find((run) => run.name === name)?.categories ?? [],
     });
   }),
 
