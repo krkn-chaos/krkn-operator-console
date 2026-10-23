@@ -17,10 +17,22 @@ class BackupRestoreApi extends BaseApiClient {
 
   /**
    * Creates a backup and triggers a browser file download.
-   * POST /backup returns binary tar.gz streamed directly to the client.
+   * POST /backup returns binary tar.gz (or tar.gz.enc if passphrase is set)
+   * streamed directly to the client.
+   *
+   * @example
+   * // Plain backup
+   * await backupRestoreApi.downloadBackup();
+   *
+   * // Encrypted backup
+   * await backupRestoreApi.downloadBackup('my-secret-passphrase');
    */
-  async downloadBackup(): Promise<void> {
-    const response = await this.fetch('/backup', { method: 'POST' });
+  async downloadBackup(passphrase?: string): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (passphrase) {
+      headers['X-Backup-Passphrase'] = btoa(new TextEncoder().encode(passphrase).reduce((s, b) => s + String.fromCharCode(b), ''));
+    }
+    const response = await this.fetch('/backup', { method: 'POST', headers });
 
     if (!response.ok) {
       let message = `HTTP ${response.status}: ${response.statusText}`;
@@ -48,14 +60,29 @@ class BackupRestoreApi extends BaseApiClient {
   /**
    * Uploads a backup archive and starts an async restore.
    * POST /restore with multipart/form-data, field name "backup".
+   * For encrypted archives, include the passphrase.
+   *
+   * @example
+   * // Plain restore
+   * const resp = await backupRestoreApi.uploadRestore(file);
+   * console.log(resp.jobId, resp.status);
+   *
+   * // Encrypted restore
+   * const resp = await backupRestoreApi.uploadRestore(encFile, 'my-secret-passphrase');
    */
-  async uploadRestore(file: File): Promise<RestoreResponse> {
+  async uploadRestore(file: File, passphrase?: string): Promise<RestoreResponse> {
     const formData = new FormData();
     formData.append('backup', file);
+
+    const headers: Record<string, string> = {};
+    if (passphrase) {
+      headers['X-Backup-Passphrase'] = btoa(new TextEncoder().encode(passphrase).reduce((s, b) => s + String.fromCharCode(b), ''));
+    }
 
     const response = await this.fetch('/restore', {
       method: 'POST',
       body: formData,
+      headers,
     });
 
     if (!response.ok) {
