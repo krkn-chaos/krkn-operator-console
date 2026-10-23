@@ -27,6 +27,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import { FiX } from 'react-icons/fi';
+import './SaveWorkflowModal.css';
 import { operatorApi } from '../../services/operatorApi';
 import { workflowsApi } from '../../services/workflowsApi';
 import { useStudioContext, buildGraph } from './StudioContext';
@@ -274,7 +275,7 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
         </FormGroup>
 
         {accessType === 'group' && (
-          <FormGroup label="Group" isRequired fieldId="wf-group-input">
+          <FormGroup label="Group" isRequired fieldId="group-search">
             {!isAdmin && availableGroups.length === 1 && (
               <>
                 <Label color="blue">{availableGroups[0].name}</Label>
@@ -314,12 +315,15 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
                       onClick={() => setIsGroupSelectOpen(!isGroupSelectOpen)}
                       isExpanded={isGroupSelectOpen}
                       style={{ width: '100%' }}
+                      className="save-workflow-group-select-toggle"
                     >
                       <TextInputGroup>
                         <TextInputGroupMain
                           value={groupSearchTerm}
                           onClick={() => setIsGroupSelectOpen(true)}
                           onChange={(_e, value) => setGroupSearchTerm(value)}
+                          name="group-search"
+                          inputId="group-search"
                           placeholder={selectedGroup || 'Search or select a group...'}
                         />
                         {groupSearchTerm && (
