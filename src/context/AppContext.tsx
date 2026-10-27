@@ -668,8 +668,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
             phase: 'jobs_list',
           };
 
+        case 'krkn_ai':
         case 'resiliency_history':
-          // From resiliency history → back to jobs list
+          // From the AI or resiliency history page → back to jobs list
           return {
             ...state,
             phase: 'jobs_list',
@@ -786,6 +787,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         phase: 'elasticsearch_data',
+      };
+
+    case 'NAVIGATE_TO_KRKN_AI':
+      return {
+        ...state,
+        phase: 'krkn_ai',
       };
 
     case 'NAVIGATE_TO_RESILIENCY_HISTORY':

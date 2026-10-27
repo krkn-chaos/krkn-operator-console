@@ -60,7 +60,7 @@ interface TerminalContentProps {
  *    - Command is in allowed list (fetched from GET /api/v1/terminal/available-commands)
  *    - Subcommand is whitelisted (prevents destructive operations)
  *    - No streaming flags (--watch, --follow) that require WebSocket
- * 5. Command sent to backend (POST /api/v1/terminal) with cluster_id and uuid
+ * 5. Command sent to backend (POST /api/v1/terminal) with cluster_id, operator_name, and uuid
  * 6. Backend executes command in isolated container with cluster kubeconfig
  * 7. Response includes base64-encoded stdout/stderr and exit code
  * 8. Terminal displays output with:
@@ -115,7 +115,7 @@ interface TerminalContentProps {
  * **Discovery:**
  * - No clusters found: Displays "No clusters found" (valid state)
  * - Discovery timeout: Shows error with retry instruction (press 'r')
- * - Clusters become unavailable after discovery: Command execution will fail with 500
+ * - Clusters become unavailable after discovery: Latest discovery state blocks command submission
  *
  * **Command Execution:**
  * - Empty stdout: Displays empty line (valid for commands like "kubectl delete")
@@ -283,6 +283,8 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
       return;
     }
 
+    if (!selectedCluster.operatorSource) return;
+
     setIsExecuting(true);
 
     // Add command to output immediately (with executing indicator)
@@ -300,6 +302,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     try {
       const result = await operatorApi.executeTerminalCommand({
         cluster_id: selectedCluster.clusterName,
+        operator_name: selectedCluster.operatorSource,
         uuid: discoveryUuid,
         command,
       });
