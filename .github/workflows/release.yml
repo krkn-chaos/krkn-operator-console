@@ -29,13 +29,8 @@ jobs:
           echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           echo "Building version: ${GITHUB_REF#refs/tags/}"
 
-      - name: Stamp component manifest
-        run: |
-          jq --arg version "$VERSION" '.version = $version' src/component.json > src/component.stamped.json
-          mv src/component.stamped.json src/component.json
-
       - name: Build application
-        run: npm run build
+        run: make build COMPONENT_BUILD_VERSION="$VERSION"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
