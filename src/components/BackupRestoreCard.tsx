@@ -13,6 +13,7 @@ import {
   Spinner,
   Split,
   SplitItem,
+  TextInput,
 } from '@patternfly/react-core';
 import { DownloadIcon, UploadIcon } from '@patternfly/react-icons';
 import { useNotifications } from '../hooks/useNotifications';
@@ -44,6 +45,8 @@ export function BackupRestoreCard() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [restoreStatus, setRestoreStatus] = useState<RestoreResponse | null>(null);
+  const [backupPassphrase, setBackupPassphrase] = useState('');
+  const [restorePassphrase, setRestorePassphrase] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollAbortRef = useRef<AbortController | null>(null);
 
@@ -56,8 +59,9 @@ export function BackupRestoreCard() {
   const handleDownloadBackup = async () => {
     setIsDownloading(true);
     try {
-      await backupRestoreApi.downloadBackup();
-      showSuccess('Backup Downloaded', 'Backup archive saved to your downloads folder.');
+      await backupRestoreApi.downloadBackup(backupPassphrase || undefined);
+      const suffix = backupPassphrase ? ' (encrypted)' : '';
+      showSuccess('Backup Downloaded', `Backup archive${suffix} saved to your downloads folder.`);
     } catch (error) {
       showError(
         'Backup Failed',
@@ -75,6 +79,7 @@ export function BackupRestoreCard() {
 
   const handleOpenRestoreModal = () => {
     setSelectedFile(null);
+    setRestorePassphrase('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -120,7 +125,7 @@ export function BackupRestoreCard() {
     if (!selectedFile) return;
     setIsUploading(true);
     try {
-      const response = await backupRestoreApi.uploadRestore(selectedFile);
+      const response = await backupRestoreApi.uploadRestore(selectedFile, restorePassphrase || undefined);
       setIsRestoreModalOpen(false);
       setSelectedFile(null);
       setRestoreStatus(response);
@@ -162,6 +167,21 @@ export function BackupRestoreCard() {
             </FlexItem>
 
             <FlexItem>
+              <label htmlFor="backup-passphrase" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                Encrypt backup (optional)
+              </label>
+              <TextInput
+                id="backup-passphrase"
+                type="password"
+                placeholder="Passphrase"
+                value={backupPassphrase}
+                onChange={(_event, value) => setBackupPassphrase(value)}
+                isDisabled={isDownloading || isUploading}
+                style={{ maxWidth: '300px' }}
+              />
+            </FlexItem>
+
+            <FlexItem>
               <Split hasGutter>
                 <SplitItem>
                   <Button
@@ -171,7 +191,7 @@ export function BackupRestoreCard() {
                     isLoading={isDownloading}
                     isDisabled={isUploading}
                   >
-                    Download Backup
+                    {backupPassphrase ? 'Download Encrypted Backup' : 'Download Backup'}
                   </Button>
                 </SplitItem>
                 <SplitItem>
@@ -244,7 +264,7 @@ export function BackupRestoreCard() {
               id="restore-file"
               ref={fileInputRef}
               type="file"
-              accept=".tar.gz,.gz"
+              accept=".tar.gz,.tar.gz.enc"
               onChange={handleFileChange}
               disabled={isUploading}
               data-testid="restore-file-input"
@@ -254,6 +274,19 @@ export function BackupRestoreCard() {
                 Selected: {selectedFile.name} ({formatBytes(selectedFile.size)})
               </small>
             )}
+          </FlexItem>
+          <FlexItem>
+            <label htmlFor="restore-passphrase" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Passphrase (required for encrypted archives)
+            </label>
+            <TextInput
+              id="restore-passphrase"
+              type="password"
+              placeholder="Passphrase"
+              value={restorePassphrase}
+              onChange={(_event, value) => setRestorePassphrase(value)}
+              isDisabled={isUploading}
+            />
           </FlexItem>
         </Flex>
       </Modal>
