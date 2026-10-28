@@ -23,6 +23,22 @@ import { authService } from '../services/authService';
 import { RateLimitError } from '../types/auth';
 import { useCooldown } from '../hooks/useCooldown';
 
+function toRouterRelativeReturnUrl(returnUrl: string, baseUrl: string): string {
+  const basename = baseUrl.replace(/\/+$/, '');
+  if (!basename) return returnUrl;
+
+  const suffixIndex = returnUrl.search(/[?#]/);
+  const pathname = suffixIndex === -1 ? returnUrl : returnUrl.slice(0, suffixIndex);
+  const suffix = suffixIndex === -1 ? '' : returnUrl.slice(suffixIndex);
+
+  if (pathname === basename) return `/${suffix}`;
+  if (pathname.startsWith(`${basename}/`)) {
+    return `${pathname.slice(basename.length)}${suffix}`;
+  }
+
+  return returnUrl;
+}
+
 export function Login() {
   const { state, login } = useAuth();
   const navigate = useNavigate();
@@ -73,7 +89,8 @@ export function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (state.isAuthenticated && !state.loading) {
-      const returnUrl = searchParams.get('returnUrl') || '/app';
+      const requestedReturnUrl = searchParams.get('returnUrl') || '/app';
+      const returnUrl = toRouterRelativeReturnUrl(requestedReturnUrl, import.meta.env.BASE_URL);
       navigate(returnUrl);
     }
   }, [state.isAuthenticated, state.loading, state.user, navigate, searchParams]);

@@ -5,6 +5,7 @@ import type { User } from '../../types/auth';
 
 describe('authService - user groups', () => {
   beforeEach(() => {
+    localStorage.clear();
     sessionStorage.clear();
   });
 
@@ -16,19 +17,19 @@ describe('authService - user groups', () => {
   };
 
   describe('setUser', () => {
-    it('should store groups as JSON string in sessionStorage under USER_GROUPS key', () => {
+    it('stores groups as JSON string in localStorage under USER_GROUPS key', () => {
       const user: User = { ...baseUser, groups: ['group-a', 'group-b'] };
 
       authService.setUser(user);
 
-      const stored = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
+      const stored = localStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
       expect(stored).toBe(JSON.stringify(['group-a', 'group-b']));
     });
 
-    it('should NOT write USER_GROUPS key when groups is undefined', () => {
+    it('does not write USER_GROUPS key when groups are undefined', () => {
       authService.setUser(baseUser);
 
-      const stored = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
+      const stored = localStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
       expect(stored).toBeNull();
     });
   });
@@ -55,7 +56,7 @@ describe('authService - user groups', () => {
     it('should return user with undefined groups when stored groups JSON is invalid', () => {
       authService.setUser(baseUser);
       // Manually corrupt the stored JSON
-      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_GROUPS, '{not-valid-json');
+      localStorage.setItem(AUTH_STORAGE_KEYS.USER_GROUPS, '{not-valid-json');
 
       const user = authService.getUser();
 
@@ -65,14 +66,77 @@ describe('authService - user groups', () => {
   });
 
   describe('clearUser', () => {
-    it('should remove the USER_GROUPS key from sessionStorage', () => {
+    it('removes the USER_GROUPS key from localStorage', () => {
       authService.setUser({ ...baseUser, groups: ['team-x'] });
-      expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS)).not.toBeNull();
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS)).not.toBeNull();
 
       authService.clearUser();
 
-      expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS)).toBeNull();
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS)).toBeNull();
     });
+  });
+
+  describe('legacy session migration', () => {
+    it('moves a valid, unexpired sessionStorage session into localStorage', () => {
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'legacy-token');
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_EMAIL, baseUser.userId);
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_NAME, baseUser.name);
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_SURNAME, baseUser.surname);
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_ROLE, baseUser.role);
+      sessionStorage.setItem(
+        AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT,
+        new Date(Date.now() + 60_000).toISOString(),
+      );
+
+      expect(authService.getToken()).toBe('legacy-token');
+      expect(authService.getUser()).toEqual(baseUser);
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('legacy-token');
+      expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull();
+    });
+
+    it('discards expired legacy sessionStorage data', () => {
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'expired-token');
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_EMAIL, baseUser.userId);
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_NAME, baseUser.name);
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_SURNAME, baseUser.surname);
+      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_ROLE, baseUser.role);
+      sessionStorage.setItem(
+        AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT,
+        new Date(Date.now() - 60_000).toISOString(),
+      );
+
+      expect(authService.getToken()).toBeNull();
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull();
+      expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull();
+    });
+  });
+
+  it('logout clears shared and legacy auth data', () => {
+    authService.setToken('shared-token');
+    authService.setUser(baseUser);
+    localStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, new Date(Date.now() + 60_000).toISOString());
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, 'legacy-token');
+
+    authService.logout();
+
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull();
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_EMAIL)).toBeNull();
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT)).toBeNull();
+    expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull();
+  });
+
+  it('keeps a newer shared session when logout request token is stale', () => {
+    authService.setToken('current-token');
+    authService.setUser(baseUser);
+    localStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, new Date(Date.now() + 60_000).toISOString());
+
+    expect(authService.logout('previous-token')).toBe(false);
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('current-token');
+    expect(authService.getUser()).toEqual(baseUser);
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT)).not.toBeNull();
+
+    expect(authService.logout('current-token')).toBe(true);
+    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull();
   });
 });
 
@@ -80,6 +144,7 @@ describe('authService - rate limiting (429)', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    localStorage.clear();
     sessionStorage.clear();
   });
 
@@ -98,6 +163,30 @@ describe('authService - rate limiting (429)', () => {
   }
 
   describe('login', () => {
+    it('stores successful login data in localStorage', async () => {
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({
+          token: 'shared-token',
+          expiresAt,
+          userId: 'test@example.com',
+          role: 'user',
+          name: 'Test',
+          surname: 'User',
+        }),
+      } as unknown as Response);
+
+      await authService.login({ userId: 'test@example.com', password: 'password' });
+
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('shared-token');
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_EMAIL)).toBe('test@example.com');
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT)).toBe(expiresAt);
+      expect(sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBeNull();
+    });
+
     it('should throw RateLimitError on 429 response', async () => {
       mock429();
 

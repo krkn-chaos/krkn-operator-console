@@ -29,13 +29,14 @@ function createApiError(message: string, status: number, statusText: string): Ap
  * Callback function called when 401 Unauthorized is received
  * This should trigger logout and redirect to login page
  */
-let onUnauthorized: (() => void) | null = null;
+type UnauthorizedHandler = (requestToken: string | null) => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
 
 /**
  * Set the callback function for handling 401 responses
  * @param callback - Function to call on 401 (should handle logout + redirect)
  */
-export function setUnauthorizedHandler(callback: () => void): void {
+export function setUnauthorizedHandler(callback: UnauthorizedHandler | null): void {
   onUnauthorized = callback;
 }
 
@@ -83,7 +84,7 @@ export async function authenticatedFetch(
 
   // Handle 401 Unauthorized - token expired or invalid
   if (response.status === 401 && onUnauthorized) {
-    onUnauthorized();
+    onUnauthorized(token);
     throw new Error('Session expired. Please login again.');
   }
 

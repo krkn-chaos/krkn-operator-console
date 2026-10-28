@@ -4,10 +4,12 @@
  * Provides global authentication state and methods for login, logout, and session management.
  */
 
-import { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, useState, ReactNode, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { operatorApi } from '../services/operatorApi';
 import { setUnauthorizedHandler } from '../utils/apiClient';
+import { AUTH_STORAGE_KEYS } from '../types/auth';
 import type { User, LoginRequest, RegisterRequest } from '../types/auth';
 
 /**
@@ -16,7 +18,7 @@ import type { User, LoginRequest, RegisterRequest } from '../types/auth';
 interface AuthState {
   isAuthenticated: boolean;
   user: User | null;
-  loading: boolean; // Loading initial auth state from sessionStorage
+  loading: boolean; // Loading initial auth state from shared browser storage
 }
 
 /**
@@ -46,8 +48,10 @@ interface AuthContextValue {
 const initialState: AuthState = {
   isAuthenticated: false,
   user: null,
-  loading: true, // Start with loading=true until we check sessionStorage
+  loading: true, // Start with loading=true until we check shared browser storage
 };
+
+const MAX_TIMEOUT_MS = 2_147_000_000;
 
 /**
  * Authentication reducer
@@ -122,83 +126,205 @@ interface AuthProviderProps {
  */
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const [authSessionRevision, setAuthSessionRevision] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const redirectToExpiredLogin = useCallback(() => {
+    const routePath = `${location.pathname}${location.search}${location.hash}`;
+    const currentRoute = location.pathname.replace(/\/+$/, '') || '/';
+
+    if (currentRoute !== '/login') {
+      navigate(`/login?expired=true&returnUrl=${encodeURIComponent(routePath)}`, { replace: true });
+    }
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   /**
    * Handle 401 Unauthorized responses
    * Automatically logout user and clear session
    */
-  const handleUnauthorized = useCallback(() => {
-    const currentPath = window.location.pathname;
-    const basename = import.meta.env.BASE_URL.replace(/\/+$/, '');
+  const handleUnauthorized = useCallback((requestToken: string | null) => {
+    if (!authService.logout(requestToken)) return;
 
-    authService.logout();
     dispatch({ type: 'AUTH_LOGOUT' });
+    redirectToExpiredLogin();
+  }, [redirectToExpiredLogin]);
 
-    // Redirect to login with expired flag, accounting for basename
-    const loginPath = basename ? `${basename}/login` : '/login';
-    if (!currentPath.endsWith('/login')) {
-      window.location.href = `${loginPath}?expired=true&returnUrl=${encodeURIComponent(currentPath)}`;
-    }
-  }, []);
+  const loadAndStoreGroups = useCallback(async (lookupUser: User, lookupToken: string) => {
+    if (lookupUser.role !== 'admin') return;
 
-  const loadAndStoreGroups = useCallback(async (userRole?: string) => {
+    const isLookupSessionCurrent = () =>
+      authService.getToken() === lookupToken &&
+      authService.getUser()?.userId === lookupUser.userId;
+
     try {
-      if (userRole !== 'admin') return;
+      if (!isLookupSessionCurrent()) return;
+
       const response = await operatorApi.getGroups();
       const groupNames = (response.groups || []).map(g => g.name);
+      if (!isLookupSessionCurrent()) return;
+
+      const currentUser = authService.getUser();
+      if (
+        !currentUser ||
+        currentUser.userId !== lookupUser.userId ||
+        authService.getToken() !== lookupToken
+      ) return;
+      authService.setUser({ ...currentUser, groups: groupNames });
+
+      // Storage may change while the shared user record is being updated.
+      // Do not apply results to auth state after that session switch.
+      if (!isLookupSessionCurrent()) return;
       dispatch({ type: 'AUTH_UPDATE_GROUPS', payload: { groups: groupNames } });
-      const user = authService.getUser();
-      if (user) {
-        authService.setUser({ ...user, groups: groupNames });
-      }
     } catch {
       // Non-critical: groups will be loaded on demand
     }
   }, []);
 
-  useEffect(() => {
-    setUnauthorizedHandler(handleUnauthorized);
-
+  const syncAuthFromStorage = useCallback((fromStorageEvent = false) => {
     const user = authService.getUser();
     const token = authService.getToken();
+    const expiresAt = authService.getTokenExpiresAt();
+    const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
 
-    if (user && token) {
-      if (authService.isTokenExpired()) {
-        authService.logout();
-        dispatch({ type: 'AUTH_INIT', payload: { user: null } });
-      } else {
-        dispatch({ type: 'AUTH_INIT', payload: { user } });
-        loadAndStoreGroups(user.role);
-      }
-    } else {
-      dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+    if (
+      user &&
+      token &&
+      Number.isFinite(expiresAtMs) &&
+      expiresAtMs > Date.now() &&
+      !authService.isTokenExpired()
+    ) {
+      dispatch({ type: 'AUTH_INIT', payload: { user } });
+      setAuthSessionRevision(revision => revision + 1);
+      loadAndStoreGroups(user, token);
+      return;
     }
-  }, [handleUnauthorized, loadAndStoreGroups]);
+
+    if (user || token || expiresAt) {
+      if (!fromStorageEvent) authService.logout();
+    }
+    dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+  }, [loadAndStoreGroups]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(handleUnauthorized);
+  }, [handleUnauthorized]);
+
+  useEffect(() => {
+    syncAuthFromStorage();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage) return;
+      // Token is written last on login and removed first on logout. Storage
+      // events run after the originating task, so the full session is visible.
+      if (event.key !== AUTH_STORAGE_KEYS.TOKEN && event.key !== null) return;
+      syncAuthFromStorage(true);
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [syncAuthFromStorage]);
+
+  const expireSession = useCallback(() => {
+    if (!authService.isTokenExpired()) return;
+
+    authService.logout();
+    dispatch({ type: 'AUTH_LOGOUT' });
+    redirectToExpiredLogin();
+  }, [redirectToExpiredLogin]);
+
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+
+    const expiresAt = authService.getTokenExpiresAt();
+    const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+      expireSession();
+      return;
+    }
+
+    let timer = 0;
+    const scheduleExpiryCheck = () => {
+      const currentExpiresAt = authService.getTokenExpiresAt();
+      const currentExpiresAtMs = currentExpiresAt ? Date.parse(currentExpiresAt) : Number.NaN;
+      if (!Number.isFinite(currentExpiresAtMs) || currentExpiresAtMs <= Date.now()) {
+        expireSession();
+        return;
+      }
+      timer = window.setTimeout(
+        scheduleExpiryCheck,
+        Math.min(currentExpiresAtMs - Date.now(), MAX_TIMEOUT_MS),
+      );
+    };
+    scheduleExpiryCheck();
+    const checkExpiry = () => {
+      if (authService.isTokenExpired()) expireSession();
+    };
+    const checkVisibleExpiry = () => {
+      if (document.visibilityState === 'visible') checkExpiry();
+    };
+
+    window.addEventListener('focus', checkExpiry);
+    document.addEventListener('visibilitychange', checkVisibleExpiry);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', checkExpiry);
+      document.removeEventListener('visibilitychange', checkVisibleExpiry);
+    };
+  }, [authSessionRevision, expireSession, state.isAuthenticated]);
 
   const login = useCallback(async (request: LoginRequest) => {
+    const tokenAtLoginStart = authService.getToken();
+
     try {
-      const response = await authService.login(request);
+      const response = await authService.login(request, tokenAtLoginStart);
+      if (!response) {
+        syncAuthFromStorage();
+        return;
+      }
+
+      const user: User = {
+        userId: response.userId,
+        name: response.name,
+        surname: response.surname,
+        role: response.role,
+        organization: response.organization,
+      };
+
+      if (authService.getToken() !== response.token) {
+        syncAuthFromStorage();
+        return;
+      }
 
       dispatch({
         type: 'AUTH_LOGIN',
-        payload: {
-          user: {
-            userId: response.userId,
-            name: response.name,
-            surname: response.surname,
-            role: response.role,
-            organization: response.organization,
-          },
-        },
+        payload: { user },
       });
+      setAuthSessionRevision(revision => revision + 1);
 
       // Load groups after login (admin only — no endpoint for user's own groups)
-      loadAndStoreGroups(response.role);
+      loadAndStoreGroups(user, response.token);
     } catch (error) {
-      dispatch({ type: 'AUTH_ERROR' });
+      const currentToken = authService.getToken();
+      const currentUser = authService.getUser();
+      const currentExpiresAt = authService.getTokenExpiresAt();
+      const currentExpiresAtMs = currentExpiresAt ? Date.parse(currentExpiresAt) : Number.NaN;
+      const newerValidSession =
+        currentToken !== null &&
+        currentToken !== tokenAtLoginStart &&
+        currentUser !== null &&
+        Number.isFinite(currentExpiresAtMs) &&
+        currentExpiresAtMs > Date.now() &&
+        !authService.isTokenExpired();
+
+      if (newerValidSession) {
+        syncAuthFromStorage();
+      } else {
+        dispatch({ type: 'AUTH_ERROR' });
+      }
       throw error;
     }
-  }, [loadAndStoreGroups]);
+  }, [loadAndStoreGroups, syncAuthFromStorage]);
 
   /**
    * Logout user
