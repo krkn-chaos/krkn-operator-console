@@ -1,0 +1,10 @@
+.elasticsearch-sort-button.pf-v5-c-button.pf-m-plain {
+  padding: 0.125rem;
+  color: var(--pf-v5-global--Color--200);
+}
+
+.elasticsearch-sort-button.pf-v5-c-button.pf-m-plain:hover,
+.elasticsearch-sort-button.pf-v5-c-button.pf-m-plain:focus-visible,
+.elasticsearch-sort-button.pf-v5-c-button.pf-m-plain[aria-pressed='true'] {
+  color: var(--pf-v5-global--primary-color--100);
+}

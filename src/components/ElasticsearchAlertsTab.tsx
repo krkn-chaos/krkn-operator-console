@@ -16,11 +16,12 @@ import {
   PaginationVariant,
 } from '@patternfly/react-core';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { DatabaseIcon } from '@patternfly/react-icons';
+import { ArrowsAltVIcon, LongArrowAltUpIcon, LongArrowAltDownIcon, DatabaseIcon } from '@patternfly/react-icons';
+import './ElasticsearchDataView.css';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications } from '../hooks';
 import { usePagination } from '../hooks/usePagination';
-import type { AlertDocument, ElasticsearchConfig } from '../types/api';
+import type { AlertDocument, AlertSortOptions, ElasticsearchConfig } from '../types/api';
 import { getFieldValue, matchesFieldFilters } from '../utils/elasticsearchFieldFilters';
 import { ElasticsearchFilterControls } from './ElasticsearchFilterControls';
 
@@ -36,7 +37,7 @@ interface ElasticsearchAlertsTabProps {
 }
 
 const SUMMARY_FIELDS = new Set(['run_uuid', 'phase', 'created_at', 'severity']);
-type AlertSortColumn = 'uuid' | 'phase' | 'created_at' | 'severity' | 'document';
+type AlertSortColumn = 'phase' | 'created_at' | 'severity';
 const ALERT_FILTER_OPTIONS = [
   { key: 'run_uuid', label: 'UUID' },
   { key: 'severity', label: 'Severity', values: ['critical', 'error', 'warning', 'info'] },
@@ -107,7 +108,8 @@ function formatAlertCreatedAt(document: AlertDocument): string {
  *
  * The parent owns the selected config and query controls so Telemetry and
  * Alerts can share them. Results are queried from the saved config, filtered
- * with the active field chips, paginated, and rendered with sortable columns.
+ * with active field chips, paginated, and rendered with sortable columns. Fixed
+ * summary fields use Elasticsearch sorting; arbitrary alert fields stay local.
  *
  * @example
  * ```tsx
@@ -145,26 +147,20 @@ export function ElasticsearchAlertsTab({
   const latestRequestId = useRef(0);
   const [sortColumn, setSortColumn] = useState<AlertSortColumn>('severity');
   const [sortAscending, setSortAscending] = useState(true);
+  const [serverSortActive, setServerSortActive] = useState(false);
   const filteredDocuments = useMemo(() => {
     return documents.filter(document => matchesFieldFilters(document.source, filters));
   }, [documents, filters]);
   const sortedDocuments = useMemo(() => {
+    if (serverSortActive) return filteredDocuments;
     const sorted = [...filteredDocuments].sort((left, right) => {
-      const leftValue = sortColumn === 'document'
-        ? formatAlertFields(left.source).map(field => `${field.key}: ${field.value}`).join(' ')
-        : sortColumn === 'severity'
-          ? alertSeverity(left)
-          : alertSummaryField(left, sortColumn === 'uuid' ? 'run_uuid' : sortColumn);
-      const rightValue = sortColumn === 'document'
-        ? formatAlertFields(right.source).map(field => `${field.key}: ${field.value}`).join(' ')
-        : sortColumn === 'severity'
-          ? alertSeverity(right)
-          : alertSummaryField(right, sortColumn === 'uuid' ? 'run_uuid' : sortColumn);
+      const leftValue = sortColumn === 'severity' ? alertSeverity(left) : alertSummaryField(left, sortColumn);
+      const rightValue = sortColumn === 'severity' ? alertSeverity(right) : alertSummaryField(right, sortColumn);
       return leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' });
     });
     return sortAscending ? sorted : sorted.reverse();
-  }, [filteredDocuments, sortAscending, sortColumn]);
-  const { page, perPage, totalItems, paginatedData, handleSetPage, handlePerPageSelect } = usePagination(sortedDocuments, { initialPerPage: 10 });
+  }, [filteredDocuments, serverSortActive, sortAscending, sortColumn]);
+  const { page, perPage, totalItems, paginatedData, setPage, handleSetPage, handlePerPageSelect } = usePagination(sortedDocuments, { initialPerPage: 10 });
 
   const selected = configs.find(config => config.name === selectedConfig);
   const today = localDateString(new Date());
@@ -181,7 +177,7 @@ export function ElasticsearchAlertsTab({
     setDraftFilter({ key: '', value: '' });
   }, [selectedConfig, startDate, endDate, size]);
 
-  const runQuery = async () => {
+  const runQuery = async (sort?: AlertSortOptions, preserveFilters = false) => {
     if (!selectedConfig) {
       showError('No config selected', 'Please select an Elasticsearch config to query');
       return;
@@ -199,16 +195,30 @@ export function ElasticsearchAlertsTab({
     latestRequestId.current = requestId;
     const requestConfig = selectedConfig;
     try {
-      const result = await elasticsearchApi.queryAlerts(
+      const args = [
         selectedConfig,
         size.trim() === '' ? undefined : Number(size),
         startDate || undefined,
         endDate || undefined,
-      );
+      ] as const;
+      const result = sort
+        ? await elasticsearchApi.queryAlerts(...args, sort)
+        : await elasticsearchApi.queryAlerts(...args);
       if (latestRequestId.current !== requestId || selectedConfig !== requestConfig) return;
       setDocuments(result.documents || []);
-      setFilters([]);
-      setDraftFilter({ key: '', value: '' });
+      if (!preserveFilters) {
+        setFilters([]);
+        setDraftFilter({ key: '', value: '' });
+      }
+      if (sort) {
+        setSortColumn(sort.sortBy as AlertSortColumn);
+        setSortAscending(sort.sortOrder === 'asc');
+        setServerSortActive(true);
+      } else {
+        setSortColumn('severity');
+        setSortAscending(true);
+        setServerSortActive(false);
+      }
       setHasQueried(true);
     } catch (error) {
       if (latestRequestId.current !== requestId || selectedConfig !== requestConfig) return;
@@ -219,12 +229,44 @@ export function ElasticsearchAlertsTab({
   };
 
   const toggleSort = (column: AlertSortColumn) => {
-    if (sortColumn === column) {
-      setSortAscending(value => !value);
-    } else {
-      setSortColumn(column);
-      setSortAscending(true);
-    }
+    const ascending = sortColumn === column ? !sortAscending : true;
+    setPage(1);
+    const sort: AlertSortOptions = {
+      sortBy: column,
+      sortOrder: ascending ? 'asc' : 'desc',
+    };
+    void runQuery(sort, true);
+  };
+
+  const sortableHeader = (label: string, column: AlertSortColumn) => {
+    const isActive = sortColumn === column;
+    const isAsc = isActive && sortAscending;
+    const nextDirection = isAsc ? 'descending' : 'ascending';
+    // Directional icon so the active sort order is readable from the glyph, not
+    // only from the blue (active) color: up = ascending, down = descending; the
+    // neutral double-headed arrow marks an inactive, sortable column.
+    const SortIcon = !isActive ? ArrowsAltVIcon : isAsc ? LongArrowAltUpIcon : LongArrowAltDownIcon;
+    return (
+      <Flex
+        alignItems={{ default: 'alignItemsCenter' }}
+        spaceItems={{ default: 'spaceItemsSm' }}
+        flexWrap={{ default: 'nowrap' }}
+      >
+        <FlexItem style={{ whiteSpace: 'nowrap' }}>{label}</FlexItem>
+        <FlexItem>
+          <Button
+            variant="plain"
+            className="elasticsearch-sort-button"
+            onClick={() => toggleSort(column)}
+            aria-label={isActive ? `Sort ${label} ${nextDirection}` : `Sort by ${label}`}
+            aria-pressed={isActive}
+            title={isActive ? `Sorted ${isAsc ? 'ascending' : 'descending'}` : `Sort by ${label}`}
+          >
+            <SortIcon aria-hidden="true" />
+          </Button>
+        </FlexItem>
+      </Flex>
+    );
   };
 
   const addFilter = () => {
@@ -269,7 +311,7 @@ export function ElasticsearchAlertsTab({
           onAddFilter={addFilter}
         />
         <FlexItem>
-          <Button variant="primary" onClick={runQuery} isDisabled={querying || !selectedConfig || invalidRange || invalidSize} isLoading={querying}>
+          <Button variant="primary" onClick={() => runQuery()} isDisabled={querying || !selectedConfig || invalidRange || invalidSize} isLoading={querying}>
             Query Alerts
           </Button>
         </FlexItem>
@@ -326,43 +368,29 @@ export function ElasticsearchAlertsTab({
               <colgroup>
                 <col style={{ width: '18%' }} />
                 <col style={{ width: '12%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '40%' }} />
+                <col style={{ width: '19%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '36%' }} />
               </colgroup>
               <Thead>
                 <Tr>
+                  <Th>UUID</Th>
                   <Th>
-                    <Button variant="plain" style={{ width: '100%', justifyContent: 'center' }} onClick={() => toggleSort('uuid')}>
-                      UUID {sortColumn === 'uuid' ? (sortAscending ? '↑' : '↓') : '↕'}
-                    </Button>
+                    {sortableHeader('Phase', 'phase')}
                   </Th>
                   <Th>
-                    <Button variant="plain" style={{ width: '100%', justifyContent: 'center' }} onClick={() => toggleSort('phase')}>
-                      Phase {sortColumn === 'phase' ? (sortAscending ? '↑' : '↓') : '↕'}
-                    </Button>
-                  </Th>
-                  <Th>
-                    <Button variant="plain" style={{ width: '100%', justifyContent: 'center' }} onClick={() => toggleSort('created_at')}>
-                      Creation Timestamp {sortColumn === 'created_at' ? (sortAscending ? '↑' : '↓') : '↕'}
-                    </Button>
+                    {sortableHeader('Creation Timestamp', 'created_at')}
                   </Th>
                   <Th style={{ minWidth: '10rem', textAlign: 'center' }}>
-                    <Button variant="plain" style={{ width: '100%', justifyContent: 'center' }} onClick={() => toggleSort('severity')}>
-                      Severity {sortColumn === 'severity' ? (sortAscending ? '↑' : '↓') : '↕'}
-                    </Button>
+                    {sortableHeader('Severity', 'severity')}
                   </Th>
-                  <Th>
-                    <Button variant="plain" style={{ width: '100%', justifyContent: 'center' }} onClick={() => toggleSort('document')}>
-                      Alert fields {sortColumn === 'document' ? (sortAscending ? '↑' : '↓') : '↕'}
-                    </Button>
-                  </Th>
+                  <Th>Alert fields</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {paginatedData.map((document, index) => (
                   <Tr key={document.id || String(index)}>
-                    <Td dataLabel="UUID" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>{alertSummaryField(document, 'run_uuid')}</Td>
+                    <Td dataLabel="UUID" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>{alertSummaryField(document, 'run_uuid').slice(0, 7)}</Td>
                     <Td dataLabel="Phase" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>{alertSummaryField(document, 'phase')}</Td>
                     <Td dataLabel="Creation Timestamp" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>{formatAlertCreatedAt(document)}</Td>
                     <Td dataLabel="Severity" style={{ minWidth: '10rem', textAlign: 'center', verticalAlign: 'top' }}>
