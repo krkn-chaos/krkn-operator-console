@@ -12,6 +12,8 @@ IMG_NAME ?= $(COMPONENT)
 
 # Git tag detection for versioning
 GIT_TAG ?= $(shell git describe --tags --exact-match 2>/dev/null)
+COMPONENT_BUILD_VERSION ?= $(if $(GIT_TAG),$(GIT_TAG),0.0.0)
+export COMPONENT_BUILD_VERSION
 
 # Full image URL - defaults to latest, can be fully overridden with IMG=
 IMG ?= $(REGISTRY)/$(IMG_NAME):latest
@@ -44,7 +46,12 @@ install: ## Install npm dependencies
 
 .PHONY: build
 build: ## Build the React application for production
-	$(NPM) run build
+	@set -eu; original=$$(mktemp); stamped=$$(mktemp src/component.stamped.XXXXXX.json); \
+		cp src/component.json "$$original"; \
+		trap 'cp "$$original" src/component.json; rm -f "$$original" "$$stamped"' EXIT; \
+		jq --arg version "$$COMPONENT_BUILD_VERSION" '.version = $$version' "$$original" > "$$stamped"; \
+		mv "$$stamped" src/component.json; \
+		$(NPM) run build
 
 .PHONY: dev
 dev: ## Run development server
@@ -69,7 +76,7 @@ clean: ## Clean build artifacts and dependencies
 ##@ Container Build
 
 .PHONY: docker-build
-docker-build: ## Build container image with docker
+docker-build: build ## Build container image with docker
 	$(CONTAINER_TOOL) build -t ${IMG} .
 ifeq ($(origin IMG)$(origin REGISTRY)$(origin IMG_NAME),filefilefile)
 ifneq ($(strip $(GIT_TAG)),)
@@ -108,7 +115,7 @@ podman-push: ## Push container image with podman
 PLATFORMS ?= linux/amd64,linux/arm64
 
 .PHONY: docker-buildx
-docker-buildx: ## Build and push multi-architecture container image
+docker-buildx: build ## Build and push multi-architecture container image
 	- $(CONTAINER_TOOL) buildx create --name krkn-operator-console-builder
 	$(CONTAINER_TOOL) buildx use krkn-operator-console-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} .

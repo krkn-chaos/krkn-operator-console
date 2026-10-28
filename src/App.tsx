@@ -1,4 +1,4 @@
-import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant, Spinner } from '@patternfly/react-core';
+import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, MastheadContent, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant, Spinner } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { FileManagementPage } from './components/FileManagement';
 import { CategoryManagementPage } from './components/CategoryManagement';
 import { ResiliencyHistoryPage } from './components/ResiliencyHistory';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
+import { ComponentVersionsAccess } from './components/ComponentVersionsAccess';
 import { useRole } from './hooks/useRole';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
 import { ScenarioDetail } from './components/ScenarioDetail';
@@ -497,6 +498,9 @@ function App() {
           </div>
         </MastheadBrand>
       </MastheadMain>
+      <MastheadContent style={{ justifyContent: 'flex-end' }}>
+        <ComponentVersionsAccess />
+      </MastheadContent>
     </Masthead>
   );
 

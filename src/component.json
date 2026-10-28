@@ -1,0 +1,9 @@
+{
+  "version": "0.0.0",
+  "components": [
+    {
+      "component": "web-console",
+      "description": "Web interface for managing and observing Krkn chaos workflows"
+    }
+  ]
+}

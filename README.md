@@ -37,6 +37,13 @@ Open `http://localhost:3000`.
 
 Vite proxies `/api` requests to `http://localhost:8080`, allowing the console to communicate directly with the locally running operator.
 
+The question-mark icon in the top bar opens component versions for every signed-in
+user. The console includes its own version from `src/component.json` in the list,
+even if the operator API is unavailable. Release builds stamp the exact Git tag
+into that JSON with `jq` before the Vite build. Local `make build`, `make docker-build`,
+and `make docker-buildx` use the same step, restoring the tracked JSON afterward.
+Development builds use `0.0.0`.
+
 ### Environment Variables
 
 Copy `.env.example` to `.env.local` to override the defaults:

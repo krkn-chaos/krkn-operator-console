@@ -24,8 +24,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set version from tag
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "Building version: ${GITHUB_REF#refs/tags/}"
+
       - name: Build application
-        run: npm run build
+        run: make build COMPONENT_BUILD_VERSION="$VERSION"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -39,11 +44,6 @@ jobs:
           registry: quay.io
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
-
-      - name: Set version from tag
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          echo "Building version: ${GITHUB_REF#refs/tags/}"
 
       - name: Build and push console image
         uses: docker/build-push-action@v6
