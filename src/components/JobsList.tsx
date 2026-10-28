@@ -48,6 +48,7 @@ import {
   TrashIcon,
   LockIcon,
   TopologyIcon,
+  ArrowsAltVIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
@@ -82,6 +83,7 @@ import type {
 const GRAPH_RUN_TERMINAL_PHASES: GraphRunListItem['phase'][] = ['Completed', 'Failed', 'PartiallyFailed'];
 // Older operators omit isRollback; pair their generated run name with the reserved workload tag.
 const GENERATED_ROLLBACK_RUN_NAME = /^krkn-rollback-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-[1-9][0-9]*)?$/i;
+type RunSortColumn = 'createdAt' | 'status' | 'name' | 'owner';
 
 export type UnifiedRunItem =
   | {
@@ -258,6 +260,8 @@ export function JobsList({
   const [timeRangeError, setTimeRangeError] = useState('');
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<RunSortColumn>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -568,6 +572,44 @@ export function JobsList({
     });
   }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter, categoryFilters, categoryOverrides]);
 
+  const sortedFilteredUnifiedRuns = useMemo(() => {
+    const getValue = (item: UnifiedRunItem): string | number => {
+      switch (sortColumn) {
+        case 'createdAt': {
+          const createdAt = item.type === 'graph' ? item.createdAt : item.run.createdAt;
+          const timestamp = new Date(createdAt).getTime();
+          return Number.isNaN(timestamp) ? 0 : timestamp;
+        }
+        case 'status':
+          return item.type === 'graph' ? item.phase : item.run.phase;
+        case 'name':
+          return item.type === 'graph'
+            ? item.graphRunName
+            : item.run.customRunName?.trim() || item.run.scenarioRunName;
+        case 'owner':
+          return (item.type === 'graph' ? item.ownerUserId : item.run.ownerUserId) || '';
+      }
+    };
+
+    return [...filteredUnifiedRuns].sort((left, right) => {
+      const leftValue = getValue(left);
+      const rightValue = getValue(right);
+      const comparison = typeof leftValue === 'number' && typeof rightValue === 'number'
+        ? leftValue - rightValue
+        : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: 'base' });
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredUnifiedRuns, sortColumn, sortDirection]);
+
+  const handleSort = (column: RunSortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortColumn(column);
+    setSortDirection(column === 'createdAt' ? 'desc' : 'asc');
+  };
+
   const hasActiveFilters = Boolean(ownerFilter || isValidDate(dateTimeFrom) || isValidDate(dateTimeTo) || customRunNameFilter || categoryFilters.length > 0);
 
   const renderRunActions = ({
@@ -633,6 +675,26 @@ export function JobsList({
       />
     </DataListAction>
   );
+
+  const renderSortableHeader = (label: string, column: RunSortColumn) => {
+    const isActive = sortColumn === column;
+    const nextDirection = isActive && sortDirection === 'asc' ? 'descending' : 'ascending';
+    return (
+      <div className="jobs-list-sort-header">
+        <span>{label}</span>
+        <Button
+          variant="plain"
+          className="jobs-list-sort-button"
+          onClick={() => handleSort(column)}
+          aria-label={isActive ? `Sort ${label} ${nextDirection}` : `Sort by ${label}`}
+          aria-pressed={isActive}
+          title={isActive ? `Sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`}
+        >
+          <ArrowsAltVIcon aria-hidden="true" />
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -905,7 +967,7 @@ export function JobsList({
             </Title>
             <EmptyStateBody>Fetching scenario runs...</EmptyStateBody>
           </EmptyState>
-        ) : filteredUnifiedRuns.length === 0 && (jobs.length > 0 || hasActiveFilters) ? (
+        ) : sortedFilteredUnifiedRuns.length === 0 && (jobs.length > 0 || hasActiveFilters) ? (
           <EmptyState>
             <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
@@ -933,7 +995,38 @@ export function JobsList({
             isCompact
             wrapModifier="truncate"
           >
-            {filteredUnifiedRuns.map((item) => {
+            <DataListItem className="jobs-list-header" aria-label="Run columns">
+              <DataListItemRow>
+                <div className="pf-v5-c-data-list__toggle" aria-hidden="true" />
+                <DataListItemCells
+                  dataListCells={[
+                    <DataListCell key="status" width={1} className="jobs-list-summary-cell--status">
+                      {renderSortableHeader('Status', 'status')}
+                    </DataListCell>,
+                    <DataListCell key="primary" width={2} className="jobs-list-summary-cell--primary">
+                      Scenario / Workflow
+                    </DataListCell>,
+                    <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
+                      {renderSortableHeader('User', 'owner')}
+                    </DataListCell>,
+                    <DataListCell key="jobs" width={2} className="jobs-list-summary-cell--jobs">
+                      Jobs / Graph Nodes
+                    </DataListCell>,
+                    <DataListCell key="run-name" width={2} className="jobs-list-summary-cell--run-name">
+                      {renderSortableHeader('Run Name', 'name')}
+                    </DataListCell>,
+                    <DataListCell key="score" width={2} className="jobs-list-summary-cell--score">
+                      Resiliency Score
+                    </DataListCell>,
+                    <DataListCell key="created" width={2} className="jobs-list-summary-cell--created">
+                      {renderSortableHeader('Created', 'createdAt')}
+                    </DataListCell>,
+                  ]}
+                />
+                <div className="pf-v5-c-data-list__item-action jobs-list-header-action" aria-hidden="true" />
+              </DataListItemRow>
+            </DataListItem>
+            {sortedFilteredUnifiedRuns.map((item) => {
               // Handle GraphRun
               if (item.type === 'graph') {
                 const isGraphExpanded = expandedGraphRunIds.has(item.graphRunName);
@@ -958,46 +1051,32 @@ export function JobsList({
                         dataListCells={[
                           <DataListCell key="status" width={1} className="jobs-list-summary-cell--status">
                             <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Status:</strong>
-                              </div>
                               <Label className="jobs-list-compact-label" isCompact color={phaseDisplay.color} icon={phaseDisplay.icon}>
                                 {phaseDisplay.label}
                               </Label>
                             </div>
                           </DataListCell>,
                           <DataListCell key="workflow" width={2} className="jobs-list-summary-cell--primary">
-                            <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>
-                                  <TopologyIcon style={{ marginRight: '0.25rem' }} />
-                                  Workflow:
-                                </strong>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <code
-                                  className="jobs-list-run-primary-value"
-                                  style={{
-                                    fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                                    fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                                    backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                                    padding: '0.125rem 0.5rem',
-                                    borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
-                                    display: 'inline-block',
-                                    border: '1px solid var(--pf-v5-global--BorderColor--100)',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {item.graphRunName}
-                                </code>
-                              </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <code
+                                className="jobs-list-run-primary-value"
+                                style={{
+                                  fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                                  fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                                  backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                                  display: 'inline-block',
+                                  border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {item.graphRunName}
+                              </code>
                             </div>
                           </DataListCell>,
                           <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
                             <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>User:</strong>
-                              </div>
                               <Tooltip content={item.ownerUserId || 'Unknown'}>
                                 <code
                                   className="jobs-list-owner-id"
@@ -1020,9 +1099,6 @@ export function JobsList({
                           </DataListCell>,
                           <DataListCell key="total-nodes" width={2} className="jobs-list-summary-cell--graph-nodes">
                             <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Graph Nodes:</strong>
-                              </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <Tooltip
                                   content={`${item.summary.completedNodes} completed, ${item.summary.failedNodes} failed, ${item.summary.runningNodes} running, ${item.summary.pendingNodes} pending, ${item.summary.totalNodes} total`}
@@ -1048,9 +1124,6 @@ export function JobsList({
                           />,
                           <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
                             <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Resiliency Score:</strong>
-                              </div>
                               <ResiliencyScoreTooltip
                                 isCompact
                                 labelClassName="jobs-list-compact-label"
@@ -1061,9 +1134,6 @@ export function JobsList({
                           </DataListCell>,
                           <DataListCell key="created" width={2} className="jobs-list-summary-cell--created">
                             <div>
-                              <div style={{ marginBottom: '0.25rem' }}>
-                                <strong>Created:</strong>
-                              </div>
                               <code
                                 style={{
                                   fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
@@ -1142,9 +1212,6 @@ export function JobsList({
                       dataListCells={[
                         <DataListCell key="status" width={1} className="jobs-list-summary-cell--status">
                           <div>
-                            <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Status:</strong>
-                            </div>
                             <Label className="jobs-list-compact-label" isCompact color={runPhaseDisplay.color} icon={runPhaseDisplay.icon}>
                               {runPhaseDisplay.label}
                             </Label>
@@ -1208,9 +1275,6 @@ export function JobsList({
                         </DataListCell>,
                         <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
                           <div>
-                            <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>User:</strong>
-                            </div>
                             <Tooltip content={run.ownerUserId || 'Unknown'}>
                               <code
                                 className="jobs-list-owner-id"
@@ -1233,9 +1297,6 @@ export function JobsList({
                         </DataListCell>,
                         <DataListCell key="jobs-summary" width={2} className="jobs-list-summary-cell--jobs">
                           <div>
-                            <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Jobs:</strong>
-                            </div>
                             <Tooltip
                               content={`${run.successfulJobs} succeeded, ${run.failedJobs} failed, ${run.runningJobs} running`}
                             >
@@ -1262,9 +1323,6 @@ export function JobsList({
                         </DataListCell>,
                         <DataListCell key="run-name" width={2} className="jobs-list-summary-cell--run-name">
                           <div>
-                            <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Run Name:</strong>
-                            </div>
                             {customRunName ? (
                               <>
                                 <code
@@ -1317,9 +1375,6 @@ export function JobsList({
                         </DataListCell>,
                         <DataListCell key="resiliency-score" width={2} className="jobs-list-summary-cell--score">
                           <div>
-                            <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Resiliency Score:</strong>
-                            </div>
                             <ResiliencyScoreTooltip
                               isCompact
                               labelClassName="jobs-list-compact-label"
@@ -1335,9 +1390,6 @@ export function JobsList({
                         </DataListCell>,
                         <DataListCell key="created" width={2} className="jobs-list-summary-cell--created">
                           <div>
-                            <div style={{ marginBottom: '0.25rem' }}>
-                              <strong>Created:</strong>
-                            </div>
                             <code
                               style={{
                                 fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',

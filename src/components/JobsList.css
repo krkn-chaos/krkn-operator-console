@@ -36,6 +36,43 @@
   padding: var(--pf-v5-global--spacer--md);
 }
 
+.jobs-list-runs .jobs-list-header {
+  background: var(--pf-v5-global--BackgroundColor--200);
+  color: var(--pf-v5-global--Color--100);
+  font-weight: 600;
+}
+
+.jobs-list-runs .jobs-list-header .pf-v5-c-data-list__item-content {
+  align-items: center;
+}
+
+.jobs-list-runs .jobs-list-header .pf-v5-c-data-list__cell {
+  padding-block: var(--pf-v5-global--spacer--sm);
+}
+
+.jobs-list-sort-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.jobs-list-sort-button.pf-v5-c-button.pf-m-plain {
+  padding: 0.125rem;
+  color: var(--pf-v5-global--Color--200);
+}
+
+.jobs-list-sort-button.pf-v5-c-button.pf-m-plain:hover,
+.jobs-list-sort-button.pf-v5-c-button.pf-m-plain:focus-visible,
+.jobs-list-sort-button.pf-v5-c-button.pf-m-plain[aria-pressed='true'] {
+  color: var(--pf-v5-global--primary-color--100);
+}
+
+.jobs-list-header-action {
+  visibility: hidden;
+}
+
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
   flex: 0 0 clamp(9.5rem, 10%, 12rem);
 }

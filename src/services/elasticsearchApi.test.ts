@@ -64,6 +64,7 @@ describe('elasticsearchApi.queryTelemetry', () => {
       '2025-01-01',
       '2025-01-02',
       { cloud_type: ['aws'] },
+      { sortBy: 'scenario_type', sortOrder: 'asc' },
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -78,6 +79,8 @@ describe('elasticsearchApi.queryTelemetry', () => {
       startDate: '2025-01-01',
       endDate: '2025-01-02',
       filters: { cloud_type: ['aws'] },
+      sortBy: 'scenario_type',
+      sortOrder: 'asc',
     });
 
     const headers = new Headers(options.headers);
@@ -122,6 +125,29 @@ describe('elasticsearchApi.queryTelemetry', () => {
 
     await expect(elasticsearchApi.queryTelemetry('prod-es')).rejects.toThrow('network down');
   });
+
+  it('serializes sort options for inline telemetry requests', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(mockResponse));
+
+    await elasticsearchApi.queryTelemetryInline(
+      { host: 'https://es.example.com', telemetryIndex: 'krkn-telemetry' },
+      20,
+      1,
+      undefined,
+      undefined,
+      undefined,
+      { sortBy: 'namespace', sortOrder: 'desc' },
+    );
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(options.body as string)).toEqual({
+      inline: { host: 'https://es.example.com', telemetryIndex: 'krkn-telemetry' },
+      size: 20,
+      page: 1,
+      sortBy: 'namespace',
+      sortOrder: 'desc',
+    });
+  });
 });
 
 describe('elasticsearchApi.queryAlerts', () => {
@@ -145,7 +171,13 @@ describe('elasticsearchApi.queryAlerts', () => {
     };
     fetchMock.mockResolvedValue(jsonResponse(response));
 
-    await expect(elasticsearchApi.queryAlerts('prod-es', 25, '2025-01-01', '2025-01-02')).resolves.toEqual(response);
+    await expect(elasticsearchApi.queryAlerts(
+      'prod-es',
+      25,
+      '2025-01-01',
+      '2025-01-02',
+      { sortBy: 'severity', sortOrder: 'desc' },
+    )).resolves.toEqual(response);
 
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/api/v1/elasticsearch-alerts-query');
@@ -155,6 +187,8 @@ describe('elasticsearchApi.queryAlerts', () => {
       size: 25,
       startDate: '2025-01-01',
       endDate: '2025-01-02',
+      sortBy: 'severity',
+      sortOrder: 'desc',
     });
   });
 });

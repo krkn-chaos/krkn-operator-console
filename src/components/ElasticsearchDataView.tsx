@@ -41,7 +41,8 @@ import {
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td, ExpandableRowContent } from '@patternfly/react-table';
 import { Chart, ChartAxis, ChartBar, ChartGroup, ChartLegend, ChartThreshold } from '@patternfly/react-charts';
-import { DatabaseIcon, PlusCircleIcon } from '@patternfly/react-icons';
+import { ArrowsAltVIcon, LongArrowAltUpIcon, LongArrowAltDownIcon, DatabaseIcon, PlusCircleIcon } from '@patternfly/react-icons';
+import './ElasticsearchDataView.css';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications, useRole } from '../hooks';
 import { ElasticsearchConfigForm } from './ElasticsearchConfigsCard';
@@ -60,6 +61,8 @@ import type {
   UpdateElasticsearchConfigRequest,
   InlineElasticsearchConnection,
   QueryTelemetryResponse,
+  TelemetrySortOptions,
+  TelemetrySortField,
 } from '../types/api';
 
 // Filter categories shown in the single-select category dropdown. Each key must
@@ -83,6 +86,13 @@ const PER_PAGE_OPTIONS = [10, 20, 50, 100];
 // this are rejected, so pagination caps itemCount here to keep later pages
 // unselectable.
 const MAX_RESULT_WINDOW = 10000;
+
+type TelemetryQueryRunner = (
+  size: number,
+  pageNum: number,
+  filters?: Record<string, string[]>,
+  sort?: TelemetrySortOptions,
+) => Promise<QueryTelemetryResponse>;
 
 /**
  * Formats an epoch-seconds timestamp as "MMM DD, YYYY, h:mm:ss AM/PM".
@@ -426,7 +436,8 @@ function PodRecoveryChart({ scenario }: { scenario: TelemetryScenarioDetail }) {
  *
  * Results are paginated server-side (perPage/page sent as size/page) and can be
  * narrowed with faceted filters whose available values come from the last
- * response's facets.
+ * response's facets. Sortable table columns request Elasticsearch ordering and
+ * retain the active sort while paging and filtering.
  *
  * Takes no props; all state is internal. Mount it directly for the
  * `elasticsearch_data` phase.
@@ -450,6 +461,7 @@ export function ElasticsearchDataView() {
   // response used to compute the page count.
   const [perPage, setPerPage] = useState(50);
   const [page, setPage] = useState(1);
+  const [sortOptions, setSortOptions] = useState<TelemetrySortOptions>();
   const [total, setTotal] = useState(0);
   const [startDate, setStartDate] = useState(isoDate(10));
   const [endDate, setEndDate] = useState(isoDate(0));
@@ -500,9 +512,7 @@ export function ElasticsearchDataView() {
   // Runner for the last-executed query path (saved config or inline). Pagination
   // and filter controls re-run the same path with new page/filter criteria, so
   // the runner is captured on each explicit "Run Query" and reused thereafter.
-  const lastRunnerRef = useRef<
-    ((size: number, pageNum: number, filters?: Record<string, string[]>) => Promise<QueryTelemetryResponse>) | null
-  >(null);
+  const lastRunnerRef = useRef<TelemetryQueryRunner | null>(null);
 
   // Clears any displayed results and invalidates in-flight requests. Called
   // whenever the query criteria change so the table never shows telemetry that
@@ -579,10 +589,11 @@ export function ElasticsearchDataView() {
   // connection paths and by the pagination/filter re-run controls. The runner is
   // stored so pagination/filter controls can re-run the same path.
   const executeQuery = async (
-    runner: (size: number, pageNum: number, filters?: Record<string, string[]>) => Promise<QueryTelemetryResponse>,
+    runner: TelemetryQueryRunner,
     pageArg: number,
     perPageArg: number,
     filtersArg?: Record<string, string[]>,
+    sortArg: TelemetrySortOptions | undefined = sortOptions,
     // Rollback invoked when this run fails while still current. Pagination and
     // filter controls apply their criteria optimistically and pass a rollback so
     // a failed re-query restores the prior page/perPage/filters, keeping the
@@ -596,7 +607,7 @@ export function ElasticsearchDataView() {
     latestRequestId.current = requestId;
     setQuerying(true);
     try {
-      const result = await runner(perPageArg, pageArg, filtersArg);
+      const result = await runner(perPageArg, pageArg, filtersArg, sortArg);
       // Ignore responses superseded by a newer run or by a criteria change.
       if (latestRequestId.current !== requestId) return;
       setDocuments(result.documents || []);
@@ -628,10 +639,26 @@ export function ElasticsearchDataView() {
     perPageArg: number,
     filtersArg?: Record<string, string[]>,
     onError?: () => void,
+    sortArg: TelemetrySortOptions | undefined = sortOptions,
   ) => {
     const runner = lastRunnerRef.current;
     if (!runner) return;
-    void executeQuery(runner, pageArg, perPageArg, filtersArg, onError);
+    void executeQuery(runner, pageArg, perPageArg, filtersArg, sortArg, onError);
+  };
+
+  const handleSort = (column: TelemetrySortField) => {
+    const previousSort = sortOptions;
+    const previousPage = page;
+    const nextSort: TelemetrySortOptions = {
+      sortBy: column,
+      sortOrder: sortOptions?.sortBy === column && sortOptions.sortOrder === 'asc' ? 'desc' : 'asc',
+    };
+    setSortOptions(nextSort);
+    setPage(1);
+    rerun(1, perPage, buildFilters(activeFilters), () => {
+      setSortOptions(previousSort);
+      setPage(previousPage);
+    }, nextSort);
   };
 
   const handleRunQuery = async () => {
@@ -642,15 +669,12 @@ export function ElasticsearchDataView() {
     // A fresh run always starts at the first page.
     setPage(1);
     await executeQuery(
-      (size, pageNum, filters) =>
-        elasticsearchApi.queryTelemetry(
-          selectedConfig,
-          size,
-          pageNum,
-          startDate || undefined,
-          endDate || undefined,
-          filters,
-        ),
+      (size, pageNum, filters, sort) => {
+        const args = [selectedConfig, size, pageNum, startDate || undefined, endDate || undefined, filters] as const;
+        return sort
+          ? elasticsearchApi.queryTelemetry(...args, sort)
+          : elasticsearchApi.queryTelemetry(...args);
+      },
       1,
       perPage,
       buildFilters(activeFilters),
@@ -680,15 +704,12 @@ export function ElasticsearchDataView() {
     // A fresh run always starts at the first page.
     setPage(1);
     await executeQuery(
-      (size, pageNum, filters) =>
-        elasticsearchApi.queryTelemetryInline(
-          inline,
-          size,
-          pageNum,
-          startDate || undefined,
-          endDate || undefined,
-          filters,
-        ),
+      (size, pageNum, filters, sort) => {
+        const args = [inline, size, pageNum, startDate || undefined, endDate || undefined, filters] as const;
+        return sort
+          ? elasticsearchApi.queryTelemetryInline(...args, sort)
+          : elasticsearchApi.queryTelemetryInline(...args);
+      },
       1,
       perPage,
       buildFilters(activeFilters),
@@ -940,6 +961,37 @@ export function ElasticsearchDataView() {
     />
   );
 
+  const sortableHeader = (label: string, column: TelemetrySortField) => {
+    const isActive = sortOptions?.sortBy === column;
+    const isAsc = isActive && sortOptions?.sortOrder === 'asc';
+    const nextDirection = isAsc ? 'descending' : 'ascending';
+    // Directional icon so the active sort order is readable from the glyph, not
+    // only from the blue (active) color: up = ascending, down = descending; the
+    // neutral double-headed arrow marks an inactive, sortable column.
+    const SortIcon = !isActive ? ArrowsAltVIcon : isAsc ? LongArrowAltUpIcon : LongArrowAltDownIcon;
+    return (
+      <Flex
+        alignItems={{ default: 'alignItemsCenter' }}
+        spaceItems={{ default: 'spaceItemsSm' }}
+        flexWrap={{ default: 'nowrap' }}
+      >
+        <FlexItem style={{ whiteSpace: 'nowrap' }}>{label}</FlexItem>
+        <FlexItem>
+          <Button
+            variant="plain"
+            className="elasticsearch-sort-button"
+            onClick={() => handleSort(column)}
+            aria-label={isActive ? `Sort ${label} ${nextDirection}` : `Sort by ${label}`}
+            aria-pressed={isActive}
+            title={isActive ? `Sorted ${isAsc ? 'ascending' : 'descending'}` : `Sort by ${label}`}
+          >
+            <SortIcon aria-hidden="true" />
+          </Button>
+        </FlexItem>
+      </Flex>
+    );
+  };
+
   // Shared results region: spinner while querying, an info prompt before the
   // first run, an empty state when a query returned nothing, or the table.
   const resultsSection = (
@@ -971,12 +1023,12 @@ export function ElasticsearchDataView() {
               <Thead>
                 <Tr>
                   <Th screenReaderText="Row expansion" />
-                  <Th>UUID</Th>
-                  <Th>Scenario Type</Th>
-                  <Th>Start Time</Th>
-                  <Th>End Time</Th>
-                  <Th>Namespace</Th>
-                  <Th>Status</Th>
+                  <Th width={10}>UUID</Th>
+                  <Th width={10}>{sortableHeader('Scenario Type', 'scenario_type')}</Th>
+                  <Th width={20}>{sortableHeader('Start Time', 'start_timestamp')}</Th>
+                  <Th width={20}>{sortableHeader('End Time', 'end_timestamp')}</Th>
+                  <Th width={20}>{sortableHeader('Namespace', 'namespace')}</Th>
+                  <Th width={10}>{sortableHeader('Status', 'status')}</Th>
                 </Tr>
               </Thead>
               {documents.map((doc, rowIndex) => {

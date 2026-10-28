@@ -8,6 +8,8 @@ import type {
   QueryTelemetryResponse,
   QueryAlertsResponse,
   InlineElasticsearchConnection,
+  TelemetrySortOptions,
+  AlertSortOptions,
 } from '../types/api';
 
 const API_BASE = '/api/v1';
@@ -71,10 +73,11 @@ class ElasticsearchApi extends BaseApiClient {
     startDate?: string,
     endDate?: string,
     filters?: Record<string, string[]>,
+    sort?: TelemetrySortOptions,
   ): Promise<QueryTelemetryResponse> {
     return this.fetchJson<QueryTelemetryResponse>('/elasticsearch-query', {
       method: 'POST',
-      body: JSON.stringify({ configName, size, page, startDate, endDate, filters }),
+      body: JSON.stringify({ configName, size, page, startDate, endDate, filters, ...sort }),
     });
   }
 
@@ -110,10 +113,11 @@ class ElasticsearchApi extends BaseApiClient {
     startDate?: string,
     endDate?: string,
     filters?: Record<string, string[]>,
+    sort?: TelemetrySortOptions,
   ): Promise<QueryTelemetryResponse> {
     return this.fetchJson<QueryTelemetryResponse>('/elasticsearch-query', {
       method: 'POST',
-      body: JSON.stringify({ inline, size, page, startDate, endDate, filters }),
+      body: JSON.stringify({ inline, size, page, startDate, endDate, filters, ...sort }),
     });
   }
 
@@ -123,10 +127,11 @@ class ElasticsearchApi extends BaseApiClient {
     size?: number,
     startDate?: string,
     endDate?: string,
+    sort?: AlertSortOptions,
   ): Promise<QueryAlertsResponse> {
     return this.fetchJson<QueryAlertsResponse>('/elasticsearch-alerts-query', {
       method: 'POST',
-      body: JSON.stringify({ configName, size, startDate, endDate }),
+      body: JSON.stringify({ configName, size, startDate, endDate, ...sort }),
     });
   }
 }

@@ -1040,6 +1040,57 @@ describe('ElasticsearchDataView', () => {
     await waitFor(() => expect(screen.getByText('s50p1-r')).toBeInTheDocument());
   };
 
+  it('requests backend sorting, toggles direction, and resets pagination', async () => {
+    await runPagedQuery();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Go to next page' })[0]);
+    await waitFor(() => expect(screen.getByText('s50p2-r')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Scenario Type' }));
+    await waitFor(() => {
+      expect(elasticsearchApi.queryTelemetry).toHaveBeenLastCalledWith(
+        'prod-es',
+        50,
+        1,
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        undefined,
+        { sortBy: 'scenario_type', sortOrder: 'asc' },
+      );
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sort Scenario Type descending' }));
+    await waitFor(() => {
+      expect(elasticsearchApi.queryTelemetry).toHaveBeenLastCalledWith(
+        'prod-es',
+        50,
+        1,
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        undefined,
+        { sortBy: 'scenario_type', sortOrder: 'desc' },
+      );
+    });
+  });
+
+  it('preserves selected facets when sorting telemetry', async () => {
+    await runInitialQuery();
+    await selectFacetValue('scenario_type', 'pod_disruption_scenarios (5)');
+    await waitFor(() => expect(elasticsearchApi.queryTelemetry).toHaveBeenCalledTimes(2));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by Status' }));
+    await waitFor(() => {
+      expect(elasticsearchApi.queryTelemetry).toHaveBeenLastCalledWith(
+        'prod-es',
+        50,
+        1,
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        { scenario_type: ['pod_disruption_scenarios'] },
+        { sortBy: 'status', sortOrder: 'asc' },
+      );
+    });
+  });
+
   it('re-queries the next page and renders its results', async () => {
     await runPagedQuery();
 
