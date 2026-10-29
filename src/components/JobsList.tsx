@@ -48,7 +48,6 @@ import {
   TrashIcon,
   LockIcon,
   TopologyIcon,
-  ArrowsAltVIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
@@ -62,6 +61,7 @@ import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
 import { JobDiagnosticAlert } from './JobDiagnosticAlert';
+import { SortableHeader } from './SortableHeader';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
@@ -79,11 +79,12 @@ import type {
   UnifiedJobItem,
   RollbackRunSummary,
 } from '../types/api';
+import type { JobsSortField } from '../types/websocket';
 
 const GRAPH_RUN_TERMINAL_PHASES: GraphRunListItem['phase'][] = ['Completed', 'Failed', 'PartiallyFailed'];
 // Older operators omit isRollback; pair their generated run name with the reserved workload tag.
 const GENERATED_ROLLBACK_RUN_NAME = /^krkn-rollback-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-[1-9][0-9]*)?$/i;
-type RunSortColumn = 'createdAt' | 'status' | 'name' | 'owner';
+type RunSortColumn = JobsSortField;
 
 export type UnifiedRunItem =
   | {
@@ -237,6 +238,8 @@ export function JobsList({
   const { activeRuns, loading: activeRunsLoading, error: activeRunsError } = useActiveRunsPoller();
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [isCategorySelectOpen, setIsCategorySelectOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<RunSortColumn>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const {
     jobs,
     pagination,
@@ -249,7 +252,7 @@ export function JobsList({
     isLoading,
     snapshotVersion,
     refresh: refreshJobs,
-  } = useJobs(categoryFilters);
+  } = useJobs(categoryFilters, sortColumn, sortDirection);
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -260,8 +263,6 @@ export function JobsList({
   const [timeRangeError, setTimeRangeError] = useState('');
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
-  const [sortColumn, setSortColumn] = useState<RunSortColumn>('createdAt');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -572,42 +573,13 @@ export function JobsList({
     });
   }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter, categoryFilters, categoryOverrides]);
 
-  const sortedFilteredUnifiedRuns = useMemo(() => {
-    const getValue = (item: UnifiedRunItem): string | number => {
-      switch (sortColumn) {
-        case 'createdAt': {
-          const createdAt = item.type === 'graph' ? item.createdAt : item.run.createdAt;
-          const timestamp = new Date(createdAt).getTime();
-          return Number.isNaN(timestamp) ? 0 : timestamp;
-        }
-        case 'status':
-          return item.type === 'graph' ? item.phase : item.run.phase;
-        case 'name':
-          return item.type === 'graph'
-            ? item.graphRunName
-            : item.run.customRunName?.trim() || item.run.scenarioRunName;
-        case 'owner':
-          return (item.type === 'graph' ? item.ownerUserId : item.run.ownerUserId) || '';
-      }
-    };
-
-    return [...filteredUnifiedRuns].sort((left, right) => {
-      const leftValue = getValue(left);
-      const rightValue = getValue(right);
-      const comparison = typeof leftValue === 'number' && typeof rightValue === 'number'
-        ? leftValue - rightValue
-        : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: 'base' });
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-  }, [filteredUnifiedRuns, sortColumn, sortDirection]);
-
   const handleSort = (column: RunSortColumn) => {
-    if (sortColumn === column) {
-      setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc');
-      return;
-    }
+    const nextDirection = sortColumn === column
+      ? sortDirection === 'asc' ? 'desc' : 'asc'
+      : column === 'createdAt' ? 'desc' : 'asc';
     setSortColumn(column);
-    setSortDirection(column === 'createdAt' ? 'desc' : 'asc');
+    setSortDirection(nextDirection);
+    setPage(1);
   };
 
   const hasActiveFilters = Boolean(ownerFilter || isValidDate(dateTimeFrom) || isValidDate(dateTimeTo) || customRunNameFilter || categoryFilters.length > 0);
@@ -678,21 +650,13 @@ export function JobsList({
 
   const renderSortableHeader = (label: string, column: RunSortColumn) => {
     const isActive = sortColumn === column;
-    const nextDirection = isActive && sortDirection === 'asc' ? 'descending' : 'ascending';
     return (
-      <div className="jobs-list-sort-header">
-        <span>{label}</span>
-        <Button
-          variant="plain"
-          className="jobs-list-sort-button"
-          onClick={() => handleSort(column)}
-          aria-label={isActive ? `Sort ${label} ${nextDirection}` : `Sort by ${label}`}
-          aria-pressed={isActive}
-          title={isActive ? `Sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`}
-        >
-          <ArrowsAltVIcon aria-hidden="true" />
-        </Button>
-      </div>
+      <SortableHeader
+        label={label}
+        isActive={isActive}
+        isAscending={isActive && sortDirection === 'asc'}
+        onSort={() => handleSort(column)}
+      />
     );
   };
 
@@ -967,7 +931,7 @@ export function JobsList({
             </Title>
             <EmptyStateBody>Fetching scenario runs...</EmptyStateBody>
           </EmptyState>
-        ) : sortedFilteredUnifiedRuns.length === 0 && (jobs.length > 0 || hasActiveFilters) ? (
+        ) : filteredUnifiedRuns.length === 0 && (jobs.length > 0 || hasActiveFilters) ? (
           <EmptyState>
             <EmptyStateIcon icon={HiOutlineRocketLaunch} />
             <Title headingLevel="h2" size="lg">
@@ -1026,7 +990,7 @@ export function JobsList({
                 <div className="pf-v5-c-data-list__item-action jobs-list-header-action" aria-hidden="true" />
               </DataListItemRow>
             </DataListItem>
-            {sortedFilteredUnifiedRuns.map((item) => {
+            {filteredUnifiedRuns.map((item) => {
               // Handle GraphRun
               if (item.type === 'graph') {
                 const isGraphExpanded = expandedGraphRunIds.has(item.graphRunName);
@@ -1058,6 +1022,11 @@ export function JobsList({
                           </DataListCell>,
                           <DataListCell key="workflow" width={2} className="jobs-list-summary-cell--primary">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <Tooltip content="Workflow">
+                                <span role="img" aria-label="Workflow" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                                  <TopologyIcon aria-hidden="true" />
+                                </span>
+                              </Tooltip>
                               <code
                                 className="jobs-list-run-primary-value"
                                 style={{

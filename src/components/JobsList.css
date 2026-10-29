@@ -50,25 +50,6 @@
   padding-block: var(--pf-v5-global--spacer--sm);
 }
 
-.jobs-list-sort-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.25rem;
-  white-space: nowrap;
-}
-
-.jobs-list-sort-button.pf-v5-c-button.pf-m-plain {
-  padding: 0.125rem;
-  color: var(--pf-v5-global--Color--200);
-}
-
-.jobs-list-sort-button.pf-v5-c-button.pf-m-plain:hover,
-.jobs-list-sort-button.pf-v5-c-button.pf-m-plain:focus-visible,
-.jobs-list-sort-button.pf-v5-c-button.pf-m-plain[aria-pressed='true'] {
-  color: var(--pf-v5-global--primary-color--100);
-}
-
 .jobs-list-header-action {
   visibility: hidden;
 }

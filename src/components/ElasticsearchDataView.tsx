@@ -41,13 +41,13 @@ import {
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td, ExpandableRowContent } from '@patternfly/react-table';
 import { Chart, ChartAxis, ChartBar, ChartGroup, ChartLegend, ChartThreshold } from '@patternfly/react-charts';
-import { ArrowsAltVIcon, LongArrowAltUpIcon, LongArrowAltDownIcon, DatabaseIcon, PlusCircleIcon } from '@patternfly/react-icons';
-import './ElasticsearchDataView.css';
+import { DatabaseIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications, useRole } from '../hooks';
 import { ElasticsearchConfigForm } from './ElasticsearchConfigsCard';
 import { JobStatsSummary } from './JobStatsSummary';
 import { ElasticsearchAlertsTab } from './ElasticsearchAlertsTab';
+import { SortableHeader } from './SortableHeader';
 import type {
   ElasticsearchConfig,
   ClusterMetadata,
@@ -964,31 +964,8 @@ export function ElasticsearchDataView() {
   const sortableHeader = (label: string, column: TelemetrySortField) => {
     const isActive = sortOptions?.sortBy === column;
     const isAsc = isActive && sortOptions?.sortOrder === 'asc';
-    const nextDirection = isAsc ? 'descending' : 'ascending';
-    // Directional icon so the active sort order is readable from the glyph, not
-    // only from the blue (active) color: up = ascending, down = descending; the
-    // neutral double-headed arrow marks an inactive, sortable column.
-    const SortIcon = !isActive ? ArrowsAltVIcon : isAsc ? LongArrowAltUpIcon : LongArrowAltDownIcon;
     return (
-      <Flex
-        alignItems={{ default: 'alignItemsCenter' }}
-        spaceItems={{ default: 'spaceItemsSm' }}
-        flexWrap={{ default: 'nowrap' }}
-      >
-        <FlexItem style={{ whiteSpace: 'nowrap' }}>{label}</FlexItem>
-        <FlexItem>
-          <Button
-            variant="plain"
-            className="elasticsearch-sort-button"
-            onClick={() => handleSort(column)}
-            aria-label={isActive ? `Sort ${label} ${nextDirection}` : `Sort by ${label}`}
-            aria-pressed={isActive}
-            title={isActive ? `Sorted ${isAsc ? 'ascending' : 'descending'}` : `Sort by ${label}`}
-          >
-            <SortIcon aria-hidden="true" />
-          </Button>
-        </FlexItem>
-      </Flex>
+      <SortableHeader label={label} isActive={isActive} isAscending={isAsc} onSort={() => handleSort(column)} />
     );
   };
 

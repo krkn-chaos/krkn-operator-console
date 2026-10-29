@@ -137,6 +137,32 @@ function makeGraphJobItem(
   };
 }
 
+function makeSortableRunItems(): UnifiedJobItem[] {
+  return [
+    makeScenarioJobItem('charlie-run', 'Succeeded', {
+      createdAt: '2026-01-03T00:00:00Z',
+      scenarioName: 'charlie-run',
+      ownerUserId: 'owner-m',
+    }),
+    makeScenarioJobItem('alpha-run', 'Failed', {
+      createdAt: '2026-01-01T00:00:00Z',
+      scenarioName: 'alpha-run',
+      ownerUserId: 'owner-z',
+    }),
+    makeScenarioJobItem('bravo-run', 'Running', {
+      createdAt: '2026-01-02T00:00:00Z',
+      scenarioName: 'bravo-run',
+      ownerUserId: 'owner-a',
+    }),
+  ];
+}
+
+function getRenderedPrimaryRunNames(): string[] {
+  const runsList = screen.getByRole('list', { name: 'Scenario runs list' });
+  return Array.from(runsList.querySelectorAll('.jobs-list-summary-cell--primary .jobs-list-run-primary-value'))
+    .map((value) => value.textContent?.trim() ?? '');
+}
+
 describe('JobsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -381,6 +407,63 @@ describe('JobsList', () => {
         .querySelector('.jobs-list-summary-cell--run-name');
       expect(Array.from(runNameCell?.querySelectorAll('code') ?? []).map((code) => code.textContent))
         .toEqual(['scenario-run-id']);
+    });
+  });
+
+  describe('Run sorting', () => {
+    it.each([
+      {
+        label: 'Status',
+        ascending: ['alpha-run', 'bravo-run', 'charlie-run'],
+        descending: ['charlie-run', 'bravo-run', 'alpha-run'],
+      },
+      {
+        label: 'Run Name',
+        ascending: ['alpha-run', 'bravo-run', 'charlie-run'],
+        descending: ['charlie-run', 'bravo-run', 'alpha-run'],
+      },
+      {
+        label: 'User',
+        ascending: ['bravo-run', 'charlie-run', 'alpha-run'],
+        descending: ['alpha-run', 'charlie-run', 'bravo-run'],
+      },
+    ])('sorts by $label in both directions and updates accessible labels', async ({ label, ascending, descending }) => {
+      const user = userEvent.setup();
+      setMockJobs(makeSortableRunItems());
+      render(<JobsList {...defaultProps} />);
+
+      const sortButton = screen.getByRole('button', { name: `Sort by ${label}` });
+      expect(sortButton).toHaveAttribute('aria-pressed', 'false');
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(ascending);
+      expect(sortButton).toHaveAccessibleName(`Sort ${label} descending`);
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(descending);
+      expect(sortButton).toHaveAccessibleName(`Sort ${label} ascending`);
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('sorts by Created date in both directions and updates accessible labels', async () => {
+      const user = userEvent.setup();
+      setMockJobs(makeSortableRunItems());
+      render(<JobsList {...defaultProps} />);
+
+      const sortButton = screen.getByRole('button', { name: 'Sort Created ascending' });
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+      expect(getRenderedPrimaryRunNames()).toEqual(['charlie-run', 'bravo-run', 'alpha-run']);
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(['alpha-run', 'bravo-run', 'charlie-run']);
+      expect(sortButton).toHaveAccessibleName('Sort Created descending');
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(['charlie-run', 'bravo-run', 'alpha-run']);
+      expect(sortButton).toHaveAccessibleName('Sort Created ascending');
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
     });
   });
 
