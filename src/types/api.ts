@@ -1626,7 +1626,7 @@ export interface InlineElasticsearchConnection {
 }
 
 export type ElasticsearchSortOrder = 'asc' | 'desc';
-export type TelemetrySortField = 'scenario_type' | 'start_timestamp' | 'end_timestamp' | 'namespace' | 'status';
+export type TelemetrySortField = 'scenario_type' | 'start_timestamp' | 'end_timestamp' | 'status';
 export type AlertSortField = 'uuid' | 'phase' | 'created_at' | 'severity';
 
 export interface TelemetrySortOptions {

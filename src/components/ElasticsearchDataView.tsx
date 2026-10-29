@@ -1027,7 +1027,7 @@ export function ElasticsearchDataView() {
                   <Th width={10}>{sortableHeader('Scenario Type', 'scenario_type')}</Th>
                   <Th width={20}>{sortableHeader('Start Time', 'start_timestamp')}</Th>
                   <Th width={20}>{sortableHeader('End Time', 'end_timestamp')}</Th>
-                  <Th width={20}>{sortableHeader('Namespace', 'namespace')}</Th>
+                  <Th width={20}>Namespace</Th>
                   <Th width={10}>{sortableHeader('Status', 'status')}</Th>
                 </Tr>
               </Thead>

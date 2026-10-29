@@ -136,7 +136,7 @@ describe('elasticsearchApi.queryTelemetry', () => {
       undefined,
       undefined,
       undefined,
-      { sortBy: 'namespace', sortOrder: 'desc' },
+      { sortBy: 'status', sortOrder: 'desc' },
     );
 
     const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -144,7 +144,7 @@ describe('elasticsearchApi.queryTelemetry', () => {
       inline: { host: 'https://es.example.com', telemetryIndex: 'krkn-telemetry' },
       size: 20,
       page: 1,
-      sortBy: 'namespace',
+      sortBy: 'status',
       sortOrder: 'desc',
     });
   });
