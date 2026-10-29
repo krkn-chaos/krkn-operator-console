@@ -1,0 +1,19 @@
+.sortable-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.sortable-header__button.pf-v5-c-button.pf-m-plain {
+  padding: 0.125rem;
+  color: var(--pf-v5-global--Color--200);
+}
+
+.sortable-header__button.pf-v5-c-button.pf-m-plain:hover,
+.sortable-header__button.pf-v5-c-button.pf-m-plain:focus-visible,
+.sortable-header__button.pf-v5-c-button.pf-m-plain[aria-pressed='true'] {
+  color: var(--pf-v5-global--primary-color--100);
+}

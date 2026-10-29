@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { websocketService } from '../services/websocketService';
 import type {
   ConnectionState,
+  JobsSortField,
+  JobsSortOrder,
   MessageHandler,
   RawMessageHandler,
 } from '../types/websocket';
@@ -15,7 +17,16 @@ interface UseWebSocketOptions {
 
 interface UseWebSocketReturn {
   connectionState: ConnectionState;
-  subscribe: (resource: string, ids?: string[], page?: number, limit?: number, categories?: string[], subscriptionId?: string) => void;
+  subscribe: (
+    resource: string,
+    ids?: string[],
+    page?: number,
+    limit?: number,
+    categories?: string[],
+    subscriptionId?: string,
+    sortBy?: JobsSortField,
+    sortOrder?: JobsSortOrder,
+  ) => void;
   unsubscribe: (resource: string, ids?: string[]) => void;
 }
 
@@ -82,7 +93,32 @@ export function useWebSocket(
   }, [connectionId, url, disabled, subscriptionMode]);
 
   const subscribe = useCallback(
-    (resource: string, ids?: string[], page?: number, limit?: number, categories?: string[], subscriptionId?: string) => websocketService.subscribe(connectionId, resource, ids, page, limit, categories, subscriptionId),
+    (
+      resource: string,
+      ids?: string[],
+      page?: number,
+      limit?: number,
+      categories?: string[],
+      subscriptionId?: string,
+      sortBy?: JobsSortField,
+      sortOrder?: JobsSortOrder,
+    ) => {
+      if (sortBy === undefined && sortOrder === undefined) {
+        websocketService.subscribe(connectionId, resource, ids, page, limit, categories, subscriptionId);
+        return;
+      }
+      websocketService.subscribe(
+        connectionId,
+        resource,
+        ids,
+        page,
+        limit,
+        categories,
+        subscriptionId,
+        sortBy,
+        sortOrder,
+      );
+    },
     [connectionId],
   );
 

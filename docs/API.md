@@ -408,6 +408,8 @@ Retrieves telemetry documents from Elasticsearch for a given time range. Support
   "page": 1,
   "startDate": "2024-01-01",
   "endDate": "2024-01-31",
+  "sortBy": "scenario_type",
+  "sortOrder": "asc",
   "filters": {
     "scenario_type": ["pod_disruption_scenarios"],
     "cloud_type": ["aws"]
@@ -505,6 +507,8 @@ if (response.ok) {
 - `startDate` (string, optional) - Start date in "yyyy-MM-dd" format
 - `endDate` (string, optional) - End date in "yyyy-MM-dd" format
 - `filters` (object, optional) - Facet filters as category key → array of allowed values. Documents match when each listed category matches one of its values. Allowed categories: `scenario_type`, `job_status`, `cloud_infrastructure`, `cloud_type`, `major_version`, `network_plugins`. Unknown filter categories are rejected with `400 Bad Request`.
+- `sortBy` (string, optional) - Telemetry sort key: `scenario_type`, `start_timestamp`, `end_timestamp`, `namespace`, or `status`. Scenario-backed keys sort by the representative scenario shown in each table row; Status includes the displayed scenario exit status.
+- `sortOrder` (string, optional) - Sort direction: `asc` or `desc`. Provide together with `sortBy`; omitting both keeps timestamp descending.
 
 **Note:** Exactly one of `configName` or `inline` must be provided.
 
@@ -647,6 +651,33 @@ if (response.ok) {
   - `count` (integer) - Documents with this value in the matched window
 
 **Note:** Stats counts apply to entire matched window, not just returned page. `stats.pass + stats.fail` may exceed `total`.
+
+### Query Alerts
+
+Retrieves alert documents from the saved Elasticsearch config's alerts index.
+
+**Endpoint:** `POST /api/v1/elasticsearch-alerts-query`
+
+**Request Body:**
+```json
+{
+  "configName": "my-es-config",
+  "size": 100,
+  "startDate": "2024-01-01",
+  "endDate": "2024-01-31",
+  "sortBy": "severity",
+  "sortOrder": "desc"
+}
+```
+
+**Request Fields:**
+- `configName` (string, required) - Saved Elasticsearch config with an alerts index.
+- `size` (integer, optional) - Maximum number of returned documents (default: 50, max: 500).
+- `startDate`, `endDate` (string, optional) - Date bounds in `yyyy-MM-dd` format.
+- `sortBy` (string, optional) - Alert sort key: `uuid`, `phase`, `created_at`, or `severity`.
+- `sortOrder` (string, optional) - `asc` or `desc`; provide together with `sortBy`. Omit both to keep `created_at` descending.
+
+Unknown sort keys, invalid directions, or incomplete sort options return `400 Bad Request`.
 
 ---
 

@@ -1,13 +1,15 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import type { ClusterJob, UnifiedJobItem, ScenarioRunState, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
 import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJobsMock } from '../hooks/__mocks__/useJobs';
+import { operatorApi } from '../services/operatorApi';
 
 vi.mock('../hooks/useJobs');
 
+const mockRole = vi.hoisted(() => ({ isAdmin: false }));
 vi.mock('../hooks/useRole', () => ({
-  useRole: () => ({ isAdmin: false, role: 'user' }),
+  useRole: () => ({ isAdmin: mockRole.isAdmin, role: mockRole.isAdmin ? 'admin' : 'user' }),
 }));
 
 vi.mock('../hooks/useActiveRunsPoller', () => ({
@@ -126,10 +128,93 @@ function makeGraphJobItem(
   };
 }
 
+function makeSortableRunItems(): UnifiedJobItem[] {
+  return [
+    makeScenarioJobItem('charlie-run', 'Succeeded', {
+      createdAt: '2026-01-03T00:00:00Z',
+      scenarioName: 'charlie-run',
+      ownerUserId: 'owner-m',
+    }),
+    makeScenarioJobItem('alpha-run', 'Failed', {
+      createdAt: '2026-01-01T00:00:00Z',
+      scenarioName: 'alpha-run',
+      ownerUserId: 'owner-z',
+    }),
+    makeScenarioJobItem('bravo-run', 'Running', {
+      createdAt: '2026-01-02T00:00:00Z',
+      scenarioName: 'bravo-run',
+      ownerUserId: 'owner-a',
+    }),
+  ];
+}
+
+function getRenderedPrimaryRunNames(): string[] {
+  const runsList = screen.getByRole('list', { name: 'Scenario runs list' });
+  return Array.from(runsList.querySelectorAll('.jobs-list-summary-cell--primary .jobs-list-run-primary-value'))
+    .map((value) => value.textContent?.trim() ?? '');
+}
+
 describe('JobsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetJobsMock();
+    mockRole.isAdmin = false;
+    vi.spyOn(operatorApi, 'getCategories').mockResolvedValue({ categories: [], total: 0 });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sorts category filter options naturally and preserves selection', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({
+      categories: [
+        { name: 'category10', color: '#111111', availableToAll: true },
+        { name: 'Alpha', color: '#222222', availableToAll: true },
+        { name: 'Category2', color: '#333333', availableToAll: true },
+      ],
+      total: 3,
+    });
+    setMockJobs([makeScenarioJobItem('category-sort-run', 'Succeeded')]);
+
+    render(<JobsList {...defaultProps} />);
+    await user.click(await screen.findByRole('button', { name: 'Filter by category' }));
+
+    const listbox = screen.getByRole('listbox');
+    const options = await within(listbox).findAllByRole('menuitem');
+    expect(options.map((option) => option.textContent?.trim())).toEqual([
+      'Alpha',
+      'Category2',
+      'category10',
+    ]);
+
+    await user.click(within(listbox).getByText('Category2'));
+    expect(await screen.findByText('1 category selected')).toBeInTheDocument();
+  });
+
+  it('sorts user filter options naturally and preserves selected user IDs', async () => {
+    const user = userEvent.setup();
+    mockRole.isAdmin = true;
+    setMockJobs([
+      makeScenarioJobItem('owner-10-run', 'Succeeded', { ownerUserId: 'user10' }),
+      makeScenarioJobItem('owner-admin-run', 'Succeeded', { ownerUserId: 'Admin' }),
+      makeScenarioJobItem('owner-2-run', 'Succeeded', { ownerUserId: 'user2' }),
+    ]);
+
+    render(<JobsList {...defaultProps} />);
+    await user.click(await screen.findByRole('button', { name: 'Select user...' }));
+
+    const listbox = screen.getByRole('listbox');
+    const options = within(listbox).getAllByRole('option');
+    expect(options.map((option) => option.textContent?.trim())).toEqual([
+      'Admin',
+      'user2',
+      'user10',
+    ]);
+
+    await user.click(within(listbox).getByRole('option', { name: 'user2' }));
+    expect(screen.getByLabelText('Remove user filter')).toBeInTheDocument();
   });
 
   it('shows empty state when no jobs', () => {
@@ -264,7 +349,7 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps} />);
 
       const runNameCell = screen.getByRole('list', { name: 'Scenario runs list' })
-        .querySelector('.jobs-list-summary-cell--run-name');
+        .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header) .jobs-list-summary-cell--run-name');
       expect(Array.from(runNameCell?.querySelectorAll('code') ?? []).map((code) => code.textContent))
         .toEqual(['same-run']);
     });
@@ -274,7 +359,7 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps} />);
 
       const runNameCell = screen.getByRole('list', { name: 'Scenario runs list' })
-        .querySelector('.jobs-list-summary-cell--run-name');
+        .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header) .jobs-list-summary-cell--run-name');
       expect(Array.from(runNameCell?.querySelectorAll('code') ?? []).map((code) => code.textContent))
         .toEqual(['my-label', 'scenario-run-id']);
     });
@@ -284,9 +369,66 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps} />);
 
       const runNameCell = screen.getByRole('list', { name: 'Scenario runs list' })
-        .querySelector('.jobs-list-summary-cell--run-name');
+        .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header) .jobs-list-summary-cell--run-name');
       expect(Array.from(runNameCell?.querySelectorAll('code') ?? []).map((code) => code.textContent))
         .toEqual(['scenario-run-id']);
+    });
+  });
+
+  describe('Run sorting', () => {
+    it.each([
+      {
+        label: 'Status',
+        ascending: ['alpha-run', 'bravo-run', 'charlie-run'],
+        descending: ['charlie-run', 'bravo-run', 'alpha-run'],
+      },
+      {
+        label: 'Run Name',
+        ascending: ['alpha-run', 'bravo-run', 'charlie-run'],
+        descending: ['charlie-run', 'bravo-run', 'alpha-run'],
+      },
+      {
+        label: 'User',
+        ascending: ['bravo-run', 'charlie-run', 'alpha-run'],
+        descending: ['alpha-run', 'charlie-run', 'bravo-run'],
+      },
+    ])('sorts by $label in both directions and updates accessible labels', async ({ label, ascending, descending }) => {
+      const user = userEvent.setup();
+      setMockJobs(makeSortableRunItems());
+      render(<JobsList {...defaultProps} />);
+
+      const sortButton = screen.getByRole('button', { name: `Sort by ${label}` });
+      expect(sortButton).toHaveAttribute('aria-pressed', 'false');
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(ascending);
+      expect(sortButton).toHaveAccessibleName(`Sort ${label} descending`);
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(descending);
+      expect(sortButton).toHaveAccessibleName(`Sort ${label} ascending`);
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('sorts by Created date in both directions and updates accessible labels', async () => {
+      const user = userEvent.setup();
+      setMockJobs(makeSortableRunItems());
+      render(<JobsList {...defaultProps} />);
+
+      const sortButton = screen.getByRole('button', { name: 'Sort Created ascending' });
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+      expect(getRenderedPrimaryRunNames()).toEqual(['charlie-run', 'bravo-run', 'alpha-run']);
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(['alpha-run', 'bravo-run', 'charlie-run']);
+      expect(sortButton).toHaveAccessibleName('Sort Created descending');
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(sortButton);
+      expect(getRenderedPrimaryRunNames()).toEqual(['charlie-run', 'bravo-run', 'alpha-run']);
+      expect(sortButton).toHaveAccessibleName('Sort Created ascending');
+      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
     });
   });
 
@@ -363,11 +505,11 @@ describe('JobsList - Run actions menu', () => {
 
     render(<JobsList {...defaultProps} />);
 
-    const summaryCells = Array.from(
-      screen.getByRole('list', { name: 'Scenario runs list' }).querySelectorAll('.pf-v5-c-data-list__cell'),
-    );
-    const jobsIndex = summaryCells.findIndex((cell) => cell.textContent?.includes('Jobs:'));
-    const runNameIndex = summaryCells.findIndex((cell) => cell.textContent?.includes('Run Name:'));
+    const runRow = screen.getByRole('list', { name: 'Scenario runs list' })
+      .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header)');
+    const summaryCells = Array.from(runRow?.querySelectorAll('.pf-v5-c-data-list__cell') ?? []);
+    const jobsIndex = summaryCells.findIndex((cell) => cell.classList.contains('jobs-list-summary-cell--jobs'));
+    const runNameIndex = summaryCells.findIndex((cell) => cell.classList.contains('jobs-list-summary-cell--run-name'));
 
     expect(jobsIndex).toBeGreaterThanOrEqual(0);
     expect(jobsIndex).toBeLessThan(runNameIndex);
@@ -421,7 +563,8 @@ describe('JobsList - Run actions menu', () => {
     render(<JobsList {...defaultProps} />);
 
     const runsList = screen.getByRole('list', { name: 'Scenario runs list' });
-    expect(runsList.querySelector('.jobs-list-summary-cell--status')).toHaveTextContent('Failed');
+    const runRow = runsList.querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header)');
+    expect(runRow?.querySelector('.jobs-list-summary-cell--status')).toHaveTextContent('Failed');
     const compactIdentity = runsList.querySelector('.jobs-list-compact-run-identity');
     expect(compactIdentity).toHaveTextContent('distinctive-label');
     expect(compactIdentity).not.toHaveTextContent('distinctive-run-id');
@@ -458,7 +601,8 @@ describe('JobsList - Run actions menu', () => {
     render(<JobsList {...defaultProps} />);
 
     const rowCells = Array.from(
-      screen.getByRole('list', { name: 'Scenario runs list' }).querySelectorAll('.pf-v5-c-data-list__item-content'),
+      screen.getByRole('list', { name: 'Scenario runs list' })
+        .querySelectorAll('.pf-v5-c-data-list__item:not(.jobs-list-header) .pf-v5-c-data-list__item-content'),
     ).map((content) => Array.from(content.children));
 
     expect(rowCells).toHaveLength(2);
