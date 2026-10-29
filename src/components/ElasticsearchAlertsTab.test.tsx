@@ -128,13 +128,13 @@ describe('ElasticsearchAlertsTab', () => {
     });
   });
 
-  it('does not offer sorting for UUID or Alert fields columns', async () => {
+  it('offers sorting for UUID while leaving arbitrary Alert fields unsortable', async () => {
     const user = userEvent.setup();
     renderAlerts();
     await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
     await screen.findByText('KubeAPIServerLatencyHigh');
 
-    expect(screen.queryByRole('button', { name: /Sort by UUID/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by UUID' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Sort by Alert fields/ })).not.toBeInTheDocument();
   });
 
