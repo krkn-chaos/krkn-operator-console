@@ -69,6 +69,7 @@ import { SortableHeader } from './SortableHeader';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
 import { getJobPhaseDisplay } from '../utils/jobPhaseDisplay';
+import { sortByLabel } from '../utils/sortByLabel';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
 import './JobsList.css';
 
@@ -295,6 +296,7 @@ export function JobsList({
   const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const sortedCategories = useMemo(() => sortByLabel(categories, (category) => category.name), [categories]);
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string[]>>({});
@@ -550,13 +552,13 @@ export function JobsList({
 
   // Get unique owner user IDs from current page for autocomplete
   const uniqueOwners = useMemo(() => {
-    return Array.from(
+    return sortByLabel(Array.from(
       new Set(
         unifiedRuns.map((item) =>
           item.type === 'graph' ? item.ownerUserId : item.run.ownerUserId
         ).filter((id): id is string => !!id)
       )
-    ).sort();
+    ), (owner) => owner);
   }, [unifiedRuns]);
 
   // Client-side filtering on current page
@@ -766,7 +768,7 @@ export function JobsList({
                     )}
                   >
                     <SelectList>
-                      {categories.map((category) => (
+                      {sortedCategories.map((category) => (
                         <SelectOption
                           key={category.name}
                           value={category.name}

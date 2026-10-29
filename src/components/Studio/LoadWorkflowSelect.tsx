@@ -17,6 +17,7 @@ import { workflowsApi } from '../../services/workflowsApi';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import type { WorkflowInfo } from '../../types/api';
+import { sortByLabel } from '../../utils/sortByLabel';
 
 /**
  * Dropdown select for loading saved workflow templates from the cluster.
@@ -111,10 +112,10 @@ export function LoadWorkflowSelect({ id = 'studio-load-workflow' }: { id?: strin
     }
   };
 
-  const filtered = templates.filter(t =>
+  const filtered = sortByLabel(templates.filter(t =>
     t.workflowName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.description || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), (template) => template.workflowName);
 
   return (
     <Select

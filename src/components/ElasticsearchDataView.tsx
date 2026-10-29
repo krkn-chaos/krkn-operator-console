@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -48,6 +48,7 @@ import { ElasticsearchConfigForm } from './ElasticsearchConfigsCard';
 import { JobStatsSummary } from './JobStatsSummary';
 import { ElasticsearchAlertsTab } from './ElasticsearchAlertsTab';
 import { SortableHeader } from './SortableHeader';
+import { sortByLabel } from '../utils/sortByLabel';
 import type {
   ElasticsearchConfig,
   ClusterMetadata,
@@ -455,6 +456,7 @@ function PodRecoveryChart({ scenario }: { scenario: TelemetryScenarioDetail }) {
 export function ElasticsearchDataView() {
   const { showError } = useNotifications();
   const [configs, setConfigs] = useState<ElasticsearchConfig[]>([]);
+  const sortedConfigs = useMemo(() => sortByLabel(configs, (config) => config.name), [configs]);
   const [selectedConfig, setSelectedConfig] = useState('');
   // Server-side pagination: perPage is the page size sent as `size`, page is the
   // 1-based page number, and total is the whole-window match count from the last
@@ -1151,7 +1153,7 @@ export function ElasticsearchDataView() {
                         aria-label="Select an Elasticsearch config"
                       >
                         <FormSelectOption value="" label="Select a saved Elasticsearch config…" isDisabled />
-                        {configs.map((cfg) => (
+                        {sortedConfigs.map((cfg) => (
                           <FormSelectOption key={cfg.name} value={cfg.name} label={cfg.name} />
                         ))}
                       </FormSelect>
