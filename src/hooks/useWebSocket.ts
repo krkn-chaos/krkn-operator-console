@@ -102,17 +102,23 @@ export function useWebSocket(
       subscriptionId?: string,
       sortBy?: JobsSortField,
       sortOrder?: JobsSortOrder,
-    ) => websocketService.subscribe(
-      connectionId,
-      resource,
-      ids,
-      page,
-      limit,
-      categories,
-      subscriptionId,
-      sortBy,
-      sortOrder,
-    ),
+    ) => {
+      if (sortBy === undefined && sortOrder === undefined) {
+        websocketService.subscribe(connectionId, resource, ids, page, limit, categories, subscriptionId);
+        return;
+      }
+      websocketService.subscribe(
+        connectionId,
+        resource,
+        ids,
+        page,
+        limit,
+        categories,
+        subscriptionId,
+        sortBy,
+        sortOrder,
+      );
+    },
     [connectionId],
   );
 

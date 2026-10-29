@@ -384,7 +384,7 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps} />);
 
       const runNameCell = screen.getByRole('list', { name: 'Scenario runs list' })
-        .querySelector('.jobs-list-summary-cell--run-name');
+        .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header) .jobs-list-summary-cell--run-name');
       expect(Array.from(runNameCell?.querySelectorAll('code') ?? []).map((code) => code.textContent))
         .toEqual(['same-run']);
     });
@@ -394,7 +394,7 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps} />);
 
       const runNameCell = screen.getByRole('list', { name: 'Scenario runs list' })
-        .querySelector('.jobs-list-summary-cell--run-name');
+        .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header) .jobs-list-summary-cell--run-name');
       expect(Array.from(runNameCell?.querySelectorAll('code') ?? []).map((code) => code.textContent))
         .toEqual(['my-label', 'scenario-run-id']);
     });
@@ -404,7 +404,7 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps} />);
 
       const runNameCell = screen.getByRole('list', { name: 'Scenario runs list' })
-        .querySelector('.jobs-list-summary-cell--run-name');
+        .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header) .jobs-list-summary-cell--run-name');
       expect(Array.from(runNameCell?.querySelectorAll('code') ?? []).map((code) => code.textContent))
         .toEqual(['scenario-run-id']);
     });
@@ -540,11 +540,11 @@ describe('JobsList - Run actions menu', () => {
 
     render(<JobsList {...defaultProps} />);
 
-    const summaryCells = Array.from(
-      screen.getByRole('list', { name: 'Scenario runs list' }).querySelectorAll('.pf-v5-c-data-list__cell'),
-    );
-    const jobsIndex = summaryCells.findIndex((cell) => cell.textContent?.includes('Jobs:'));
-    const runNameIndex = summaryCells.findIndex((cell) => cell.textContent?.includes('Run Name:'));
+    const runRow = screen.getByRole('list', { name: 'Scenario runs list' })
+      .querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header)');
+    const summaryCells = Array.from(runRow?.querySelectorAll('.pf-v5-c-data-list__cell') ?? []);
+    const jobsIndex = summaryCells.findIndex((cell) => cell.classList.contains('jobs-list-summary-cell--jobs'));
+    const runNameIndex = summaryCells.findIndex((cell) => cell.classList.contains('jobs-list-summary-cell--run-name'));
 
     expect(jobsIndex).toBeGreaterThanOrEqual(0);
     expect(jobsIndex).toBeLessThan(runNameIndex);
@@ -598,7 +598,8 @@ describe('JobsList - Run actions menu', () => {
     render(<JobsList {...defaultProps} />);
 
     const runsList = screen.getByRole('list', { name: 'Scenario runs list' });
-    expect(runsList.querySelector('.jobs-list-summary-cell--status')).toHaveTextContent('Failed');
+    const runRow = runsList.querySelector('.pf-v5-c-data-list__item:not(.jobs-list-header)');
+    expect(runRow?.querySelector('.jobs-list-summary-cell--status')).toHaveTextContent('Failed');
     const compactIdentity = runsList.querySelector('.jobs-list-compact-run-identity');
     expect(compactIdentity).toHaveTextContent('distinctive-label');
     expect(compactIdentity).not.toHaveTextContent('distinctive-run-id');
@@ -670,7 +671,8 @@ describe('JobsList - Run actions menu', () => {
     render(<JobsList {...defaultProps} />);
 
     const rowCells = Array.from(
-      screen.getByRole('list', { name: 'Scenario runs list' }).querySelectorAll('.pf-v5-c-data-list__item-content'),
+      screen.getByRole('list', { name: 'Scenario runs list' })
+        .querySelectorAll('.pf-v5-c-data-list__item:not(.jobs-list-header) .pf-v5-c-data-list__item-content'),
     ).map((content) => Array.from(content.children));
 
     expect(rowCells).toHaveLength(2);
