@@ -16,14 +16,14 @@ import {
   PaginationVariant,
 } from '@patternfly/react-core';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ArrowsAltVIcon, LongArrowAltUpIcon, LongArrowAltDownIcon, DatabaseIcon } from '@patternfly/react-icons';
-import './ElasticsearchDataView.css';
+import { DatabaseIcon } from '@patternfly/react-icons';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications } from '../hooks';
 import { usePagination } from '../hooks/usePagination';
-import type { AlertDocument, AlertSortOptions, ElasticsearchConfig } from '../types/api';
+import type { AlertDocument, AlertSortField, AlertSortOptions, ElasticsearchConfig } from '../types/api';
 import { getFieldValue, matchesFieldFilters } from '../utils/elasticsearchFieldFilters';
 import { ElasticsearchFilterControls } from './ElasticsearchFilterControls';
+import { SortableHeader } from './SortableHeader';
 
 interface ElasticsearchAlertsTabProps {
   configs: ElasticsearchConfig[];
@@ -37,7 +37,7 @@ interface ElasticsearchAlertsTabProps {
 }
 
 const SUMMARY_FIELDS = new Set(['run_uuid', 'phase', 'created_at', 'severity']);
-type AlertSortColumn = 'phase' | 'created_at' | 'severity';
+type AlertSortColumn = AlertSortField;
 const ALERT_FILTER_OPTIONS = [
   { key: 'run_uuid', label: 'UUID' },
   { key: 'severity', label: 'Severity', values: ['critical', 'error', 'warning', 'info'] },
@@ -109,7 +109,8 @@ function formatAlertCreatedAt(document: AlertDocument): string {
  * The parent owns the selected config and query controls so Telemetry and
  * Alerts can share them. Results are queried from the saved config, filtered
  * with active field chips, paginated, and rendered with sortable columns. Fixed
- * summary fields use Elasticsearch sorting; arbitrary alert fields stay local.
+ * summary fields use Elasticsearch sorting when response confirms it; older
+ * operators fall back to sorting returned documents locally.
  *
  * @example
  * ```tsx
@@ -154,8 +155,9 @@ export function ElasticsearchAlertsTab({
   const sortedDocuments = useMemo(() => {
     if (serverSortActive) return filteredDocuments;
     const sorted = [...filteredDocuments].sort((left, right) => {
-      const leftValue = sortColumn === 'severity' ? alertSeverity(left) : alertSummaryField(left, sortColumn);
-      const rightValue = sortColumn === 'severity' ? alertSeverity(right) : alertSummaryField(right, sortColumn);
+      const field = sortColumn === 'uuid' ? 'run_uuid' : sortColumn;
+      const leftValue = sortColumn === 'severity' ? alertSeverity(left) : alertSummaryField(left, field);
+      const rightValue = sortColumn === 'severity' ? alertSeverity(right) : alertSummaryField(right, field);
       return leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' });
     });
     return sortAscending ? sorted : sorted.reverse();
@@ -211,9 +213,9 @@ export function ElasticsearchAlertsTab({
         setDraftFilter({ key: '', value: '' });
       }
       if (sort) {
-        setSortColumn(sort.sortBy as AlertSortColumn);
+        setSortColumn(sort.sortBy);
         setSortAscending(sort.sortOrder === 'asc');
-        setServerSortActive(true);
+        setServerSortActive(result.sortBy === sort.sortBy && result.sortOrder === sort.sortOrder);
       } else {
         setSortColumn('severity');
         setSortAscending(true);
@@ -240,32 +242,13 @@ export function ElasticsearchAlertsTab({
 
   const sortableHeader = (label: string, column: AlertSortColumn) => {
     const isActive = sortColumn === column;
-    const isAsc = isActive && sortAscending;
-    const nextDirection = isAsc ? 'descending' : 'ascending';
-    // Directional icon so the active sort order is readable from the glyph, not
-    // only from the blue (active) color: up = ascending, down = descending; the
-    // neutral double-headed arrow marks an inactive, sortable column.
-    const SortIcon = !isActive ? ArrowsAltVIcon : isAsc ? LongArrowAltUpIcon : LongArrowAltDownIcon;
     return (
-      <Flex
-        alignItems={{ default: 'alignItemsCenter' }}
-        spaceItems={{ default: 'spaceItemsSm' }}
-        flexWrap={{ default: 'nowrap' }}
-      >
-        <FlexItem style={{ whiteSpace: 'nowrap' }}>{label}</FlexItem>
-        <FlexItem>
-          <Button
-            variant="plain"
-            className="elasticsearch-sort-button"
-            onClick={() => toggleSort(column)}
-            aria-label={isActive ? `Sort ${label} ${nextDirection}` : `Sort by ${label}`}
-            aria-pressed={isActive}
-            title={isActive ? `Sorted ${isAsc ? 'ascending' : 'descending'}` : `Sort by ${label}`}
-          >
-            <SortIcon aria-hidden="true" />
-          </Button>
-        </FlexItem>
-      </Flex>
+      <SortableHeader
+        label={label}
+        isActive={isActive}
+        isAscending={isActive && sortAscending}
+        onSort={() => toggleSort(column)}
+      />
     );
   };
 
@@ -374,7 +357,9 @@ export function ElasticsearchAlertsTab({
               </colgroup>
               <Thead>
                 <Tr>
-                  <Th>UUID</Th>
+                  <Th>
+                    {sortableHeader('UUID', 'uuid')}
+                  </Th>
                   <Th>
                     {sortableHeader('Phase', 'phase')}
                   </Th>
@@ -390,7 +375,9 @@ export function ElasticsearchAlertsTab({
               <Tbody>
                 {paginatedData.map((document, index) => (
                   <Tr key={document.id || String(index)}>
-                    <Td dataLabel="UUID" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>{alertSummaryField(document, 'run_uuid').slice(0, 7)}</Td>
+                    <Td dataLabel="UUID" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>
+                      {alertSummaryField(document, 'run_uuid')}
+                    </Td>
                     <Td dataLabel="Phase" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>{alertSummaryField(document, 'phase')}</Td>
                     <Td dataLabel="Creation Timestamp" style={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>{formatAlertCreatedAt(document)}</Td>
                     <Td dataLabel="Severity" style={{ minWidth: '10rem', textAlign: 'center', verticalAlign: 'top' }}>

@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import type { UnifiedJobItem, PaginationMeta, JobStatsSummary } from '../../types/api';
+import type { JobsSortField, JobsSortOrder } from '../../types/websocket';
 
 const state = {
   jobs: [] as UnifiedJobItem[],
@@ -13,9 +14,48 @@ const state = {
   setLimit: vi.fn(),
 };
 
-export function useJobs() {
+export function useJobs(
+  _categoryFilters: string[] = [],
+  sortBy: JobsSortField = 'createdAt',
+  sortOrder: JobsSortOrder = 'desc',
+) {
+  const jobs = [...state.jobs].sort((left, right) => {
+    let leftValue: string | number = '';
+    let rightValue: string | number = '';
+    switch (sortBy) {
+      case 'createdAt':
+        leftValue = new Date(left.createdAt).getTime() || 0;
+        rightValue = new Date(right.createdAt).getTime() || 0;
+        break;
+      case 'status':
+        leftValue = left.type === 'graphRun'
+          ? left.graphRun?.phase === 'Completed' ? 'Succeeded' : left.graphRun?.phase || 'Pending'
+          : left.scenarioRun?.phase || 'Pending';
+        rightValue = right.type === 'graphRun'
+          ? right.graphRun?.phase === 'Completed' ? 'Succeeded' : right.graphRun?.phase || 'Pending'
+          : right.scenarioRun?.phase || 'Pending';
+        break;
+      case 'name':
+        leftValue = left.type === 'graphRun'
+          ? left.name
+          : left.scenarioRun?.customRunName?.trim() || left.scenarioRun?.scenarioRunName || left.name;
+        rightValue = right.type === 'graphRun'
+          ? right.name
+          : right.scenarioRun?.customRunName?.trim() || right.scenarioRun?.scenarioRunName || right.name;
+        break;
+      case 'owner':
+        leftValue = (left.type === 'graphRun' ? left.graphRun?.ownerUserId : left.scenarioRun?.ownerUserId) || '';
+        rightValue = (right.type === 'graphRun' ? right.graphRun?.ownerUserId : right.scenarioRun?.ownerUserId) || '';
+        break;
+    }
+    const comparison = typeof leftValue === 'number' && typeof rightValue === 'number'
+      ? leftValue - rightValue
+      : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: 'base' });
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
   return {
-    jobs: state.jobs,
+    jobs,
     pagination: state.pagination,
     stats: state.stats,
     hasReceivedStats: state.hasReceivedStats,
