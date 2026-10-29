@@ -51,6 +51,53 @@ describe('LoadWorkflowSelect', () => {
     expect(screen.getByText('Load saved workflow')).toBeInTheDocument();
   });
 
+  it('sorts saved workflows naturally after search and preserves selected workflow IDs', async () => {
+    const user = userEvent.setup();
+    const validLayout = { nodes: [], edges: [], nextNodeNumber: 1 };
+    vi.mocked(workflowsApi.getAvailableWorkflows).mockResolvedValue({
+      workflows: [
+        { workflowId: 'w10', workflowName: 'Workflow10' },
+        { workflowId: 'w-z', workflowName: 'Zebra task' },
+        { workflowId: 'w2', workflowName: 'workflow2' },
+        { workflowId: 'w-alpha', workflowName: 'Alpha workflow' },
+      ],
+    });
+    vi.mocked(workflowsApi.getWorkflow).mockResolvedValue({
+      workflowId: 'w2',
+      workflowName: 'workflow2',
+      graph: {},
+      studioLayout: validLayout,
+      availableToAll: true,
+    });
+
+    render(<LoadWorkflowSelect />);
+    await user.click(screen.getByText('Load saved workflow'));
+
+    const allOptions = await screen.findAllByRole('option');
+    expect(allOptions.map((option) => option.textContent?.trim())).toEqual([
+      'Alpha workflow',
+      'workflow2',
+      'Workflow10',
+      'Zebra task',
+    ]);
+
+    await user.type(screen.getByPlaceholderText('Search workflows...'), 'workflow');
+    const filteredOptions = screen.getAllByRole('option');
+    expect(filteredOptions.map((option) => option.textContent?.trim())).toEqual([
+      'Alpha workflow',
+      'workflow2',
+      'Workflow10',
+    ]);
+
+    await user.click(screen.getByRole('option', { name: 'workflow2' }));
+    await waitFor(() => expect(workflowsApi.getWorkflow).toHaveBeenCalledWith('w2'));
+    expect(mockLoadWorkflow).toHaveBeenCalledWith(
+      validLayout,
+      expect.objectContaining({ workflowId: 'w2', workflowName: 'workflow2' }),
+      [],
+    );
+  });
+
   it('shows savedWorkflow.workflowName when a workflow is loaded', () => {
     vi.mocked(useStudioContext).mockReturnValue({
       ...defaultContext,

@@ -69,6 +69,30 @@ describe('ElasticsearchDataView', () => {
     });
   });
 
+  it('sorts Elasticsearch config options naturally and preserves selected config names', async () => {
+    const user = userEvent.setup();
+    vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([
+      { ...mockConfigs[0], name: 'prod10' },
+      { ...mockConfigs[0], name: 'Alpha' },
+      { ...mockConfigs[0], name: 'Prod2' },
+    ]);
+    render(<ElasticsearchDataView />);
+
+    await screen.findByText('Alpha');
+    const select = screen.getByLabelText('Select an Elasticsearch config') as HTMLSelectElement;
+    await waitFor(() => expect(select.options).toHaveLength(4));
+
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+      'Select a saved Elasticsearch config…',
+      'Alpha',
+      'Prod2',
+      'prod10',
+    ]);
+
+    await user.selectOptions(select, 'Prod2');
+    expect(select).toHaveValue('Prod2');
+  });
+
   it('selects the Alerts tab and queries alert documents', async () => {
     const user = userEvent.setup();
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockConfigs);

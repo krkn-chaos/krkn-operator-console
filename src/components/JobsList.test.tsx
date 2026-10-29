@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { operatorApi } from '../services/operatorApi';
@@ -7,8 +7,9 @@ import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJo
 
 vi.mock('../hooks/useJobs');
 
+const mockRole = vi.hoisted(() => ({ isAdmin: false }));
 vi.mock('../hooks/useRole', () => ({
-  useRole: () => ({ isAdmin: false, role: 'user' }),
+  useRole: () => ({ isAdmin: mockRole.isAdmin, role: mockRole.isAdmin ? 'admin' : 'user' }),
 }));
 
 vi.mock('../hooks/useActiveRunsPoller', () => ({
@@ -167,6 +168,63 @@ describe('JobsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetJobsMock();
+    mockRole.isAdmin = false;
+    vi.spyOn(operatorApi, 'getCategories').mockResolvedValue({ categories: [], total: 0 });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sorts category filter options naturally and preserves selection', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({
+      categories: [
+        { name: 'category10', color: '#111111', availableToAll: true },
+        { name: 'Alpha', color: '#222222', availableToAll: true },
+        { name: 'Category2', color: '#333333', availableToAll: true },
+      ],
+      total: 3,
+    });
+    setMockJobs([makeScenarioJobItem('category-sort-run', 'Succeeded')]);
+
+    render(<JobsList {...defaultProps} />);
+    await user.click(await screen.findByRole('button', { name: 'Filter by category' }));
+
+    const listbox = screen.getByRole('listbox');
+    const options = await within(listbox).findAllByRole('menuitem');
+    expect(options.map((option) => option.textContent?.trim())).toEqual([
+      'Alpha',
+      'Category2',
+      'category10',
+    ]);
+
+    await user.click(within(listbox).getByText('Category2'));
+    expect(await screen.findByText('1 category selected')).toBeInTheDocument();
+  });
+
+  it('sorts user filter options naturally and preserves selected user IDs', async () => {
+    const user = userEvent.setup();
+    mockRole.isAdmin = true;
+    setMockJobs([
+      makeScenarioJobItem('owner-10-run', 'Succeeded', { ownerUserId: 'user10' }),
+      makeScenarioJobItem('owner-admin-run', 'Succeeded', { ownerUserId: 'Admin' }),
+      makeScenarioJobItem('owner-2-run', 'Succeeded', { ownerUserId: 'user2' }),
+    ]);
+
+    render(<JobsList {...defaultProps} />);
+    await user.click(await screen.findByRole('button', { name: 'Select user...' }));
+
+    const listbox = screen.getByRole('listbox');
+    const options = within(listbox).getAllByRole('option');
+    expect(options.map((option) => option.textContent?.trim())).toEqual([
+      'Admin',
+      'user2',
+      'user10',
+    ]);
+
+    await user.click(within(listbox).getByRole('option', { name: 'user2' }));
+    expect(screen.getByLabelText('Remove user filter')).toBeInTheDocument();
   });
 
   it('shows empty state when no jobs', () => {

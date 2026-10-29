@@ -300,6 +300,10 @@ export function ElasticsearchAlertsTab({
         </FlexItem>
       </Flex>
 
+      <Alert variant="info" isInline title="Alert sorting uses Max results" style={{ marginTop: '0.75rem' }}>
+        Sortable headers re-query alerts ordered by the selected column, capped at {size.trim() || 'the default result limit'}. The returned rows may differ from the current set. Increase Max results and run the query again to include more alerts.
+      </Alert>
+
       <Flex spaceItems={{ default: 'spaceItemsSm' }} style={{ marginTop: '0.75rem' }}>
         {filters.filter(filter => filter.key).map((filter, index) => {
           const label = ALERT_FILTER_OPTIONS.find(option => option.key === filter.key)?.label || filter.key;
