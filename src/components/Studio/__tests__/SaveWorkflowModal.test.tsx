@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { SaveWorkflowModal } from '../SaveWorkflowModal';
 import { workflowsApi } from '../../../services/workflowsApi';
 import { operatorApi } from '../../../services/operatorApi';
@@ -9,6 +10,8 @@ import { useNotifications } from '../../../hooks';
 import { useRole } from '../../../hooks/useRole';
 import { isApiError } from '../../../utils/apiClient';
 
+const saveWorkflowModalStyles = readFileSync(`${process.cwd()}/src/components/Studio/SaveWorkflowModal.css`, 'utf8');
+
 vi.mock('../../../services/workflowsApi');
 vi.mock('../../../services/operatorApi');
 vi.mock('../StudioContext');
@@ -16,7 +19,7 @@ vi.mock('../../../hooks');
 vi.mock('../../../hooks/useRole');
 vi.mock('../../../utils/apiClient');
 
-describe('SaveWorkflowModal - 409 conflict handling', () => {
+describe('SaveWorkflowModal', () => {
   const mockShowSuccess = vi.fn();
   const mockShowError = vi.fn();
   const mockSetSavedWorkflow = vi.fn();
@@ -180,5 +183,28 @@ describe('SaveWorkflowModal - 409 conflict handling', () => {
 
     expect(mockOnClose).not.toHaveBeenCalled();
     expect(mockOnSuccess).not.toHaveBeenCalled();
+  });
+
+  it('renders the group-select toggle with full-width text and matching label ID', async () => {
+    const user = userEvent.setup();
+    render(
+      <SaveWorkflowModal isOpen onClose={mockOnClose} onSuccess={mockOnSuccess} />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Assign to group' }));
+
+    const toggle = document.querySelector('.save-workflow-group-select-toggle');
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toHaveClass('save-workflow-group-select-toggle');
+
+    const toggleText = toggle?.querySelector('.pf-v5-c-menu-toggle__text');
+    expect(toggleText).toBeInTheDocument();
+    expect(saveWorkflowModalStyles).toMatch(
+      /\.save-workflow-group-select-toggle\s+\.pf-v5-c-menu-toggle__text\s*\{\s*width:\s*100%;?\s*\}/,
+    );
+
+    const groupInput = document.getElementById('group-search');
+    expect(groupInput).toBeInTheDocument();
+    expect(document.querySelector('label[for="group-search"]')).toBeInTheDocument();
   });
 });

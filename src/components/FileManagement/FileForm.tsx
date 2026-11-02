@@ -32,6 +32,7 @@ import {
   Spinner,
 } from '@patternfly/react-core';
 import { FiX } from 'react-icons/fi';
+import './FileForm.css';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
@@ -397,6 +398,7 @@ export function FileForm({
                     onClick={() => setIsGroupSelectOpen(!isGroupSelectOpen)}
                     isExpanded={isGroupSelectOpen}
                     style={{ width: '100%' }}
+                    className="file-form-group-select-toggle"
                   >
                     <TextInputGroup>
                       <TextInputGroupMain
