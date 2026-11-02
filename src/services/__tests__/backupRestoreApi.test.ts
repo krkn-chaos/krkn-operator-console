@@ -97,6 +97,128 @@ describe('backupRestoreApi', () => {
     });
   });
 
+  describe('downloadBackup with passphrase', () => {
+    it('should send Base64-encoded X-Backup-Passphrase header when passphrase is provided', async () => {
+      const mockBlob = new Blob(['fake-archive'], { type: 'application/gzip' });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          'Content-Disposition': 'attachment; filename="krkn-backup.tar.gz.enc"',
+        }),
+        blob: async () => mockBlob,
+      });
+
+      vi.spyOn(document, 'createElement').mockReturnValue(Object.assign(document.createElement('a'), { click: vi.fn() }));
+      vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+      vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+
+      await backupRestoreApi.downloadBackup('my-secret');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = new Headers(callArgs[1].headers);
+      const headerValue = headers.get('X-Backup-Passphrase');
+      expect(headerValue).not.toBeNull();
+      const decoded = new TextDecoder().decode(
+        Uint8Array.from(atob(headerValue!), c => c.charCodeAt(0))
+      );
+      expect(decoded).toBe('my-secret');
+
+      vi.restoreAllMocks();
+    });
+
+    it('should not send X-Backup-Passphrase header when no passphrase is provided', async () => {
+      const mockBlob = new Blob(['fake-archive'], { type: 'application/gzip' });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          'Content-Disposition': 'attachment; filename="krkn-backup.tar.gz"',
+        }),
+        blob: async () => mockBlob,
+      });
+
+      vi.spyOn(document, 'createElement').mockReturnValue(Object.assign(document.createElement('a'), { click: vi.fn() }));
+      vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+      vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+
+      await backupRestoreApi.downloadBackup();
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = new Headers(callArgs[1].headers);
+      expect(headers.get('X-Backup-Passphrase')).toBeNull();
+
+      vi.restoreAllMocks();
+    });
+
+    it('should correctly Base64-encode Unicode passphrases', async () => {
+      const mockBlob = new Blob(['fake-archive'], { type: 'application/gzip' });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          'Content-Disposition': 'attachment; filename="krkn-backup.tar.gz.enc"',
+        }),
+        blob: async () => mockBlob,
+      });
+
+      vi.spyOn(document, 'createElement').mockReturnValue(Object.assign(document.createElement('a'), { click: vi.fn() }));
+      vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+      vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+
+      const unicodePassphrase = 'pässwörd-日本語';
+      await backupRestoreApi.downloadBackup(unicodePassphrase);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = new Headers(callArgs[1].headers);
+      const headerValue = headers.get('X-Backup-Passphrase');
+      expect(headerValue).not.toBeNull();
+      const decoded = new TextDecoder().decode(
+        Uint8Array.from(atob(headerValue!), c => c.charCodeAt(0))
+      );
+      expect(decoded).toBe(unicodePassphrase);
+
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe('uploadRestore with passphrase', () => {
+    it('should send Base64-encoded X-Backup-Passphrase header for encrypted restore', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: 'restore-enc', status: 'in_progress' }),
+      });
+
+      const file = new File(['fake-content'], 'backup.tar.gz.enc', { type: 'application/octet-stream' });
+      await backupRestoreApi.uploadRestore(file, 'decrypt-me');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = new Headers(callArgs[1].headers);
+      const headerValue = headers.get('X-Backup-Passphrase');
+      expect(headerValue).not.toBeNull();
+      const decoded = new TextDecoder().decode(
+        Uint8Array.from(atob(headerValue!), c => c.charCodeAt(0))
+      );
+      expect(decoded).toBe('decrypt-me');
+    });
+
+    it('should not send X-Backup-Passphrase header when no passphrase for restore', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: 'restore-plain', status: 'in_progress' }),
+      });
+
+      const file = new File(['fake-content'], 'backup.tar.gz', { type: 'application/gzip' });
+      await backupRestoreApi.uploadRestore(file);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = new Headers(callArgs[1].headers);
+      expect(headers.get('X-Backup-Passphrase')).toBeNull();
+    });
+  });
+
   describe('getRestoreStatus', () => {
     it('should call GET /api/v1/restore/{jobId}', async () => {
       mockFetch.mockResolvedValueOnce({
