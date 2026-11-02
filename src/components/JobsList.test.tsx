@@ -14,6 +14,8 @@ vi.mock('../hooks/useActiveRunsPoller', () => ({
   useActiveRunsPoller: () => ({ activeRuns: null, loading: false, error: null }),
 }));
 
+const mockLoadReportStatus = vi.hoisted(() => vi.fn());
+
 vi.mock('./GraphRunDetail', () => ({
   GraphRunDetail: ({ graphRunName }: { graphRunName: string }) => (
     <div data-testid={`graph-detail-${graphRunName}`}>Graph Detail Mock</div>
@@ -46,6 +48,7 @@ vi.mock('../hooks/useReportActions', () => ({
     handleDownload: vi.fn(),
     handlePreview: vi.fn(),
     closePreview: vi.fn(),
+    load: mockLoadReportStatus,
     retry: vi.fn(),
   }),
 }));
@@ -142,6 +145,21 @@ describe('JobsList', () => {
     setMockIsLoading(true);
     render(<JobsList {...defaultProps} />);
     expect(screen.getByText('Loading Jobs')).toBeInTheDocument();
+  });
+
+  it('does not check report status when rows render or expand', () => {
+    const runName = 'lazy-report-run';
+    setMockJobs([makeScenarioJobItem(runName, 'Succeeded')]);
+
+    const { rerender } = render(
+      <JobsList {...defaultProps} expandedRunIds={new Set<string>()} />,
+    );
+    expect(mockLoadReportStatus).not.toHaveBeenCalled();
+
+    rerender(
+      <JobsList {...defaultProps} expandedRunIds={new Set([runName])} />,
+    );
+    expect(mockLoadReportStatus).not.toHaveBeenCalled();
   });
 
   it('shows logs for jobs that exceeded the retry limit', () => {
