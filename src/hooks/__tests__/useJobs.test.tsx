@@ -71,7 +71,7 @@ describe('useJobs', () => {
   it('subscribes to WS with page and limit on connect', () => {
     renderHook(() => useJobs());
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 20, [], expect.any(String));
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 20, [], expect.any(String), 'createdAt', 'desc');
   });
 
   it('does not subscribe when disconnected', () => {
@@ -133,7 +133,7 @@ describe('useJobs', () => {
 
     act(() => { result.current.setPage(2); });
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 2, 20, [], expect.any(String));
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 2, 20, [], expect.any(String), 'createdAt', 'desc');
   });
 
   it('re-subscribes when limit changes', () => {
@@ -144,7 +144,7 @@ describe('useJobs', () => {
 
     act(() => { result.current.setLimit(50); });
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 50, [], expect.any(String));
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 50, [], expect.any(String), 'createdAt', 'desc');
   });
 
   it('subscribes with category filters and resubscribes when they change', () => {
@@ -154,7 +154,7 @@ describe('useJobs', () => {
     rerender({ filters: ['network-chaos'] });
 
     expect(websocketService.subscribe).toHaveBeenLastCalledWith(
-      'jobs', 'jobs', undefined, 1, 20, ['network-chaos'], expect.any(String),
+      'jobs', 'jobs', undefined, 1, 20, ['network-chaos'], expect.any(String), 'createdAt', 'desc',
     );
     const subscriptions = vi.mocked(websocketService.subscribe).mock.calls;
     expect(subscriptions[subscriptions.length - 1]?.[6]).not.toBe(firstSubscriptionId);

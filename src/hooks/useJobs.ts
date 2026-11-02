@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { websocketService } from '../services/websocketService';
-import type { ServerMessage, PaginationMeta } from '../types/websocket';
+import type { JobsSortField, JobsSortOrder, PaginationMeta, ServerMessage } from '../types/websocket';
 import type { UnifiedJobItem, JobStatsSummary } from '../types/api';
 
 const DEFAULT_PAGE = 1;
@@ -27,11 +27,15 @@ interface UseJobsReturn {
 /**
  * Hook providing a unified paginated jobs list via WebSocket.
  *
- * Subscribes to WS resource 'jobs' with page/limit and optional category filters.
+ * Subscribes to WS resource 'jobs' with page, limit, category filters, and sort.
  * Backend sends a snapshot automatically on subscribe and on every change.
- * When page or limit changes, re-subscribes to get the new page.
+ * Page, limit, filters, or sort changes create a fresh subscription.
  */
-export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsReturn {
+export function useJobs(
+  categoryFilters: string[] = EMPTY_CATEGORIES,
+  sortBy: JobsSortField = 'createdAt',
+  sortOrder: JobsSortOrder = 'desc',
+): UseJobsReturn {
   const [jobs, setJobs] = useState<UnifiedJobItem[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta>(EMPTY_PAGINATION);
   const [stats, setStats] = useState<JobStatsSummary>(EMPTY_STATS);
@@ -48,7 +52,7 @@ export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsRe
   const desiredSubscriptionKeyRef = useRef('');
   const categories = useMemo(() => [...new Set(categoryFilters)].sort(), [categoryFilters]);
   const categoriesKey = categories.join('\u0000');
-  const subscriptionKey = `${page}:${limit}:${categoriesKey}`;
+  const subscriptionKey = `${page}:${limit}:${categoriesKey}:${sortBy}:${sortOrder}`;
   if (desiredSubscriptionKeyRef.current !== subscriptionKey) {
     desiredSubscriptionKeyRef.current = subscriptionKey;
     activeSubscriptionIdRef.current = null;
@@ -97,8 +101,8 @@ export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsRe
     activeSubscriptionIdRef.current = subscriptionId;
 
     setIsLoading(true);
-    websocketService.subscribe('jobs', 'jobs', undefined, page, limit, categories, subscriptionId);
-  }, [connectionState, page, limit, categories, subscriptionKey, refreshVersion]);
+    websocketService.subscribe('jobs', 'jobs', undefined, page, limit, categories, subscriptionId, sortBy, sortOrder);
+  }, [connectionState, page, limit, categories, subscriptionKey, refreshVersion, sortBy, sortOrder]);
 
   return {
     jobs,

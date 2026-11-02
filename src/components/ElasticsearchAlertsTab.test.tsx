@@ -83,6 +83,61 @@ describe('ElasticsearchAlertsTab', () => {
     expect(elasticsearchApi.queryAlerts).toHaveBeenCalledWith('prod-es', 50, '2026-09-20', '2026-09-29');
   });
 
+  it('re-queries sortable alert fields and preserves active filters', async () => {
+    const user = userEvent.setup();
+    renderAlerts();
+    await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
+    await screen.findByText('KubeAPIServerLatencyHigh');
+
+    await user.selectOptions(screen.getByLabelText('Filter category'), 'phase');
+    await user.selectOptions(screen.getByLabelText('Filter values'), 'during');
+    await user.click(screen.getByRole('button', { name: 'Add filter' }));
+
+    await user.click(screen.getByRole('button', { name: 'Sort by Phase' }));
+    await waitFor(() => {
+      expect(elasticsearchApi.queryAlerts).toHaveBeenLastCalledWith(
+        'prod-es', 50, '2026-09-20', '2026-09-29',
+        { sortBy: 'phase', sortOrder: 'asc' },
+      );
+    });
+    expect(screen.getByText('Phase: during')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Sort Phase descending' }));
+    await waitFor(() => {
+      expect(elasticsearchApi.queryAlerts).toHaveBeenLastCalledWith(
+        'prod-es', 50, '2026-09-20', '2026-09-29',
+        { sortBy: 'phase', sortOrder: 'desc' },
+      );
+    });
+  });
+
+  it('server-sorts by severity', async () => {
+    const user = userEvent.setup();
+    renderAlerts();
+    await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
+    await screen.findByText('KubeAPIServerLatencyHigh');
+
+    // Severity is the default active column (ascending), so the first click
+    // toggles to descending.
+    await user.click(screen.getByRole('button', { name: 'Sort Severity descending' }));
+    await waitFor(() => {
+      expect(elasticsearchApi.queryAlerts).toHaveBeenLastCalledWith(
+        'prod-es', 50, '2026-09-20', '2026-09-29',
+        { sortBy: 'severity', sortOrder: 'desc' },
+      );
+    });
+  });
+
+  it('offers sorting for UUID while leaving arbitrary Alert fields unsortable', async () => {
+    const user = userEvent.setup();
+    renderAlerts();
+    await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
+    await screen.findByText('KubeAPIServerLatencyHigh');
+
+    expect(screen.getByRole('button', { name: 'Sort by UUID' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Sort by Alert fields/ })).not.toBeInTheDocument();
+  });
+
   it('disables the query when the end date is in the future', async () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);

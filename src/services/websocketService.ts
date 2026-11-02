@@ -15,6 +15,8 @@ import type {
   MessageHandler,
   RawMessageHandler,
   ConnectionStateHandler,
+  JobsSortField,
+  JobsSortOrder,
   Subscription,
   WebSocketConnectionOptions,
   ManagedConnection,
@@ -127,6 +129,9 @@ class WebSocketService {
    * @param page - Optional page number for paginated snapshots
    * @param limit - Optional page size for paginated snapshots
    * @param categories - Optional category names; jobs match any selected category
+   * @param subscriptionId - Optional correlation ID for the requested snapshot
+   * @param sortBy - Optional jobs sort field
+   * @param sortOrder - Optional jobs sort direction
    *
    * @example
    * ```ts
@@ -148,11 +153,13 @@ class WebSocketService {
     limit?: number,
     categories?: string[],
     subscriptionId?: string,
+    sortBy?: JobsSortField,
+    sortOrder?: JobsSortOrder,
   ): void {
     const conn = this.connections.get(connectionId);
     if (!conn) return;
 
-    const sub: Subscription = { resource, ids, page, limit, categories, subscriptionId };
+    const sub: Subscription = { resource, ids, page, limit, categories, subscriptionId, sortBy, sortOrder };
     const existingIdx = conn.subscriptions.findIndex(
       s => s.resource === resource && JSON.stringify(s.ids) === JSON.stringify(ids)
     );
@@ -163,7 +170,9 @@ class WebSocketService {
     }
 
     if (conn.ws?.readyState === WebSocket.OPEN) {
-      this.sendClientMessage(conn, { action: 'subscribe', resource, ids, page, limit, categories, subscriptionId });
+      this.sendClientMessage(conn, {
+        action: 'subscribe', resource, ids, page, limit, categories, subscriptionId, sortBy, sortOrder,
+      });
     }
   }
 
@@ -354,7 +363,17 @@ class WebSocketService {
   private resubscribeAll(conn: ManagedConnection): void {
     if (!conn.options.subscriptionMode) return;
     for (const sub of conn.subscriptions) {
-      this.sendClientMessage(conn, { action: 'subscribe', resource: sub.resource, ids: sub.ids, page: sub.page, limit: sub.limit, categories: sub.categories });
+      this.sendClientMessage(conn, {
+        action: 'subscribe',
+        resource: sub.resource,
+        ids: sub.ids,
+        page: sub.page,
+        limit: sub.limit,
+        categories: sub.categories,
+        subscriptionId: sub.subscriptionId,
+        sortBy: sub.sortBy,
+        sortOrder: sub.sortOrder,
+      });
     }
   }
 
