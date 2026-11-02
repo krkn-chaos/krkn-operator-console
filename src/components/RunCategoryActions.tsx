@@ -84,8 +84,9 @@ export function RunCategoryActions({
   const [confirmRollback, setConfirmRollback] = useState<RollbackAttempt | null>(null);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
   const hasLoadedReplayJobsForOpenMenu = useRef(false);
+  const hasRequestedReportStatus = useRef(false);
 
-  const report = useReportActions({ runId, runName, runPhase });
+  const report = useReportActions({ runId, runName, runPhase, defer: true, poll: false });
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -103,6 +104,12 @@ export function RunCategoryActions({
     if (hasLoadedCategoriesForOpenMenu.current) return;
     hasLoadedCategoriesForOpenMenu.current = true;
     onOpenCategories();
+  };
+
+  const handleReportsFlyout = () => {
+    if (hasRequestedReportStatus.current || report.isLoading || report.reportStatus || report.error) return;
+    hasRequestedReportStatus.current = true;
+    report.load();
   };
 
   const handleWorkflowReplay = () => {
@@ -184,35 +191,57 @@ export function RunCategoryActions({
             <DropdownItem
               key="reports"
               icon={report.isLoading ? <Spinner size="sm" /> : <FileAltIcon />}
-              isDisabled={report.isLoading || !report.hasReports || report.isDownloading !== null || report.isPreviewing !== null}
-              flyoutMenu={report.hasReports ? (
+              isDisabled={report.isLoading || report.isDownloading !== null || report.isPreviewing !== null}
+              onShowFlyout={handleReportsFlyout}
+              flyoutMenu={(
                 <Menu id={`reports-${runName}`}>
                   <MenuContent>
-                    <MenuList aria-label={`Reports for run ${runName}`}>
-                      {report.hasHtml && (
+                    <MenuList aria-label={`Reports for run ${runName}`} aria-busy={report.isLoading}>
+                      {report.isLoading ? (
+                        <MenuItem key="reports-loading" isDisabled icon={<Spinner size="sm" />}>
+                          Checking reports…
+                        </MenuItem>
+                      ) : report.hasReports ? (
                         <>
-                          <MenuItem key="preview-html" icon={<SearchIcon />} onClick={() => { handleOpenChange(false); void report.handlePreview('html'); }}>
-                            Preview HTML
+                          {report.hasHtml && (
+                            <>
+                              <MenuItem key="preview-html" icon={<SearchIcon />} onClick={() => { handleOpenChange(false); void report.handlePreview('html'); }}>
+                                Preview HTML
+                              </MenuItem>
+                              <MenuItem key="download-html" icon={<FileCodeIcon />} onClick={() => { handleOpenChange(false); void report.handleDownload('html'); }}>
+                                Download HTML
+                              </MenuItem>
+                            </>
+                          )}
+                          {report.hasPdf && (
+                            <>
+                              <MenuItem key="preview-pdf" icon={<FilePdfIcon />} onClick={() => { handleOpenChange(false); void report.handlePreview('pdf'); }}>
+                                Preview PDF
+                              </MenuItem>
+                              <MenuItem key="download-pdf" icon={<DownloadIcon />} onClick={() => { handleOpenChange(false); void report.handleDownload('pdf'); }}>
+                                Download PDF
+                              </MenuItem>
+                            </>
+                          )}
+                        </>
+                      ) : report.reportStatus ? (
+                        <>
+                          <MenuItem key="reports-unavailable" isDisabled>
+                            No reports available yet
                           </MenuItem>
-                          <MenuItem key="download-html" icon={<FileCodeIcon />} onClick={() => { handleOpenChange(false); void report.handleDownload('html'); }}>
-                            Download HTML
+                          <MenuItem key="reports-check-again" icon={<RedoIcon />} onClick={report.retry}>
+                            Check again
                           </MenuItem>
                         </>
-                      )}
-                      {report.hasPdf && (
-                        <>
-                          <MenuItem key="preview-pdf" icon={<FilePdfIcon />} onClick={() => { handleOpenChange(false); void report.handlePreview('pdf'); }}>
-                            Preview PDF
-                          </MenuItem>
-                          <MenuItem key="download-pdf" icon={<DownloadIcon />} onClick={() => { handleOpenChange(false); void report.handleDownload('pdf'); }}>
-                            Download PDF
-                          </MenuItem>
-                        </>
+                      ) : (
+                        <MenuItem key="reports-not-checked" isDisabled>
+                          Report status not checked
+                        </MenuItem>
                       )}
                     </MenuList>
                   </MenuContent>
                 </Menu>
-              ) : undefined}
+              )}
             >
               {report.isLoading ? 'Checking reports…' : 'Reports'}
             </DropdownItem>

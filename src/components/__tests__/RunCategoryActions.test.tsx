@@ -1,13 +1,31 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { CategoryResponse } from '../../types/api';
+import type { CategoryResponse, ReportStatus } from '../../types/api';
 
 const mockHandleDownload = vi.fn();
 const mockHandlePreview = vi.fn();
 const mockClosePreview = vi.fn();
+const mockLoad = vi.fn();
 const mockRetry = vi.fn();
 
-let mockReportReturn = {
+type MockReportReturn = {
+  reportStatus: ReportStatus | null;
+  isLoading: boolean;
+  error: string | null;
+  hasHtml: boolean;
+  hasPdf: boolean;
+  hasReports: boolean;
+  preview: { format: 'html' | 'pdf'; url: string } | null;
+  isDownloading: 'html' | 'pdf' | null;
+  isPreviewing: 'html' | 'pdf' | null;
+  handleDownload: typeof mockHandleDownload;
+  handlePreview: typeof mockHandlePreview;
+  closePreview: typeof mockClosePreview;
+  load: typeof mockLoad;
+  retry: typeof mockRetry;
+};
+
+let mockReportReturn: MockReportReturn = {
   reportStatus: null,
   isLoading: false,
   error: null as string | null,
@@ -20,6 +38,7 @@ let mockReportReturn = {
   handleDownload: mockHandleDownload,
   handlePreview: mockHandlePreview,
   closePreview: mockClosePreview,
+  load: mockLoad,
   retry: mockRetry,
 };
 
@@ -66,6 +85,7 @@ describe('RunCategoryActions', () => {
       handleDownload: mockHandleDownload,
       handlePreview: mockHandlePreview,
       closePreview: mockClosePreview,
+      load: mockLoad,
       retry: mockRetry,
     };
   });
@@ -131,6 +151,31 @@ describe('RunCategoryActions', () => {
     render(<RunCategoryActions {...defaultProps} runId="run-123" />);
     fireEvent.click(screen.getByLabelText('Actions for run run-123'));
     expect(screen.getByText('Checking reports…')).toBeInTheDocument();
+  });
+
+  it('starts report status lookup only when Reports flyout opens', () => {
+    render(<RunCategoryActions {...defaultProps} runId="run-123" />);
+
+    expect(mockLoad).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('Actions for run run-123'));
+    expect(mockLoad).not.toHaveBeenCalled();
+
+    fireEvent.mouseEnter(screen.getByText('Reports'));
+    expect(mockLoad).toHaveBeenCalledOnce();
+  });
+
+  it('offers an explicit status retry when no reports are available', () => {
+    mockReportReturn = {
+      ...mockReportReturn,
+      reportStatus: { generated: false, htmlAvailable: false, pdfAvailable: false },
+    };
+    render(<RunCategoryActions {...defaultProps} runId="run-123" />);
+    fireEvent.click(screen.getByLabelText('Actions for run run-123'));
+    fireEvent.mouseEnter(screen.getByText('Reports'));
+
+    expect(screen.getByText('No reports available yet')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Check again'));
+    expect(mockRetry).toHaveBeenCalledOnce();
   });
 
   it('shows Reports flyout with HTML actions when HTML is available', () => {
