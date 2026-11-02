@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { isApiError, BaseApiClient } from '../apiClient';
+import { authenticatedFetch, isApiError, BaseApiClient, setUnauthorizedHandler } from '../apiClient';
 import type { ApiError } from '../apiClient';
+import { authService } from '../../services/authService';
 
 vi.mock('../../services/authService', () => ({
   authService: {
@@ -60,7 +61,22 @@ describe('BaseApiClient.fetchJson', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.mocked(authService.getToken).mockReturnValue('fake-jwt-token');
+    setUnauthorizedHandler(null);
     client = new TestApiClient('https://api.example.com');
+  });
+
+  it('passes the request token to the unauthorized handler on 401', async () => {
+    const requestToken = 'token-used-by-request';
+    const unauthorizedHandler = vi.fn();
+    vi.mocked(authService.getToken).mockReturnValue(requestToken);
+    setUnauthorizedHandler(unauthorizedHandler);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(fakeResponse(401, { message: 'Unauthorized' }));
+
+    await expect(authenticatedFetch('https://api.example.com/private'))
+      .rejects.toThrow('Session expired. Please login again.');
+
+    expect(unauthorizedHandler).toHaveBeenCalledWith(requestToken);
   });
 
   it('returns parsed JSON on a successful response', async () => {

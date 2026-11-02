@@ -10,7 +10,7 @@
 export type UserRole = 'admin' | 'user';
 
 /**
- * User information stored in session
+ * User information stored with the authenticated session
  */
 export interface User {
   userId: string; // Email address
@@ -89,7 +89,7 @@ export class RateLimitError extends Error {
 }
 
 /**
- * Session storage keys for auth data
+ * Browser storage keys for auth data
  */
 export const AUTH_STORAGE_KEYS = {
   TOKEN: 'jwt_token',
