@@ -37,6 +37,7 @@ import type {
   UnifiedJobsResponse,
   ScenarioRunListResponse,
   ReportStatus,
+  RollbackAvailability,
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -239,6 +240,14 @@ class OperatorApiClient extends BaseApiClient {
    */
   async getScenarioRunStatus(scenarioRunName: string): Promise<ScenarioRunStatusResponse> {
     return this.fetchJson<ScenarioRunStatusResponse>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}`);
+  }
+
+  async getRollbackAvailability(scenarioRunName: string, jobId: string): Promise<RollbackAvailability> {
+    return this.fetchJson<RollbackAvailability>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/rollback/${encodeURIComponent(jobId)}`);
+  }
+
+  async startRollback(scenarioRunName: string, jobId: string): Promise<RollbackAvailability> {
+    return this.fetchJson<RollbackAvailability>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/rollback/${encodeURIComponent(jobId)}`, { method: 'POST' });
   }
 
   /**

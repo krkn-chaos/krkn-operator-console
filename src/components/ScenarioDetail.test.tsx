@@ -126,6 +126,8 @@ describe('ScenarioDetail', () => {
     rerunScenario: null,
     rerunKubeconfigPath: null,
     rerunCloudCredentialRef: null,
+    rerunWorkspace: null,
+    rerunRollbackEnabled: false,
     notifications: [],
   };
 
@@ -809,6 +811,41 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalled();
       });
+    });
+
+    it('requires a workspace when rollback is enabled', async () => {
+      const user = userEvent.setup();
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' }, rerunRollbackEnabled: true });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      expect(await screen.findByText(/Enable rollback requires a workspace/)).toBeInTheDocument();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('keeps workspace selection independent from rollback', async () => {
+      const user = userEvent.setup();
+      const workspace = { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' };
+      vi.mocked(operatorApi.runScenario).mockResolvedValue(mockCreateResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockActiveRuns);
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' }, rerunWorkspace: workspace });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ workspace, rollbackEnabled: false }),
+      ));
+    });
+
+    it('sends rollback enabled with the selected workspace', async () => {
+      const user = userEvent.setup();
+      const workspace = { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' };
+      vi.mocked(operatorApi.runScenario).mockResolvedValue(mockCreateResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockActiveRuns);
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' }, rerunWorkspace: workspace, rerunRollbackEnabled: true });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ workspace, rollbackEnabled: true }),
+      ));
     });
 
     it('preserves the declared mount path for a touched global file parameter', async () => {

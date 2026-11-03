@@ -143,6 +143,19 @@ describe('RunWorkflowModal retry configuration', () => {
     />
   );
 
+  it('blocks a graph node with rollback enabled but no workspace', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useStudioContext).mockReturnValue({
+      workflow: { nodes: [], edges: [], nextNodeNumber: 1 },
+      exportWorkflow: vi.fn(() => ({ graph: { node: { name: 'scenario', rollbackEnabled: true } }, metadata: {} })),
+    } as unknown as ReturnType<typeof useStudioContext>);
+    renderRetryModal();
+    await user.click(screen.getByRole('button', { name: 'Select cluster' }));
+    await user.click(screen.getByRole('button', { name: /Run Workflow on 1 cluster/i }));
+    expect(showError).toHaveBeenCalledWith('Cannot run workflow', 'Rollback requires a workspace for node node.');
+    expect(graphRunsApi.createGraphRun).not.toHaveBeenCalled();
+  });
+
   it('serializes a customized retry count', async () => {
     const user = userEvent.setup();
     renderRetryModal();

@@ -50,6 +50,8 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
           signature_status: signatureStatuses[index] ?? node.scenario?.signature_status,
           scenarioFormValues: node.env ?? {},
           volumes: node.volumes,
+          workspace: node.workspace,
+          rollbackEnabled: node.rollbackEnabled,
           cloudCredentialRef: node.cloudCredentialRef,
         },
       };

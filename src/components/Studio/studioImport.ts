@@ -315,6 +315,8 @@ export function graphNodeToStudioConfig(
     signature_status: node.scenario?.signature_status,
     scenarioFormValues: { ...(node.env ?? {}) },
     volumes: node.volumes,
+    workspace: node.workspace,
+    rollbackEnabled: node.rollbackEnabled,
     resiliencyWeight: node.resiliencyWeight,
     cloudCredentialRef: node.cloudCredentialRef,
   };

@@ -46,7 +46,7 @@ export function useScenarioRunsPoller() {
         type: 'UPDATE_SCENARIO_RUN',
         payload: {
           run: preserveTerminal
-            ? { ...base, clusterJobs: details.clusterJobs, resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled, resiliencyScores: details.resiliencyScores }
+            ? { ...base, clusterJobs: details.clusterJobs, rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled, resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled, resiliencyScores: details.resiliencyScores }
             : {
                 ...base,
                 phase: details.phase,
@@ -55,6 +55,7 @@ export function useScenarioRunsPoller() {
                 failedJobs: details.failedJobs,
                 runningJobs: details.runningJobs,
                 clusterJobs: details.clusterJobs,
+                rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled,
                 ownerUserId: details.ownerUserId || base.ownerUserId,
                 registryName: details.registryName || base.registryName,
                 graphRunName: details.graphRunName || base.graphRunName,
@@ -85,6 +86,7 @@ export function useScenarioRunsPoller() {
         const scenarioName = run.scenarioName || run.scenarioRunName.replace(/-[a-f0-9]{8}$/, '');
         return {
           scenarioRunName: run.scenarioRunName,
+          rollbackEnabled: run.rollbackEnabled,
           scenarioName,
           phase: run.phase,
           totalTargets: run.totalTargets,
@@ -125,6 +127,7 @@ export function useScenarioRunsPoller() {
 
       const updatedState: ScenarioRunState = {
         scenarioRunName: data.scenarioRunName || runName,
+        rollbackEnabled: data.rollbackEnabled ?? existing?.rollbackEnabled,
         scenarioName: data.scenarioName || existing?.scenarioName || runName.replace(/-[a-f0-9]{8}$/, ''),
         phase: data.phase,
         totalTargets: data.totalTargets,

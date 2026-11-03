@@ -17,5 +17,7 @@ export function buildRerunIntent(config: JobConfigResponse, run: ScenarioRunStat
     kubeconfigPath: config.kubeconfigPath,
     ...(config.cloudCredentialRef ? { cloudCredentialRef: config.cloudCredentialRef } : {}),
     categories: config.categories,
+    workspace: config.workspace,
+    rollbackEnabled: config.rollbackEnabled,
   };
 }
