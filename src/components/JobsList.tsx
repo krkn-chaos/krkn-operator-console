@@ -179,8 +179,7 @@ interface JobsListProps {
   onToggleJobAccordion: (jobId: string) => void;
   onDeleteScenarioRun: (scenarioRunName: string) => Promise<void>;
   onDeleteJob: (jobId: string) => Promise<void>;
-  onRerunScenario: (run: ScenarioRunState, jobId: string) => void;
-  onLoadRunDetails?: (run: ScenarioRunState) => void;
+  onRerunScenario: (run: ScenarioRunState) => void;
   scenarioRunDetails?: ScenarioRunState[];
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
@@ -197,7 +196,6 @@ export function JobsList({
   onDeleteScenarioRun,
   onDeleteJob,
   onRerunScenario,
-  onLoadRunDetails,
   scenarioRunDetails = [],
   expandedGraphRunIds,
   onToggleGraphRunAccordion,
@@ -551,9 +549,6 @@ export function JobsList({
     onDelete,
     runId,
     runPhase,
-    replayJobs,
-    isReplayJobsLoading,
-    onOpenReplayJobs,
     onReplayScenario,
     onReplayWorkflow,
     isWorkflowReplayDisabled,
@@ -566,10 +561,7 @@ export function JobsList({
     onDelete: () => void;
     runId?: string;
     runPhase?: string;
-    replayJobs?: ClusterJob[];
-    isReplayJobsLoading?: boolean;
-    onOpenReplayJobs?: () => void;
-    onReplayScenario?: (jobId: string) => void;
+    onReplayScenario?: () => void;
     onReplayWorkflow?: () => Promise<void>;
     isWorkflowReplayDisabled?: boolean;
   }) => (
@@ -593,9 +585,6 @@ export function JobsList({
         onOpenCategories={() => { void loadCategories(); }}
         onToggleCategory={onToggleCategory}
         onDelete={onDelete}
-        replayJobs={replayJobs}
-        isReplayJobsLoading={isReplayJobsLoading}
-        onOpenReplayJobs={onOpenReplayJobs}
         onReplayScenario={onReplayScenario}
         onReplayWorkflow={onReplayWorkflow}
         isWorkflowReplayDisabled={isWorkflowReplayDisabled}
@@ -1325,12 +1314,7 @@ export function JobsList({
                       onDelete: () => setConfirmDeleteRun(run.scenarioRunName),
                       runId: run.scenarioRunName,
                       runPhase: run.phase,
-                      replayJobs: run.clusterJobs,
-                      isReplayJobsLoading: loadingRunDetails.has(run.scenarioRunName),
-                      onOpenReplayJobs: () => {
-                        if (run.clusterJobs.length === 0) onLoadRunDetails?.(run);
-                      },
-                      onReplayScenario: (jobId) => onRerunScenario(run, jobId),
+                      onReplayScenario: () => onRerunScenario(run),
                     })}
                   </DataListItemRow>
 
