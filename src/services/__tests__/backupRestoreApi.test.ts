@@ -55,6 +55,53 @@ describe('backupRestoreApi', () => {
         'Backup failed: no resources'
       );
     });
+
+    it('should trigger a download from an S3 presigned URL', async () => {
+      const downloadUrl = 'https://tgangise-bucket.s3.us-east-2.amazonaws.com/krkn-operator/backups/backup.tar.gz?X-Amz-Signature=test';
+      const s3Blob = new Blob(['s3-archive'], { type: 'application/gzip' });
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          json: async () => ({ downloadUrl, filename: 'backup.tar.gz' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          blob: async () => s3Blob,
+        });
+
+      const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      const anchor = document.createElement('a');
+      const clickSpy = vi.spyOn(anchor, 'click').mockImplementation(() => undefined);
+      vi.spyOn(document, 'createElement').mockReturnValue(anchor);
+      vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+      vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+
+      await backupRestoreApi.downloadBackup();
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[1][0]).toBe(downloadUrl);
+      expect(anchor.href).toMatch(/^blob:/);
+      expect(anchor.download).toBe('backup.tar.gz');
+      expect(clickSpy).toHaveBeenCalledOnce();
+      expect(revokeObjectURL).toHaveBeenCalledOnce();
+
+      vi.restoreAllMocks();
+    });
+
+    it('should reject an S3 response without a valid download URL', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => ({ filename: 'backup.tar.gz' }),
+      });
+
+      await expect(backupRestoreApi.downloadBackup()).rejects.toThrow(
+        'Backup response did not contain a valid download URL'
+      );
+    });
   });
 
   describe('uploadRestore', () => {
@@ -94,6 +141,33 @@ describe('backupRestoreApi', () => {
       await expect(backupRestoreApi.uploadRestore(file)).rejects.toThrow(
         'Backup file must be a .tar.gz archive'
       );
+    });
+
+    it('should start a restore from a remote HTTPS URL or S3 URI', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: 'restore-remote', status: 'in_progress' }),
+      });
+
+      const response = await backupRestoreApi.restoreFromURL(
+        ' s3://backup-bucket/krkn-operator/backups/backup.tar.gz ',
+        'secret-passphrase'
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/restore/url'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ url: 's3://backup-bucket/krkn-operator/backups/backup.tar.gz' }),
+        })
+      );
+      const headers = new Headers(mockFetch.mock.calls[0][1].headers);
+      const decoded = new TextDecoder().decode(
+        Uint8Array.from(atob(headers.get('X-Backup-Passphrase')!), c => c.charCodeAt(0))
+      );
+      expect(decoded).toBe('secret-passphrase');
+      expect(response.jobId).toBe('restore-remote');
     });
   });
 

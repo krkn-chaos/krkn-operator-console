@@ -64,7 +64,7 @@ describe('BackupRestoreCard', () => {
         expect(backupRestoreApi.downloadBackup).toHaveBeenCalled();
         expect(mockShowSuccess).toHaveBeenCalledWith(
           'Backup Downloaded',
-          'Backup archive saved to your downloads folder.'
+          'Backup archive saved to your downloads folder. This archive contains sensitive data — store it securely.'
         );
       });
     });
@@ -112,7 +112,7 @@ describe('BackupRestoreCard', () => {
       await user.click(screen.getByRole('button', { name: /upload & restore/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Select Backup Archive')).toBeInTheDocument();
+        expect(screen.getByText('Or select a local backup archive')).toBeInTheDocument();
         expect(screen.getByText(/This will replace backed-up configuration/i)).toBeInTheDocument();
         expect(screen.getByText(/Current users, user groups, targets, and secrets/i)).toBeInTheDocument();
       });
@@ -145,6 +145,34 @@ describe('BackupRestoreCard', () => {
         const confirmButtons = screen.getAllByRole('button', { name: /upload & restore/i });
         const modalConfirm = confirmButtons[confirmButtons.length - 1];
         expect(modalConfirm).not.toBeDisabled();
+      });
+    });
+
+    it('should start a restore from a remote S3 source', async () => {
+      vi.mocked(backupRestoreApi.restoreFromURL).mockResolvedValue({
+        jobId: 'restore-s3',
+        status: 'in_progress',
+        message: 'Restore started',
+      });
+
+      render(<BackupRestoreCard />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      await user.click(screen.getByRole('button', { name: /upload & restore/i }));
+      await user.type(
+        screen.getByLabelText(/Remote backup URL or S3 URI/i),
+        's3://backup-bucket/krkn-operator/backups/backup.tar.gz'
+      );
+
+      const confirmButtons = screen.getAllByRole('button', { name: /upload & restore/i });
+      expect(confirmButtons[confirmButtons.length - 1]).not.toBeDisabled();
+      await user.click(confirmButtons[confirmButtons.length - 1]);
+
+      await waitFor(() => {
+        expect(backupRestoreApi.restoreFromURL).toHaveBeenCalledWith(
+          's3://backup-bucket/krkn-operator/backups/backup.tar.gz',
+          undefined
+        );
       });
     });
 
@@ -338,6 +366,8 @@ describe('BackupRestoreCard', () => {
 
       const passphraseInput = screen.getByPlaceholderText('Passphrase');
       await user.type(passphraseInput, 'test-pass');
+      const confirmInput = screen.getByPlaceholderText('Confirm passphrase');
+      await user.type(confirmInput, 'test-pass');
       await user.click(screen.getByRole('button', { name: /download encrypted backup/i }));
 
       await waitFor(() => {
@@ -397,6 +427,9 @@ describe('BackupRestoreCard', () => {
       const restorePassInputs = screen.getAllByPlaceholderText('Passphrase');
       const restorePassInput = restorePassInputs[restorePassInputs.length - 1];
       await user.type(restorePassInput, 'decrypt-me');
+
+      const confirmPassInput = screen.getByPlaceholderText('Confirm passphrase');
+      await user.type(confirmPassInput, 'decrypt-me');
 
       const confirmButtons = screen.getAllByRole('button', { name: /upload & restore/i });
       await user.click(confirmButtons[confirmButtons.length - 1]);
