@@ -1310,6 +1310,16 @@ describe('StudioContext', () => {
       expect(graph['env-node'].env).toEqual({ KEY: 'val', GLOBAL_KEY: 'global_val' });
     });
 
+    it('exports the workspace and rollback setting from a configured node', () => {
+      const node = makeConfiguredNode('rollback-node');
+      node.config!.workspace = { name: 'shared-data' };
+      node.config!.rollbackEnabled = true;
+
+      const graph = buildGraph({ nodes: [node], edges: [], nextNodeNumber: 2 });
+      expect(graph['rollback-node'].workspace).toEqual({ name: 'shared-data' });
+      expect(graph['rollback-node'].rollbackEnabled).toBe(true);
+    });
+
     it('exports the node resiliency weight and defaults legacy nodes to one', () => {
       const weightedNode = makeConfiguredNode('weighted-node');
       weightedNode.config!.resiliencyWeight = 2.5;

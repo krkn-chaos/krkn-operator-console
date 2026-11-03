@@ -48,6 +48,8 @@ const initialState: AppState = {
   rerunScenario: null,
   rerunKubeconfigPath: null,
   rerunCloudCredentialRef: null,
+  rerunWorkspace: null,
+  rerunRollbackEnabled: false,
 
   // Error handling
   error: null,
@@ -159,6 +161,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         rerunScenario: null,
         rerunKubeconfigPath: null,
         rerunCloudCredentialRef: null,
+        rerunWorkspace: null,
+        rerunRollbackEnabled: false,
         error: null,
       };
 
@@ -407,6 +411,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         startInPreview: false,
         rerunScenario: null,
         rerunKubeconfigPath: null,
+        rerunWorkspace: null,
+        rerunRollbackEnabled: false,
         error: null,
       };
 
@@ -551,6 +557,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         rerunScenario: state.rerunIntent?.scenario ?? null,
         rerunKubeconfigPath: state.rerunIntent?.kubeconfigPath ?? null,
         rerunCloudCredentialRef: state.rerunIntent?.cloudCredentialRef ?? null,
+        rerunWorkspace: state.rerunIntent?.workspace ?? null,
+        rerunRollbackEnabled: state.rerunIntent?.rollbackEnabled ?? false,
         rerunIntent: null,
         error: null,
       };
@@ -617,6 +625,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         rerunScenario: null,
         rerunKubeconfigPath: null,
         rerunCloudCredentialRef: null,
+        rerunWorkspace: null,
+        rerunRollbackEnabled: false,
         error: null,
       };
 
@@ -730,6 +740,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
               rerunScenario: null,
               rerunKubeconfigPath: null,
               rerunCloudCredentialRef: null,
+              rerunWorkspace: null,
+              rerunRollbackEnabled: false,
             };
           }
           // Normal flow — back to scenarios list
@@ -747,6 +759,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             rerunScenario: null,
             rerunKubeconfigPath: null,
             rerunCloudCredentialRef: null,
+            rerunWorkspace: null,
+            rerunRollbackEnabled: false,
           };
 
         default:
