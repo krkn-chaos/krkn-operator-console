@@ -178,11 +178,11 @@ function App() {
     proceed();
   };
 
-  const handleRerunScenario = async (run: ScenarioRunState, jobId: string) => {
+  const handleRerunScenario = async (run: ScenarioRunState) => {
     dispatch({ type: 'INIT_START' });
 
     try {
-      const config = await operatorApi.getJobConfig(jobId);
+      const config = await operatorApi.getScenarioRunConfig(run.scenarioRunName);
 
       dispatch({ type: 'RERUN_SCENARIO', payload: buildRerunIntent(config, run) });
 
@@ -232,7 +232,6 @@ function App() {
               onDeleteScenarioRun={handleDeleteScenarioRun}
               onDeleteJob={handleDeleteJob}
               onRerunScenario={handleRerunScenario}
-              onLoadRunDetails={(run) => fetchRunDetails(run.scenarioRunName, run)}
               scenarioRunDetails={state.scenarioRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
               onToggleGraphRunAccordion={(graphRunName) =>

@@ -15,7 +15,7 @@ import {
 } from '@patternfly/react-core';
 import { EllipsisVIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
-import type { CategoryResponse, ClusterJob } from '../types/api';
+import type { CategoryResponse } from '../types/api';
 
 interface RunCategoryActionsProps {
   runName: string;
@@ -32,10 +32,7 @@ interface RunCategoryActionsProps {
   runId?: string;
   /** Used to stop polling once the run completes. */
   runPhase?: string;
-  replayJobs?: ClusterJob[];
-  isReplayJobsLoading?: boolean;
-  onOpenReplayJobs?: () => void;
-  onReplayScenario?: (jobId: string) => void;
+  onReplayScenario?: () => void;
   onReplayWorkflow?: () => Promise<void>;
   isWorkflowReplayDisabled?: boolean;
 }
@@ -70,16 +67,12 @@ export function RunCategoryActions({
   onDelete,
   runId,
   runPhase,
-  replayJobs = [],
-  isReplayJobsLoading = false,
-  onOpenReplayJobs,
   onReplayScenario,
   onReplayWorkflow,
   isWorkflowReplayDisabled = false,
 }: RunCategoryActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
-  const hasLoadedReplayJobsForOpenMenu = useRef(false);
 
   const report = useReportActions({ runId, runName, runPhase });
 
@@ -87,7 +80,6 @@ export function RunCategoryActions({
     setIsOpen(open);
     if (!open) {
       hasLoadedCategoriesForOpenMenu.current = false;
-      hasLoadedReplayJobsForOpenMenu.current = false;
     }
   };
 
@@ -97,19 +89,17 @@ export function RunCategoryActions({
     onOpenCategories();
   };
 
-  const handleReplayFlyout = () => {
-    if (hasLoadedReplayJobsForOpenMenu.current) return;
-    hasLoadedReplayJobsForOpenMenu.current = true;
-    onOpenReplayJobs?.();
-  };
-
   const handleWorkflowReplay = () => {
     if (!onReplayWorkflow) return;
     handleOpenChange(false);
     void onReplayWorkflow();
   };
 
-  const replayableJobs = replayJobs.filter((job) => job.completionTime);
+  const handleScenarioReplay = () => {
+    if (!onReplayScenario) return;
+    handleOpenChange(false);
+    onReplayScenario();
+  };
 
   return (
     <>
@@ -137,34 +127,7 @@ export function RunCategoryActions({
             <DropdownItem
               key="replay-scenario"
               icon={<RedoIcon />}
-              onShowFlyout={handleReplayFlyout}
-              flyoutMenu={(
-                <Menu id={`replay-clusters-${runName}`}>
-                  <MenuContent>
-                    <MenuList aria-label={`Replay ${runName} on a cluster`} aria-busy={isReplayJobsLoading}>
-                      {isReplayJobsLoading ? (
-                        <MenuItem key="replay-clusters-loading" isDisabled icon={<Spinner size="sm" />}>
-                          Loading clusters…
-                        </MenuItem>
-                      ) : replayableJobs.length > 0 ? replayableJobs.map((job) => (
-                        <MenuItem
-                          key={job.jobId}
-                          onClick={() => {
-                            handleOpenChange(false);
-                            onReplayScenario(job.jobId);
-                          }}
-                        >
-                          {job.providerName}/{job.clusterName}
-                        </MenuItem>
-                      )) : (
-                        <MenuItem key="replay-clusters-empty" isDisabled>
-                          No completed clusters to replay
-                        </MenuItem>
-                      )}
-                    </MenuList>
-                  </MenuContent>
-                </Menu>
-              )}
+              onClick={handleScenarioReplay}
             >
               Replay
             </DropdownItem>

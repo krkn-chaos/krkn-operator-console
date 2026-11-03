@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import type { ClusterJob, UnifiedJobItem, ScenarioRunState, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
+import type { ClusterJob, UnifiedJobItem, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
 import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJobsMock } from '../hooks/__mocks__/useJobs';
 
 vi.mock('../hooks/useJobs');
@@ -498,16 +498,6 @@ describe('JobsList - Run actions menu', () => {
 describe('JobsList - Replay actions', () => {
   const mockOnRerunScenario = vi.fn();
 
-  const makeJob = (overrides: Partial<ClusterJob> = {}): ClusterJob => ({
-    providerName: 'krkn-operator-acm',
-    clusterName: 'managed-cluster-1',
-    jobId: 'job-001',
-    podName: 'krkn-pod-001',
-    phase: 'Running',
-    message: '',
-    ...overrides,
-  });
-
   const rerunDefaultProps = {
     expandedRunIds: new Set<string>(['run-001']),
     expandedJobIds: new Set<string>(),
@@ -527,141 +517,19 @@ describe('JobsList - Replay actions', () => {
     setMockIsLoading(false);
   });
 
-  it('shows no completed clusters to replay for a running job', async () => {
+  it('starts scenario replay directly from the actions menu without opening a cluster submenu', async () => {
     const user = userEvent.setup();
-    setMockJobs([makeScenarioJobItem('run-001', 'Running', { clusterJobs: [makeJob({ phase: 'Running' })] })]);
+    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded')]);
     render(<JobsList {...rerunDefaultProps} />);
 
     await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.hover(screen.getByText('Replay'));
-    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
-  });
+    await user.click(screen.getByRole('menuitem', { name: 'Replay' }));
 
-  it('shows no completed clusters to replay for a pending job', async () => {
-    const user = userEvent.setup();
-    setMockJobs([makeScenarioJobItem('run-001', 'Pending', { clusterJobs: [makeJob({ phase: 'Pending' })] })]);
-    render(<JobsList {...rerunDefaultProps} />);
-
-    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.hover(screen.getByText('Replay'));
-    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
-  });
-
-  it('renders scenario runs when the jobs snapshot omits clusterJobs', async () => {
-    const user = userEvent.setup();
-    const itemWithoutClusterJobs = makeScenarioJobItem('run-001', 'Succeeded');
-    if (itemWithoutClusterJobs.scenarioRun) {
-      delete (itemWithoutClusterJobs.scenarioRun as Partial<ScenarioRunStatusResponse>).clusterJobs;
-    }
-    setMockJobs([itemWithoutClusterJobs]);
-
-    render(<JobsList {...rerunDefaultProps} />);
-
-    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.hover(screen.getByText('Replay'));
-
-    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
-  });
-
-  it('replays a completed cluster from the run actions submenu', async () => {
-    const user = userEvent.setup();
-    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded', {
-      clusterJobs: [makeJob({ phase: 'Succeeded', completionTime: '2026-07-29T11:00:00Z' })],
-    })]);
-    render(<JobsList {...rerunDefaultProps} />);
-
-    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.hover(screen.getByText('Replay'));
-    const replayCluster = await screen.findByText('krkn-operator-acm/managed-cluster-1', {
-      selector: '.pf-v5-c-menu__item-text',
-    });
-    await user.click(replayCluster);
     expect(mockOnRerunScenario).toHaveBeenCalledTimes(1);
-    const [calledRun, calledJobId] = mockOnRerunScenario.mock.calls[0];
+    expect(mockOnRerunScenario.mock.calls[0]).toHaveLength(1);
+    const [calledRun] = mockOnRerunScenario.mock.calls[0];
     expect(calledRun.scenarioRunName).toBe('run-001');
-    expect(calledJobId).toBe('job-001');
-  });
-
-  it('only lists completed clusters for replay in a mixed-status run', async () => {
-    const user = userEvent.setup();
-    setMockJobs([makeScenarioJobItem('run-001', 'Running', {
-      clusterJobs: [
-        makeJob({ jobId: 'job-running', phase: 'Running' }),
-        makeJob({ jobId: 'job-done', phase: 'Succeeded', completionTime: '2026-07-29T11:00:00Z', clusterName: 'cluster-2' }),
-      ],
-    })]);
-    render(<JobsList {...rerunDefaultProps} />);
-    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.hover(screen.getByText('Replay'));
-
-    expect(await screen.findByText('krkn-operator-acm/cluster-2', {
-      selector: '.pf-v5-c-menu__item-text',
-    })).toBeInTheDocument();
-    expect(screen.queryByText('krkn-operator-acm/managed-cluster-1', {
-      selector: '.pf-v5-c-menu__item-text',
-    })).not.toBeInTheDocument();
-  });
-
-  it('uses cluster jobs fetched into app state when the jobs snapshot is empty', async () => {
-    const user = userEvent.setup();
-    const onLoadRunDetails = vi.fn();
-    const baseProps = {
-      ...rerunDefaultProps,
-      onLoadRunDetails,
-      scenarioRunDetails: [] as ScenarioRunState[],
-    };
-    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded')]);
-    const { rerender } = render(<JobsList {...baseProps} />);
-
-    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.hover(screen.getByText('Replay'));
-    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
-    expect(onLoadRunDetails).toHaveBeenCalledOnce();
-
-    rerender(<JobsList {...baseProps} scenarioRunDetails={[{
-      scenarioRunName: 'run-001',
-      scenarioName: 'pod-scenarios',
-      phase: 'Succeeded',
-      totalTargets: 1,
-      successfulJobs: 1,
-      failedJobs: 0,
-      runningJobs: 0,
-      clusterJobs: [makeJob({
-        clusterName: 'loaded-cluster',
-        phase: 'Succeeded',
-        completionTime: '2026-07-29T11:00:00Z',
-      })],
-      createdAt: '2026-07-29T10:00:00Z',
-    }]} />);
-
-    expect(await screen.findByText('krkn-operator-acm/loaded-cluster', {
-      selector: '.pf-v5-c-menu__item-text',
-    })).toBeInTheDocument();
-  });
-
-  it('handles context run details that omit clusterJobs when opening replay', async () => {
-    const user = userEvent.setup();
-    const contextRunWithoutClusterJobs = {
-      scenarioRunName: 'run-001',
-      scenarioName: 'pod-scenarios',
-      phase: 'Succeeded',
-      totalTargets: 1,
-      successfulJobs: 1,
-      failedJobs: 0,
-      runningJobs: 0,
-      createdAt: '2026-07-29T10:00:00Z',
-    } as unknown as ScenarioRunState;
-    setMockJobs([makeScenarioJobItem('run-001', 'Succeeded')]);
-
-    render(<JobsList
-      {...rerunDefaultProps}
-      scenarioRunDetails={[contextRunWithoutClusterJobs]}
-    />);
-
-    await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.hover(screen.getByText('Replay'));
-
-    expect(await screen.findByText('No completed clusters to replay')).toBeInTheDocument();
+    expect(screen.queryByText('No completed clusters to replay')).not.toBeInTheDocument();
   });
 
   it.each(['Completed', 'Failed', 'PartiallyFailed'] as const)(
