@@ -67,7 +67,6 @@ import './JobsList.css';
 
 import type {
   CategoryResponse,
-  ClusterJob,
   ScenarioRunState,
   ScenarioRunPhase,
   ClusterJobPhase,
