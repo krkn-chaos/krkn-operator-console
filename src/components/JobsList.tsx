@@ -40,6 +40,7 @@ import {
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
+  HistoryIcon,
   SyncAltIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -139,6 +140,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
       run: {
         scenarioRunName: sr.scenarioRunName,
         rollbackEnabled: sr.rollbackEnabled,
+        isRollback: sr.isRollback,
         scenarioName: sr.scenarioName || '',
         phase: sr.phase,
         totalTargets: sr.totalTargets,
@@ -1086,7 +1088,7 @@ export function JobsList({
               const contextRun = scenarioRunDetailsByName.get(listedRun.scenarioRunName);
               const run = listedRun.clusterJobs.length === 0 && contextRun
                 ? { ...listedRun, ...contextRun, clusterJobs: contextRun.clusterJobs ?? [] }
-                : { ...listedRun, rollbackEnabled: listedRun.rollbackEnabled ?? contextRun?.rollbackEnabled };
+                : { ...listedRun, rollbackEnabled: listedRun.rollbackEnabled ?? contextRun?.rollbackEnabled, isRollback: listedRun.isRollback ?? contextRun?.isRollback };
               const customRunName = run.customRunName?.trim();
               const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
@@ -1123,15 +1125,17 @@ export function JobsList({
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>
-                                <HiOutlineRocketLaunch style={{ marginRight: '0.25rem' }} />
-                                Scenario:
+                                {run.isRollback
+                                  ? <HistoryIcon aria-hidden="true" style={{ marginRight: '0.25rem' }} />
+                                  : <HiOutlineRocketLaunch style={{ marginRight: '0.25rem' }} />}
+                                {run.isRollback ? 'Rollback:' : 'Scenario:'}
                               </strong>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <Tooltip content={`Run ID: ${scenarioRunName}`}>
                                 <code
                                   className="jobs-list-run-primary-value"
-                                  aria-label={`Scenario ${run.scenarioName}; run ID ${scenarioRunName}`}
+                                  aria-label={`${run.isRollback ? 'Rollback' : 'Scenario'} ${run.scenarioName}; run ID ${scenarioRunName}`}
                                   style={{
                                     fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
                                     fontSize: 'var(--pf-v5-global--FontSize--sm)',

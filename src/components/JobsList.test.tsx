@@ -91,6 +91,7 @@ function makeScenarioJobItem(
     scenarioName?: string;
     ownerUserId?: string;
     rollbackEnabled?: boolean;
+    isRollback?: boolean;
   } = {},
 ): UnifiedJobItem {
   return {
@@ -100,6 +101,7 @@ function makeScenarioJobItem(
     scenarioRun: {
       scenarioRunName: name,
       rollbackEnabled: opts.rollbackEnabled,
+      isRollback: opts.isRollback,
       scenarioName: opts.scenarioName,
       phase: phase as ScenarioRunStatusResponse['phase'],
       totalTargets: 1,
@@ -495,6 +497,21 @@ describe('JobsList - Run actions menu', () => {
     expect(owner).toHaveTextContent(ownerUserId);
     await user.hover(owner as HTMLElement);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(ownerUserId);
+  });
+
+  it('marks rollback runs from isRollback rather than the workload name', () => {
+    setMockJobs([
+      makeScenarioJobItem('rollback-attempt-2', 'Succeeded', { scenarioName: 'workload-rollback', isRollback: true }),
+      makeScenarioJobItem('ordinary-attempt', 'Succeeded', { scenarioName: 'workload-rollback' }),
+    ]);
+
+    render(<JobsList {...defaultProps} />);
+
+    const rollbackName = screen.getByLabelText('Rollback workload-rollback; run ID rollback-attempt-2');
+    const ordinaryName = screen.getByLabelText('Scenario workload-rollback; run ID ordinary-attempt');
+    expect(rollbackName.closest('.jobs-list-summary-cell--primary')).toHaveTextContent('Rollback:');
+    expect(rollbackName.closest('.jobs-list-summary-cell--primary')?.querySelector('svg')).toBeInTheDocument();
+    expect(ordinaryName.closest('.jobs-list-summary-cell--primary')).toHaveTextContent('Scenario:');
   });
 
   it('keeps the run ID available from the scenario label without adding a second visible line', async () => {

@@ -46,7 +46,7 @@ export function useScenarioRunsPoller() {
         type: 'UPDATE_SCENARIO_RUN',
         payload: {
           run: preserveTerminal
-            ? { ...base, clusterJobs: details.clusterJobs, rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled, resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled, resiliencyScores: details.resiliencyScores }
+            ? { ...base, clusterJobs: details.clusterJobs, rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled, isRollback: details.isRollback ?? base.isRollback, resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled, resiliencyScores: details.resiliencyScores }
             : {
                 ...base,
                 phase: details.phase,
@@ -56,6 +56,7 @@ export function useScenarioRunsPoller() {
                 runningJobs: details.runningJobs,
                 clusterJobs: details.clusterJobs,
                 rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled,
+                isRollback: details.isRollback ?? base.isRollback,
                 ownerUserId: details.ownerUserId || base.ownerUserId,
                 registryName: details.registryName || base.registryName,
                 graphRunName: details.graphRunName || base.graphRunName,
@@ -87,6 +88,7 @@ export function useScenarioRunsPoller() {
         return {
           scenarioRunName: run.scenarioRunName,
           rollbackEnabled: run.rollbackEnabled,
+          isRollback: run.isRollback,
           scenarioName,
           phase: run.phase,
           totalTargets: run.totalTargets,
@@ -128,6 +130,7 @@ export function useScenarioRunsPoller() {
       const updatedState: ScenarioRunState = {
         scenarioRunName: data.scenarioRunName || runName,
         rollbackEnabled: data.rollbackEnabled ?? existing?.rollbackEnabled,
+        isRollback: data.isRollback ?? existing?.isRollback,
         scenarioName: data.scenarioName || existing?.scenarioName || runName.replace(/-[a-f0-9]{8}$/, ''),
         phase: data.phase,
         totalTargets: data.totalTargets,
@@ -226,6 +229,7 @@ export function useScenarioRunsPoller() {
  */
 export function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
   if (prev.rollbackEnabled !== next.rollbackEnabled) return true;
+  if (prev.isRollback !== next.isRollback) return true;
   if (prev.phase !== next.phase) return true;
   if (prev.totalTargets !== next.totalTargets) return true;
   if (prev.runningJobs !== next.runningJobs) return true;

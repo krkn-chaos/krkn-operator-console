@@ -136,6 +136,12 @@ describe('hasChanges', () => {
     expect(hasChanges(prev, next)).toBe(true);
   });
 
+  it('detects rollback identity arriving in a run update', () => {
+    const prev = makeRunState({ isRollback: undefined });
+    const next = makeRunState({ isRollback: true });
+    expect(hasChanges(prev, next)).toBe(true);
+  });
+
   it('detects phase change', () => {
     const prev = makeRunState({ phase: 'Running' });
     const next = makeRunState({ phase: 'Succeeded' });
