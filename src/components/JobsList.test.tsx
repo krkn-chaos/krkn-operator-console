@@ -514,6 +514,26 @@ describe('JobsList - Run actions menu', () => {
     expect(ordinaryName.closest('.jobs-list-summary-cell--primary')).toHaveTextContent('Scenario:');
   });
 
+  it('recognizes generated rollback runs in snapshots from an older operator', () => {
+    const runName = 'krkn-rollback-918e8635-b304-4038-8e22-cc9f2ac380d9-2';
+    setMockJobs([makeScenarioJobItem(runName, 'Succeeded', { scenarioName: 'workload-rollback' })]);
+
+    render(<JobsList {...defaultProps} />);
+
+    expect(screen.getByLabelText(`Rollback workload-rollback; run ID ${runName}`)
+      .closest('.jobs-list-summary-cell--primary')).toHaveTextContent('Rollback:');
+  });
+
+  it('respects an explicit non-rollback marker even when the name resembles a rollback', () => {
+    const runName = 'krkn-rollback-918e8635-b304-4038-8e22-cc9f2ac380d9-2';
+    setMockJobs([makeScenarioJobItem(runName, 'Succeeded', { scenarioName: 'workload-rollback', isRollback: false })]);
+
+    render(<JobsList {...defaultProps} />);
+
+    expect(screen.getByLabelText(`Scenario workload-rollback; run ID ${runName}`)
+      .closest('.jobs-list-summary-cell--primary')).toHaveTextContent('Scenario:');
+  });
+
   it('keeps the run ID available from the scenario label without adding a second visible line', async () => {
     const user = userEvent.setup();
     const runId = 'pod-scenarios-4c56abcd';

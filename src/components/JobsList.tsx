@@ -79,6 +79,8 @@ import type {
 } from '../types/api';
 
 const GRAPH_RUN_TERMINAL_PHASES: GraphRunListItem['phase'][] = ['Completed', 'Failed', 'PartiallyFailed'];
+// Older operators omit isRollback; pair their generated run name with the reserved workload tag.
+const GENERATED_ROLLBACK_RUN_NAME = /^krkn-rollback-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-[1-9][0-9]*)?$/i;
 
 export type UnifiedRunItem =
   | {
@@ -1095,6 +1097,7 @@ export function JobsList({
               const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
+              const isRollback = run.isRollback ?? (run.scenarioName === 'workload-rollback' && GENERATED_ROLLBACK_RUN_NAME.test(run.scenarioRunName));
               const scenarioCategoryKey = runCategoryKey('scenario-runs', run.scenarioRunName);
               const scenarioCategoryNames = categoryOverrides[scenarioCategoryKey] ?? item.categories;
               const scenarioCategories = getRunCategories('scenario-runs', run.scenarioRunName, item.categories);
@@ -1127,17 +1130,17 @@ export function JobsList({
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>
-                                {run.isRollback
+                                {isRollback
                                   ? <HistoryIcon aria-hidden="true" style={{ marginRight: '0.25rem' }} />
                                   : <HiOutlineRocketLaunch style={{ marginRight: '0.25rem' }} />}
-                                {run.isRollback ? 'Rollback:' : 'Scenario:'}
+                                {isRollback ? 'Rollback:' : 'Scenario:'}
                               </strong>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <Tooltip content={`Run ID: ${scenarioRunName}`}>
                                 <code
                                   className="jobs-list-run-primary-value"
-                                  aria-label={`${run.isRollback ? 'Rollback' : 'Scenario'} ${run.scenarioName}; run ID ${scenarioRunName}`}
+                                  aria-label={`${isRollback ? 'Rollback' : 'Scenario'} ${run.scenarioName}; run ID ${scenarioRunName}`}
                                   style={{
                                     fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
                                     fontSize: 'var(--pf-v5-global--FontSize--sm)',
