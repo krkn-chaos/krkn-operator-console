@@ -205,6 +205,40 @@ describe('JobsList', () => {
     expect(screen.getByTestId('rollback-actions')).toHaveTextContent('node-cpu-hog-953e3861');
   });
 
+  it('uses rollback enablement from the run stream when a jobs snapshot omits it', () => {
+    const job: ClusterJob = {
+      providerName: 'krkn-operator-acm',
+      clusterName: 'krkn-operator-acm-2',
+      jobId: '918e8635-b304-4038-8e22-cc9f2ac380d9',
+      podName: 'krkn-job-918e8635-b304-4038-8e22-cc9f2ac380d9',
+      phase: 'MaxRetriesExceeded',
+    };
+    setMockJobs([makeScenarioJobItem('node-cpu-hog-953e3861', 'Failed', { clusterJobs: [job] })]);
+    const contextRun: ScenarioRunState = {
+      scenarioRunName: 'node-cpu-hog-953e3861',
+      rollbackEnabled: true,
+      scenarioName: 'node-cpu-hog',
+      phase: 'Failed',
+      totalTargets: 1,
+      successfulJobs: 0,
+      failedJobs: 1,
+      runningJobs: 0,
+      clusterJobs: [job],
+      createdAt: '2026-11-04T10:12:44+01:00',
+    };
+
+    render(
+      <JobsList
+        {...defaultProps}
+        expandedRunIds={new Set([contextRun.scenarioRunName])}
+        expandedJobIds={new Set([job.jobId])}
+        scenarioRunDetails={[contextRun]}
+      />
+    );
+
+    expect(screen.getByTestId('rollback-actions')).toHaveTextContent(contextRun.scenarioRunName);
+  });
+
   it('shows logs and the failure reason for an expanded failed job', () => {
     setMockJobs([
       makeScenarioJobItem('run-failed', 'Failed', {
