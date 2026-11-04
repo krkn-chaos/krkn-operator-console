@@ -24,6 +24,12 @@ vi.mock('./LogViewer', () => ({
   LogViewer: () => <div data-testid="log-viewer-mock" />,
 }));
 
+vi.mock('./RollbackActions', () => ({
+  RollbackActions: ({ scenarioRunName }: { scenarioRunName: string }) => (
+    <div data-testid="rollback-actions">{scenarioRunName}</div>
+  ),
+}));
+
 vi.mock('./ActiveRunsSummary', () => ({
   ActiveRunsSummary: () => <div data-testid="active-runs-summary" />,
 }));
@@ -83,6 +89,7 @@ function makeScenarioJobItem(
     createdAt?: string;
     scenarioName?: string;
     ownerUserId?: string;
+    rollbackEnabled?: boolean;
   } = {},
 ): UnifiedJobItem {
   return {
@@ -91,6 +98,7 @@ function makeScenarioJobItem(
     createdAt: opts.createdAt || '2026-01-01T00:00:00Z',
     scenarioRun: {
       scenarioRunName: name,
+      rollbackEnabled: opts.rollbackEnabled,
       scenarioName: opts.scenarioName,
       phase: phase as ScenarioRunStatusResponse['phase'],
       totalTargets: 1,
@@ -170,6 +178,31 @@ describe('JobsList', () => {
     expect(screen.getByText('Max retries exceeded')).toBeInTheDocument();
     expect(screen.getByTestId('log-viewer-mock')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete Job' })).not.toBeInTheDocument();
+  });
+
+  it('shows rollback actions for a completed job when the unified run enables rollback', () => {
+    setMockJobs([
+      makeScenarioJobItem('node-cpu-hog-953e3861', 'Failed', {
+        rollbackEnabled: true,
+        clusterJobs: [{
+          providerName: 'krkn-operator',
+          clusterName: 'cluster-1',
+          jobId: 'job-max-retries',
+          podName: 'pod-1',
+          phase: 'MaxRetriesExceeded',
+        }],
+      }),
+    ]);
+
+    render(
+      <JobsList
+        {...defaultProps}
+        expandedRunIds={new Set(['node-cpu-hog-953e3861'])}
+        expandedJobIds={new Set(['job-max-retries'])}
+      />
+    );
+
+    expect(screen.getByTestId('rollback-actions')).toHaveTextContent('node-cpu-hog-953e3861');
   });
 
   it('shows logs and the failure reason for an expanded failed job', () => {
