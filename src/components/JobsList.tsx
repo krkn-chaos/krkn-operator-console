@@ -139,6 +139,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
       categories: item.categories || [],
       run: {
         scenarioRunName: sr.scenarioRunName,
+        rollbackEnabled: sr.rollbackEnabled,
         scenarioName: sr.scenarioName || '',
         phase: sr.phase,
         totalTargets: sr.totalTargets,
