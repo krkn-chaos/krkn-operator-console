@@ -409,6 +409,7 @@ export interface ReportStatus {
 export interface ScenarioRunStatusResponse {
   scenarioRunName: string;
   rollbackEnabled?: boolean;
+  isRollback?: boolean; // Derived by the operator from spec.rollbackSource
   scenarioName?: string; // Optional - backend may include it in the future
   phase: ScenarioRunPhase;
   totalTargets: number;
@@ -439,6 +440,7 @@ export interface RollbackAvailability {
 export interface ScenarioRunState {
   scenarioRunName: string;
   rollbackEnabled?: boolean;
+  isRollback?: boolean;
   scenarioName: string; // For display purposes
   phase: ScenarioRunPhase;
   totalTargets: number;
