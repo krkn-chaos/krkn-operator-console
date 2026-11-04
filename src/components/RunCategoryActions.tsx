@@ -15,6 +15,7 @@ import {
 } from '@patternfly/react-core';
 import { EllipsisVIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
+import { RollbackMenuAction } from './RollbackMenuAction';
 import type { CategoryResponse, ClusterJob } from '../types/api';
 
 interface RunCategoryActionsProps {
@@ -33,6 +34,7 @@ interface RunCategoryActionsProps {
   /** Used to stop polling once the run completes. */
   runPhase?: string;
   replayJobs?: ClusterJob[];
+  rollbackEnabled?: boolean;
   isReplayJobsLoading?: boolean;
   onOpenReplayJobs?: () => void;
   onReplayScenario?: (jobId: string) => void;
@@ -71,6 +73,7 @@ export function RunCategoryActions({
   runId,
   runPhase,
   replayJobs = [],
+  rollbackEnabled = false,
   isReplayJobsLoading = false,
   onOpenReplayJobs,
   onReplayScenario,
@@ -85,6 +88,10 @@ export function RunCategoryActions({
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
+    if (open && runId && rollbackEnabled && replayJobs.length === 0 && !hasLoadedReplayJobsForOpenMenu.current) {
+      hasLoadedReplayJobsForOpenMenu.current = true;
+      onOpenReplayJobs?.();
+    }
     if (!open) {
       hasLoadedCategoriesForOpenMenu.current = false;
       hasLoadedReplayJobsForOpenMenu.current = false;
@@ -168,6 +175,16 @@ export function RunCategoryActions({
             >
               Replay
             </DropdownItem>
+          )}
+          {runId && (
+            <RollbackMenuAction
+              runName={runName}
+              rollbackEnabled={rollbackEnabled}
+              jobs={replayJobs}
+              isJobsLoading={isReplayJobsLoading}
+              isMenuOpen={isOpen}
+              onCloseMenu={() => handleOpenChange(false)}
+            />
           )}
           {onReplayWorkflow && (
             <DropdownItem
