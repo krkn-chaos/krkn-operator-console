@@ -60,7 +60,6 @@ import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
 import { JobDiagnosticAlert } from './JobDiagnosticAlert';
-import { RollbackActions } from './RollbackActions';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
@@ -70,6 +69,7 @@ import type {
   CategoryResponse,
   ScenarioRunState,
   ScenarioRunPhase,
+  ClusterJob,
   ClusterJobPhase,
   GraphRunListItem,
   GraphRunSummary,
@@ -550,6 +550,10 @@ export function JobsList({
     onDelete,
     runId,
     runPhase,
+    replayJobs,
+    rollbackEnabled,
+    isReplayJobsLoading,
+    onOpenReplayJobs,
     onReplayScenario,
     onReplayWorkflow,
     isWorkflowReplayDisabled,
@@ -562,6 +566,10 @@ export function JobsList({
     onDelete: () => void;
     runId?: string;
     runPhase?: string;
+    replayJobs?: ClusterJob[];
+    rollbackEnabled?: boolean;
+    isReplayJobsLoading?: boolean;
+    onOpenReplayJobs?: () => void;
     onReplayScenario?: () => void;
     onReplayWorkflow?: () => Promise<void>;
     isWorkflowReplayDisabled?: boolean;
@@ -586,6 +594,10 @@ export function JobsList({
         onOpenCategories={() => { void loadCategories(); }}
         onToggleCategory={onToggleCategory}
         onDelete={onDelete}
+        replayJobs={replayJobs}
+        rollbackEnabled={rollbackEnabled}
+        isReplayJobsLoading={isReplayJobsLoading}
+        onOpenReplayJobs={onOpenReplayJobs}
         onReplayScenario={onReplayScenario}
         onReplayWorkflow={onReplayWorkflow}
         isWorkflowReplayDisabled={isWorkflowReplayDisabled}
@@ -1316,6 +1328,12 @@ export function JobsList({
                       runId: run.scenarioRunName,
                       runPhase: run.phase,
                       onReplayScenario: () => onRerunScenario(run),
+                      replayJobs: run.clusterJobs,
+                      rollbackEnabled: run.rollbackEnabled,
+                      isReplayJobsLoading: loadingRunDetails.has(run.scenarioRunName),
+                      onOpenReplayJobs: () => {
+                        if (run.clusterJobs.length === 0) onLoadRunDetails?.(run);
+                      },
                     })}
                   </DataListItemRow>
 
@@ -1434,9 +1452,6 @@ export function JobsList({
                                       {hasJobDetails && (
                                         <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
                                           <JobDiagnosticAlert job={job} />
-                                          {run.rollbackEnabled && !['Pending', 'Running'].includes(job.phase) && (
-                                            <FlexItem><RollbackActions scenarioRunName={run.scenarioRunName} job={job} /></FlexItem>
-                                          )}
                                           {/* Job Details */}
                                           <FlexItem>
                                             <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>

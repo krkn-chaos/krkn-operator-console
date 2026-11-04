@@ -1,7 +1,8 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import type { ClusterJob, UnifiedJobItem, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
+import { operatorApi } from '../services/operatorApi';
+import type { ClusterJob, UnifiedJobItem, ScenarioRunState, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
 import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJobsMock } from '../hooks/__mocks__/useJobs';
 
 vi.mock('../hooks/useJobs');
@@ -24,11 +25,11 @@ vi.mock('./LogViewer', () => ({
   LogViewer: () => <div data-testid="log-viewer-mock" />,
 }));
 
-vi.mock('./RollbackActions', () => ({
-  RollbackActions: ({ scenarioRunName }: { scenarioRunName: string }) => (
-    <div data-testid="rollback-actions">{scenarioRunName}</div>
-  ),
+vi.mock('../hooks/useNotifications', () => ({
+  useNotifications: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
 }));
+
+afterEach(() => vi.restoreAllMocks());
 
 vi.mock('./ActiveRunsSummary', () => ({
   ActiveRunsSummary: () => <div data-testid="active-runs-summary" />,
@@ -180,32 +181,32 @@ describe('JobsList', () => {
     expect(screen.queryByRole('button', { name: 'Delete Job' })).not.toBeInTheDocument();
   });
 
-  it('shows rollback actions for a completed job when the unified run enables rollback', () => {
-    setMockJobs([
-      makeScenarioJobItem('node-cpu-hog-953e3861', 'Failed', {
-        rollbackEnabled: true,
-        clusterJobs: [{
-          providerName: 'krkn-operator',
-          clusterName: 'cluster-1',
-          jobId: 'job-max-retries',
-          podName: 'pod-1',
-          phase: 'MaxRetriesExceeded',
-        }],
-      }),
-    ]);
+  it('shows Rollback beside Replay in the run menu without expanding the run', async () => {
+    const user = userEvent.setup();
+    setMockJobs([makeScenarioJobItem('node-cpu-hog-953e3861', 'Failed', {
+      clusterJobs: [{
+        providerName: 'krkn-operator-acm',
+        clusterName: 'krkn-operator-acm-2',
+        jobId: '918e8635-b304-4038-8e22-cc9f2ac380d9',
+        podName: 'krkn-job-918e8635-b304-4038-8e22-cc9f2ac380d9',
+        phase: 'MaxRetriesExceeded',
+      }],
+    })]);
+    render(<JobsList {...defaultProps} />);
 
-    render(
-      <JobsList
-        {...defaultProps}
-        expandedRunIds={new Set(['node-cpu-hog-953e3861'])}
-        expandedJobIds={new Set(['job-max-retries'])}
-      />
-    );
-
-    expect(screen.getByTestId('rollback-actions')).toHaveTextContent('node-cpu-hog-953e3861');
+    await user.click(screen.getByRole('button', { name: 'Actions for run node-cpu-hog-953e3861' }));
+    const replay = screen.getByText('Replay').closest('li');
+    const rollback = screen.getByText('Rollback').closest('li');
+    expect(replay).toBeInTheDocument();
+    expect(rollback).toBeInTheDocument();
+    expect(replay?.nextElementSibling).toBe(rollback);
+    expect(screen.getByText('Rollback').closest('button')).toHaveAttribute('aria-disabled', 'true');
+    await user.hover(screen.getByText('Rollback'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Rollback was not enabled for this run');
   });
 
-  it('uses rollback enablement from the run stream when a jobs snapshot omits it', () => {
+  it('uses rollback enablement from the run stream when a jobs snapshot omits it', async () => {
+    const user = userEvent.setup();
     const job: ClusterJob = {
       providerName: 'krkn-operator-acm',
       clusterName: 'krkn-operator-acm-2',
@@ -213,6 +214,7 @@ describe('JobsList', () => {
       podName: 'krkn-job-918e8635-b304-4038-8e22-cc9f2ac380d9',
       phase: 'MaxRetriesExceeded',
     };
+    vi.spyOn(operatorApi, 'getRollbackAvailability').mockResolvedValue({ jobId: job.jobId, state: 'available', canExecute: true });
     setMockJobs([makeScenarioJobItem('node-cpu-hog-953e3861', 'Failed', { clusterJobs: [job] })]);
     const contextRun: ScenarioRunState = {
       scenarioRunName: 'node-cpu-hog-953e3861',
@@ -226,17 +228,11 @@ describe('JobsList', () => {
       clusterJobs: [job],
       createdAt: '2026-11-04T10:12:44+01:00',
     };
+    render(<JobsList {...defaultProps} scenarioRunDetails={[contextRun]} />);
 
-    render(
-      <JobsList
-        {...defaultProps}
-        expandedRunIds={new Set([contextRun.scenarioRunName])}
-        expandedJobIds={new Set([job.jobId])}
-        scenarioRunDetails={[contextRun]}
-      />
-    );
-
-    expect(screen.getByTestId('rollback-actions')).toHaveTextContent(contextRun.scenarioRunName);
+    await user.click(screen.getByRole('button', { name: 'Actions for run node-cpu-hog-953e3861' }));
+    await waitFor(() => expect(screen.getByText('Rollback').closest('button')).not.toHaveAttribute('aria-disabled'));
+    expect(operatorApi.getRollbackAvailability).toHaveBeenCalledWith(contextRun.scenarioRunName, job.jobId);
   });
 
   it('shows logs and the failure reason for an expanded failed job', () => {

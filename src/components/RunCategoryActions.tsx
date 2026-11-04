@@ -15,7 +15,8 @@ import {
 } from '@patternfly/react-core';
 import { EllipsisVIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
-import type { CategoryResponse } from '../types/api';
+import { RollbackMenuAction } from './RollbackMenuAction';
+import type { CategoryResponse, ClusterJob } from '../types/api';
 
 interface RunCategoryActionsProps {
   runName: string;
@@ -32,6 +33,10 @@ interface RunCategoryActionsProps {
   runId?: string;
   /** Used to stop polling once the run completes. */
   runPhase?: string;
+  replayJobs?: ClusterJob[];
+  rollbackEnabled?: boolean;
+  isReplayJobsLoading?: boolean;
+  onOpenReplayJobs?: () => void;
   onReplayScenario?: () => void;
   onReplayWorkflow?: () => Promise<void>;
   isWorkflowReplayDisabled?: boolean;
@@ -67,19 +72,29 @@ export function RunCategoryActions({
   onDelete,
   runId,
   runPhase,
+  replayJobs = [],
+  rollbackEnabled = false,
+  isReplayJobsLoading = false,
+  onOpenReplayJobs,
   onReplayScenario,
   onReplayWorkflow,
   isWorkflowReplayDisabled = false,
 }: RunCategoryActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
+  const hasLoadedReplayJobsForOpenMenu = useRef(false);
 
   const report = useReportActions({ runId, runName, runPhase });
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
+    if (open && runId && rollbackEnabled && replayJobs.length === 0 && !hasLoadedReplayJobsForOpenMenu.current) {
+      hasLoadedReplayJobsForOpenMenu.current = true;
+      onOpenReplayJobs?.();
+    }
     if (!open) {
       hasLoadedCategoriesForOpenMenu.current = false;
+      hasLoadedReplayJobsForOpenMenu.current = false;
     }
   };
 
@@ -131,6 +146,16 @@ export function RunCategoryActions({
             >
               Replay
             </DropdownItem>
+          )}
+          {runId && (
+            <RollbackMenuAction
+              runName={runName}
+              rollbackEnabled={rollbackEnabled}
+              jobs={replayJobs}
+              isJobsLoading={isReplayJobsLoading}
+              isMenuOpen={isOpen}
+              onCloseMenu={() => handleOpenChange(false)}
+            />
           )}
           {onReplayWorkflow && (
             <DropdownItem
