@@ -1074,7 +1074,7 @@ export function JobsList({
               const contextRun = scenarioRunDetailsByName.get(listedRun.scenarioRunName);
               const run = listedRun.clusterJobs.length === 0 && contextRun
                 ? { ...listedRun, ...contextRun, clusterJobs: contextRun.clusterJobs ?? [] }
-                : listedRun;
+                : { ...listedRun, rollbackEnabled: listedRun.rollbackEnabled ?? contextRun?.rollbackEnabled };
               const customRunName = run.customRunName?.trim();
               const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);

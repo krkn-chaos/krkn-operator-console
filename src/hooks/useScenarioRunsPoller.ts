@@ -225,6 +225,7 @@ export function useScenarioRunsPoller() {
  * ```
  */
 export function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
+  if (prev.rollbackEnabled !== next.rollbackEnabled) return true;
   if (prev.phase !== next.phase) return true;
   if (prev.totalTargets !== next.totalTargets) return true;
   if (prev.runningJobs !== next.runningJobs) return true;

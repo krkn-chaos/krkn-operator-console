@@ -130,6 +130,12 @@ describe('hasChanges', () => {
     expect(hasChanges(run, { ...run })).toBe(false);
   });
 
+  it('detects rollback enablement arriving in a run update', () => {
+    const prev = makeRunState({ rollbackEnabled: undefined });
+    const next = makeRunState({ rollbackEnabled: true });
+    expect(hasChanges(prev, next)).toBe(true);
+  });
+
   it('detects phase change', () => {
     const prev = makeRunState({ phase: 'Running' });
     const next = makeRunState({ phase: 'Succeeded' });
