@@ -57,6 +57,8 @@ function StudioNodeEditorModalComponent({
   const [globalTouchedFields, setGlobalTouchedFields] = useState<TouchedFields>({});
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
   const [cloudCredentialRef, setCloudCredentialRef] = useState('');
+  const [workspace, setWorkspace] = useState<import('../../types/api').WorkspaceReference | undefined>();
+  const [rollbackEnabled, setRollbackEnabled] = useState(false);
   const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
   const [resiliencyWeight, setResiliencyWeight] = useState(1);
 
@@ -105,12 +107,16 @@ function StudioNodeEditorModalComponent({
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
       setCloudCredentialRef(node.config.cloudCredentialRef || '');
       setVolumes(node.config.volumes || {});
+      setWorkspace(node.config.workspace);
+      setRollbackEnabled(node.config.rollbackEnabled ?? false);
       setResiliencyWeight(node.config.resiliencyWeight ?? 1);
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
     } else {
       setRegistryType('public');
       setRegistryName('');
+      setWorkspace(undefined);
+      setRollbackEnabled(false);
       setSelectedScenario(null);
       setSelectedSignatureStatus(undefined);
       setScenarioImage('');
@@ -237,6 +243,11 @@ function StudioNodeEditorModalComponent({
       return;
     }
 
+    if (rollbackEnabled && !workspace) {
+      setValidationWarnings(['Enable rollback requires a workspace.']);
+      return;
+    }
+
     // Check for pending file input (file selected or path typed but not added)
     if (hasPendingFileInput && !pendingFileWarningShown) {
       setValidationWarnings([
@@ -264,6 +275,8 @@ function StudioNodeEditorModalComponent({
         globalFormValues,
         globalTouchedFields,
         volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
+        workspace,
+        rollbackEnabled,
         resiliencyWeight,
         cloudCredentialRef: cloudCredentialRef || undefined,
       },
@@ -367,6 +380,10 @@ function StudioNodeEditorModalComponent({
           nodeIdError={nodeIdError}
           currentNodeId={node.nodeId}
           volumes={volumes}
+          workspace={workspace}
+          onWorkspaceChange={setWorkspace}
+          rollbackEnabled={rollbackEnabled}
+          onRollbackEnabledChange={setRollbackEnabled}
           onVolumesChange={(vols) => {
             setVolumes(vols);
             setPendingFileWarningShown(false);

@@ -40,6 +40,7 @@ import { LogViewer } from './LogViewer';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { ReportDownloadButton } from './ReportDownloadButton';
 import { JobDiagnosticAlert } from './JobDiagnosticAlert';
+import { RollbackActions } from './RollbackActions';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioRunStatusResponse, ClusterJobPhase } from '../types/api';
 
@@ -355,6 +356,9 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
                           {hasJobDetails && (
                             <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
                               <JobDiagnosticAlert job={job} />
+                              {run.rollbackEnabled && !['Pending', 'Running', 'Retrying'].includes(job.phase) && (
+                                <FlexItem><RollbackActions scenarioRunName={run.scenarioRunName} job={job} /></FlexItem>
+                              )}
                               {/* Job Metadata */}
                               <FlexItem>
                                 <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>

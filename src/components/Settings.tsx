@@ -36,6 +36,7 @@ import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
 import { CloudCredentialsCard } from './CloudCredentialsCard';
+import { WorkspacesCard } from './WorkspacesCard';
 import { BackupRestoreCard } from './BackupRestoreCard';
 import { SignatureVerificationSettings } from './SignatureVerificationSettings';
 
@@ -238,6 +239,12 @@ export function Settings() {
               </Tab>
             )}
 
+            {isAdmin && (
+              <Tab eventKey={6} title={<TabTitleText>Workspaces</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}><WorkspacesCard /></div>
+              </Tab>
+            )}
+
             {/* Provider Configuration Tab - Admin Only */}
             {isAdmin && (
               <Tab eventKey={3} title={<TabTitleText>Provider Configuration</TabTitleText>}>
@@ -340,7 +347,7 @@ export function Settings() {
 
             {/* Backup & Restore Tab - Admin Only */}
             {isAdmin && (
-              <Tab eventKey={6} title={<TabTitleText>Backup & Restore</TabTitleText>}>
+              <Tab eventKey={7} title={<TabTitleText>Backup & Restore</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <BackupRestoreCard />
                 </div>

@@ -27,6 +27,10 @@ vi.mock('../../hooks/useReportActions', () => ({
   useReportActions: () => mockReportReturn,
 }));
 
+vi.mock('../../hooks/useNotifications', () => ({
+  useNotifications: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
+}));
+
 const { RunCategoryActions } = await import('../RunCategoryActions');
 
 const categories: CategoryResponse[] = [

@@ -128,6 +128,8 @@ export interface ScenarioReference {
 }
 
 export interface RerunIntent {
+  workspace?: WorkspaceReference;
+  rollbackEnabled?: boolean;
   scenario: ScenarioReference;
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
@@ -139,6 +141,8 @@ export interface RerunIntent {
 }
 
 export interface JobConfigResponse {
+  workspace?: WorkspaceReference;
+  rollbackEnabled?: boolean;
   targetRequestId: string;
   targetClusters: { [operatorName: string]: string[] };
   scenario?: ScenarioReference;
@@ -254,6 +258,35 @@ export interface ErrorResponse {
   message: string;
 }
 
+/** Published PVC wrapper shown in the platform workspace catalog. */
+export interface WorkspaceInfo {
+  name: string;
+  claimName?: string;
+  groups?: string[];
+  availableToAll: boolean;
+  available: boolean;
+  reason?: string;
+}
+
+/** Bound Filesystem RWX claim in the operator namespace, visible to admins only. */
+export interface WorkspacePVC {
+  name: string;
+}
+
+/** Admin payload for publishing an existing PVC. */
+export interface WorkspacePublishRequest {
+  claimName: string;
+  groups?: string[];
+  availableToAll?: boolean;
+}
+
+/** Workspace reference pinned to a run during replay. */
+export interface WorkspaceReference {
+  name: string;
+  workspaceUid?: string;
+  claimUid?: string;
+}
+
 // Scenario Run Types
 
 export interface ScenarioFileMount {
@@ -274,6 +307,8 @@ export interface FileReference {
 }
 
 export interface ScenarioRunRequest {
+  workspace?: WorkspaceReference;
+  rollbackEnabled?: boolean;
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
   scenario: ScenarioReference;
@@ -335,12 +370,13 @@ export interface JobsListResponse {
 // NEW API Types for ScenarioRun (CRD-based)
 
 export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed' | 'MaxRetriesExceeded';
-export type ClusterJobPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'MaxRetriesExceeded';
+export type ClusterJobPhase = 'Pending' | 'Running' | 'Retrying' | 'Succeeded' | 'Failed' | 'MaxRetriesExceeded';
 
 export interface ClusterJob {
   providerName: string; // Provider that owns this cluster (e.g., 'krkn-operator', 'krkn-operator-acm')
   clusterName: string;
   jobId: string; // UUID - still exists but secondary
+  attemptHistory?: { jobId: string; scenarioImage?: string }[];
   podName: string;
   phase: ClusterJobPhase;
   startTime?: string;
@@ -370,6 +406,8 @@ export interface ReportStatus {
 
 export interface ScenarioRunStatusResponse {
   scenarioRunName: string;
+  rollbackEnabled?: boolean;
+  isRollback?: boolean; // Derived by the operator from spec.rollbackSource
   scenarioName?: string; // Optional - backend may include it in the future
   phase: ScenarioRunPhase;
   totalTargets: number;
@@ -388,9 +426,19 @@ export interface ScenarioRunStatusResponse {
   reportStatus?: ReportStatus;
 }
 
+export interface RollbackAvailability {
+  jobId: string;
+  state: 'checking' | 'available' | 'absent' | 'unavailable' | 'running' | 'succeeded' | 'failed' | 'error';
+  canExecute?: boolean;
+  rollbackRunName?: string;
+  message?: string;
+}
+
 // Internal state for tracking scenario runs
 export interface ScenarioRunState {
   scenarioRunName: string;
+  rollbackEnabled?: boolean;
+  isRollback?: boolean;
   scenarioName: string; // For display purposes
   phase: ScenarioRunPhase;
   totalTargets: number;
@@ -543,6 +591,8 @@ export interface AppState {
   rerunScenario: ScenarioReference | null;
   rerunKubeconfigPath: string | null;
   rerunCloudCredentialRef: string | null;
+  rerunWorkspace: WorkspaceReference | null;
+  rerunRollbackEnabled: boolean;
 
   // Error handling
   error: AppError | null;
@@ -793,6 +843,8 @@ export interface AvailableRegistriesResponse {
  * Compatible with krknctl ScenarioNode structure
  */
 export interface GraphScenarioNode {
+  workspace?: WorkspaceReference;
+  rollbackEnabled?: boolean;
   /** Optional comment describing the scenario */
   _comment?: string;
   /** Registry-independent scenario identity sent to the operator. */
@@ -1123,6 +1175,9 @@ export interface StudioNode {
     globalFormValues?: ScenarioFormValues;
     /** Global touched fields (tracks which global fields were modified) */
     globalTouchedFields?: TouchedFields;
+    /** Workspace selected for this scenario node. */
+    workspace?: WorkspaceReference;
+    rollbackEnabled?: boolean;
     /** Volume mounts (mock dropdown for now) */
     volumes?: { [key: string]: string };
     /** File mounts (mock dropdown for now) */

@@ -40,6 +40,7 @@ import {
 } from '@patternfly/react-core';
 import {
   HourglassHalfIcon,
+  HistoryIcon,
   SyncAltIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -78,6 +79,8 @@ import type {
 } from '../types/api';
 
 const GRAPH_RUN_TERMINAL_PHASES: GraphRunListItem['phase'][] = ['Completed', 'Failed', 'PartiallyFailed'];
+// Older operators omit isRollback; pair their generated run name with the reserved workload tag.
+const GENERATED_ROLLBACK_RUN_NAME = /^krkn-rollback-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-[1-9][0-9]*)?$/i;
 
 export type UnifiedRunItem =
   | {
@@ -138,6 +141,8 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
       categories: item.categories || [],
       run: {
         scenarioRunName: sr.scenarioRunName,
+        rollbackEnabled: sr.rollbackEnabled,
+        isRollback: sr.isRollback,
         scenarioName: sr.scenarioName || '',
         phase: sr.phase,
         totalTargets: sr.totalTargets,
@@ -552,6 +557,7 @@ export function JobsList({
     runId,
     runPhase,
     replayJobs,
+    rollbackEnabled,
     isReplayJobsLoading,
     onOpenReplayJobs,
     onReplayScenario,
@@ -567,6 +573,7 @@ export function JobsList({
     runId?: string;
     runPhase?: string;
     replayJobs?: ClusterJob[];
+    rollbackEnabled?: boolean;
     isReplayJobsLoading?: boolean;
     onOpenReplayJobs?: () => void;
     onReplayScenario?: (jobId: string) => void;
@@ -594,6 +601,7 @@ export function JobsList({
         onToggleCategory={onToggleCategory}
         onDelete={onDelete}
         replayJobs={replayJobs}
+        rollbackEnabled={rollbackEnabled}
         isReplayJobsLoading={isReplayJobsLoading}
         onOpenReplayJobs={onOpenReplayJobs}
         onReplayScenario={onReplayScenario}
@@ -1083,12 +1091,13 @@ export function JobsList({
               const listedRun = item.run;
               const contextRun = scenarioRunDetailsByName.get(listedRun.scenarioRunName);
               const run = listedRun.clusterJobs.length === 0 && contextRun
-                ? { ...listedRun, ...contextRun, clusterJobs: contextRun.clusterJobs ?? [] }
-                : listedRun;
+                ? { ...listedRun, ...contextRun, rollbackEnabled: listedRun.rollbackEnabled ?? contextRun.rollbackEnabled, isRollback: listedRun.isRollback ?? contextRun.isRollback, clusterJobs: contextRun.clusterJobs ?? [] }
+                : { ...listedRun, rollbackEnabled: listedRun.rollbackEnabled ?? contextRun?.rollbackEnabled, isRollback: listedRun.isRollback ?? contextRun?.isRollback };
               const customRunName = run.customRunName?.trim();
               const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
+              const isRollback = run.isRollback ?? (run.scenarioName === 'workload-rollback' && GENERATED_ROLLBACK_RUN_NAME.test(run.scenarioRunName));
               const scenarioCategoryKey = runCategoryKey('scenario-runs', run.scenarioRunName);
               const scenarioCategoryNames = categoryOverrides[scenarioCategoryKey] ?? item.categories;
               const scenarioCategories = getRunCategories('scenario-runs', run.scenarioRunName, item.categories);
@@ -1121,15 +1130,17 @@ export function JobsList({
                           <div>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <strong>
-                                <HiOutlineRocketLaunch style={{ marginRight: '0.25rem' }} />
-                                Scenario:
+                                {isRollback
+                                  ? <HistoryIcon aria-hidden="true" style={{ marginRight: '0.25rem' }} />
+                                  : <HiOutlineRocketLaunch style={{ marginRight: '0.25rem' }} />}
+                                {isRollback ? 'Rollback:' : 'Scenario:'}
                               </strong>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <Tooltip content={`Run ID: ${scenarioRunName}`}>
                                 <code
                                   className="jobs-list-run-primary-value"
-                                  aria-label={`Scenario ${run.scenarioName}; run ID ${scenarioRunName}`}
+                                  aria-label={`${isRollback ? 'Rollback' : 'Scenario'} ${run.scenarioName}; run ID ${scenarioRunName}`}
                                   style={{
                                     fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
                                     fontSize: 'var(--pf-v5-global--FontSize--sm)',
@@ -1326,6 +1337,7 @@ export function JobsList({
                       runId: run.scenarioRunName,
                       runPhase: run.phase,
                       replayJobs: run.clusterJobs,
+                      rollbackEnabled: run.rollbackEnabled,
                       isReplayJobsLoading: loadingRunDetails.has(run.scenarioRunName),
                       onOpenReplayJobs: () => {
                         if (run.clusterJobs.length === 0) onLoadRunDetails?.(run);

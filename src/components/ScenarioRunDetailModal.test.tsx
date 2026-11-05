@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetScenarioRunStatus = vi.fn();
+const mockGetRollbackAvailability = vi.fn();
 
 vi.mock('../services/operatorApi', () => ({
   operatorApi: {
     getScenarioRunStatus: (...args: unknown[]) => mockGetScenarioRunStatus(...args),
+    getRollbackAvailability: (...args: unknown[]) => mockGetRollbackAvailability(...args),
   },
 }));
 
@@ -39,6 +41,7 @@ describe('ScenarioRunDetailModal report controls', () => {
       runningJobs: 0,
       clusterJobs: [],
     });
+    mockGetRollbackAvailability.mockResolvedValue({ jobId: 'job-rollback', state: 'available', canExecute: true });
   });
 
   it('renders report controls with the loaded run identity and phase', async () => {
@@ -112,5 +115,19 @@ describe('ScenarioRunDetailModal report controls', () => {
 
     expect(screen.getByText('Job failure reason')).toBeInTheDocument();
     expect(screen.getByTestId('log-viewer')).toBeInTheDocument();
+  });
+
+  it('shows rollback for a failed run only when inspection finds files', async () => {
+    mockGetScenarioRunStatus.mockResolvedValueOnce({
+      scenarioRunName: 'scenario-run-001', scenarioName: 'pod-disruption', rollbackEnabled: true,
+      phase: 'Failed', totalTargets: 1, successfulJobs: 0, failedJobs: 1, runningJobs: 0,
+      clusterJobs: [{ providerName: 'local', clusterName: 'cluster-1', jobId: 'job-rollback', podName: 'pod-1', phase: 'Failed' }],
+    });
+    const user = userEvent.setup();
+    render(<ScenarioRunDetailModal scenarioRunName="scenario-run-001" isOpen onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Cluster Jobs')).toBeInTheDocument());
+    await user.click(document.getElementById('toggle-job-job-rollback')!);
+    expect(await screen.findByRole('button', { name: 'Rollback attempt job-roll' })).toBeVisible();
+    expect(mockGetRollbackAvailability).toHaveBeenCalledWith('scenario-run-001', 'job-rollback');
   });
 });

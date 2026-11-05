@@ -50,6 +50,8 @@ describe('RegistrySelector', () => {
     rerunScenario: null,
     rerunKubeconfigPath: null,
     rerunCloudCredentialRef: null,
+    rerunWorkspace: null,
+    rerunRollbackEnabled: false,
     notifications: [],
   };
 

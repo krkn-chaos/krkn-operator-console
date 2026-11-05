@@ -15,6 +15,7 @@ import {
 } from '@patternfly/react-core';
 import { EllipsisVIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
+import { RollbackConfirmation, RollbackMenuAction, type RollbackAttempt } from './RollbackMenuAction';
 import type { CategoryResponse, ClusterJob } from '../types/api';
 
 interface RunCategoryActionsProps {
@@ -33,6 +34,7 @@ interface RunCategoryActionsProps {
   /** Used to stop polling once the run completes. */
   runPhase?: string;
   replayJobs?: ClusterJob[];
+  rollbackEnabled?: boolean;
   isReplayJobsLoading?: boolean;
   onOpenReplayJobs?: () => void;
   onReplayScenario?: (jobId: string) => void;
@@ -71,6 +73,7 @@ export function RunCategoryActions({
   runId,
   runPhase,
   replayJobs = [],
+  rollbackEnabled = false,
   isReplayJobsLoading = false,
   onOpenReplayJobs,
   onReplayScenario,
@@ -78,6 +81,7 @@ export function RunCategoryActions({
   isWorkflowReplayDisabled = false,
 }: RunCategoryActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [confirmRollback, setConfirmRollback] = useState<RollbackAttempt | null>(null);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
   const hasLoadedReplayJobsForOpenMenu = useRef(false);
 
@@ -85,6 +89,10 @@ export function RunCategoryActions({
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
+    if (open && runId && rollbackEnabled && replayJobs.length === 0 && !hasLoadedReplayJobsForOpenMenu.current) {
+      hasLoadedReplayJobsForOpenMenu.current = true;
+      onOpenReplayJobs?.();
+    }
     if (!open) {
       hasLoadedCategoriesForOpenMenu.current = false;
       hasLoadedReplayJobsForOpenMenu.current = false;
@@ -168,6 +176,19 @@ export function RunCategoryActions({
             >
               Replay
             </DropdownItem>
+          )}
+          {runId && (
+            <RollbackMenuAction
+              runName={runName}
+              rollbackEnabled={rollbackEnabled}
+              jobs={replayJobs}
+              isJobsLoading={isReplayJobsLoading}
+              isMenuOpen={isOpen}
+              onConfirm={(attempt) => {
+                setConfirmRollback(attempt);
+                handleOpenChange(false);
+              }}
+            />
           )}
           {onReplayWorkflow && (
             <DropdownItem
@@ -293,6 +314,13 @@ export function RunCategoryActions({
           </DropdownItem>
         </DropdownList>
       </Dropdown>
+      {runId && (
+        <RollbackConfirmation
+          runName={runName}
+          attempt={confirmRollback}
+          onClose={() => setConfirmRollback(null)}
+        />
+      )}
       {report.preview && (
         <Modal
           title={report.preview.format.toUpperCase() + ' report preview'}
