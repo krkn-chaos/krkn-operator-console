@@ -356,7 +356,7 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
                           {hasJobDetails && (
                             <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
                               <JobDiagnosticAlert job={job} />
-                              {run.rollbackEnabled && !['Pending', 'Running'].includes(job.phase) && (
+                              {run.rollbackEnabled && !['Pending', 'Running', 'Retrying'].includes(job.phase) && (
                                 <FlexItem><RollbackActions scenarioRunName={run.scenarioRunName} job={job} /></FlexItem>
                               )}
                               {/* Job Metadata */}

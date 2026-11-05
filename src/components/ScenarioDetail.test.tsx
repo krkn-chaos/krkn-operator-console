@@ -848,6 +848,24 @@ describe('ScenarioDetail', () => {
       ));
     });
 
+    it('hydrates workspace and rollback after replay details arrive', async () => {
+      const user = userEvent.setup();
+      const workspace = { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' };
+      vi.mocked(operatorApi.runScenario).mockResolvedValue(mockCreateResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockActiveRuns);
+      const view = renderWithContext({ phase: 'loading_scenario_detail', scenarioDetail: null });
+      view.rerender(
+        <AppContext.Provider value={{ state: { ...baseState, rerunWorkspace: workspace, rerunRollbackEnabled: true }, dispatch: mockDispatch }}>
+          <ScenarioDetail scenarioName="pod-scenarios" registryConfig={null} />
+        </AppContext.Provider>,
+      );
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ workspace, rollbackEnabled: true }),
+      ));
+    });
+
     it('preserves the declared mount path for a touched global file parameter', async () => {
       const user = userEvent.setup();
       const resiliencyFile = new File(['slo: {}'], 'resiliency.yaml', { type: 'application/yaml' });
