@@ -43,7 +43,7 @@ export function WorkspaceSelector({ value, onChange, id }: WorkspaceSelectorProp
           <FormSelect id={id} value={value?.name ?? ''} onChange={(_event, selected) => onChange(selected ? { name: selected } : undefined)} aria-label="Workspace">
             <FormSelectOption value="" label="No workspace" />
             {!selectedAvailable && <FormSelectOption value={value?.name ?? ''} label={`${value?.name} (saved; unavailable)`} isDisabled />}
-            {workspaces.map((workspace) => <FormSelectOption key={workspace.name} value={workspace.name} label={workspace.displayName || workspace.name} />)}
+            {workspaces.map((workspace) => <FormSelectOption key={workspace.name} value={workspace.name} label={workspace.name} />)}
           </FormSelect>
           {value?.workspaceUid && <Button variant="link" onClick={() => onChange({ name: value.name })}>Use current binding instead of saved binding</Button>}
         </>

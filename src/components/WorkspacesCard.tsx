@@ -30,7 +30,6 @@ export function WorkspacesCard() {
   const [eligiblePVCs, setEligiblePVCs] = useState<WorkspacePVC[]>([]);
   const [pvcLoading, setPVCLoading] = useState(false);
   const [pvcError, setPVCError] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState('');
   const [visibility, setVisibility] = useState<'private' | 'public' | 'group'>('private');
   const [group, setGroup] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -68,7 +67,6 @@ export function WorkspacesCard() {
     setEditing(workspace ?? null);
     setName(workspace?.name ?? '');
     setClaimName(workspace?.claimName ?? '');
-    setDisplayName(workspace?.displayName ?? '');
     setVisibility(workspace?.availableToAll ? 'public' : workspace?.groups?.length ? 'group' : 'private');
     setGroup(workspace?.groups?.[0] ?? '');
     setFormError(null);
@@ -106,7 +104,6 @@ export function WorkspacesCard() {
     }
     const request: WorkspacePublishRequest = {
       claimName: claim,
-      displayName: displayName.trim(),
       availableToAll: visibility === 'public',
       groups: visibility === 'group' ? [group] : [],
     };
@@ -171,7 +168,7 @@ export function WorkspacesCard() {
             <Thead><Tr><Th>Name</Th><Th>PVC</Th><Th>Visibility</Th><Th>Status</Th><Th>Actions</Th></Tr></Thead>
             <Tbody>{workspaces.map((workspace) => (
               <Tr key={workspace.name}>
-                <Td dataLabel="Name">{workspace.displayName || workspace.name}<br /><small>{workspace.name}</small></Td>
+                <Td dataLabel="Name">{workspace.name}</Td>
                 <Td dataLabel="PVC">{workspace.claimName}</Td>
                 <Td dataLabel="Visibility">{workspace.availableToAll ? 'Public' : workspace.groups?.length ? `Group: ${workspace.groups[0]}` : 'Admin only'}</Td>
                 <Td dataLabel="Status"><Label color={workspace.available ? 'green' : 'red'}>{workspace.available ? 'Available' : 'Unavailable'}</Label>{workspace.reason && <div>{workspace.reason}</div>}</Td>
@@ -206,9 +203,6 @@ export function WorkspacesCard() {
             )}
           </FormGroup>
           {editing && <Alert variant="info" title="To change the PVC, unpublish this workspace and publish a new one. Existing run bindings will no longer be valid." isInline />}
-          <FormGroup label="Display name" fieldId="workspace-display-name">
-            <TextInput aria-label="Display name" id="workspace-display-name" value={displayName} onChange={(_event, value) => setDisplayName(value)} isDisabled={saving} />
-          </FormGroup>
           <FormGroup label="Visibility" fieldId="workspace-visibility">
             <Radio id="workspace-private" name="workspace-visibility" label="Admin only" isChecked={visibility === 'private'} onChange={() => setVisibility('private')} isDisabled={saving} />
             <Radio id="workspace-public" name="workspace-visibility" label="Public" isChecked={visibility === 'public'} onChange={() => setVisibility('public')} isDisabled={saving} />

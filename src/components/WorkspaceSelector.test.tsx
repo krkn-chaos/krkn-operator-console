@@ -8,7 +8,7 @@ vi.mock('../services/workspacesApi');
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(workspacesApi.listAvailable).mockResolvedValue([{ name: 'current', displayName: 'Current data', availableToAll: true, available: true }]);
+  vi.mocked(workspacesApi.listAvailable).mockResolvedValue([{ name: 'current', availableToAll: true, available: true }]);
 });
 
 describe('WorkspaceSelector', () => {
@@ -16,7 +16,7 @@ describe('WorkspaceSelector', () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<WorkspaceSelector id="workspace" onChange={onChange} />);
-    await screen.findByRole('option', { name: 'Current data' });
+    await screen.findByRole('option', { name: 'current' });
     await user.selectOptions(screen.getByLabelText('Workspace'), 'current');
     expect(onChange).toHaveBeenCalledWith({ name: 'current' });
   });

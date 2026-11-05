@@ -261,7 +261,6 @@ export interface ErrorResponse {
 /** Published PVC wrapper shown in the platform workspace catalog. */
 export interface WorkspaceInfo {
   name: string;
-  displayName?: string;
   claimName?: string;
   groups?: string[];
   availableToAll: boolean;
@@ -277,7 +276,6 @@ export interface WorkspacePVC {
 /** Admin payload for publishing an existing PVC. */
 export interface WorkspacePublishRequest {
   claimName: string;
-  displayName?: string;
   groups?: string[];
   availableToAll?: boolean;
 }
