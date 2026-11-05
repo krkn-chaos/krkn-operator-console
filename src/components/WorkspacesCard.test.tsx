@@ -10,7 +10,7 @@ vi.mock('../services/workspacesApi');
 vi.mock('../services/operatorApi');
 vi.mock('../hooks/useNotifications');
 
-const sample = { name: 'rollback', displayName: 'Rollback files', claimName: 'shared-pvc', groups: ['team-a'], availableToAll: false, available: false, reason: 'PVCMissing' };
+const sample = { name: 'rollback', claimName: 'shared-pvc', groups: ['team-a'], availableToAll: false, available: false, reason: 'PVCMissing' };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -31,6 +31,7 @@ describe('WorkspacesCard', () => {
     await user.click(screen.getByRole('button', { name: 'Edit rollback' }));
     expect(await screen.findByRole('dialog', { name: 'Edit workspace' })).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace name')).toBeDisabled();
+    expect(screen.queryByLabelText('Display name')).not.toBeInTheDocument();
     expect(screen.getByLabelText('PVC name')).toBeDisabled();
     expect(screen.getByLabelText('Access group')).toHaveValue('team-a');
   });
@@ -47,7 +48,7 @@ describe('WorkspacesCard', () => {
     await user.click(screen.getByLabelText('Public'));
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(workspacesApi.save).toHaveBeenCalledWith('shared-data', {
-      claimName: 'krkn-shared-file', displayName: '', availableToAll: true, groups: [],
+      claimName: 'krkn-shared-file', availableToAll: true, groups: [],
     }));
   });
 
