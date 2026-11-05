@@ -237,6 +237,22 @@ describe('JobsList', () => {
     expect(operatorApi.getRollbackAvailability).toHaveBeenCalledWith(contextRun.scenarioRunName, job.jobId);
   });
 
+  it('keeps rollback enablement from the jobs snapshot when detailed jobs arrive without it', async () => {
+    const user = userEvent.setup();
+    const job: ClusterJob = {
+      providerName: 'operator', clusterName: 'cluster-a', jobId: 'attempt-a', podName: 'pod-a', phase: 'Failed',
+    };
+    vi.spyOn(operatorApi, 'getRollbackAvailability').mockResolvedValue({ jobId: job.jobId, state: 'available', canExecute: true });
+    setMockJobs([makeScenarioJobItem('run-a', 'Failed', { rollbackEnabled: true, clusterJobs: [] })]);
+    const detail: ScenarioRunState = {
+      scenarioRunName: 'run-a', scenarioName: 'node-cpu-hog', phase: 'Failed', totalTargets: 1,
+      successfulJobs: 0, failedJobs: 1, runningJobs: 0, clusterJobs: [job], createdAt: '2026-11-04T10:12:44+01:00',
+    };
+    render(<JobsList {...defaultProps} scenarioRunDetails={[detail]} />);
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-a' }));
+    await waitFor(() => expect(operatorApi.getRollbackAvailability).toHaveBeenCalledWith('run-a', job.jobId));
+  });
+
   it('shows logs and the failure reason for an expanded failed job', () => {
     setMockJobs([
       makeScenarioJobItem('run-failed', 'Failed', {

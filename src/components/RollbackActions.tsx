@@ -55,7 +55,7 @@ export function RollbackActions({ scenarioRunName, job }: RollbackActionsProps) 
   const available = attemptIds.filter((id) => availability[id]?.canExecute && (availability[id]?.state === 'available' || availability[id]?.state === 'failed'));
   const checking = attemptIds.some((id) => !availability[id] || availability[id]?.state === 'checking');
   const running = attemptIds.some((id) => availability[id]?.state === 'running');
-  const completed = attemptIds.some((id) => availability[id]?.state === 'absent' && availability[id]?.rollbackRunName);
+  const completed = attemptIds.some((id) => availability[id]?.state === 'succeeded');
   const failures = attemptIds.filter((id) => availability[id]?.state === 'error');
   const unavailable = attemptIds.filter((id) => availability[id]?.state === 'unavailable' ||
     (!availability[id]?.canExecute && ['available', 'failed'].includes(availability[id]?.state ?? '')));

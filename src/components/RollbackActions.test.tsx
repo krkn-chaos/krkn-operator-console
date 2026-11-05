@@ -37,7 +37,7 @@ describe('RollbackActions', () => {
     const { rerender } = render(<RollbackActions scenarioRunName="run-a" job={job} />);
     expect(await screen.findByText('Rollback is running')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Rollback attempt/ })).not.toBeInTheDocument();
-    vi.mocked(operatorApi.getRollbackAvailability).mockResolvedValue({ jobId: 'current-id', state: 'absent', canExecute: true, rollbackRunName: 'rollback-current' });
+    vi.mocked(operatorApi.getRollbackAvailability).mockResolvedValue({ jobId: 'current-id', state: 'succeeded', canExecute: false, rollbackRunName: 'rollback-current' });
     rerender(<RollbackActions scenarioRunName="run-b" job={job} />);
     expect(await screen.findByText('Rollback completed')).toBeVisible();
   });

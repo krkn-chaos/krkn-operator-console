@@ -105,6 +105,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
   const [workspace, setWorkspace] = useState(rerunWorkspace ?? undefined);
   const [rollbackEnabled, setRollbackEnabled] = useState(rerunRollbackEnabled);
+
+  useEffect(() => {
+    setWorkspace(rerunWorkspace ?? undefined);
+    setRollbackEnabled(rerunRollbackEnabled);
+  }, [rerunWorkspace, rerunRollbackEnabled]);
   const [fileReferences, setFileReferences] = useState<import('../types/api').FileReference[]>([]);
   const [availableFiles, setAvailableFiles] = useState<import('../types/api').FileInfo[]>([]);
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);

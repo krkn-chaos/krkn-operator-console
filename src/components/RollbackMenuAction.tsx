@@ -5,7 +5,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { operatorApi } from '../services/operatorApi';
 import type { ClusterJob, RollbackAvailability } from '../types/api';
 
-interface RollbackAttempt {
+export interface RollbackAttempt {
   job: ClusterJob;
   jobId: string;
 }
@@ -16,7 +16,7 @@ interface RollbackMenuActionProps {
   jobs: ClusterJob[];
   isJobsLoading: boolean;
   isMenuOpen: boolean;
-  onCloseMenu: () => void;
+  onConfirm: (attempt: RollbackAttempt) => void;
 }
 
 function canExecuteRollback(result?: RollbackAvailability): boolean {
@@ -33,12 +33,11 @@ function unavailableReason(result?: RollbackAvailability): string {
 }
 
 /** Offers per-attempt rollback from the run overflow menu after checking retained files. */
-export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoading, isMenuOpen, onCloseMenu }: RollbackMenuActionProps) {
-  const { showSuccess, showError } = useNotifications();
+export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoading, isMenuOpen, onConfirm }: RollbackMenuActionProps) {
   const attempts = useMemo(() => {
     const found = new Map<string, RollbackAttempt>();
     for (const job of jobs) {
-      if (job.phase === 'Pending' || job.phase === 'Running') continue;
+      if (job.phase === 'Pending' || job.phase === 'Running' || job.phase === 'Retrying') continue;
       for (const jobId of [job.jobId, ...(job.attemptHistory ?? []).map((attempt) => attempt.jobId)]) {
         if (jobId && !found.has(jobId)) found.set(jobId, { job, jobId });
       }
@@ -46,9 +45,6 @@ export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoadi
     return [...found.values()];
   }, [jobs]);
   const [availability, setAvailability] = useState<Record<string, RollbackAvailability>>({});
-  const [confirmAttempt, setConfirmAttempt] = useState<RollbackAttempt | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -82,34 +78,7 @@ export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoadi
     else reason = unavailableReason(availability[attempts[0].jobId]);
   }
 
-  const startRollback = async () => {
-    if (!confirmAttempt) return;
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const result = await operatorApi.startRollback(runName, confirmAttempt.jobId);
-      setAvailability((current) => ({ ...current, [confirmAttempt.jobId]: result }));
-      showSuccess('Rollback started', `${confirmAttempt.job.providerName}/${confirmAttempt.job.clusterName}`);
-      setConfirmAttempt(null);
-      onCloseMenu();
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'Rollback could not be started';
-      setSubmitError(message);
-      showError('Rollback failed to start', message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const closeConfirmation = () => {
-    if (submitting) return;
-    setConfirmAttempt(null);
-    setSubmitError(null);
-    onCloseMenu();
-  };
-
   return (
-    <>
       <DropdownItem
         key="rollback"
         icon={reason === 'Checking rollback files…' ? <Spinner size="sm" /> : <HistoryIcon />}
@@ -117,8 +86,7 @@ export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoadi
         tooltipProps={reason ? { content: reason } : undefined}
         onClick={() => {
           if (executable.length !== 1) return;
-          setSubmitError(null);
-          setConfirmAttempt(executable[0]);
+          onConfirm(executable[0]);
         }}
         flyoutMenu={reason || executable.length === 1 ? undefined : (
           <Menu id={`rollback-attempts-${runName}`}>
@@ -133,8 +101,7 @@ export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoadi
                       isAriaDisabled={disabled}
                       tooltipProps={disabled ? { content: unavailableReason(result) } : undefined}
                       onClick={() => {
-                        setSubmitError(null);
-                        setConfirmAttempt(attempt);
+                        if (!disabled) onConfirm(attempt);
                       }}
                     >
                       {attempt.job.providerName}/{attempt.job.clusterName} · {attempt.jobId.slice(0, 8)}
@@ -148,19 +115,51 @@ export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoadi
       >
         Rollback
       </DropdownItem>
+  );
+}
+
+/** Keeps confirmation mounted independently of the overflow dropdown. */
+export function RollbackConfirmation({ runName, attempt, onClose }: { runName: string; attempt: RollbackAttempt | null; onClose: () => void }) {
+  const { showSuccess, showError } = useNotifications();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const close = () => {
+    if (submitting) return;
+    setSubmitError(null);
+    onClose();
+  };
+
+  const startRollback = async () => {
+    if (!attempt) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await operatorApi.startRollback(runName, attempt.jobId);
+      showSuccess('Rollback started', `${attempt.job.providerName}/${attempt.job.clusterName}`);
+      onClose();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Rollback could not be started';
+      setSubmitError(message);
+      showError('Rollback failed to start', message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
       <Modal
         variant={ModalVariant.small}
         title="Confirm rollback"
-        isOpen={confirmAttempt !== null}
-        onClose={closeConfirmation}
+        isOpen={attempt !== null}
+        onClose={close}
         actions={[
           <Button key="rollback" variant="danger" isLoading={submitting} isDisabled={submitting} onClick={() => { void startRollback(); }}>Execute rollback</Button>,
-          <Button key="cancel" variant="link" isDisabled={submitting} onClick={closeConfirmation}>Cancel</Button>,
+          <Button key="cancel" variant="link" isDisabled={submitting} onClick={close}>Cancel</Button>,
         ]}
       >
-        {confirmAttempt && <p>Run rollback for {confirmAttempt.job.providerName}/{confirmAttempt.job.clusterName}, attempt {confirmAttempt.jobId.slice(0, 8)}?</p>}
+        {attempt && <p>Run rollback for {attempt.job.providerName}/{attempt.job.clusterName}, attempt {attempt.jobId.slice(0, 8)}?</p>}
         {submitError && <Alert variant="danger" isInline title={submitError} />}
       </Modal>
-    </>
   );
 }

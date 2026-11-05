@@ -15,7 +15,7 @@ import {
 } from '@patternfly/react-core';
 import { EllipsisVIcon, DownloadIcon, ExclamationCircleIcon, FileAltIcon, FileCodeIcon, FilePdfIcon, RedoIcon, SearchIcon, TagIcon, TrashIcon } from '@patternfly/react-icons';
 import { useReportActions } from '../hooks/useReportActions';
-import { RollbackMenuAction } from './RollbackMenuAction';
+import { RollbackConfirmation, RollbackMenuAction, type RollbackAttempt } from './RollbackMenuAction';
 import type { CategoryResponse, ClusterJob } from '../types/api';
 
 interface RunCategoryActionsProps {
@@ -81,6 +81,7 @@ export function RunCategoryActions({
   isWorkflowReplayDisabled = false,
 }: RunCategoryActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [confirmRollback, setConfirmRollback] = useState<RollbackAttempt | null>(null);
   const hasLoadedCategoriesForOpenMenu = useRef(false);
   const hasLoadedReplayJobsForOpenMenu = useRef(false);
 
@@ -183,7 +184,10 @@ export function RunCategoryActions({
               jobs={replayJobs}
               isJobsLoading={isReplayJobsLoading}
               isMenuOpen={isOpen}
-              onCloseMenu={() => handleOpenChange(false)}
+              onConfirm={(attempt) => {
+                setConfirmRollback(attempt);
+                handleOpenChange(false);
+              }}
             />
           )}
           {onReplayWorkflow && (
@@ -310,6 +314,13 @@ export function RunCategoryActions({
           </DropdownItem>
         </DropdownList>
       </Dropdown>
+      {runId && (
+        <RollbackConfirmation
+          runName={runName}
+          attempt={confirmRollback}
+          onClose={() => setConfirmRollback(null)}
+        />
+      )}
       {report.preview && (
         <Modal
           title={report.preview.format.toUpperCase() + ' report preview'}
