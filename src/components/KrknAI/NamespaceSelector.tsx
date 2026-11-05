@@ -6,6 +6,7 @@ interface NamespaceSelectorProps {
   selectedNamespaces: string[];
   loading: boolean;
   error: string | null;
+  disabled?: boolean;
   onToggle: (namespace: string, enabled: boolean) => void;
   onSelectAll: () => void;
   onClear: () => void;
@@ -21,6 +22,7 @@ export function NamespaceSelector({
   onSelectAll,
   onClear,
   onRetry,
+  disabled = false,
 }: NamespaceSelectorProps) {
   return (
     <Card className="krkn-ai-namespace-selector">
@@ -47,11 +49,11 @@ export function NamespaceSelector({
             <div className="krkn-ai-namespace-selector__toolbar">
               <span>{selectedNamespaces.length} of {namespaces.length} selected</span>
               <div>
-                <Button variant="link" isDisabled={loading} onClick={onSelectAll}>Select all</Button>
-                <Button variant="link" isDisabled={loading || selectedNamespaces.length === 0} onClick={onClear}>Clear</Button>
+                <Button variant="link" isDisabled={loading || disabled} onClick={onSelectAll}>Select all</Button>
+                <Button variant="link" isDisabled={loading || disabled || selectedNamespaces.length === 0} onClick={onClear}>Clear</Button>
               </div>
             </div>
-            <fieldset className="krkn-ai-namespace-selector__list" disabled={loading}>
+            <fieldset className="krkn-ai-namespace-selector__list" disabled={loading || disabled}>
               <legend>Available namespaces</legend>
               {namespaces.map((namespace) => (
                 <Checkbox

@@ -656,6 +656,78 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(await screen.findByRole('heading', { name: 'real-run-1' })).toBeInTheDocument();
   }, 15_000);
 
+  it('locks namespace selection and prevents repeat discovery while generation is pending', async () => {
+    const user = userEvent.setup();
+    let resolveDiscovery!: (response: { configYaml: string; warnings: string[] }) => void;
+    mocks.ai.discover.mockReturnValue(new Promise((resolve) => { resolveDiscovery = resolve; }));
+    render(<KrknAIPage />);
+    await flushReact();
+    await user.click(screen.getByRole('button', { name: 'Create run' }));
+    await user.type(screen.getByRole('textbox', { name: 'Run name' }), 'pending-discovery');
+    const namespace = await screen.findByRole('checkbox', { name: 'shop' });
+    await user.click(namespace);
+    const discover = screen.getByRole('button', { name: 'Discover components' });
+    await waitFor(() => expect(discover).toBeEnabled());
+
+    await user.click(discover);
+
+    expect(mocks.ai.discover).toHaveBeenCalledTimes(1);
+    expect(namespace).toBeDisabled();
+    const generating = screen.getByRole('button', { name: /Discovering/ });
+    expect(generating).toBeDisabled();
+    await user.click(namespace);
+    await user.click(generating);
+
+    await act(async () => {
+      resolveDiscovery({ configYaml: DISCOVERED_YAML, warnings: [] });
+    });
+    expect(await screen.findByRole('button', { name: /Review YAML/ })).toBeInTheDocument();
+  });
+
+  it('shows the component-discovery deadline as a retryable failure', async () => {
+    const user = userEvent.setup();
+    const timeoutMessage = 'Component discovery timed out after 390 seconds. Check cluster/operator availability, then retry discovery.';
+    mocks.ai.discover.mockRejectedValueOnce(new Error(timeoutMessage));
+    render(<KrknAIPage />);
+    await flushReact();
+    await user.click(screen.getByRole('button', { name: 'Create run' }));
+    await user.type(screen.getByRole('textbox', { name: 'Run name' }), 'timed-out-discovery');
+    await user.click(await screen.findByRole('checkbox', { name: 'shop' }));
+    const discover = screen.getByRole('button', { name: 'Discover components' });
+    await waitFor(() => expect(discover).toBeEnabled());
+    await user.click(discover);
+
+    expect(await screen.findByText(timeoutMessage)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Krkn AI discovery failed/ })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'shop' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Discover components' })).toBeEnabled();
+  });
+
+  it('ignores discovery errors caused by caller cancellation', async () => {
+    const user = userEvent.setup();
+    mocks.ai.discover.mockImplementation((_request: unknown, options: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new DOMException('Discovery cancelled', 'AbortError')), { once: true });
+    }));
+    render(<KrknAIPage />);
+    await flushReact();
+    await user.click(screen.getByRole('button', { name: 'Create run' }));
+    const runName = screen.getByRole('textbox', { name: 'Run name' });
+    await user.type(runName, 'cancelled-discovery');
+    await user.click(await screen.findByRole('checkbox', { name: 'shop' }));
+    const discover = screen.getByRole('button', { name: 'Discover components' });
+    await waitFor(() => expect(discover).toBeEnabled());
+    await user.click(discover);
+    expect(screen.getByRole('checkbox', { name: 'shop' })).toBeDisabled();
+
+    await user.type(runName, '-edited');
+
+    const discoverySignal = mocks.ai.discover.mock.calls[0][1].signal;
+    expect(discoverySignal.aborted).toBe(true);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'shop' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Discover components' })).toBeEnabled();
+  });
+
   it.each(['discovery', 'previous'])(
     'starts composition at zero for a %s configuration without resetting manual edits',
     async (source) => {

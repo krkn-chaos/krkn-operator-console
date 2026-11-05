@@ -98,3 +98,78 @@ describe('krknAiApi.getStatus', () => {
     );
   });
 });
+
+describe('krknAiApi.discover deadline', () => {
+  const originalFetch = global.fetch;
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockFetch.mockReset();
+    global.fetch = mockFetch as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    global.fetch = originalFetch;
+  });
+
+  it('reports a discovery-specific timeout and clears its timer', async () => {
+    let requestSignal: AbortSignal | undefined;
+    mockFetch.mockImplementation((_input: RequestInfo | URL, init?: RequestInit) => new Promise((_resolve, reject) => {
+      const signal = init?.signal as AbortSignal;
+      requestSignal = signal;
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+
+    const pending = krknAiApi.discover({ targetRequestId: 'target-1', targetClusters: {}, namespacePattern: 'shop' });
+    const timeoutAssertion = expect(pending).rejects.toMatchObject({ name: 'Error' });
+    await vi.runOnlyPendingTimersAsync();
+
+    await timeoutAssertion;
+    expect(requestSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('clears its timer after a successful response', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ configYaml: 'configuration', warnings: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    await expect(krknAiApi.discover({ targetRequestId: 'target-1', targetClusters: {}, namespacePattern: 'shop' }))
+      .resolves.toEqual({ configYaml: 'configuration', warnings: [] });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('clears its timer after an HTTP error', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Discovery unavailable' }), {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    await expect(krknAiApi.discover({ targetRequestId: 'target-1', targetClusters: {}, namespacePattern: 'shop' }))
+      .rejects.toMatchObject({ message: 'Discovery unavailable', status: 503 });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('propagates caller cancellation and clears its timer', async () => {
+    mockFetch.mockImplementation((_input: RequestInfo | URL, init?: RequestInit) => new Promise((_resolve, reject) => {
+      const signal = init?.signal as AbortSignal;
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+    const caller = new AbortController();
+    const reason = new DOMException('Discovery cancelled', 'AbortError');
+    const removeAbortListener = vi.spyOn(caller.signal, 'removeEventListener');
+    const pending = krknAiApi.discover(
+      { targetRequestId: 'target-1', targetClusters: {}, namespacePattern: 'shop' },
+      { signal: caller.signal },
+    );
+    caller.abort(reason);
+
+    await expect(pending).rejects.toBe(reason);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(removeAbortListener).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
+});

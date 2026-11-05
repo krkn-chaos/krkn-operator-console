@@ -1,6 +1,8 @@
 import { config } from '../config';
 import { BaseApiClient } from '../utils/apiClient';
 
+const COMPONENT_DISCOVERY_TIMEOUT_MS = 390_000;
+
 export interface KrknAIApiRequestOptions {
   signal?: AbortSignal;
 }
@@ -294,12 +296,36 @@ class KrknAIApiClient extends BaseApiClient {
     );
   }
 
-  discover(request: KrknAIDiscoveryRequest, { signal }: KrknAIApiRequestOptions = {}): Promise<KrknAIDiscoveryResponse> {
-    return this.fetchJson<KrknAIDiscoveryResponse>('/krkn-ai/discoveries', {
-      method: 'POST',
-      body: JSON.stringify(request),
-      signal,
-    });
+  async discover(
+    request: KrknAIDiscoveryRequest,
+    { signal }: KrknAIApiRequestOptions = {},
+  ): Promise<KrknAIDiscoveryResponse> {
+    const controller = new AbortController();
+    const deadlineSeconds = Math.ceil(COMPONENT_DISCOVERY_TIMEOUT_MS / 1000);
+    let timedOut = false;
+    const abortFromCaller = () => controller.abort(signal?.reason);
+    if (signal?.aborted) controller.abort(signal.reason);
+    else signal?.addEventListener('abort', abortFromCaller, { once: true });
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, COMPONENT_DISCOVERY_TIMEOUT_MS);
+
+    try {
+      return await this.fetchJson<KrknAIDiscoveryResponse>('/krkn-ai/discoveries', {
+        method: 'POST',
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (timedOut && !signal?.aborted) {
+        throw new Error(`Component discovery timed out after ${deadlineSeconds} second${deadlineSeconds === 1 ? '' : 's'}. Check cluster/operator availability, then retry discovery.`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', abortFromCaller);
+    }
   }
 
   async validateConfig(

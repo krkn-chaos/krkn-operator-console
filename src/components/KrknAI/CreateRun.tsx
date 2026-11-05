@@ -611,6 +611,7 @@ export function CreateRun({
             namespaces={availableNamespaces}
             selectedNamespaces={selectedNamespaces}
             loading={namespaceLoading}
+            disabled={configLoading}
             error={namespaceError}
             onToggle={handleNamespaceToggle}
             onSelectAll={() => setSelectedNamespaces(availableNamespaces)}
