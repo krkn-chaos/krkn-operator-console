@@ -4,6 +4,7 @@ import { CopyIcon, DownloadIcon } from '@patternfly/react-icons';
 import Anser from 'anser';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { websocketService } from '../services/websocketService';
+import { LogTerminal } from './LogTerminal';
 import type { RawMessageHandler } from '../types/websocket';
 
 interface LogViewerProps {
@@ -22,6 +23,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const isFirstMessageRef = useRef<boolean>(true);
+  const hasConnectedRef = useRef(false);
 
   const isPending = status === 'Pending';
   const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'MaxRetriesExceeded' || status === 'Stopped';
@@ -55,10 +57,26 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
     });
   }, []);
 
-  useWebSocket(connectionId, wsUrl, handleRawMessage, {
+  const { connectionState } = useWebSocket(connectionId, wsUrl, handleRawMessage, {
     disabled: isPending,
     subscriptionMode: false,
   });
+
+  useEffect(() => {
+    if (connectionState === 'reconnecting' ||
+      (connectionState === 'connecting' && hasConnectedRef.current)) {
+      isFirstMessageRef.current = true;
+      setLogs(['Reconnecting to log stream...']);
+      return;
+    }
+    if (connectionState === 'connected') {
+      if (hasConnectedRef.current) {
+        isFirstMessageRef.current = true;
+        setLogs([]);
+      }
+      hasConnectedRef.current = true;
+    }
+  }, [connectionState]);
 
 
   const triggerDownload = (content: string, filename: string, mimeType: string) => {
@@ -143,26 +161,6 @@ ${htmlLines.map(line => `<div>${line}</div>`).join('\n')}
     }
   };
 
-  const renderAnsiLog = (log: string, index: number) => {
-    const ansiParsed = Anser.ansiToJson(log, { use_classes: false });
-    return (
-      <div key={index} style={{ margin: 0 }}>
-        {ansiParsed.map((chunk, chunkIndex) => {
-          const style: React.CSSProperties = {
-            color: chunk.fg ? `rgb(${chunk.fg})` : undefined,
-            backgroundColor: chunk.bg ? `rgb(${chunk.bg})` : undefined,
-            fontWeight: chunk.decoration && chunk.decoration.includes('bold') ? 'bold' : undefined,
-            textDecoration: chunk.decoration && chunk.decoration.includes('underline') ? 'underline' : undefined,
-          };
-          return (
-            <span key={chunkIndex} style={style}>
-              {chunk.content}
-            </span>
-          );
-        })}
-      </div>
-    );
-  };
 
   useLayoutEffect(() => {
     if (isFollowing && logsContainerRef.current && logs.length > 0) {
@@ -234,23 +232,7 @@ ${htmlLines.map(line => `<div>${line}</div>`).join('\n')}
           </Flex>
         </CardTitle>
         <CardBody>
-          <div
-            ref={logsContainerRef}
-            style={{
-              backgroundColor: '#000000',
-              color: '#ffffff',
-              fontFamily: 'monospace',
-              fontSize: compact ? '11px' : '12px',
-              padding: compact ? '12px' : '16px',
-              borderRadius: '4px',
-              maxHeight: compact ? '300px' : '500px',
-              overflowY: 'auto',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
-            {logs.map((log, index) => renderAnsiLog(log, index))}
-          </div>
+          <LogTerminal ref={logsContainerRef} logs={logs} compact={compact} ariaLabel="Scenario log output" />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
             <Checkbox
               id={`follow-logs-${jobId}`}

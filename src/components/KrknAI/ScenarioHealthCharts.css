@@ -1,0 +1,110 @@
+.krkn-ai-health-chart__selection {
+  min-width: 0;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 0;
+}
+
+.krkn-ai-health-chart__selection-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.krkn-ai-health-chart__selection-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.krkn-ai-health-chart__selection .krkn-ai-health-chart__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+.krkn-ai-health-chart__selection .pf-v5-c-check__label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.krkn-ai-health-chart__description {
+  margin: 0;
+  color: var(--krkn-ai-muted);
+  font-size: 0.875rem;
+}
+
+.krkn-ai-health-heatmap__legend {
+  margin-block-end: 0.75rem;
+}
+
+.krkn-ai-health-chart__heatmap-scroll {
+  display: grid;
+  grid-template-columns: fit-content(18rem) minmax(0, 1fr);
+  max-height: 30rem;
+  overflow-y: auto;
+  border: 1px solid var(--krkn-ai-border);
+  scrollbar-gutter: stable;
+}
+
+.krkn-ai-health-chart__heatmap-labels {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 0;
+  background: var(--krkn-ai-surface, #fff);
+  border-inline-end: 1px solid var(--krkn-ai-border);
+}
+
+.krkn-ai-health-chart__heatmap-label {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding-inline: 0.5rem;
+}
+
+.krkn-ai-health-chart__heatmap-label span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.krkn-ai-health-chart__heatmap-viewport {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.krkn-ai-health-chart .krkn-ai-health-chart__heatmap-plot {
+  display: block;
+  max-width: none;
+}
+
+.krkn-ai-health-chart__heatmap-sample:focus,
+.krkn-ai-health-chart__response-point:focus {
+  outline: none;
+}
+
+.krkn-ai-health-chart__heatmap-sample:focus rect,
+.krkn-ai-health-chart__response-point:focus {
+  stroke: var(--pf-v5-global--primary-color--100, #0066cc);
+  stroke-width: 3px;
+}
+
+.krkn-ai-health-chart__tooltip {
+  text-align: left;
+  white-space: normal;
+}
+
+
+@media (max-width: 640px) {
+  .krkn-ai-health-chart__heatmap-scroll {
+    grid-template-columns: fit-content(12rem) minmax(0, 1fr);
+  }
+}
+

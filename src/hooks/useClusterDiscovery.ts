@@ -110,22 +110,9 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
 
   const pollIntervalRef = useRef<number | null>(null);
   const pollStartTimeRef = useRef<number | null>(null);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const generationRef = useRef(0);
 
-  /**
-   * Transform ClustersResponse.targetData to TargetResponse[]
-   *
-   * Converts multi-operator format:
-   * {
-   *   "krkn-operator": [{cluster-name, cluster-api-url}],
-   *   "krkn-operator-acm": [...]
-   * }
-   *
-   * To flat array compatible with ClusterPermissionsTable:
-   * [
-   *   {uuid, clusterName, clusterAPIURL, ready: true},
-   *   ...
-   * ]
-   */
   /**
    * Cleanup polling interval
    */
@@ -135,16 +122,35 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
       pollIntervalRef.current = null;
     }
   }, []);
+  const cancelActiveDiscovery = useCallback(() => {
+    generationRef.current++;
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    cleanup();
+  }, [cleanup]);
 
   /**
    * Poll GET /api/v1/targets/{uuid} until ready
    */
   const pollForClusters = useCallback(
-    async (discoveryUuid: string) => {
+    async (discoveryUuid: string, generation: number, controller: AbortController) => {
       let attempt = 0;
       pollStartTimeRef.current = Date.now();
 
+      const isCurrent = () =>
+        generationRef.current === generation && !controller.signal.aborted;
+      const finish = () => {
+        cleanup();
+        if (requestControllerRef.current === controller) {
+          requestControllerRef.current = null;
+        }
+        controller.abort();
+        setIsPolling(false);
+        setIsLoading(false);
+      };
+
       const poll = async (): Promise<boolean> => {
+        if (!isCurrent()) return false;
         attempt++;
 
         // Check timeout
@@ -152,22 +158,26 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
           pollStartTimeRef.current &&
           Date.now() - pollStartTimeRef.current > config.pollTimeout
         ) {
-          cleanup();
-          setIsPolling(false);
-          setIsLoading(false);
           setError('Discovery timeout - please try again');
+          finish();
           return false; // Terminal state - stop polling
         }
 
         try {
-          const status = await operatorApi.getTargetStatus(discoveryUuid);
+          const status = await operatorApi.getTargetStatus(discoveryUuid, {
+            signal: controller.signal,
+          });
+          if (!isCurrent()) return false;
 
           if (status === 200) {
             // Ready - fetch clusters
             cleanup();
 
             try {
-              const response = await operatorApi.getClusters(discoveryUuid);
+              const response = await operatorApi.getClusters(discoveryUuid, {
+                signal: controller.signal,
+              });
+              if (!isCurrent()) return false;
               const transformed = transformDiscoveredClusters(response.targetData);
 
               if (config.debugMode) {
@@ -175,14 +185,13 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
               }
 
               setClusters(transformed);
-              setIsPolling(false);
-              setIsLoading(false);
+              finish();
             } catch (err) {
+              if (!isCurrent()) return false;
               const errorMessage =
                 err instanceof Error ? err.message : 'Failed to fetch clusters';
               setError(errorMessage);
-              setIsPolling(false);
-              setIsLoading(false);
+              finish();
             }
             return false; // Terminal state - stop polling
           } else if (status === 202) {
@@ -194,25 +203,20 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
             }
             return true; // Continue polling
           } else if (status === 404) {
-            cleanup();
             setError('Discovery request not found');
-            setIsPolling(false);
-            setIsLoading(false);
+            finish();
             return false; // Terminal state - stop polling
           } else {
-            cleanup();
             setError(`Unexpected status: ${status}`);
-            setIsPolling(false);
-            setIsLoading(false);
+            finish();
             return false; // Terminal state - stop polling
           }
         } catch (err) {
-          cleanup();
+          if (!isCurrent()) return false;
           const errorMessage =
             err instanceof Error ? err.message : 'Failed to poll discovery status';
           setError(errorMessage);
-          setIsPolling(false);
-          setIsLoading(false);
+          finish();
           return false; // Terminal state - stop polling
         }
       };
@@ -220,8 +224,8 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
       // Start polling immediately
       const shouldContinue = await poll();
 
-      // Only schedule interval if first poll returned 202 (pending)
-      if (shouldContinue) {
+      // Only schedule interval if first poll returned 202 (pending).
+      if (shouldContinue && isCurrent()) {
         pollIntervalRef.current = window.setInterval(poll, config.pollInterval);
       }
     },
@@ -232,32 +236,46 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
    * Start cluster discovery workflow
    */
   const startDiscovery = useCallback(async () => {
+    cleanup();
+    requestControllerRef.current?.abort();
+    const generation = ++generationRef.current;
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+
     setIsLoading(true);
     setIsPolling(false);
     setError(null);
     setClusters(null);
-    cleanup();
+    setDiscoveryUuid(null);
 
     try {
       // Step 1: POST /api/v1/targets to get UUID
-      const response = await operatorApi.createTargetRequest();
+      const response = await operatorApi.createTargetRequest({
+        signal: controller.signal,
+      });
+      if (generationRef.current !== generation || controller.signal.aborted) return;
+      if (!response.uuid) throw new Error('Target request did not return a UUID.');
 
       if (config.debugMode) {
         console.log('[useClusterDiscovery] Created target request:', response.uuid);
       }
 
-      // Store UUID for later cleanup
       setDiscoveryUuid(response.uuid);
       setIsPolling(true);
 
       // Step 2: Poll until ready, then fetch clusters
-      await pollForClusters(response.uuid);
+      await pollForClusters(response.uuid, generation, controller);
     } catch (err) {
+      if (generationRef.current !== generation || controller.signal.aborted) return;
+      cleanup();
+      if (requestControllerRef.current === controller) {
+        requestControllerRef.current = null;
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to start discovery';
       setError(errorMessage);
       setIsLoading(false);
     }
-  }, [pollForClusters, cleanup]);
+  }, [cleanup, pollForClusters]);
 
   /**
    * Retry discovery after error
@@ -270,22 +288,18 @@ export function useClusterDiscovery(): UseClusterDiscoveryResult {
    * Reset all state
    */
   const reset = useCallback(() => {
-    cleanup();
+    cancelActiveDiscovery();
     setClusters(null);
     setDiscoveryUuid(null);
     setIsLoading(false);
     setIsPolling(false);
     setError(null);
-  }, [cleanup]);
+  }, [cancelActiveDiscovery]);
 
   /**
    * Cleanup on unmount
    */
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
+  useEffect(() => cancelActiveDiscovery, [cancelActiveDiscovery]);
 
   return {
     clusters,

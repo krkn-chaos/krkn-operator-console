@@ -59,6 +59,22 @@ class WebSocketService {
   }
 
   /**
+   * Build the authenticated Krkn-AI orchestrator Pod log URL.
+   */
+  buildAiRunLogsUrl(
+    runName: string,
+    follow: boolean,
+    tailLines?: number,
+    timestamps = false,
+  ): string {
+    const params = new URLSearchParams({ follow: String(follow) });
+    if (tailLines !== undefined) params.set('tailLines', String(tailLines));
+    if (timestamps) params.set('timestamps', 'true');
+    const path = `/api/v2/ws/krkn-ai/runs/${encodeURIComponent(runName)}/logs`;
+    return this.buildUrl(`${path}?${params.toString()}`);
+  }
+
+  /**
    * Open a WebSocket connection (or increment refCount if already open).
    *
    * @param connectionId - Unique key for this connection (e.g. 'runs', or `logs-${jobId}`)
