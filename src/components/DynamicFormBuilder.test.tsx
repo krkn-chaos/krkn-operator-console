@@ -38,6 +38,42 @@ function makeBooleanField(
 }
 
 describe('DynamicFormBuilder', () => {
+  it('keeps a regex default editable while offering namespace suggestions', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const field = { ...makeStringField('NAMESPACE', 'Target namespace'), default: 'openshift-.*' };
+
+    render(
+      <DynamicFormBuilder
+        fields={[field]}
+        values={{ NAMESPACE: 'openshift-.*' }}
+        onChange={onChange}
+        clusterOptions={{ NAMESPACE: { options: ['default', 'openshift-monitoring'], status: 'ready' } }}
+      />,
+    );
+
+    expect(screen.getByRole('combobox', { name: 'Target namespace' })).toHaveValue('openshift-.*');
+    await user.click(screen.getByRole('button', { name: 'Show Target namespace options' }));
+    await user.click(screen.getByText('default'));
+    expect(onChange).toHaveBeenCalledWith({ NAMESPACE: 'default' });
+  });
+
+  it('appends a selected node to a comma-separated node name field', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <DynamicFormBuilder
+        fields={[makeStringField('NODE_NAME', 'Node name')]}
+        values={{ NODE_NAME: 'worker-1' }}
+        onChange={onChange}
+        clusterOptions={{ NODE_NAME: { options: ['worker-2'], status: 'ready', selectionMode: 'comma' } }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Show Node name options' }));
+    await user.click(screen.getByText('worker-2'));
+    expect(onChange).toHaveBeenCalledWith({ NODE_NAME: 'worker-1,worker-2' });
+  });
+
   describe('group rendering', () => {
     it('should render group headers with title and description', () => {
       const fields: ScenarioField[] = [
