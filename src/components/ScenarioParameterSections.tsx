@@ -13,10 +13,15 @@ import {
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
+import type { ClusterFieldOptionState } from './ClusterOptionInput';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, ElasticsearchConfig, CloudCredential } from '../types/api';
 import { getCloudDisabledFields, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
 
 interface ScenarioParameterSectionsProps {
+  scenarioClusterOptions?: Record<string, ClusterFieldOptionState>;
+  globalClusterOptions?: Record<string, ClusterFieldOptionState>;
+  onScenarioClusterOptionsOpen?: (variable: string) => void;
+  onGlobalClusterOptionsOpen?: (variable: string) => void;
   optionalFields: ScenarioField[];
   formValues: ScenarioFormValues;
   onFormChange: (values: ScenarioFormValues) => void;
@@ -46,6 +51,10 @@ interface ScenarioParameterSectionsProps {
 }
 
 export function ScenarioParameterSections({
+  scenarioClusterOptions,
+  globalClusterOptions,
+  onScenarioClusterOptionsOpen,
+  onGlobalClusterOptionsOpen,
   optionalFields,
   formValues,
   onFormChange,
@@ -149,6 +158,8 @@ export function ScenarioParameterSections({
                   values={formValues}
                   onChange={onFormChange}
                   disabledFields={cloudDisabledFields}
+                  clusterOptions={scenarioClusterOptions}
+                  onClusterOptionsOpen={onScenarioClusterOptionsOpen}
                 />
               ) : (
                 <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--pf-v5-global--Color--200)' }}>
@@ -220,6 +231,8 @@ export function ScenarioParameterSections({
                     touchedFields={globalTouchedFields}
                     onChange={onGlobalFormChange}
                     disabledFields={disabledFields}
+                    clusterOptions={globalClusterOptions}
+                    onClusterOptionsOpen={onGlobalClusterOptionsOpen}
                   />
                 </CardBody>
               </Card>
@@ -234,6 +247,8 @@ export function ScenarioParameterSections({
                     touchedFields={globalTouchedFields}
                     onChange={onGlobalFormChange}
                     disabledFields={disabledFields}
+                    clusterOptions={globalClusterOptions}
+                    onClusterOptionsOpen={onGlobalClusterOptionsOpen}
                   />
                 </CardBody>
               </Card>

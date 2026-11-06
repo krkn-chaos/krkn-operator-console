@@ -17,6 +17,7 @@ import {
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField, EnumField } from '../types/api';
 import { getInjectedFieldPlaceholder, isSecretField } from '../utils/fieldUtils';
+import { ClusterOptionInput, type ClusterFieldOptionState } from './ClusterOptionInput';
 
 interface DynamicFormBuilderWithTrackingProps {
   fields: ScenarioField[];
@@ -24,6 +25,8 @@ interface DynamicFormBuilderWithTrackingProps {
   touchedFields: TouchedFields;
   onChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
   disabledFields?: string[];
+  clusterOptions?: Record<string, ClusterFieldOptionState>;
+  onClusterOptionsOpen?: (variable: string) => void;
 }
 
 export function DynamicFormBuilderWithTracking({
@@ -32,6 +35,8 @@ export function DynamicFormBuilderWithTracking({
   touchedFields,
   onChange,
   disabledFields: externalDisabledFields = [],
+  clusterOptions,
+  onClusterOptionsOpen,
 }: DynamicFormBuilderWithTrackingProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const validationTimeouts = useRef<{ [key: string]: number }>({});
@@ -190,16 +195,30 @@ export function DynamicFormBuilderWithTracking({
             isRequired={field.required}
             fieldId={field.variable}
           >
-            <TextInput
-              id={field.variable}
-              type={isSecretField(field) ? 'password' : 'text'}
-              value={isFieldDisabled && !isInjectedField && isDisabled ? '***' : value as string}
-              onChange={(_event, val) => handleChange(field.variable, val)}
-              validated={validated}
-              placeholder={injectedPlaceholder ?? field.default}
-              autoComplete={isSecretField(field) ? 'off' : undefined}
-              isDisabled={isFieldDisabled}
-            />
+            {clusterOptions?.[field.variable] && !isSecretField(field) ? (
+              <ClusterOptionInput
+                id={field.variable}
+                label={field.short_description}
+                value={value as string}
+                onChange={(val) => handleChange(field.variable, val)}
+                validated={validated}
+                placeholder={injectedPlaceholder ?? field.default}
+                isDisabled={isFieldDisabled}
+                optionState={clusterOptions[field.variable]}
+                onOptionsOpen={() => onClusterOptionsOpen?.(field.variable)}
+              />
+            ) : (
+              <TextInput
+                id={field.variable}
+                type={isSecretField(field) ? 'password' : 'text'}
+                value={isFieldDisabled && !isInjectedField && isDisabled ? '***' : value as string}
+                onChange={(_event, val) => handleChange(field.variable, val)}
+                validated={validated}
+                placeholder={injectedPlaceholder ?? field.default}
+                autoComplete={isSecretField(field) ? 'off' : undefined}
+                isDisabled={isFieldDisabled}
+              />
+            )}
             {field.description && (
               <FormHelperText>
                 <HelperText>
@@ -498,6 +517,7 @@ function ScrollableFieldGroupWithTracking({
         <SearchInput
           placeholder="Filter fields..."
           aria-label={`Filter fields in ${groupField.short_description}`}
+          onKeyDown={(event) => event.stopPropagation()}
           value={search}
           onChange={(_event, value) => setSearch(value)}
           onClear={() => setSearch('')}
