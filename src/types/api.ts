@@ -1112,6 +1112,18 @@ export type RunItem =
 export type { PaginationMeta } from './websocket';
 
 /** Server-side unified job item from GET /api/v2/jobs */
+export interface RollbackRunSummary {
+  scenarioRunName: string;
+  sourceJobId: string;
+  iteration?: number;
+  phase: ScenarioRunPhase;
+  ownerUserId?: string;
+  createdAt: string;
+  jobId?: string;
+  podName?: string;
+  jobPhase?: ClusterJobPhase;
+}
+
 export interface UnifiedJobItem {
   type: 'scenarioRun' | 'graphRun';
   name: string;
@@ -1120,6 +1132,7 @@ export interface UnifiedJobItem {
   categories?: string[];
   scenarioRun?: ScenarioRunStatusResponse;
   graphRun?: GraphRunListItem;
+  rollbackRuns?: RollbackRunSummary[];
 }
 
 /** Aggregate job statistics computed across all runs (not just the current page). */

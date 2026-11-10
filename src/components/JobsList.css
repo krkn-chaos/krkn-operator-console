@@ -3,6 +3,39 @@
   container-type: inline-size;
 }
 
+.jobs-list-rollback-status {
+  margin-top: var(--pf-v5-global--spacer--xs);
+}
+
+.jobs-list-rollback-children {
+  margin: var(--pf-v5-global--spacer--sm) var(--pf-v5-global--spacer--md) var(--pf-v5-global--spacer--md) var(--pf-v5-global--spacer--xl);
+  padding-left: var(--pf-v5-global--spacer--md);
+  border-left: 2px solid var(--pf-v5-global--BorderColor--100);
+}
+
+.jobs-list-rollback-child {
+  padding: var(--pf-v5-global--spacer--sm);
+}
+
+.jobs-list-rollback-child summary {
+  display: list-item;
+  cursor: pointer;
+}
+
+.jobs-list-rollback-child summary > * {
+  margin-inline-end: var(--pf-v5-global--spacer--sm);
+}
+
+.jobs-list-rollback-child summary:focus-visible {
+  outline: var(--pf-v5-global--BorderWidth--md) solid var(--pf-v5-global--primary-color--100);
+}
+
+.jobs-list-rollback-detail {
+  display: grid;
+  gap: var(--pf-v5-global--spacer--md);
+  padding: var(--pf-v5-global--spacer--md);
+}
+
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
   flex: 0 0 clamp(9.5rem, 10%, 12rem);
 }

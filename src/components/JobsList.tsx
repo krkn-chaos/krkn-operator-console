@@ -76,6 +76,7 @@ import type {
   GraphRunSummary,
   GraphClusterScore,
   UnifiedJobItem,
+  RollbackRunSummary,
 } from '../types/api';
 
 const GRAPH_RUN_TERMINAL_PHASES: GraphRunListItem['phase'][] = ['Completed', 'Failed', 'PartiallyFailed'];
@@ -97,7 +98,25 @@ export type UnifiedRunItem =
       resiliencyScoreBaseline?: number;
       resiliencyScores?: GraphClusterScore[];
     }
-  | { type: 'scenario'; run: ScenarioRunState; categories: string[] };
+  | { type: 'scenario'; run: ScenarioRunState; categories: string[]; rollbackRuns: RollbackRunSummary[] };
+
+// Only the latest rollback execution for each original attempt contributes to the indicator.
+function rollbackProgress(runs: RollbackRunSummary[]) {
+  if (runs.length === 0) return null;
+  const latest = new Map<string, RollbackRunSummary>();
+  for (const run of runs) {
+    const previous = latest.get(run.sourceJobId);
+    if (!previous || (run.iteration ?? 0) > (previous.iteration ?? 0) || ((run.iteration ?? 0) === (previous.iteration ?? 0) && run.createdAt > previous.createdAt)) {
+      latest.set(run.sourceJobId, run);
+    }
+  }
+  const phases = [...latest.values()].map((run) => run.phase);
+  if (phases.some((phase) => !phase || phase === 'Pending' || phase === 'Running')) return { label: 'Rolling back', color: 'blue' as const };
+  const succeeded = phases.filter((phase) => phase === 'Succeeded').length;
+  if (succeeded === phases.length) return { label: 'Rolled back', color: 'green' as const };
+  if (succeeded > 0) return { label: 'Partially rolled back', color: 'orange' as const };
+  return { label: 'Rollback failed', color: 'red' as const };
+}
 
 function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
   if (item.type === 'graphRun') {
@@ -139,6 +158,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
     return {
       type: 'scenario',
       categories: item.categories || [],
+      rollbackRuns: item.rollbackRuns ?? [],
       run: {
         scenarioRunName: sr.scenarioRunName,
         rollbackEnabled: sr.rollbackEnabled,
@@ -163,6 +183,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
   return {
     type: 'scenario',
     categories: item.categories || [],
+    rollbackRuns: item.rollbackRuns ?? [],
     run: {
       scenarioRunName: item.name,
       scenarioName: '',
@@ -302,6 +323,8 @@ export function JobsList({
         return { icon: <ExclamationTriangleIcon />, color: 'orange' as const, label: 'Partially Failed' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
@@ -1095,6 +1118,7 @@ export function JobsList({
               const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
+              const rollbackState = rollbackProgress(item.rollbackRuns);
               const isRollback = run.isRollback ?? (run.scenarioName === 'workload-rollback' && GENERATED_ROLLBACK_RUN_NAME.test(run.scenarioRunName));
               const scenarioCategoryKey = runCategoryKey('scenario-runs', run.scenarioRunName);
               const scenarioCategoryNames = categoryOverrides[scenarioCategoryKey] ?? item.categories;
@@ -1122,6 +1146,13 @@ export function JobsList({
                             <Label className="jobs-list-compact-label" isCompact color={runPhaseDisplay.color} icon={runPhaseDisplay.icon}>
                               {runPhaseDisplay.label}
                             </Label>
+                            {rollbackState && (
+                              <Tooltip content="Status of executed rollback attempts; the scenario result remains unchanged.">
+                                <Label className="jobs-list-compact-label jobs-list-rollback-status" isCompact color={rollbackState.color} icon={<HistoryIcon />}>
+                                  {rollbackState.label}
+                                </Label>
+                              </Tooltip>
+                            )}
                           </div>
                         </DataListCell>,
                         <DataListCell key="scenario" width={2} className="jobs-list-summary-cell--primary">
@@ -1364,6 +1395,9 @@ export function JobsList({
                                 const jobPhaseDisplay = getJobPhaseDisplay(job.phase);
                                 const isDeleting = deletingJob === job.jobId;
                                 const hasJobDetails = isJobExpanded;
+                                const jobRollbacks = item.rollbackRuns.filter((rollback) =>
+                                  rollback.sourceJobId === job.jobId || job.attemptHistory?.some((attempt) => attempt.jobId === rollback.sourceJobId)
+                                );
 
                                 return (
                                   <DataListItem key={job.jobId} isExpanded={isJobExpanded}>
@@ -1404,6 +1438,7 @@ export function JobsList({
                                                   border: '1px solid var(--pf-v5-global--BorderColor--100)',
                                                 }}
                                               >
+                                                <TopologyIcon aria-hidden="true" style={{ marginRight: '0.25rem' }} />
                                                 {job.providerName}/{job.clusterName}
                                               </code>
                                             </div>
@@ -1449,6 +1484,38 @@ export function JobsList({
                                         ]}
                                       />
                                     </DataListItemRow>
+
+                                    {jobRollbacks.length > 0 && (
+                                      <div className="jobs-list-rollback-children" aria-label={`Rollback history for ${job.clusterName}`}>
+                                        {jobRollbacks.map((rollback) => {
+                                          const rollbackPhase = getRunPhaseDisplay(rollback.phase);
+                                          return (
+                                            <details key={rollback.scenarioRunName} className="jobs-list-rollback-child">
+                                              <summary>
+                                                <HistoryIcon aria-hidden="true" />
+                                                <strong>Rollback</strong>
+                                                <Label isCompact color={rollbackPhase.color} icon={rollbackPhase.icon}>{rollbackPhase.label}</Label>
+                                                <span>{formatTimestamp(rollback.createdAt)}</span>
+                                                {rollback.ownerUserId && <span>by {rollback.ownerUserId}</span>}
+                                              </summary>
+                                              <div className="jobs-list-rollback-detail">
+                                                <div>Run: <code>{rollback.scenarioRunName}</code></div>
+                                                {rollback.jobId ? (
+                                                  <LogViewer
+                                                    scenarioRunName={rollback.scenarioRunName}
+                                                    jobId={rollback.jobId}
+                                                    clusterName={job.clusterName}
+                                                    podName={rollback.podName ?? ''}
+                                                    status={rollback.jobPhase ?? rollback.phase}
+                                                    compact
+                                                  />
+                                                ) : <span>Waiting for rollback job to start.</span>}
+                                              </div>
+                                            </details>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
 
                                     {/* Job Details (expanded) */}
                                     <DataListContent
