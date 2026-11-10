@@ -10,14 +10,7 @@ import {
   TextInputGroupUtilities,
 } from '@patternfly/react-core';
 import { TimesIcon } from '@patternfly/react-icons';
-
-export interface ClusterFieldOptionState {
-  options: string[];
-  status: 'idle' | 'loading' | 'ready' | 'error';
-  error?: string;
-  selectionMode?: 'single' | 'comma';
-  clearable?: boolean;
-}
+import type { ClusterFieldOptionState } from '../utils/clusterParameterOptions';
 
 interface ClusterOptionInputProps {
   id: string;
@@ -67,7 +60,7 @@ export function ClusterOptionInput({
   const openOptions = () => {
     if (isDisabled || isOpen) return;
     setIsOpen(true);
-    if (optionState.status === 'idle') onOptionsOpen?.();
+    if (optionState.status === 'idle' || optionState.status === 'ready') onOptionsOpen?.();
   };
 
   const chooseOption = (selected: string) => {
@@ -101,12 +94,10 @@ export function ClusterOptionInput({
           return (previous + (event.key === 'ArrowDown' ? 1 : choices.length - 1)) % choices.length;
         });
       }
-    } else if (event.key === 'Enter') {
+    } else if (event.key === 'Enter' && isOpen) {
       event.preventDefault();
       event.stopPropagation();
-      if (!isOpen) {
-        openOptions();
-      } else if (focusedIndex >= 0) {
+      if (focusedIndex >= 0) {
         const selected = choices[focusedIndex];
         if (selected) chooseOption(selected);
       } else {

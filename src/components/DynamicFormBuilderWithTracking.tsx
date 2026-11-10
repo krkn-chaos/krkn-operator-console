@@ -17,7 +17,8 @@ import {
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField, EnumField } from '../types/api';
 import { getInjectedFieldPlaceholder, isSecretField } from '../utils/fieldUtils';
-import { ClusterOptionInput, type ClusterFieldOptionState } from './ClusterOptionInput';
+import { ClusterOptionInput } from './ClusterOptionInput';
+import type { ClusterFieldOptionState } from '../utils/clusterParameterOptions';
 
 interface DynamicFormBuilderWithTrackingProps {
   fields: ScenarioField[];
