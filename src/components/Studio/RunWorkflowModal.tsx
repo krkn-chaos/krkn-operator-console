@@ -413,7 +413,7 @@ export function RunWorkflowModal({
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem>Retries after the initial attempt for each scenario node. Set to 0 to disable retries.</HelperTextItem>
+                  <HelperTextItem>Retries after the initial attempt. Nodes with rollback enabled always use 0 retries.</HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>

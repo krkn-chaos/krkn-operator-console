@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, DropdownItem, Menu, MenuContent, MenuItem, MenuList, Modal, ModalVariant, Spinner } from '@patternfly/react-core';
-import { HistoryIcon } from '@patternfly/react-icons';
+import { HistoryIcon, TopologyIcon } from '@patternfly/react-icons';
 import { useNotifications } from '../hooks/useNotifications';
 import { operatorApi } from '../services/operatorApi';
 import type { ClusterJob, RollbackAvailability } from '../types/api';
@@ -98,13 +98,14 @@ export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoadi
                   return (
                     <MenuItem
                       key={attempt.jobId}
+                      icon={<TopologyIcon aria-hidden="true" />}
                       isAriaDisabled={disabled}
                       tooltipProps={disabled ? { content: unavailableReason(result) } : undefined}
                       onClick={() => {
                         if (!disabled) onConfirm(attempt);
                       }}
                     >
-                      {attempt.job.providerName}/{attempt.job.clusterName} · {attempt.jobId.slice(0, 8)}
+                      {attempt.job.clusterName}
                     </MenuItem>
                   );
                 })}

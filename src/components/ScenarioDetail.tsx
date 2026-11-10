@@ -23,6 +23,7 @@ import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { FileSelector } from './FileSelector';
 import { WorkspaceSelector } from './WorkspaceSelector';
+import { workspacesApi } from '../services/workspacesApi';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
@@ -105,6 +106,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
   const [workspace, setWorkspace] = useState(rerunWorkspace ?? undefined);
   const [rollbackEnabled, setRollbackEnabled] = useState(rerunRollbackEnabled);
+  const [showRollbackPreviewConfirmation, setShowRollbackPreviewConfirmation] = useState(false);
+  const [checkingWorkspaces, setCheckingWorkspaces] = useState(false);
 
   useEffect(() => {
     setWorkspace(rerunWorkspace ?? undefined);
@@ -487,11 +490,28 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       setIsPendingFileModalOpen(true);
       return;
     }
-    proceedToPreview();
+    void proceedToPreview();
   };
 
-  const proceedToPreview = () => {
+  const proceedToPreview = async () => {
     if (validateForm()) {
+      if (rollbackEnabled) {
+        setShowPreview(true);
+        return;
+      }
+      setCheckingWorkspaces(true);
+      try {
+        if ((await workspacesApi.listAvailable()).length > 0) {
+          setShowRollbackPreviewConfirmation(true);
+          return;
+        }
+      } catch {
+        setValidationErrors(['Unable to check available workspaces. Please retry.']);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      } finally {
+        setCheckingWorkspaces(false);
+      }
       setShowPreview(true);
       return;
     }
@@ -600,7 +620,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       setValidationErrors(['Enable rollback requires a workspace. Select one or disable rollback.']);
       return;
     }
-    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+    if (!rollbackEnabled && (!Number.isInteger(maxRetries) || maxRetries < 0)) {
       setValidationErrors(['Maximum retries must be a non-negative whole number.']);
       return;
     }
@@ -758,7 +778,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         customRunName: customRunName.trim() || undefined,
         elasticsearchConfigName: appliedEsConfigName || undefined,
         cloudCredentialRef: appliedCloudCredName || undefined,
-        maxRetries,
+        maxRetries: rollbackEnabled ? 0 : maxRetries,
         resiliencyScoreEnabled: enableResiliencyScore || undefined,
         categories: selectedRunCategories.length > 0
           ? (visibleCategories.status === 'ready'
@@ -989,7 +1009,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             variant="primary"
             onClick={() => {
               setIsPendingFileModalOpen(false);
-              proceedToPreview();
+              void proceedToPreview();
             }}
           >
             Continue without adding
@@ -1054,6 +1074,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               <Switch id="scenario-rollback-enabled" label="Enable rollback" isChecked={rollbackEnabled} onChange={(_event, checked) => setRollbackEnabled(checked)} />
               <WorkspaceSelector id="scenario-workspace" value={workspace} onChange={setWorkspace} />
               {rollbackEnabled && !workspace && <Alert variant="warning" title="Select a workspace to enable rollback" isInline />}
+              {rollbackEnabled && (
+                <Alert variant="info" title="Why retries are disabled" isInline>
+                  A retry can change the cluster again and leave another set of rollback files. With rollback enabled, each target runs once so rollback uses the files from a single attempt.
+                </Alert>
+              )}
             </CardBody>
           </Card>
 
@@ -1102,8 +1127,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
 
           {/* Preview Button */}
           <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-            <Button variant="primary" size="lg" onClick={handlePreview}>
-              Preview Configuration
+            <Button variant="primary" size="lg" onClick={handlePreview} isDisabled={checkingWorkspaces} isLoading={checkingWorkspaces}>
+              {checkingWorkspaces ? 'Checking workspaces...' : 'Preview Configuration'}
             </Button>
           </div>
         </>
@@ -1227,9 +1252,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   type="number"
                   min={0}
                   step={1}
-                  value={maxRetries}
+                  value={rollbackEnabled ? 0 : maxRetries}
                   onChange={(_event, value) => setMaxRetries(Math.max(0, Number(value) || 0))}
-                  isDisabled={isSubmitting}
+                  isDisabled={isSubmitting || rollbackEnabled}
                 />
                 <FormHelperText>
                   <HelperText>
@@ -1296,6 +1321,23 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           </div>
         </>
       )}
+
+      <Modal
+        variant={ModalVariant.small}
+        title="Rollback is not enabled"
+        titleIconVariant={ExclamationTriangleIcon}
+        isOpen={showRollbackPreviewConfirmation}
+        onClose={() => setShowRollbackPreviewConfirmation(false)}
+        actions={[
+          <Button key="continue" variant="primary" onClick={() => {
+            setShowRollbackPreviewConfirmation(false);
+            setShowPreview(true);
+          }}>Continue</Button>,
+          <Button key="cancel" variant="link" onClick={() => setShowRollbackPreviewConfirmation(false)}>Cancel</Button>,
+        ]}
+      >
+        <p>Workspaces are available, but rollback is not enabled. Continue to the configuration preview without rollback?</p>
+      </Modal>
 
       {/* Cluster Conflict Warning Modal */}
       {conflictWarning && (

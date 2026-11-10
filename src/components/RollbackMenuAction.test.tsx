@@ -109,9 +109,13 @@ describe('RollbackMenuAction', () => {
     renderAction(true, [job, second]);
     await waitFor(() => expect(screen.getByText('Rollback').closest('button')).toHaveAttribute('aria-expanded', 'false'));
     await user.hover(screen.getByText('Rollback'));
-    expect(await screen.findByText('krkn-operator-acm/krkn-operator-acm-2 · 918e8635')).toBeVisible();
-    await user.click(screen.getByText('krkn-operator-acm/krkn-operator-acm-3 · second-a'));
+    const firstCluster = await screen.findByText('krkn-operator-acm-2');
+    expect(firstCluster).toBeVisible();
+    expect(firstCluster.closest('button')?.querySelector('svg')).toBeInTheDocument();
+    expect(screen.queryByText(/918e8635/)).not.toBeInTheDocument();
+    await user.click(screen.getByText('krkn-operator-acm-3'));
     expect(screen.getByText(/Run rollback for krkn-operator-acm\/krkn-operator-acm-3/)).toBeVisible();
+    expect(screen.getByText(/attempt second-a/)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog', { name: 'Confirm rollback' })).not.toBeInTheDocument();
     expect(operatorApi.startRollback).not.toHaveBeenCalled();
