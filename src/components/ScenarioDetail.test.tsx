@@ -192,6 +192,7 @@ describe('ScenarioDetail', () => {
       stdout: JSON.stringify({ items: [{ metadata: { name: command.includes('namespaces') ? 'default' : 'worker-1' } }] }),
       stderr: '', exitCode: 0,
     }));
+    vi.mocked(operatorApi.getNodes).mockResolvedValue({ nodes: ['worker-1'] });
     const nodeName: StringField = {
       name: 'node-name', variable: 'NODE_NAME', short_description: 'Node name',
       description: 'Node to target', type: 'string', required: true, default: '',
@@ -201,9 +202,7 @@ describe('ScenarioDetail', () => {
     await waitFor(() => expect(operatorApi.executeTerminalCommand).toHaveBeenCalledWith({
       cluster_id: 'cluster1', uuid: 'test-uuid-123', command: 'kubectl get namespaces -o json',
     }));
-    await waitFor(() => expect(operatorApi.executeTerminalCommand).toHaveBeenCalledWith({
-      cluster_id: 'cluster1', uuid: 'test-uuid-123', command: 'kubectl get nodes -o json',
-    }));
+    await waitFor(() => expect(operatorApi.getNodes).toHaveBeenCalledWith('test-uuid-123', 'cluster1'));
   });
 
   it('refreshes pod suggestions when selected namespace changes', async () => {
@@ -356,7 +355,6 @@ describe('ScenarioDetail', () => {
     expect(screen.queryByText('app=demo')).not.toBeInTheDocument();
     await user.click(await screen.findByText('protected=true'));
     expect(screen.getByRole('combobox', { name: 'Pod label' })).toHaveValue('protected=true');
-    expect(operatorApi.executeTerminalCommand).toHaveBeenCalledTimes(2);
   });
 
   it('offers pod labels from every namespace matching current regex without replacing it', async () => {
@@ -370,11 +368,12 @@ describe('ScenarioDetail', () => {
             { metadata: { name: 'openshift-monitoring' } },
             { metadata: { name: 'default' } },
           ]
-        : command === 'kubectl get pods -n openshift-etcd -o json'
-          ? [{ metadata: { name: 'etcd-0', labels: { app: 'etcd' } } }]
-          : command === 'kubectl get pods -n openshift-monitoring -o json'
-            ? [{ metadata: { name: 'prometheus-0', labels: { app: 'prometheus' } } }]
-            : [];
+        : command === 'kubectl get pods -A -o json'
+          ? [
+            { metadata: { name: 'etcd-0', namespace: 'openshift-etcd', labels: { app: 'etcd' } } },
+            { metadata: { name: 'prometheus-0', namespace: 'openshift-monitoring', labels: { app: 'prometheus' } } },
+            { metadata: { name: 'other', namespace: 'default', labels: { app: 'other' } } },
+          ] : [];
       return { stdout: JSON.stringify({ items }), stderr: '', exitCode: 0 };
     });
     const podLabel: StringField = {
@@ -389,16 +388,14 @@ describe('ScenarioDetail', () => {
     await user.click(screen.getByRole('button', { name: 'Show Pod label options' }));
     expect(await screen.findByText('app=etcd')).toBeInTheDocument();
     expect(screen.getByText('app=prometheus')).toBeInTheDocument();
+    expect(screen.queryByText('app=other')).not.toBeInTheDocument();
     expect(calls).not.toContain('kubectl get pods -n default -o json');
     expect(screen.getByRole('combobox', { name: 'Target namespace' })).toHaveValue('openshift-.*');
   });
 
-  it('loads node names independently of namespace for node scenarios', async () => {
+  it('loads node names through the dedicated nodes endpoint', async () => {
     const user = userEvent.setup();
-    vi.mocked(operatorApi.executeTerminalCommand).mockResolvedValue({
-      stdout: JSON.stringify({ items: [{ metadata: { name: 'worker-1' } }] }),
-      stderr: '', exitCode: 0,
-    });
+    vi.mocked(operatorApi.getNodes).mockResolvedValue({ nodes: ['worker-1'] });
     const nodeName: StringField = {
       name: 'node-name', variable: 'NODE_NAME', short_description: 'Node name',
       description: 'Node to target', type: 'string', required: true, default: '',
@@ -410,13 +407,13 @@ describe('ScenarioDetail', () => {
 
     await user.click(screen.getByRole('button', { name: 'Show Node name options' }));
     expect(await screen.findByText('worker-1')).toBeInTheDocument();
-    expect(operatorApi.executeTerminalCommand).toHaveBeenCalledWith({
-      cluster_id: 'cluster1', uuid: 'test-uuid-123', command: 'kubectl get nodes -o json',
-    });
+    expect(operatorApi.getNodes).toHaveBeenCalledWith('test-uuid-123', 'cluster1');
+    expect(operatorApi.executeTerminalCommand).not.toHaveBeenCalled();
   });
 
   it('offers cluster options in optional and global parameter sections', async () => {
     const user = userEvent.setup();
+    vi.mocked(operatorApi.getNodes).mockResolvedValue({ nodes: ['worker-1'] });
     vi.mocked(operatorApi.executeTerminalCommand).mockImplementation(async ({ command }) => ({
       stdout: JSON.stringify({ items: [{ metadata: { name: command.includes('namespaces') ? 'default' : command.includes('nodes') ? 'worker-1' : 'api-0' } }] }),
       stderr: '', exitCode: 0,

@@ -3,14 +3,23 @@ import type { ScenarioField, ScenarioFormValues } from '../types/api';
 type Resource = 'namespaces' | 'nodes' | 'pods' | 'pvcs' | 'vmi' | 'serviceaccounts';
 type Selection = 'name' | 'label' | 'container';
 
+export interface ClusterFieldOptionState {
+  options: string[];
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  error?: string;
+  selectionMode?: 'single' | 'comma';
+  clearable?: boolean;
+}
+
 export interface ClusterOptionSource {
   resource: Resource;
   selection: Selection;
   namespaced: boolean;
+  selectionMode?: 'comma';
 }
 
 interface KubeItem {
-  metadata?: { name?: string; labels?: Record<string, string> };
+  metadata?: { name?: string; namespace?: string; labels?: Record<string, string> };
   spec?: { containers?: Array<{ name?: string }> };
 }
 
@@ -23,6 +32,7 @@ export type ClusterCommandRunner = (clusterName: string, command: string) => Pro
   stderr: string;
   exitCode: number;
 }>;
+export type ClusterNodeReader = (uuid: string, clusterName: string) => Promise<string[]>;
 
 const namespaced = (resource: Resource, selection: Selection = 'name'): ClusterOptionSource =>
   ({ resource, selection, namespaced: true });
@@ -39,8 +49,12 @@ export function getClusterOptionSource(
   const scenario = scenarioName.toLowerCase();
 
   if (variable === 'NAMESPACE' || variable === 'KUBE_VIRT_NAMESPACE') return clusterScoped('namespaces');
-  if (['NODE_NAME', 'NODE_NAMES', 'KUBE_VIRT_NODE_NAME', 'KUBE_VIRT_SSH_NODE'].includes(variable)) return clusterScoped('nodes');
-  if (['POD_NAME', 'POD_NAMES'].includes(variable)) return namespaced('pods');
+  if (['NODE_NAME', 'NODE_NAMES', 'KUBE_VIRT_NODE_NAME', 'KUBE_VIRT_SSH_NODE'].includes(variable)) {
+    return { ...clusterScoped('nodes'), ...(variable === 'NODE_NAMES' && { selectionMode: 'comma' as const }) };
+  }
+  if (['POD_NAME', 'POD_NAMES'].includes(variable)) {
+    return { ...namespaced('pods'), ...(variable === 'POD_NAMES' && { selectionMode: 'comma' as const }) };
+  }
   if (variable === 'PVC_NAME') return namespaced('pvcs');
   if (variable === 'VM_NAME' && ['vmi-outage', 'kubevirt-outage'].includes(scenario)) return namespaced('vmi');
   if (variable === 'CONTAINER_NAME') return namespaced('pods', 'container');
@@ -73,15 +87,13 @@ export function getClusterOptionSource(
 export function clusterOptionQueryKey(
   uuid: string,
   clusterNames: string[],
-  scenarioName: string,
-  variable: string,
   source: ClusterOptionSource,
   namespaceExpression: string,
   podName: string,
 ): string {
   return JSON.stringify([
-    uuid, [...clusterNames].sort(), scenarioName, variable,
-    source.resource, source.selection, namespaceExpression, podName,
+    uuid, [...clusterNames].sort(), source.resource, source.selection,
+    source.namespaced ? namespaceExpression : '', source.selection === 'container' ? podName : '',
   ]);
 }
 
@@ -118,6 +130,7 @@ export async function discoverClusterOptions({
   namespaceExpression = '',
   podName = '',
   runCommand,
+  getNodeNames,
   cache,
 }: {
   uuid: string;
@@ -126,12 +139,19 @@ export async function discoverClusterOptions({
   namespaceExpression?: string;
   podName?: string;
   runCommand: ClusterCommandRunner;
+  getNodeNames: ClusterNodeReader;
   cache: Map<string, Promise<KubeList>>;
 }): Promise<string[]> {
   if (!uuid || clusterNames.length === 0) return [];
 
-  const getList = (clusterName: string, resource: Resource, namespace?: string): Promise<KubeList> => {
-    const command = `kubectl get ${resource}${namespace ? ` -n ${namespace}` : ''} -o json`;
+  if (source.resource === 'nodes' && source.selection === 'name') {
+    const perCluster = await Promise.all(clusterNames.map((clusterName) => getNodeNames(uuid, clusterName)));
+    return perCluster[0].filter((name) => perCluster.every((names) => names.includes(name))).sort();
+  }
+
+  const getList = (clusterName: string, resource: Resource, namespace?: string, allNamespaces = false): Promise<KubeList> => {
+    const scope = allNamespaces ? ' -A' : namespace ? ` -n ${namespace}` : '';
+    const command = `kubectl get ${resource}${scope} -o json`;
     const cacheKey = JSON.stringify([uuid, clusterName, command]);
     const cached = cache.get(cacheKey);
     if (cached) return cached;
@@ -142,31 +162,36 @@ export async function discoverClusterOptions({
       return parsed as KubeList;
     });
     cache.set(cacheKey, request);
-    void request.catch(() => cache.delete(cacheKey));
+    void request.then(() => cache.delete(cacheKey), () => cache.delete(cacheKey));
     return request;
   };
 
+  const exactNamespace = /^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$/.test(namespaceExpression)
+    ? namespaceExpression : null;
   let namespaces: string[] = [];
   if (source.namespaced) {
-    const perClusterNamespaces = await Promise.all(clusterNames.map(async (clusterName) =>
-      new Set(optionValues((await getList(clusterName, 'namespaces')).items, clusterScoped('namespaces'), '')),
-    ));
-    const commonNamespaces = [...perClusterNamespaces[0]].filter((name) =>
-      perClusterNamespaces.every((candidate) => candidate.has(name)),
-    );
-    namespaces = matchingNamespaces(commonNamespaces, namespaceExpression);
+    if (exactNamespace) {
+      namespaces = [exactNamespace];
+    } else {
+      const perClusterNamespaces = await Promise.all(clusterNames.map(async (clusterName) =>
+        new Set(optionValues((await getList(clusterName, 'namespaces')).items, clusterScoped('namespaces'), '')),
+      ));
+      const commonNamespaces = [...perClusterNamespaces[0]].filter((name) =>
+        perClusterNamespaces.every((candidate) => candidate.has(name)),
+      );
+      namespaces = matchingNamespaces(commonNamespaces, namespaceExpression);
+    }
   }
 
+  if (source.namespaced && namespaces.length === 0) return [];
+  const namespaceSet = new Set(namespaces);
   const perClusterOptions = await Promise.all(clusterNames.map(async (clusterName) => {
-    const requestedNamespaces = source.namespaced ? namespaces : [undefined];
-    const values = new Set<string>();
-    for (let index = 0; index < requestedNamespaces.length; index += 4) {
-      const lists = await Promise.all(requestedNamespaces.slice(index, index + 4).map((namespace) =>
-        getList(clusterName, source.resource, namespace),
-      ));
-      lists.forEach((list) => optionValues(list.items, source, podName).forEach((value) => values.add(value)));
-    }
-    return values;
+    const list = await getList(clusterName, source.resource, source.namespaced ? exactNamespace ?? undefined : undefined,
+      source.namespaced && !exactNamespace);
+    const items = source.namespaced && !exactNamespace
+      ? list.items.filter((item) => namespaceSet.has(item.metadata?.namespace ?? ''))
+      : list.items;
+    return new Set(optionValues(items, source, podName));
   }));
   return [...perClusterOptions[0]].filter((value) =>
     perClusterOptions.every((options) => options.has(value)),

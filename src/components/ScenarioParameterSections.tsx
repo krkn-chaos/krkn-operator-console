@@ -13,7 +13,7 @@ import {
 } from '@patternfly/react-core';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
 import { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
-import type { ClusterFieldOptionState } from './ClusterOptionInput';
+import type { ClusterFieldOptionState } from '../utils/clusterParameterOptions';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, ElasticsearchConfig, CloudCredential } from '../types/api';
 import { getCloudDisabledFields, filterFieldsByCloudType } from '../utils/cloudProviderUtils';
 

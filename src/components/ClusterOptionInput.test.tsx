@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ClusterOptionInput } from './ClusterOptionInput';
 
 describe('ClusterOptionInput', () => {
@@ -89,6 +89,38 @@ describe('ClusterOptionInput', () => {
     await user.keyboard('{Enter}');
     expect(input).toHaveValue('work');
     expect(screen.queryByRole('option', { name: 'workloads' })).not.toBeInTheDocument();
+  });
+
+  it('lets closed input Enter reach parent form shortcut', () => {
+    const onKeyDown = vi.fn();
+    render(
+      <div onKeyDown={onKeyDown}>
+        <ClusterOptionInput
+          id="NAMESPACE" label="Target namespace" value="default"
+          optionState={{ options: ['default'], status: 'ready' }} onChange={() => {}}
+        />
+      </div>,
+    );
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target namespace' }), { key: 'Enter' });
+    expect(onKeyDown).toHaveBeenCalledOnce();
+  });
+
+  it('requests fresh options after reopening a ready menu', async () => {
+    const user = userEvent.setup();
+    const onOptionsOpen = vi.fn();
+    render(
+      <ClusterOptionInput
+        id="NAMESPACE" label="Target namespace" value="default"
+        optionState={{ options: ['default'], status: 'ready' }}
+        onChange={() => {}} onOptionsOpen={onOptionsOpen}
+      />,
+    );
+    const toggle = screen.getByRole('button', { name: 'Show Target namespace options' });
+    await user.click(toggle);
+    await user.click(toggle);
+    await user.click(toggle);
+    expect(onOptionsOpen).toHaveBeenCalledTimes(2);
   });
 
   it('clears a selected value without opening its menu', async () => {

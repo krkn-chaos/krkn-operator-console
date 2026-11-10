@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -20,7 +20,6 @@ import { CopyIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { useAppContext } from '../context/AppContext';
 import { DynamicFormBuilder } from './DynamicFormBuilder';
-import type { ClusterFieldOptionState } from './ClusterOptionInput';
 import { ClusterConflictWarning } from './ClusterConflictWarning';
 import { FileSelector } from './FileSelector';
 import { ScenarioParameterSections } from './ScenarioParameterSections';
@@ -32,8 +31,8 @@ import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 import { runOnEnterFromFormControl } from '../utils/keyboard';
 import { useSignatureVerification } from '../hooks/useSignatureVerification';
 import { useVisibleCategories } from '../hooks/useVisibleCategories';
+import { useClusterParameterOptions } from '../hooks/useClusterParameterOptions';
 import { CategoryMultiSelect } from './CategoryMultiSelect';
-import { clusterOptionQueryKey, discoverClusterOptions, getClusterOptionSource } from '../utils/clusterParameterOptions';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus, ClustersResponse } from '../types/api';
 import { createScenarioReference } from '../utils/scenarioReference';
@@ -92,28 +91,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     isLoading: signatureVerificationLoading,
   } = useSignatureVerification();
   const { scenarioDetail, scenarioFormValues, scenarioGlobals, globalFormValues, globalTouchedFields, startInPreview, isRerunFlow, rerunScenario, rerunKubeconfigPath, rerunCloudCredentialRef, scenarios } = state;
-  const selectedPodLabel = (variable: string): string => {
-    const scenarioField = scenarioDetail?.fields.find((field) => field.variable.toUpperCase() === variable);
-    const globalField = scenarioGlobals?.fields.find((field) => field.variable.toUpperCase() === variable);
-    const field = scenarioField ?? globalField;
-    if (!field) return '';
-    const values = scenarioField ? scenarioFormValues : globalFormValues;
-    const source = getClusterOptionSource(scenarioName, field, values || {});
-    if (source?.resource !== 'pods' || source.selection !== 'label') return '';
-    return String(values?.[field.variable] ?? field.default ?? '').trim();
-  };
-  const includedPodLabels = ['POD_LABEL', 'LABEL_SELECTOR'].map(selectedPodLabel).filter(Boolean);
-  const excludedPodLabel = selectedPodLabel('EXCLUDE_LABEL');
-  const hasPodLabelConflict = Boolean(excludedPodLabel && includedPodLabels.includes(excludedPodLabel));
   const selectedScenario = state.scenarios?.find((scenario) => scenario.name === scenarioName);
   const showSignatureOverrideWarning = signatureVerificationEnabled === false && selectedScenario?.signature_status !== 'signed';
   const [showPreview, setShowPreview] = useState(startInPreview);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
-  const [clusterOptionStates, setClusterOptionStates] = useState<Record<string, ClusterFieldOptionState>>({});
-  const clusterOptionStatesRef = useRef(clusterOptionStates);
-  clusterOptionStatesRef.current = clusterOptionStates;
-  const pendingClusterOptions = useRef(new Set<string>());
-  const clusterListCache = useRef<Parameters<typeof discoverClusterOptions>[0]['cache']>(new Map());
   const [showGlobalParameters, setShowGlobalParameters] = useState(false);
   const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -895,112 +876,22 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     () => state.selectedClusters.map((cluster) => cluster.clusterName),
     [state.selectedClusters],
   );
-  const virtualMachineScenario = ['vmi-outage', 'kubevirt-outage'].includes(scenarioName);
-  const namespaceExpression = String(virtualMachineScenario
-    ? scenarioFormValues?.KUBE_VIRT_NAMESPACE ?? globalFormValues?.KUBE_VIRT_NAMESPACE ?? scenarioFormValues?.NAMESPACE ?? globalFormValues?.NAMESPACE ?? ''
-    : scenarioFormValues?.NAMESPACE ?? globalFormValues?.NAMESPACE ?? scenarioFormValues?.KUBE_VIRT_NAMESPACE ?? globalFormValues?.KUBE_VIRT_NAMESPACE ?? '');
-  const podName = String(scenarioFormValues?.POD_NAME ?? '');
   const scenarioFields = useMemo(() => scenarioDetail?.fields ?? [], [scenarioDetail?.fields]);
-  const getOptionQuery = useCallback((variable: string, global: boolean) => {
-    const field = (global ? allGlobalFields : scenarioFields).find((candidate) => candidate.variable === variable);
-    if (!field) return null;
-    const source = getClusterOptionSource(scenarioName, field, global ? globalFormValues || {} : scenarioFormValues || {});
-    if (!source) return null;
-    const key = clusterOptionQueryKey(
-      state.uuid ?? '', clusterNames, scenarioName, variable, source,
-      source.namespaced ? namespaceExpression : '', source.selection === 'container' ? podName : '',
-    );
-    return { key, source };
-  }, [allGlobalFields, scenarioFields, scenarioName, globalFormValues, scenarioFormValues,
-    state.uuid, clusterNames, namespaceExpression, podName]);
-  const getOptionStates = (fields: typeof scenarioFields, global: boolean) => Object.fromEntries(
-    fields.flatMap((field) => {
-      const query = getOptionQuery(field.variable, global);
-      if (!query) return [];
-      const optionState = clusterOptionStates[query.key] ?? { options: [], status: 'idle' as const };
-      const variable = field.variable.toUpperCase();
-      let omitted: string[] = [];
-      if (query.source.resource === 'pods' && query.source.selection === 'label') {
-        if (variable === 'EXCLUDE_LABEL') omitted = includedPodLabels;
-        else if (variable === 'POD_LABEL' || variable === 'LABEL_SELECTOR') omitted = [excludedPodLabel];
-      }
-      return [[field.variable, {
-        ...optionState,
-        options: optionState.options.filter((option) => !omitted.includes(option)),
-        clearable: query.source.resource === 'pods' && query.source.selection === 'label' &&
-          ['POD_LABEL', 'LABEL_SELECTOR', 'EXCLUDE_LABEL'].includes(variable),
-        selectionMode: /multiple|comma/i.test(field.description ?? '') &&
-          ['NODE_NAME', 'NODE_NAMES', 'POD_NAMES'].includes(field.variable)
-          ? 'comma' as const : 'single' as const,
-      }]];
-    }),
-  ) as Record<string, ClusterFieldOptionState>;
-  const scenarioClusterOptions = getOptionStates(scenarioFields, false);
-  const globalClusterOptions = getOptionStates(allGlobalFields, true);
-
-  const loadClusterOptions = useCallback(async (variable: string, global = false, automatic = false) => {
-    const query = getOptionQuery(variable, global);
-    if (!query || pendingClusterOptions.current.has(query.key)) return;
-    const status = clusterOptionStatesRef.current[query.key]?.status;
-    if (status === 'loading' || status === 'ready' || (automatic && status === 'error')) return;
-    pendingClusterOptions.current.add(query.key);
-    setClusterOptionStates((previous) => ({ ...previous, [query.key]: { options: [], status: 'loading' } }));
-    try {
-      const options = await discoverClusterOptions({
-        uuid: state.uuid ?? '',
-        clusterNames,
-        source: query.source,
-        namespaceExpression,
-        podName,
-        cache: clusterListCache.current,
-        runCommand: async (clusterName, command) => operatorApi.executeTerminalCommand({
-          cluster_id: clusterName,
-          uuid: state.uuid ?? '',
-          command,
-        }),
-      });
-      setClusterOptionStates((previous) => ({ ...previous, [query.key]: { options, status: 'ready' } }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Cluster option lookup failed';
-      setClusterOptionStates((previous) => ({ ...previous, [query.key]: {
-        options: [],
-        status: 'error',
-        error: message.startsWith('TERMINAL_ERROR:403:')
-          ? 'Permission denied while loading cluster options.'
-          : message.startsWith('TERMINAL_ERROR:500:')
-            ? 'Cluster command failed while loading options.'
-            : message,
-      } }));
-    } finally {
-      pendingClusterOptions.current.delete(query.key);
-    }
-  }, [getOptionQuery, state.uuid, clusterNames, namespaceExpression, podName]);
-
-  useEffect(() => {
-    if (!scenarioDetail || showPreview || !state.uuid || clusterNames.length === 0) return;
-    const fields = [
-      ...scenarioFields.map((field) => ({ field, global: false })),
-      ...allGlobalFields.map((field) => ({ field, global: true })),
-    ];
-    const hasNamespaceField = fields.some(({ field }) =>
-      ['NAMESPACE', 'KUBE_VIRT_NAMESPACE'].includes(field.variable.toUpperCase()));
-    const dependentFields = fields.filter(({ field, global }) => {
-      const source = getOptionQuery(field.variable, global)?.source;
-      if (!source) return false;
-      if (!source.namespaced) {
-        void loadClusterOptions(field.variable, global, true);
-        return false;
-      }
-      return !hasNamespaceField || Boolean(namespaceExpression);
-    });
-    const timer = window.setTimeout(() => {
-      dependentFields.forEach(({ field, global }) => {
-        void loadClusterOptions(field.variable, global, true);
-      });
-    }, 200);
-    return () => window.clearTimeout(timer);
-  }, [scenarioDetail, showPreview, state.uuid, clusterNames, scenarioFields, allGlobalFields,
-    namespaceExpression, getOptionQuery, loadClusterOptions]);
+  const {
+    scenarioOptions: scenarioClusterOptions,
+    globalOptions: globalClusterOptions,
+    hasPodLabelConflict,
+    loadOptions: loadClusterOptions,
+  } = useClusterParameterOptions({
+    uuid: state.uuid,
+    clusterNames,
+    scenarioName,
+    scenarioFields,
+    globalFields: allGlobalFields,
+    scenarioValues: scenarioFormValues,
+    globalValues: globalFormValues,
+    active: Boolean(scenarioDetail) && !showPreview,
+  });
 
   const hasConfigurableMainFields = mainFormFields.some((field) => field.type !== 'group');
 
