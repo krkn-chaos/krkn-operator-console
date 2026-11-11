@@ -128,7 +128,7 @@ export interface ScenarioReference {
 }
 
 export interface RerunIntent {
-  workspace?: WorkspaceReference;
+  workspace?: WorkspaceSelection;
   rollbackEnabled?: boolean;
   scenario: ScenarioReference;
   clusters: { operatorName: string; clusterName: string }[];
@@ -141,7 +141,7 @@ export interface RerunIntent {
 }
 
 export interface JobConfigResponse {
-  workspace?: WorkspaceReference;
+  workspace?: WorkspaceSelection;
   rollbackEnabled?: boolean;
   targetRequestId: string;
   targetClusters: { [operatorName: string]: string[] };
@@ -262,7 +262,7 @@ export interface ErrorResponse {
 export interface WorkspaceInfo {
   name: string;
   claimName?: string;
-  groups?: string[];
+  groups?: [] | [string];
   availableToAll: boolean;
   available: boolean;
   reason?: string;
@@ -276,15 +276,17 @@ export interface WorkspacePVC {
 /** Admin payload for publishing an existing PVC. */
 export interface WorkspacePublishRequest {
   claimName: string;
-  groups?: string[];
+  groups?: [] | [string];
   availableToAll?: boolean;
 }
 
-/** Workspace reference pinned to a run during replay. */
-export interface WorkspaceReference {
+/** Published workspace selection; optional UIDs reject a replaced binding on replay. */
+export interface WorkspaceSelection {
   name: string;
   workspaceUid?: string;
   claimUid?: string;
+  /** Accepted only for compatibility with older replay payloads. */
+  claimName?: string;
 }
 
 // Scenario Run Types
@@ -307,7 +309,7 @@ export interface FileReference {
 }
 
 export interface ScenarioRunRequest {
-  workspace?: WorkspaceReference;
+  workspace?: WorkspaceSelection;
   rollbackEnabled?: boolean;
   targetRequestId: string; // Target request UUID
   targetClusters: { [providerName: string]: string[] }; // Map of provider names to cluster names
@@ -426,10 +428,13 @@ export interface ScenarioRunStatusResponse {
   reportStatus?: ReportStatus;
 }
 
+export const ROLLBACK_STATES = ['checking', 'available', 'absent', 'unavailable', 'running', 'succeeded', 'failed', 'error'] as const;
+export type RollbackState = (typeof ROLLBACK_STATES)[number];
+
 export interface RollbackAvailability {
   jobId: string;
-  state: 'checking' | 'available' | 'absent' | 'unavailable' | 'running' | 'succeeded' | 'failed' | 'error';
-  canExecute?: boolean;
+  state: RollbackState;
+  canExecute: boolean;
   rollbackRunName?: string;
   message?: string;
 }
@@ -591,7 +596,7 @@ export interface AppState {
   rerunScenario: ScenarioReference | null;
   rerunKubeconfigPath: string | null;
   rerunCloudCredentialRef: string | null;
-  rerunWorkspace: WorkspaceReference | null;
+  rerunWorkspace: WorkspaceSelection | null;
   rerunRollbackEnabled: boolean;
 
   // Error handling
@@ -843,7 +848,7 @@ export interface AvailableRegistriesResponse {
  * Compatible with krknctl ScenarioNode structure
  */
 export interface GraphScenarioNode {
-  workspace?: WorkspaceReference;
+  workspace?: WorkspaceSelection;
   rollbackEnabled?: boolean;
   /** Optional comment describing the scenario */
   _comment?: string;
@@ -1189,7 +1194,7 @@ export interface StudioNode {
     /** Global touched fields (tracks which global fields were modified) */
     globalTouchedFields?: TouchedFields;
     /** Workspace selected for this scenario node. */
-    workspace?: WorkspaceReference;
+    workspace?: WorkspaceSelection;
     rollbackEnabled?: boolean;
     /** Volume mounts (mock dropdown for now) */
     volumes?: { [key: string]: string };

@@ -21,17 +21,17 @@ import {
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { FileSelector } from '../FileSelector';
 import { WorkspaceSelector } from '../WorkspaceSelector';
-import type { FileReference, WorkspaceReference } from '../../types/api';
+import type { FileReference, WorkspaceSelection } from '../../types/api';
 
 interface NodeMetadataStepProps {
   nodeId: string;
   onNodeIdChange: (nodeId: string) => void;
   nodeIdError?: string;
   currentNodeId?: string; // Current node ID (for validation exclusion)
-  workspace?: WorkspaceReference;
+  workspace?: WorkspaceSelection;
   rollbackEnabled?: boolean;
   onRollbackEnabledChange?: (enabled: boolean) => void;
-  onWorkspaceChange?: (workspace?: WorkspaceReference) => void;
+  onWorkspaceChange?: (workspace?: WorkspaceSelection) => void;
   volumes?: { [fileId: string]: string }; // fileId -> mountPath mapping
   onVolumesChange?: (volumes: { [fileId: string]: string }) => void;
   onPendingChange?: (hasPending: boolean) => void;

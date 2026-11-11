@@ -19,7 +19,7 @@ describe('useRollbackAvailability', () => {
   it('waits for inspection to finish before scheduling another poll', async () => {
     const pending = deferred();
     vi.mocked(operatorApi.getRollbackAvailability).mockReturnValueOnce(pending.promise)
-      .mockResolvedValue({ jobId: 'attempt', state: 'absent' });
+      .mockResolvedValue({ jobId: 'attempt', state: 'absent', canExecute: false });
     const { result, unmount } = renderHook(() => useRollbackAvailability('run', ['attempt'], true));
     expect(operatorApi.getRollbackAvailability).toHaveBeenCalledTimes(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
@@ -35,7 +35,7 @@ describe('useRollbackAvailability', () => {
   it('ignores a response from the previous run', async () => {
     const oldRun = deferred();
     vi.mocked(operatorApi.getRollbackAvailability).mockReturnValueOnce(oldRun.promise)
-      .mockResolvedValueOnce({ jobId: 'attempt', state: 'absent' });
+      .mockResolvedValueOnce({ jobId: 'attempt', state: 'absent', canExecute: false });
     const { result, rerender } = renderHook(({ runName }) => useRollbackAvailability(runName, ['attempt'], true), {
       initialProps: { runName: 'old-run' },
     });

@@ -18,7 +18,7 @@ describe('RollbackActions', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('shows no execution button when the exact attempt has no rollback files', async () => {
-    vi.mocked(operatorApi.getRollbackAvailability).mockResolvedValue({ jobId: 'current-id', state: 'absent' });
+    vi.mocked(operatorApi.getRollbackAvailability).mockResolvedValue({ jobId: 'current-id', state: 'absent', canExecute: false });
     render(<RollbackActions scenarioRunName="run-a" job={job} />);
     await waitFor(() => expect(operatorApi.getRollbackAvailability).toHaveBeenCalledWith('run-a', 'current-id'));
     expect(screen.queryByRole('button', { name: /Rollback attempt/ })).not.toBeInTheDocument();
@@ -33,7 +33,7 @@ describe('RollbackActions', () => {
   });
 
   it('shows the execution outcome without offering a second action', async () => {
-    vi.mocked(operatorApi.getRollbackAvailability).mockResolvedValue({ jobId: 'current-id', state: 'running', canExecute: true, rollbackRunName: 'rollback-current' });
+    vi.mocked(operatorApi.getRollbackAvailability).mockResolvedValue({ jobId: 'current-id', state: 'running', canExecute: false, rollbackRunName: 'rollback-current' });
     const { rerender } = render(<RollbackActions scenarioRunName="run-a" job={job} />);
     expect(await screen.findByText('Rollback is running')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Rollback attempt/ })).not.toBeInTheDocument();
@@ -51,9 +51,9 @@ describe('RollbackActions', () => {
 
   it('confirms and starts rollback for an available earlier attempt', async () => {
     vi.mocked(operatorApi.getRollbackAvailability).mockImplementation(async (_run, id) => ({
-      jobId: id, state: id === 'older-id' ? 'available' : 'absent', canExecute: true,
+      jobId: id, state: id === 'older-id' ? 'available' : 'absent', canExecute: id === 'older-id',
     }));
-    vi.mocked(operatorApi.startRollback).mockResolvedValue({ jobId: 'older-id', state: 'running', rollbackRunName: 'rollback-older' });
+    vi.mocked(operatorApi.startRollback).mockResolvedValue({ jobId: 'older-id', state: 'running', canExecute: false, rollbackRunName: 'rollback-older' });
     render(<RollbackActions scenarioRunName="run-a" job={{ ...job, attemptHistory: [{ jobId: 'older-id' }] }} />);
 
     const user = userEvent.setup();

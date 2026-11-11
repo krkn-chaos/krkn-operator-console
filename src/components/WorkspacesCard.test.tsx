@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspacesCard } from './WorkspacesCard';
+import type { WorkspaceInfo } from '../types/api';
 import { workspacesApi } from '../services/workspacesApi';
 import { operatorApi } from '../services/operatorApi';
 import { useNotifications } from '../hooks/useNotifications';
@@ -10,7 +11,7 @@ vi.mock('../services/workspacesApi');
 vi.mock('../services/operatorApi');
 vi.mock('../hooks/useNotifications');
 
-const sample = { name: 'rollback', claimName: 'shared-pvc', groups: ['team-a'], availableToAll: false, available: false, reason: 'PVCMissing' };
+const sample: WorkspaceInfo = { name: 'rollback', claimName: 'shared-pvc', groups: ['team-a'], availableToAll: false, available: false, reason: 'PVCMissing' };
 
 beforeEach(() => {
   vi.clearAllMocks();

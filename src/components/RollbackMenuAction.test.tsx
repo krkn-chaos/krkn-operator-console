@@ -89,7 +89,7 @@ describe('RollbackMenuAction', () => {
   it('opens confirmation directly for a single available attempt and executes only after confirmation', async () => {
     const user = userEvent.setup();
     vi.mocked(operatorApi.getRollbackAvailability).mockResolvedValue({ jobId: job.jobId, state: 'available', canExecute: true });
-    vi.mocked(operatorApi.startRollback).mockResolvedValue({ jobId: job.jobId, state: 'running', rollbackRunName: 'rollback-run' });
+    vi.mocked(operatorApi.startRollback).mockResolvedValue({ jobId: job.jobId, state: 'running', canExecute: false, rollbackRunName: 'rollback-run' });
     renderAction();
     await waitFor(() => expect(screen.getByText('Rollback').closest('button')).not.toHaveAttribute('aria-disabled'));
     await user.click(screen.getByText('Rollback'));

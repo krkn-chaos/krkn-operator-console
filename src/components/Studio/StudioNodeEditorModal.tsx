@@ -57,7 +57,7 @@ function StudioNodeEditorModalComponent({
   const [globalTouchedFields, setGlobalTouchedFields] = useState<TouchedFields>({});
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
   const [cloudCredentialRef, setCloudCredentialRef] = useState('');
-  const [workspace, setWorkspace] = useState<import('../../types/api').WorkspaceReference | undefined>();
+  const [workspace, setWorkspace] = useState<import('../../types/api').WorkspaceSelection | undefined>();
   const [rollbackEnabled, setRollbackEnabled] = useState(false);
   const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
   const [resiliencyWeight, setResiliencyWeight] = useState(1);

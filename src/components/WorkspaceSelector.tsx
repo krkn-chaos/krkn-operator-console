@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, FormGroup, FormSelect, FormSelectOption, Spinner } from '@patternfly/react-core';
 import { workspacesApi } from '../services/workspacesApi';
-import type { WorkspaceInfo, WorkspaceReference } from '../types/api';
+import type { WorkspaceInfo, WorkspaceSelection } from '../types/api';
 
 interface WorkspaceSelectorProps {
-  value?: WorkspaceReference;
-  onChange: (value?: WorkspaceReference) => void;
+  value?: WorkspaceSelection;
+  onChange: (value?: WorkspaceSelection) => void;
   id: string;
 }
 
