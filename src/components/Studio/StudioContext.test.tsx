@@ -38,7 +38,7 @@ vi.mock('./studioAutosave', () => ({
 }));
 
 import { workflowsApi } from '../../services/workflowsApi';
-import { saveAutosave, clearAutosave } from './studioAutosave';
+import { saveAutosave, clearAutosave, AUTOSAVE_VERSION } from './studioAutosave';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -236,9 +236,36 @@ describe('StudioContext', () => {
       expect(payload.groups).toEqual(['team-a']);
       expect(payload.graph).toBeDefined();
       expect(payload.graph['node-a']).toBeDefined();
-      expect(payload.graph['node-a'].name).toBe('scenario-node-a');
+      expect(payload.graph['node-a'].scenario?.name).toBe('scenario-node-a');
       expect(payload.studioLayout).toBeDefined();
       expect(payload.studioLayout!.nodes).toHaveLength(1);
+    });
+
+    it('persists category selections and explicitly clears them when the selection is empty', async () => {
+      const wf: StudioWorkflow = { nodes: [makeConfiguredNode('node-a')], edges: [], nextNodeNumber: 2 };
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+
+      act(() => {
+        result.current.setCategoryCatalog([
+          { name: 'network', availableToAll: true },
+        ], 'ready');
+        result.current.loadWorkflow(wf, makeSavedWorkflow({ categories: ['network'] }));
+      });
+
+      await act(async () => {
+        await result.current.saveWorkflowToCluster();
+      });
+      expect(vi.mocked(workflowsApi.updateWorkflow).mock.calls[0][1].categories).toEqual(['network']);
+
+      act(() => {
+        result.current.setSelectedCategories([]);
+      });
+      expect(result.current.isDirty).toBe(true);
+
+      await act(async () => {
+        await result.current.saveWorkflowToCluster();
+      });
+      expect(vi.mocked(workflowsApi.updateWorkflow).mock.calls[1][1].categories).toEqual([]);
     });
 
     it('updates savedWorkflow timestamp after successful save', async () => {
@@ -370,6 +397,34 @@ describe('StudioContext', () => {
       expect(result.current.savedWorkflow?.workflowName).toBe('loaded-workflow');
     });
 
+    it('restores categories saved with a workflow template', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      act(() => {
+        result.current.loadWorkflow(
+          { nodes: [], edges: [], nextNodeNumber: 1 },
+          makeSavedWorkflow({ categories: ['network', 'reliability'] }),
+        );
+      });
+
+      expect(result.current.selectedCategories).toEqual(['network', 'reliability']);
+    });
+
+    it('hides unavailable categories from selection without deleting them from saved metadata', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      act(() => {
+        result.current.loadWorkflow(
+          { nodes: [], edges: [], nextNodeNumber: 1 },
+          makeSavedWorkflow({ categories: ['network', 'private-category'] }),
+        );
+      });
+      act(() => {
+        result.current.setCategoryCatalog([{ name: 'network', availableToAll: true }], 'ready');
+      });
+
+      expect(result.current.selectedCategories).toEqual(['network']);
+      expect(result.current.savedWorkflow?.categories).toEqual(['network', 'private-category']);
+    });
+
     it('captures the loaded workflow as the snapshot (isDirty is false)', () => {
       const wf: StudioWorkflow = {
         nodes: [makeConfiguredNode('snap-check')],
@@ -497,6 +552,7 @@ describe('StudioContext', () => {
 
       act(() => {
         result.current.addNode();
+        result.current.setSelectedCategories(['network']);
       });
 
       // Advance past the 30-second autosave interval
@@ -507,6 +563,7 @@ describe('StudioContext', () => {
       expect(saveAutosave).toHaveBeenCalled();
       const call = vi.mocked(saveAutosave).mock.calls[0][0];
       expect(call.workflow.nodes).toHaveLength(1);
+      expect(call.categories).toEqual(['network']);
       expect(call.version).toBe('1.0');
     });
 
@@ -816,70 +873,70 @@ describe('StudioContext', () => {
       expectedValid: boolean;
       expectedErrorSubstring?: string;
     }> = [
-      {
-        name: 'rejects when source node does not exist',
-        nodes: [makeConfiguredNode('only-target')],
-        edges: [],
-        source: 'ghost',
-        target: 'only-target',
-        expectedValid: false,
-        expectedErrorSubstring: 'not found',
-      },
-      {
-        name: 'rejects when source is unconfigured',
-        nodes: [
-          { nodeId: 'unconf', status: 'unconfigured', position: { x: 0, y: 0 } },
-          makeConfiguredNode('conf-tgt'),
-        ],
-        edges: [],
-        source: 'unconf',
-        target: 'conf-tgt',
-        expectedValid: false,
-        expectedErrorSubstring: 'Source node must be configured',
-      },
-      {
-        name: 'rejects when target is unconfigured',
-        nodes: [
-          makeConfiguredNode('conf-src'),
-          { nodeId: 'unconf-tgt', status: 'unconfigured', position: { x: 0, y: 0 } },
-        ],
-        edges: [],
-        source: 'conf-src',
-        target: 'unconf-tgt',
-        expectedValid: false,
-        expectedErrorSubstring: 'Target node must be configured',
-      },
-      {
-        name: 'rejects when target already has a dependency',
-        nodes: [
-          makeConfiguredNode('dep-src-1'),
-          makeConfiguredNode('dep-src-2'),
-          makeConfiguredNode('dep-tgt'),
-        ],
-        edges: [{ id: 'dep-src-1-dep-tgt', source: 'dep-src-1', target: 'dep-tgt' }],
-        source: 'dep-src-2',
-        target: 'dep-tgt',
-        expectedValid: false,
-        expectedErrorSubstring: 'one dependency',
-      },
-      {
-        name: 'rejects cycles (A->B->A)',
-        nodes: [makeConfiguredNode('cyc-a'), makeConfiguredNode('cyc-b')],
-        edges: [{ id: 'cyc-a-cyc-b', source: 'cyc-a', target: 'cyc-b' }],
-        source: 'cyc-b',
-        target: 'cyc-a',
-        expectedValid: false,
-        expectedErrorSubstring: 'Circular dependency',
-      },
-      {
-        name: 'allows a valid connection',
-        nodes: [makeConfiguredNode('ok-src'), makeConfiguredNode('ok-tgt')],
-        edges: [],
-        source: 'ok-src',
-        target: 'ok-tgt',
-        expectedValid: true,
-      },
-    ];
+        {
+          name: 'rejects when source node does not exist',
+          nodes: [makeConfiguredNode('only-target')],
+          edges: [],
+          source: 'ghost',
+          target: 'only-target',
+          expectedValid: false,
+          expectedErrorSubstring: 'not found',
+        },
+        {
+          name: 'rejects when source is unconfigured',
+          nodes: [
+            { nodeId: 'unconf', status: 'unconfigured', position: { x: 0, y: 0 } },
+            makeConfiguredNode('conf-tgt'),
+          ],
+          edges: [],
+          source: 'unconf',
+          target: 'conf-tgt',
+          expectedValid: false,
+          expectedErrorSubstring: 'Source node must be configured',
+        },
+        {
+          name: 'rejects when target is unconfigured',
+          nodes: [
+            makeConfiguredNode('conf-src'),
+            { nodeId: 'unconf-tgt', status: 'unconfigured', position: { x: 0, y: 0 } },
+          ],
+          edges: [],
+          source: 'conf-src',
+          target: 'unconf-tgt',
+          expectedValid: false,
+          expectedErrorSubstring: 'Target node must be configured',
+        },
+        {
+          name: 'rejects when target already has a dependency',
+          nodes: [
+            makeConfiguredNode('dep-src-1'),
+            makeConfiguredNode('dep-src-2'),
+            makeConfiguredNode('dep-tgt'),
+          ],
+          edges: [{ id: 'dep-src-1-dep-tgt', source: 'dep-src-1', target: 'dep-tgt' }],
+          source: 'dep-src-2',
+          target: 'dep-tgt',
+          expectedValid: false,
+          expectedErrorSubstring: 'one dependency',
+        },
+        {
+          name: 'rejects cycles (A->B->A)',
+          nodes: [makeConfiguredNode('cyc-a'), makeConfiguredNode('cyc-b')],
+          edges: [{ id: 'cyc-a-cyc-b', source: 'cyc-a', target: 'cyc-b' }],
+          source: 'cyc-b',
+          target: 'cyc-a',
+          expectedValid: false,
+          expectedErrorSubstring: 'Circular dependency',
+        },
+        {
+          name: 'allows a valid connection',
+          nodes: [makeConfiguredNode('ok-src'), makeConfiguredNode('ok-tgt')],
+          edges: [],
+          source: 'ok-src',
+          target: 'ok-tgt',
+          expectedValid: true,
+        },
+      ];
 
     cases.forEach(({ name, nodes, edges, source, target, expectedValid, expectedErrorSubstring }) => {
       it(name, () => {
@@ -913,50 +970,50 @@ describe('StudioContext', () => {
       expectedValid: boolean;
       expectedErrorSubstring?: string;
     }> = [
-      {
-        name: 'rejects IDs shorter than 5 characters',
-        nodeId: 'abc',
-        expectedValid: false,
-        expectedErrorSubstring: '5-25 characters',
-      },
-      {
-        name: 'rejects IDs longer than 25 characters',
-        nodeId: 'abcdefghijklmnopqrstuvwxyz',
-        expectedValid: false,
-        expectedErrorSubstring: '5-25 characters',
-      },
-      {
-        name: 'rejects IDs with uppercase letters',
-        nodeId: 'Node-One',
-        expectedValid: false,
-        expectedErrorSubstring: 'lowercase',
-      },
-      {
-        name: 'rejects IDs with special characters',
-        nodeId: 'node_one',
-        expectedValid: false,
-        expectedErrorSubstring: 'lowercase',
-      },
-      {
-        name: 'accepts a valid lowercase-hyphen ID',
-        nodeId: 'my-node',
-        expectedValid: true,
-      },
-      {
-        name: 'rejects duplicate nodeId',
-        nodeId: 'existing',
-        existingNodes: [makeConfiguredNode('existing')],
-        expectedValid: false,
-        expectedErrorSubstring: 'already exists',
-      },
-      {
-        name: 'allows duplicate when excluded (renaming self)',
-        nodeId: 'existing',
-        excludeId: 'existing',
-        existingNodes: [makeConfiguredNode('existing')],
-        expectedValid: true,
-      },
-    ];
+        {
+          name: 'rejects IDs shorter than 5 characters',
+          nodeId: 'abc',
+          expectedValid: false,
+          expectedErrorSubstring: '5-25 characters',
+        },
+        {
+          name: 'rejects IDs longer than 25 characters',
+          nodeId: 'abcdefghijklmnopqrstuvwxyz',
+          expectedValid: false,
+          expectedErrorSubstring: '5-25 characters',
+        },
+        {
+          name: 'rejects IDs with uppercase letters',
+          nodeId: 'Node-One',
+          expectedValid: false,
+          expectedErrorSubstring: 'lowercase',
+        },
+        {
+          name: 'rejects IDs with special characters',
+          nodeId: 'node_one',
+          expectedValid: false,
+          expectedErrorSubstring: 'lowercase',
+        },
+        {
+          name: 'accepts a valid lowercase-hyphen ID',
+          nodeId: 'my-node',
+          expectedValid: true,
+        },
+        {
+          name: 'rejects duplicate nodeId',
+          nodeId: 'existing',
+          existingNodes: [makeConfiguredNode('existing')],
+          expectedValid: false,
+          expectedErrorSubstring: 'already exists',
+        },
+        {
+          name: 'allows duplicate when excluded (renaming self)',
+          nodeId: 'existing',
+          excludeId: 'existing',
+          existingNodes: [makeConfiguredNode('existing')],
+          expectedValid: true,
+        },
+      ];
 
     validationCases.forEach(({ name, nodeId, excludeId, existingNodes, expectedValid, expectedErrorSubstring }) => {
       it(name, () => {
@@ -1015,9 +1072,14 @@ describe('StudioContext', () => {
         expect(Object.keys(exported.graph)).toHaveLength(2);
         expect(exported.graph['export-a'].depends_on).toBeUndefined();
         expect(exported.graph['export-b'].depends_on).toBe('export-a');
-        expect(exported.graph['export-a'].name).toBe('scenario-export-a');
+        expect(exported.graph['export-a'].scenario?.name).toBe('scenario-export-a');
         expect(exported.graph['export-a'].env).toEqual({ KEY: 'val' });
         expect(exported.metadata.nodeCount).toBe(2);
+        // studioLayout carries the full canvas for lossless re-import.
+        expect(exported.studioLayout).toBe(wf);
+        expect(exported.studioLayout.nodes).toEqual([nodeA, nodeB]);
+        expect(exported.studioLayout.edges).toEqual(wf.edges);
+        expect(exported.studioLayout.nextNodeNumber).toBe(3);
       }
     });
 
@@ -1040,11 +1102,102 @@ describe('StudioContext', () => {
   });
 
   // =========================================================================
+  // 12b. importWorkflow
+  // =========================================================================
+  describe('importWorkflow', () => {
+    it('replaces the current workflow with the imported one', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+
+      const imported: StudioWorkflow = {
+        nodes: [makeConfiguredNode('imp-a'), makeConfiguredNode('imp-b')],
+        edges: [{ id: 'imp-a-imp-b', source: 'imp-a', target: 'imp-b' }],
+        nextNodeNumber: 3,
+      };
+
+      act(() => {
+        result.current.importWorkflow(imported);
+      });
+
+      expect(result.current.workflow).toEqual(imported);
+    });
+
+    it('imports as a fresh UNSAVED workflow and resets edit state', () => {
+      // Start from a saved workflow so we can assert the reset.
+      const initial: StudioWorkflow = {
+        nodes: [makeConfiguredNode('load-a')],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+      const { result } = renderHook(() => useStudioContext(), {
+        wrapper: wrapperWith(initial),
+      });
+
+      act(() => {
+        result.current.loadWorkflow(initial, makeSavedWorkflow());
+        result.current.setIsEditingDetails(true);
+      });
+      expect(result.current.savedWorkflow).not.toBeNull();
+
+      const imported: StudioWorkflow = {
+        nodes: [makeConfiguredNode('imp-x')],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+      act(() => {
+        result.current.importWorkflow(imported);
+      });
+
+      // No savedWorkflow -> treated as new local work; edit state cleared.
+      expect(result.current.savedWorkflow).toBeNull();
+      expect(result.current.isEditingDetails).toBe(false);
+      // No snapshot recorded, so the fresh import is not marked dirty.
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it('clears autosave on import of an empty workflow', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      vi.mocked(clearAutosave).mockClear();
+      vi.mocked(saveAutosave).mockClear();
+
+      act(() => {
+        result.current.importWorkflow({ nodes: [], edges: [], nextNodeNumber: 1 });
+      });
+
+      expect(clearAutosave).toHaveBeenCalled();
+      // Empty workflow: nothing worth persisting.
+      expect(saveAutosave).not.toHaveBeenCalled();
+    });
+
+    it('persists the imported workflow to autosave immediately', () => {
+      const { result } = renderHook(() => useStudioContext(), { wrapper });
+      vi.mocked(clearAutosave).mockClear();
+      vi.mocked(saveAutosave).mockClear();
+
+      const imported: StudioWorkflow = {
+        nodes: [makeConfiguredNode('imp-a')],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+
+      act(() => {
+        result.current.importWorkflow(imported);
+      });
+
+      expect(clearAutosave).toHaveBeenCalled();
+      expect(saveAutosave).toHaveBeenCalledTimes(1);
+      const arg = vi.mocked(saveAutosave).mock.calls[0][0];
+      expect(arg.workflow).toEqual(imported);
+      expect(arg.version).toBe(AUTOSAVE_VERSION);
+      expect(typeof arg.timestamp).toBe('number');
+    });
+  });
+
+  // =========================================================================
   // 13. useStudioContext outside provider
   // =========================================================================
   describe('useStudioContext outside provider', () => {
     it('throws when used without StudioProvider', () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
       const { result } = renderHook(() => {
         try {
@@ -1155,6 +1308,41 @@ describe('StudioContext', () => {
 
       const graph = buildGraph(wf);
       expect(graph['env-node'].env).toEqual({ KEY: 'val', GLOBAL_KEY: 'global_val' });
+    });
+
+    it('exports the node resiliency weight and defaults legacy nodes to one', () => {
+      const weightedNode = makeConfiguredNode('weighted-node');
+      weightedNode.config!.resiliencyWeight = 2.5;
+
+      const graph = buildGraph({
+        nodes: [weightedNode, makeConfiguredNode('legacy-node')],
+        edges: [],
+        nextNodeNumber: 3,
+      });
+
+      expect(graph['weighted-node'].resiliencyWeight).toBe(2.5);
+      expect(graph['legacy-node'].resiliencyWeight).toBe(1);
+    });
+
+    it('strips cloud env vars and sets cloudCredentialRef when a credential is saved on the node', () => {
+      const node = makeConfiguredNode('cloud-node');
+      node.config!.scenarioFormValues = {
+        ACTION: 'node_stop_start_scenario',
+        AWS_ACCESS_KEY_ID: 'should-be-stripped',
+        CLOUD_TYPE: 'aws',
+      };
+      node.config!.cloudCredentialRef = 'aws-dummy';
+      const wf: StudioWorkflow = {
+        nodes: [node],
+        edges: [],
+        nextNodeNumber: 2,
+      };
+
+      const graph = buildGraph(wf);
+      expect(graph['cloud-node'].cloudCredentialRef).toBe('aws-dummy');
+      expect(graph['cloud-node'].env).toEqual({ ACTION: 'node_stop_start_scenario' });
+      expect(graph['cloud-node'].env?.AWS_ACCESS_KEY_ID).toBeUndefined();
+      expect(graph['cloud-node'].env?.CLOUD_TYPE).toBeUndefined();
     });
   });
 });

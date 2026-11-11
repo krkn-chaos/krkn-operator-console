@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { CopyIcon } from '@patternfly/react-icons';
+import { CopyIcon, DisconnectedIcon } from '@patternfly/react-icons';
+import { Tooltip } from '@patternfly/react-core';
 import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { operatorApi } from '../services/operatorApi';
 import { validateCommand } from '../utils/terminalValidation';
+import { isClusterUnavailable } from '../utils/clusterAvailability';
+import { ClusterHealthIndicator } from './ClusterHealthIndicator';
 import type { TargetResponse, AvailableCommandsResponse } from '../types/api';
 import './TerminalContent.css';
 
@@ -259,6 +262,26 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   // Execute command on selected cluster
   const executeCommand = async (command: string) => {
     if (!selectedCluster || !discoveryUuid) return;
+
+    const currentCluster = clusters?.find(
+      cluster =>
+        cluster.clusterName === selectedCluster.clusterName &&
+        cluster.operatorSource === selectedCluster.operatorSource
+    );
+    if (!currentCluster || isClusterUnavailable(currentCluster.online, currentCluster.clusterStatus)) {
+      const status = !currentCluster
+        ? 'no longer available'
+        : currentCluster.online === false
+          ? 'offline'
+          : 'unhealthy';
+      setOutputLines(prev => [
+        ...prev,
+        `☸ ${selectedCluster.clusterName} $ ${command}`,
+        `Error: Cluster ${selectedCluster.clusterName} is ${status}; command was not sent.`,
+      ]);
+      setSelectedCluster(null);
+      return;
+    }
 
     setIsExecuting(true);
 
@@ -575,13 +598,22 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
         ) : [];
         if (sortedClusters.length > 0 && clusterNumber >= 1 && clusterNumber <= sortedClusters.length) {
           const cluster = sortedClusters[clusterNumber - 1];
-          setSelectedCluster(cluster);
-          setOutputLines(prev => [
-            ...prev,
-            `$ ${command}`,
-            `Connected to cluster: ${cluster.clusterName}`,
-            '',
-          ]);
+          if (isClusterUnavailable(cluster.online, cluster.clusterStatus)) {
+            const status = cluster.online === false ? 'offline' : 'unhealthy';
+            setOutputLines(prev => [
+              ...prev,
+              `$ ${command}`,
+              `Error: Cluster ${cluster.clusterName} is ${status} and cannot be selected.`,
+            ]);
+          } else {
+            setSelectedCluster(cluster);
+            setOutputLines(prev => [
+              ...prev,
+              `$ ${command}`,
+              `Connected to cluster: ${cluster.clusterName}`,
+              '',
+            ]);
+          }
         } else {
           setOutputLines(prev => [
             ...prev,
@@ -715,7 +747,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
   const sortedClusters = [...clusters].sort((a, b) =>
     a.clusterName.localeCompare(b.clusterName)
   );
-  const columns = formatClustersGrid(sortedClusters);
+  const columns = formatClustersGrid(sortedClusters).filter((column) => column.length > 0);
   const totalPages = Math.ceil(sortedClusters.length / CLUSTERS_PER_PAGE);
   const hasNextPage = currentPage < totalPages - 1;
 
@@ -738,6 +770,18 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
                     <div key={cluster.uuid} className="cluster-item">
                       <span className="cluster-number">{globalIndex + 1}.</span>{' '}
                       <span className="cluster-name">{cluster.clusterName}</span>
+                      <ClusterHealthIndicator status={cluster.clusterStatus} />
+                      {cluster.online === false && (
+                        <Tooltip content="Cluster is offline" position="top">
+                          <span
+                            className="terminal-cluster-offline"
+                            role="img"
+                            aria-label="Cluster reachability: offline"
+                          >
+                            <DisconnectedIcon aria-hidden="true" />
+                          </span>
+                        </Tooltip>
+                      )}
                     </div>
                   );
                 })}
@@ -816,4 +860,3 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     </div>
   );
 }
-

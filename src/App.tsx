@@ -1,4 +1,4 @@
-import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant } from '@patternfly/react-core';
+import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, MastheadContent, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant, Spinner } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,10 @@ import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
 import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio, ElasticsearchDataView } from './components';
 import { FileManagementPage } from './components/FileManagement';
+import { CategoryManagementPage } from './components/CategoryManagement';
+import { ResiliencyHistoryPage } from './components/ResiliencyHistory';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH } from './components/AppSidebar';
+import { ComponentVersionsAccess } from './components/ComponentVersionsAccess';
 import { useRole } from './hooks/useRole';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
 import { ScenarioDetail } from './components/ScenarioDetail';
@@ -20,6 +23,8 @@ import { graphRunsApi } from './services';
 import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
 import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
+import { buildRerunIntent } from './utils/rerunIntent';
+import { loadGraphRunReplay } from './utils/graphRunReplay';
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -136,6 +141,17 @@ function App() {
     }
   };
 
+  const handleReplayWorkflow = async (graphRunName: string) => {
+    dispatch({ type: 'START_WORKFLOW_REPLAY' });
+    try {
+      const { workflow, categories } = await loadGraphRunReplay(graphRunName);
+      dispatch({ type: 'OPEN_STUDIO_REPLAY', payload: { workflow, categories } });
+    } catch (error) {
+      dispatch({ type: 'WORKFLOW_REPLAY_FAILED' });
+      showError('Failed to replay workflow', error instanceof Error ? error.message : 'Unable to load workflow');
+    }
+  };
+
   const handleCreateJob = () => {
     const proceed = async () => {
       // Create initial target for fetching clusters
@@ -162,28 +178,13 @@ function App() {
     proceed();
   };
 
-  const handleRerunScenario = async (run: ScenarioRunState, jobId: string) => {
+  const handleRerunScenario = async (run: ScenarioRunState) => {
     dispatch({ type: 'INIT_START' });
 
     try {
-      const config = await operatorApi.getJobConfig(jobId);
+      const config = await operatorApi.getScenarioRunConfig(run.scenarioRunName);
 
-      const clusters = Object.entries(config.targetClusters).flatMap(
-        ([operatorName, clusterNames]) =>
-          clusterNames.map(clusterName => ({ operatorName, clusterName }))
-      );
-
-      dispatch({
-        type: 'RERUN_SCENARIO',
-        payload: {
-          scenarioName: config.scenarioName,
-          registryName: run.registryName,
-          clusters,
-          environment: config.environment,
-          scenarioImage: config.scenarioImage,
-          kubeconfigPath: config.kubeconfigPath,
-        },
-      });
+      dispatch({ type: 'RERUN_SCENARIO', payload: buildRerunIntent(config, run) });
 
       const response = await operatorApi.createTargetRequest();
       dispatch({
@@ -231,11 +232,13 @@ function App() {
               onDeleteScenarioRun={handleDeleteScenarioRun}
               onDeleteJob={handleDeleteJob}
               onRerunScenario={handleRerunScenario}
+              scenarioRunDetails={state.scenarioRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
               onToggleGraphRunAccordion={(graphRunName) =>
                 dispatch({ type: 'TOGGLE_GRAPH_RUN_ACCORDION', payload: { graphRunName } })
               }
               onDeleteGraphRun={handleDeleteGraphRun}
+              onReplayWorkflow={handleReplayWorkflow}
               loadingRunDetails={state.loadingRunDetails}
             />
           </PageSection>
@@ -249,6 +252,13 @@ function App() {
         return (
           <PageSection>
             <ElasticsearchDataView />
+          </PageSection>
+        );
+
+      case 'resiliency_history':
+        return (
+          <PageSection isFilled>
+            <ResiliencyHistoryPage />
           </PageSection>
         );
 
@@ -268,10 +278,20 @@ function App() {
           </PageSection>
         );
 
+      case 'categories':
+        return (
+          <PageSection isFilled>
+            <CategoryManagementPage />
+          </PageSection>
+        );
+
       case 'studio':
         return (
           <PageSection>
-            <Studio />
+            <Studio
+              initialWorkflow={state.studioReplayWorkflow ?? undefined}
+              initialCategories={state.studioReplayCategories ?? undefined}
+            />
           </PageSection>
         );
 
@@ -358,8 +378,20 @@ function App() {
     proceed();
   };
 
+  const handleNavigateToCategories = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_CATEGORIES' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
   const handleNavigateToElasticsearchData = () => {
     const proceed = () => dispatch({ type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
+  const handleNavigateToResiliencyHistory = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_RESILIENCY_HISTORY' });
     if (!checkStudioGuard(proceed)) return;
     proceed();
   };
@@ -424,8 +456,10 @@ function App() {
       onRunScenario={handleCreateJob}
       onNavigateStudio={handleNavigateToStudio}
       onOpenFiles={handleNavigateToFiles}
+      onNavigateCategories={handleNavigateToCategories}
       onNavigateTerminal={handleNavigateToTerminal}
       onNavigateElasticsearchData={handleNavigateToElasticsearchData}
+      onNavigateResiliencyHistory={handleNavigateToResiliencyHistory}
       onNavigateSettings={handleNavigateToSettings}
       onEditProfile={handleEditProfile}
       onChangePassword={handleChangePassword}
@@ -463,6 +497,9 @@ function App() {
           </div>
         </MastheadBrand>
       </MastheadMain>
+      <MastheadContent style={{ justifyContent: 'flex-end' }}>
+        <ComponentVersionsAccess />
+      </MastheadContent>
     </Masthead>
   );
 
@@ -491,6 +528,39 @@ function App() {
         )}
         <PageSection isFilled>{renderContent()}</PageSection>
       </div>
+
+      {state.isWorkflowReplayLoading && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.38)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '1rem 1.25rem',
+              color: 'var(--pf-v5-global--Color--100)',
+              backgroundColor: 'var(--pf-v5-global--BackgroundColor--100)',
+              border: '1px solid var(--pf-v5-global--BorderColor--100)',
+              borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+              boxShadow: 'var(--pf-v5-global--BoxShadow--lg)',
+            }}
+          >
+            <Spinner size="md" aria-label="Loading workflow" />
+            <span>Opening workflow in Chaos Studio…</span>
+          </div>
+        </div>
+      )}
 
       <Modal
         variant={ModalVariant.medium}

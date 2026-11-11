@@ -38,6 +38,8 @@ import {
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { LogViewer } from './LogViewer';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
+import { ReportDownloadButton } from './ReportDownloadButton';
+import { JobDiagnosticAlert } from './JobDiagnosticAlert';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioRunStatusResponse, ClusterJobPhase } from '../types/api';
 
@@ -130,6 +132,8 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
         return { icon: <ExclamationTriangleIcon />, color: 'orange' as const, label: 'Partially Failed' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
@@ -145,6 +149,8 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
         return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'MaxRetriesExceeded':
+        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
         return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
     }
@@ -244,6 +250,22 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
             <ScenarioConfigDisplay scenarioRunName={scenarioRunName!} />
           </FlexItem>
 
+          {/* Report Download Section */}
+          <FlexItem>
+            <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <strong>Reports:</strong>
+              </div>
+              {run.scenarioRunName && (
+                <ReportDownloadButton
+                  runId={run.scenarioRunName}
+                  runName={run.scenarioRunName}
+                  runPhase={run.phase}
+                />
+              )}
+            </div>
+          </FlexItem>
+
           {/* Cluster Jobs */}
           {run.clusterJobs && run.clusterJobs.length > 0 ? (
             <FlexItem>
@@ -253,6 +275,7 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
                   {run.clusterJobs.map((job) => {
                     const isJobExpanded = expandedJobIds.has(job.jobId);
                     const jobPhaseDisplay = getJobPhaseDisplay(job.phase);
+                    const hasJobDetails = isJobExpanded;
 
                     return (
                       <DataListItem key={job.jobId} isExpanded={isJobExpanded}>
@@ -327,10 +350,11 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
                         <DataListContent
                           aria-label={`Details for job ${job.jobId}`}
                           id={`expand-job-${job.jobId}`}
-                          isHidden={!isJobExpanded}
+                          isHidden={!hasJobDetails}
                         >
-                          {isJobExpanded && (
+                          {hasJobDetails && (
                             <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
+                              <JobDiagnosticAlert job={job} />
                               {/* Job Metadata */}
                               <FlexItem>
                                 <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
@@ -363,7 +387,7 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
                                 </div>
                               </FlexItem>
 
-                              {/* Logs */}
+                              {/* Failed jobs always show logs so their cause is immediately available. */}
                               <FlexItem>
                                 <LogViewer
                                   scenarioRunName={run.scenarioRunName}

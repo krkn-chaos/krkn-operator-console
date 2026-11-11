@@ -5,6 +5,7 @@ import { ScenarioDetail } from './ScenarioDetail';
 import { AppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
+import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import type { AppState } from '../types/api';
 import type {
   ScenarioDetail as ScenarioDetailType,
@@ -13,10 +14,18 @@ import type {
   CreateScenarioRunResponse,
   ScenarioRunStatusResponse,
   ActiveRunsResponse,
+  StringField,
 } from '../types/api';
 
 vi.mock('../services/operatorApi');
 vi.mock('../services/elasticsearchApi');
+vi.mock('../services/cloudCredentialsApi');
+vi.mock('../services/signatureVerificationApi', () => ({
+  signatureVerificationApi: {
+    getSettings: vi.fn().mockResolvedValue({ enabled: true }),
+    updateSettings: vi.fn(),
+  },
+}));
 
 describe('ScenarioDetail', () => {
   const mockDispatch = vi.fn();
@@ -90,6 +99,7 @@ describe('ScenarioDetail', () => {
     scenarioGlobals: null,
     globalFormValues: null,
     globalTouchedFields: null,
+    isRerunFlow: false,
     scenarios: null,
     selectedScenarios: null,
     selectedScenario: null,
@@ -111,9 +121,11 @@ describe('ScenarioDetail', () => {
     providerConfigStatus: 'idle',
     providerConfigData: null,
     rerunIntent: null,
+    rerunCategories: [],
     startInPreview: false,
-    rerunScenarioImage: null,
+    rerunScenario: null,
     rerunKubeconfigPath: null,
+    rerunCloudCredentialRef: null,
     notifications: [],
   };
 
@@ -127,10 +139,54 @@ describe('ScenarioDetail', () => {
     );
   };
 
+  const waitForSignatureVerification = async () => {
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Image signature verification in progress' }),
+      ).not.toBeInTheDocument();
+    });
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(operatorApi.getClusters).mockResolvedValue({
+      status: 'ready',
+      targetData: {
+        'krkn-operator': [{
+          'cluster-name': 'cluster1',
+          'cluster-api-url': 'https://api.cluster1.example.com:6443',
+          'cluster-status': 'healthy',
+          online: true,
+        }],
+      },
+    });
+    vi.mocked(operatorApi.getScenarios).mockResolvedValue({ scenarios: [] });
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({ files: [] });
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({ categories: [], total: 0 });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
+    vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
+  });
+
+  describe('Signature verification loading', () => {
+    it('keeps the loading status focusable while verification is pending', async () => {
+      let resolveScenarios!: (response: { scenarios: { name: string; signature_status: 'signed' }[] }) => void;
+      vi.mocked(operatorApi.getScenarios).mockImplementationOnce(
+        () => new Promise((resolve) => { resolveScenarios = resolve; }),
+      );
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        scenarios: null,
+      });
+
+      const loadingStatus = await screen.findByRole('status', { hidden: true });
+      expect(loadingStatus).toHaveAttribute('tabindex', '0');
+
+      resolveScenarios({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+      });
+      await waitForSignatureVerification();
+    });
   });
 
   describe('Component Loading', () => {
@@ -214,10 +270,99 @@ describe('ScenarioDetail', () => {
       expect(screen.getByText(/sha256:abc123def456/i)).toBeInTheDocument();
     });
 
-    it('should render back button', () => {
+    it('copies the complete digest and announces success', async () => {
+      const user = userEvent.setup();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText },
+      });
       renderWithContext();
 
+      await user.click(screen.getByRole('button', { name: /copy full digest/i }));
+
+      expect(writeText).toHaveBeenCalledWith('sha256:abc123def456');
+      expect(await screen.findByRole('status')).toHaveTextContent('Digest copied.');
+    });
+
+    it('resets copy feedback while a repeat digest copy is pending', async () => {
+      const user = userEvent.setup();
+      let resolveSecondCopy: (() => void) | undefined;
+      const writeText = vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockImplementationOnce(() => new Promise<void>((resolve) => {
+          resolveSecondCopy = resolve;
+        }));
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText },
+      });
+      renderWithContext();
+
+      const copyButton = screen.getByRole('button', { name: /copy full digest/i });
+      await user.click(copyButton);
+      expect(await screen.findByRole('status')).toHaveTextContent('Digest copied.');
+
+      await user.click(copyButton);
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+      expect(resolveSecondCopy).toBeDefined();
+      resolveSecondCopy?.();
+      expect(await screen.findByRole('status')).toHaveTextContent('Digest copied.');
+    });
+
+    it('shows an accessible error and the full digest when copying fails', async () => {
+      const user = userEvent.setup();
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: vi.fn().mockRejectedValue(new Error('permission denied')) },
+      });
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /copy full digest/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not copy the digest.');
+      expect(screen.getByRole('alert')).toHaveTextContent('sha256:abc123def456');
+    });
+
+    it('should render back button', () => {
+      renderWithContext({ scenarios: [{ name: 'test-scenario' }] });
+
       expect(screen.getByRole('button', { name: /Back to Scenarios List/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Cancel Button', () => {
+    it('should render a cancel button and ask for confirmation', async () => {
+      const user = userEvent.setup();
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+
+      expect(screen.getByText(/cancel scenario configuration/i)).toBeInTheDocument();
+      expect(screen.getByText(/are you sure you want to cancel/i)).toBeInTheDocument();
+    });
+
+    it('dispatches CANCEL_WORKFLOW when cancellation is confirmed', async () => {
+      const user = userEvent.setup();
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+      await user.click(screen.getByRole('button', { name: /yes, cancel/i }));
+
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'CANCEL_WORKFLOW' });
+    });
+
+    it('dismisses the confirmation without leaving the page', async () => {
+      const user = userEvent.setup();
+      renderWithContext();
+
+      await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
+      await user.click(screen.getByRole('button', { name: /no, continue editing/i }));
+
+      expect(screen.queryByText(/cancel scenario configuration/i)).not.toBeInTheDocument();
+      expect(mockDispatch).not.toHaveBeenCalledWith({ type: 'CANCEL_WORKFLOW' });
     });
   });
 
@@ -241,6 +386,19 @@ describe('ScenarioDetail', () => {
       // The DynamicFormBuilder will render the input field
       // This test verifies the component structure
       expect(screen.getByText('Required Parameters')).toBeInTheDocument();
+    });
+
+    it('shows an empty state when the scenario has no required parameters', () => {
+      const scenarioWithoutRequiredFields: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [mockScenarioDetail.fields[1]],
+      };
+      renderWithContext({ scenarioDetail: scenarioWithoutRequiredFields, scenarioFormValues: {} });
+
+      expect(screen.getByText('No required parameters')).toBeInTheDocument();
+      expect(screen.getByText(/can be previewed and run without filling this section/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Optional Parameters/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Preview Configuration/i })).toBeInTheDocument();
     });
   });
 
@@ -493,6 +651,62 @@ describe('ScenarioDetail', () => {
       // KILL_COUNT should show default value '1'
       expect(screen.getByText('1')).toBeInTheDocument();
     });
+
+    it('should mask cloud-injected fields in preview when credential is applied', async () => {
+      const user = userEvent.setup();
+      const detailWithCloudFields: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [
+          ...mockScenarioDetail.fields,
+          {
+            name: 'ibmc-url',
+            variable: 'IBMC_URL',
+            short_description: 'IBM Cloud URL [*IBM Cloud only*]',
+            title: 'IBM Cloud URL',
+            description: 'IBM Cloud URL',
+            type: 'string',
+            required: false,
+            default: '',
+          },
+          {
+            name: 'ibmc-api-key',
+            variable: 'IBMC_APIKEY',
+            short_description: 'IBM Cloud API key [*IBM Cloud only*]',
+            title: 'IBM Cloud API key',
+            description: 'IBM Cloud API Key',
+            type: 'string',
+            required: false,
+            default: '',
+            secret: true,
+          },
+        ],
+      };
+
+      vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([
+        { name: 'ibm1', provider: 'ibmcloud', description: 'IBM test cred' },
+      ]);
+
+      renderWithContext({
+        scenarioDetail: detailWithCloudFields,
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Load Cloud Credential')).toBeInTheDocument();
+      });
+
+      const credSelect = screen.getByRole('combobox', { name: /Load from saved credential/i });
+      await user.selectOptions(credSelect, 'ibm1');
+
+      const previewButton = screen.getByRole('button', { name: /Preview Configuration/i });
+      await user.click(previewButton);
+
+      const maskedValues = screen.getAllByText('••••••••');
+      expect(maskedValues.length).toBeGreaterThanOrEqual(2);
+      expect(screen.queryByText('(empty)')).not.toBeInTheDocument();
+    });
   });
 
   describe('Running Scenario', () => {
@@ -529,6 +743,47 @@ describe('ScenarioDetail', () => {
       clusterRuns: {},
     };
 
+    it('refreshes health and removes a cluster that became unhealthy before submission', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getClusters).mockResolvedValueOnce({
+        status: 'ready',
+        targetData: {
+          'krkn-operator': [{
+            'cluster-name': 'cluster1',
+            'cluster-api-url': 'https://api.cluster1.example.com:6443',
+            'cluster-status': 'unhealthy',
+            online: true,
+          }],
+        },
+      });
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      expect(await screen.findByText(/Cluster availability changed before submission/)).toBeInTheDocument();
+      expect(operatorApi.getClusters).toHaveBeenCalledWith('test-uuid-123');
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'TOGGLE_CLUSTER',
+        payload: { cluster: expect.objectContaining({ operatorName: 'krkn-operator', clusterName: 'cluster1' }) },
+      });
+      expect(operatorApi.getActiveRuns).not.toHaveBeenCalled();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('does not submit when cluster health cannot be refreshed', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getClusters).mockRejectedValueOnce(new Error('discovery unavailable'));
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      expect(await screen.findByText(/Could not verify cluster availability before running: discovery unavailable/)).toBeInTheDocument();
+      expect(operatorApi.getActiveRuns).not.toHaveBeenCalled();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
     it('should run scenario when run button clicked in preview mode', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
@@ -554,6 +809,405 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalled();
       });
+    });
+
+    it('preserves the declared mount path for a touched global file parameter', async () => {
+      const user = userEvent.setup();
+      const resiliencyFile = new File(['slo: {}'], 'resiliency.yaml', { type: 'application/yaml' });
+      const globalFileMountPath = '/home/krkn/resiliency-file.yaml';
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+        scenarioGlobals: {
+          ...mockScenarioGlobals,
+          fields: [{
+            name: 'resiliency-file',
+            variable: 'RESILIENCY_FILE',
+            short_description: 'Resiliency score metrics file',
+            description: 'SLO definitions for resiliency scoring',
+            type: 'file',
+            mount_path: globalFileMountPath,
+          }],
+        },
+        globalFormValues: { RESILIENCY_FILE: resiliencyFile },
+        globalTouchedFields: { RESILIENCY_FILE: true },
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({
+            files: [{
+              name: 'resiliency.yaml',
+              content: expect.any(String),
+              mountPath: globalFileMountPath,
+            }],
+          }),
+        );
+      });
+    });
+
+    it('allows a scenario without required parameters to preview and run', async () => {
+      const user = userEvent.setup();
+      const scenarioWithoutRequiredFields: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [mockScenarioDetail.fields[1]],
+      };
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioDetail: scenarioWithoutRequiredFields,
+        scenarioFormValues: {},
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      expect(screen.getByText('Configuration Preview')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalled();
+      });
+    });
+
+    it('sends selected visible categories with a new scenario run', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getCategories).mockResolvedValueOnce({
+        categories: [
+          { name: 'network', color: '#d40078', availableToAll: true },
+          { name: 'reliability', color: '#ff9900', availableToAll: true },
+        ],
+        total: 2,
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(await screen.findByRole('button', { name: /assign categories to this run/i }));
+      await user.click(screen.getByRole('checkbox', { name: 'network' }));
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ categories: ['network'] }),
+        );
+      });
+    });
+
+    it('restores only currently visible categories when replaying a scenario run', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getCategories).mockResolvedValueOnce({
+        categories: [{ name: 'network', color: '#d40078', availableToAll: true }],
+        total: 1,
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        rerunCategories: ['network', 'no-longer-visible'],
+      });
+
+      await waitForSignatureVerification();
+      const toggle = await screen.findByRole('button', { name: /assign categories to this run/i });
+      await waitFor(() => expect(toggle).toHaveTextContent('1 category selected'));
+      await user.click(toggle);
+      expect(screen.getByRole('checkbox', { name: 'network' })).toBeChecked();
+      expect(screen.queryByRole('checkbox', { name: 'no-longer-visible' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ categories: ['network'] }),
+        );
+      });
+    });
+
+    it('keeps replay categories when the category catalog fails to load', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getCategories).mockRejectedValueOnce(new Error('temporary failure'));
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: { NAMESPACE: 'default' },
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        rerunCategories: ['network'],
+      });
+
+      await waitForSignatureVerification();
+      await waitFor(() => expect(screen.getByText('Categories could not be loaded')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ categories: ['network'] }),
+        );
+      });
+    });
+
+    it('should serialize a customized maximum retry count', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      const retriesInput = screen.getByRole('spinbutton', { name: /Maximum retries/i });
+      await user.clear(retriesInput);
+      await user.type(retriesInput, '5');
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 5 }));
+      });
+    });
+
+    it('rejects fractional maximum retries before submitting', async () => {
+      const user = userEvent.setup();
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      const retriesInput = screen.getByRole('spinbutton', { name: /Maximum retries/i });
+      await user.clear(retriesInput);
+      await user.type(retriesInput, '1.5');
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      expect(await screen.findByText('Maximum retries must be a non-negative whole number.')).toBeInTheDocument();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('includes retry-exhausted jobs in the immediate failure summary', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce({
+        ...mockStatusResponse,
+        failedJobs: 1,
+        clusterJobs: [{
+          providerName: 'krkn-operator',
+          clusterName: 'cluster1',
+          jobId: 'job-123',
+          podName: 'pod-123',
+          phase: 'MaxRetriesExceeded',
+          message: 'retry limit reached',
+        }],
+      });
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/retry limit reached/)).toBeInTheDocument();
+      });
+    });
+
+    it('should run scenario when Enter is pressed in a parameter field', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('should ignore repeated Enter while a scenario submission is pending', async () => {
+      const user = userEvent.setup();
+      let resolveActiveRuns!: (response: ActiveRunsResponse) => void;
+      vi.mocked(operatorApi.getActiveRuns).mockImplementation(
+        () => new Promise((resolve) => { resolveActiveRuns = resolve; })
+      );
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+      await waitFor(() => expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(1));
+
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(1);
+      resolveActiveRuns(mockActiveRuns);
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledTimes(1));
+    });
+
+    it('should not run scenario when Shift+Enter is pressed in a parameter field', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Shift>}{Enter}{/Shift}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('should not run scenario for non-Enter keys in a parameter field', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('a');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('should run scenario when Enter is pressed on a select field', async () => {
+      const user = userEvent.setup();
+      const detailWithEnum: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [
+          {
+            name: 'mode',
+            variable: 'MODE',
+            short_description: 'Mode',
+            title: 'Mode',
+            description: 'Scenario mode',
+            type: 'enum',
+            required: true,
+            allowed_values: 'safe,fast',
+            separator: ',',
+          },
+        ],
+      };
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioDetail: detailWithEnum,
+        scenarioFormValues: { MODE: 'safe' },
+      });
+
+      const modeSelect = screen.getByRole('combobox');
+      await user.click(modeSelect);
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('should not run scenario when Enter is pressed in preview mode', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        startInPreview: true,
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      const runNameInput = screen.getByPlaceholderText('e.g. nightly-pod-disruption-test');
+      await user.click(runNameInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('should validate required fields before running from Enter', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({ scenarioFormValues: {} });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      expect(screen.getByText(/Target namespace is required/i)).toBeInTheDocument();
+    });
+
+    it('should validate pattern-constrained fields before running from Enter', async () => {
+      const user = userEvent.setup();
+      const detailWithValidator: ScenarioDetailType = {
+        ...mockScenarioDetail,
+        fields: [
+          {
+            ...(mockScenarioDetail.fields[0] as StringField),
+            validator: '^[a-z]+$',
+            validation_message: 'Use lowercase letters only',
+          },
+        ],
+      };
+
+      renderWithContext({
+        scenarioDetail: detailWithValidator,
+        scenarioFormValues: { NAMESPACE: 'INVALID_VALUE' },
+      });
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      expect(screen.getAllByText(/Use lowercase letters only/i).length).toBeGreaterThan(0);
+    });
+
+    it('should block Enter while a managed file input is pending', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+        files: [
+          { fileId: 'file-1', fileName: 'metrics.yaml', description: 'Metrics config', availableToAll: true },
+        ],
+      });
+
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await waitFor(() => expect(operatorApi.getAvailableFiles).toHaveBeenCalled());
+      await user.click(await screen.findByText('Select a file'));
+      await user.click(await screen.findByText('metrics.yaml'));
+
+      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      await user.click(namespaceInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      expect(screen.getByText('Pending file not added')).toBeInTheDocument();
     });
 
     it('should build correct scenario run request with public registry', async () => {
@@ -582,13 +1236,41 @@ describe('ScenarioDetail', () => {
             targetClusters: {
               'krkn-operator': ['cluster1'],
             },
-            scenarioImage: 'krkn-hub:pod-scenarios',
-            scenarioName: 'pod-scenarios',
+            scenario: { name: 'pod-scenarios', private: false },
             environment: expect.objectContaining({
               NAMESPACE: 'default',
               KILL_COUNT: '5',
             }),
           })
+        );
+      });
+    });
+
+
+    it('should include resiliencyScoreEnabled when the resiliency score switch is enabled', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        scenarioFormValues: {
+          NAMESPACE: 'default',
+        },
+      });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+
+      const resiliencySwitch = screen.getByRole('checkbox');
+      expect(resiliencySwitch).not.toBeChecked();
+      await user.click(resiliencySwitch);
+      expect(resiliencySwitch).toBeChecked();
+
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ resiliencyScoreEnabled: true })
         );
       });
     });
@@ -623,11 +1305,113 @@ describe('ScenarioDetail', () => {
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalledWith(
           expect.objectContaining({
-            scenarioImage: 'pod-scenarios', // Private registry: no krkn-hub prefix
-            registryName: 'corp-registry',
+            scenario: { name: 'pod-scenarios', private: true, registryName: 'corp-registry' },
           })
         );
       });
+    });
+
+    it('should preserve the scenario reference when rerunning', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: true, registryName: 'rerun-registry' },
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitForSignatureVerification();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenario: { name: 'pod-scenarios', private: true, registryName: 'rerun-registry' },
+          })
+        );
+      });
+    });
+
+    it('allows a signed rerun when the scenario list was not loaded', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        scenarios: null,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitForSignatureVerification();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.getScenarios).toHaveBeenCalledWith({});
+        expect(operatorApi.runScenario).toHaveBeenCalled();
+      });
+    });
+
+    it('resubmits the saved cloud credential when replaying a signed scenario', async () => {
+      const user = userEvent.setup();
+      vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValueOnce([
+        { name: 'aws-ci', provider: 'aws', description: 'AWS test credential' },
+      ]);
+      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        rerunCloudCredentialRef: 'aws-ci',
+        scenarios: null,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitForSignatureVerification();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ cloudCredentialRef: 'aws-ci' }),
+        );
+      });
+    });
+
+    it('blocks an unsigned rerun when the scenario list was not loaded', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.getScenarios).mockResolvedValueOnce({
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'unsigned' }],
+      });
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+
+      renderWithContext({
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        scenarios: null,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      await waitForSignatureVerification();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('This scenario cannot run because its image signature is not verified.')).toBeInTheDocument();
+      });
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
     });
 
     it('should dispatch scenario run created action', async () => {
@@ -808,12 +1592,31 @@ describe('ScenarioDetail', () => {
   describe('Back Navigation', () => {
     it('should dispatch go back action when back button clicked', async () => {
       const user = userEvent.setup();
-      renderWithContext();
+      renderWithContext({ scenarios: [{ name: 'test-scenario' }] });
 
       const backButton = screen.getByRole('button', { name: /Back to Scenarios List/i });
       await user.click(backButton);
 
       expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    });
+
+    it('should render the job list back button in replay flow', async () => {
+      const user = userEvent.setup();
+      renderWithContext({
+        isRerunFlow: true,
+        scenarios: [{ name: 'stale-scenario' }],
+      });
+
+      const backButton = screen.getByRole('button', { name: /Back to Job List/i });
+      await user.click(backButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    });
+
+    it('keeps the scenario-list label when the scenario cache is empty outside replay', () => {
+      renderWithContext({ isRerunFlow: false, scenarios: null });
+
+      expect(screen.getByRole('button', { name: /Back to Scenarios List/i })).toBeInTheDocument();
     });
   });
 
@@ -1193,6 +1996,21 @@ describe('ScenarioDetail', () => {
 
       // When hasGroupedScenarioFields is true, optional section is suppressed
       expect(screen.queryByRole('button', { name: /Optional Parameters/i })).not.toBeInTheDocument();
+    });
+
+    it('should not run when Enter is pressed in a grouped-field search input', async () => {
+      const user = userEvent.setup();
+
+      renderWithContext({
+        scenarioDetail: groupedScenarioDetail,
+        scenarioFormValues: { NAMESPACE: 'default' },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Filter fields...');
+      await user.click(searchInput);
+      await user.keyboard('{Enter}');
+
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
     });
   });
 });

@@ -22,6 +22,8 @@ describe('ClusterPermissionsTable', () => {
       uuid: 'target-1',
       clusterName: 'cluster1',
       clusterAPIURL: 'https://api.cluster1.example.com',
+      operatorSource: 'krkn-operator-acm',
+      clusterStatus: 'unhealthy',
       secretType: 'token',
       ready: true,
     },
@@ -59,6 +61,7 @@ describe('ClusterPermissionsTable', () => {
     expect(screen.getByText('cluster2')).toBeInTheDocument();
     expect(screen.getByText('https://api.cluster1.example.com')).toBeInTheDocument();
     expect(screen.getByText('https://api.cluster2.example.com')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cluster status: unhealthy')).toHaveClass('pf-m-red');
   });
 
   it('should display checkboxes for each action', () => {

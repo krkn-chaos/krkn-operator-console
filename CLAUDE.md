@@ -214,6 +214,9 @@ git push                                        # Push to remote
 - Avoid inline function definitions in JSX
 - Use React.memo for expensive components
 
+**UI Consistency:**
+- MANDATORY: All UI work MUST follow `src/UI_STYLE_GUIDE.md` (buttons & icons, loaders & states, tables/forms/modals). Copy the "Canonical" components it cites instead of inventing new patterns.
+
 **Frontend Quality:**
 - Use ESLint and Prettier
 - Write component tests with React Testing Library

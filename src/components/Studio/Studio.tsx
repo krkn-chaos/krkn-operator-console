@@ -19,6 +19,7 @@ import {
   Button,
   Flex,
   FlexItem,
+  FormGroup,
   Modal,
   ModalVariant,
   Spinner,
@@ -27,9 +28,11 @@ import { ArrowLeftIcon, PencilAltIcon, TrashIcon, ExclamationTriangleIcon, SaveI
 import { useAppContext } from '../../context/AppContext';
 import { useStudioTargetFetch } from '../../hooks/useStudioTargetFetch';
 import { useNotifications } from '../../hooks';
+import { useVisibleCategories } from '../../hooks/useVisibleCategories';
 import { workflowsApi } from '../../services/workflowsApi';
 import { StudioProvider, useStudioContext } from './StudioContext';
 import { loadAutosave, clearAutosave } from './studioAutosave';
+import { getStudioRecoveryState } from './studioRecovery';
 import { StudioToolbar } from './StudioToolbar';
 import { StudioCanvas } from './StudioCanvas';
 import { StudioRecoveryModal } from './StudioRecoveryModal';
@@ -37,12 +40,29 @@ import { StudioNodeEditorModal } from './StudioNodeEditorModal';
 import { RunWorkflowModal } from './RunWorkflowModal';
 import { LoadWorkflowSelect } from './LoadWorkflowSelect';
 import { WorkflowDetailsPanel } from './WorkflowDetailsPanel';
+import { CategoryMultiSelect } from '../CategoryMultiSelect';
 import { studioLeaveGuard } from './studioLeaveGuard';
 import type { StudioWorkflow, StudioNode } from '../../types/api';
 
 function StudioContent() {
   const { dispatch } = useAppContext();
-  const { updateNode, workflow, savedWorkflow, isDirty, saveWorkflowToCluster, clearSavedWorkflow, clearWorkflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const {
+    updateNode,
+    workflow,
+    savedWorkflow,
+    isDirty,
+    saveWorkflowToCluster,
+    clearSavedWorkflow,
+    clearWorkflow,
+    isEditingDetails,
+    setIsEditingDetails,
+    selectedCategories,
+    setSelectedCategories,
+    visibleCategories,
+    categoryLoadStatus,
+    setCategoryCatalog,
+  } = useStudioContext();
+  const categoriesQuery = useVisibleCategories();
   const { showSuccess, showError } = useNotifications();
   const [selectedNode, setSelectedNode] = useState<StudioNode | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -54,6 +74,10 @@ function StudioContent() {
   const [leaveReason, setLeaveReason] = useState<'dirty' | 'unsaved' | 'editing'>('dirty');
   const pendingLeaveAction = useRef<(() => void) | null>(null);
   const targetFetch = useStudioTargetFetch();
+
+  useEffect(() => {
+    setCategoryCatalog(categoriesQuery.categories, categoriesQuery.status);
+  }, [categoriesQuery.categories, categoriesQuery.status, setCategoryCatalog]);
 
   const workflowRef = useRef(workflow);
   workflowRef.current = workflow;
@@ -199,11 +223,24 @@ function StudioContent() {
 
       {/* Workflow load + details */}
       <Card style={{ marginBottom: '1rem' }}>
-        <CardTitle>Workflow Templates</CardTitle>
+        <CardTitle>Workflow setup</CardTitle>
         <CardBody>
-          <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
+          <Flex alignItems={{ default: 'alignItemsFlexEnd' }} spaceItems={{ default: 'spaceItemsSm' }}>
             <FlexItem>
-              <LoadWorkflowSelect />
+              <FormGroup label="Workflow" fieldId="studio-load-workflow">
+                <LoadWorkflowSelect id="studio-load-workflow" />
+              </FormGroup>
+            </FlexItem>
+            <FlexItem>
+              <CategoryMultiSelect
+                id="studio-run-categories"
+                label="Assign categories to this run"
+                categories={visibleCategories}
+                status={categoryLoadStatus}
+                selectedCategories={selectedCategories}
+                onSelectionChange={setSelectedCategories}
+                onRetry={() => { void categoriesQuery.reload(); }}
+              />
             </FlexItem>
             {savedWorkflow && !isEditingDetails && (
               <FlexItem>
@@ -332,18 +369,35 @@ function StudioContent() {
   );
 }
 
-export function Studio() {
-  const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(undefined);
+export function Studio({
+  initialWorkflow: replayWorkflow,
+  initialCategories = [],
+}: {
+  initialWorkflow?: StudioWorkflow;
+  initialCategories?: string[];
+}) {
+  const [initialWorkflow, setInitialWorkflow] = useState<StudioWorkflow | undefined>(replayWorkflow);
+  const [categorySelection, setCategorySelection] = useState<string[]>([]);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; timestamp: number } | null>(null);
+  const [autosaveData, setAutosaveData] = useState<{ workflow: StudioWorkflow; categories: string[]; timestamp: number } | null>(null);
   const [isReady, setIsReady] = useState(false); // Wait for user decision
 
   // Check for autosave on mount
   useEffect(() => {
+    if (replayWorkflow) {
+      clearAutosave();
+      setInitialWorkflow(replayWorkflow);
+      setCategorySelection(initialCategories);
+      setIsReady(true);
+      return;
+    }
+
     const autosave = loadAutosave();
     if (autosave) {
+      const recovery = getStudioRecoveryState(autosave);
       setAutosaveData({
-        workflow: autosave.workflow,
+        workflow: recovery.workflow,
+        categories: recovery.categories,
         timestamp: autosave.timestamp,
       });
       setShowRecoveryModal(true);
@@ -352,12 +406,14 @@ export function Studio() {
       // No autosave, ready to start fresh
       setIsReady(true);
     }
-  }, []);
+  }, [initialCategories, replayWorkflow]);
 
   // Handle recovery modal actions
   const handleResumeAutosave = () => {
     if (autosaveData) {
-      setInitialWorkflow(autosaveData.workflow);
+      const recovery = getStudioRecoveryState(autosaveData);
+      setInitialWorkflow(recovery.workflow);
+      setCategorySelection(recovery.categories);
     }
     setShowRecoveryModal(false);
     setIsReady(true); // Now ready with autosave data
@@ -386,7 +442,7 @@ export function Studio() {
   }
 
   return (
-    <StudioProvider initialWorkflow={initialWorkflow}>
+    <StudioProvider initialWorkflow={initialWorkflow} initialCategories={categorySelection}>
       <StudioContent />
     </StudioProvider>
   );

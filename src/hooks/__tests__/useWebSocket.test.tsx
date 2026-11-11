@@ -125,7 +125,7 @@ describe('useWebSocket', () => {
       result.current.subscribe('run', ['run-1']);
     });
 
-    expect(mockSubscribe).toHaveBeenCalledWith('test-callbacks', 'run', ['run-1'], undefined, undefined);
+    expect(mockSubscribe).toHaveBeenCalledWith('test-callbacks', 'run', ['run-1'], undefined, undefined, undefined, undefined);
 
     act(() => {
       result.current.unsubscribe('run', ['run-1']);
@@ -143,7 +143,19 @@ describe('useWebSocket', () => {
       result.current.subscribe('jobs', undefined, 2, 20);
     });
 
-    expect(mockSubscribe).toHaveBeenCalledWith('test-pagination', 'jobs', undefined, 2, 20);
+    expect(mockSubscribe).toHaveBeenCalledWith('test-pagination', 'jobs', undefined, 2, 20, undefined, undefined);
+  });
+
+  it('forwards category filters and subscription correlation IDs', () => {
+    const { result } = renderHook(() => useWebSocket('test-categories', 'ws://localhost/test'));
+
+    act(() => {
+      result.current.subscribe('jobs', undefined, 1, 20, ['network-chaos'], 'jobs-2');
+    });
+
+    expect(mockSubscribe).toHaveBeenCalledWith(
+      'test-categories', 'jobs', undefined, 1, 20, ['network-chaos'], 'jobs-2',
+    );
   });
 
   it('should clean up handlers on unmount in subscription mode', () => {

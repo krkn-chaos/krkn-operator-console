@@ -29,6 +29,7 @@ import {
   ToolbarGroup,
 } from '@patternfly/react-core';
 import type { ClusterPermissions, TargetResponse } from '../types/api';
+import { ClusterHealthIndicator } from './ClusterHealthIndicator';
 
 interface ClusterPermissionsTableProps {
   /** Available target clusters */
@@ -138,6 +139,7 @@ export function ClusterPermissionsTable({
     const updated = { ...clusterPermissions };
 
     targets.forEach((target) => {
+      if (action === 'run' && target.online === false) return;
       const url = target.clusterAPIURL;
       const current = updated[url] || { actions: [] };
       if (!current.actions.includes(action)) {
@@ -170,7 +172,8 @@ export function ClusterPermissionsTable({
 
   // Check if all targets have a specific action
   const allHaveAction = (action: Action): boolean => {
-    return targets.every((target) => hasAction(target.clusterAPIURL, action));
+    const eligibleTargets = action === 'run' ? targets.filter((target) => target.online !== false) : targets;
+    return eligibleTargets.length > 0 && eligibleTargets.every((target) => hasAction(target.clusterAPIURL, action));
   };
 
   if (targets.length === 0 && orphanedUrls.length === 0) {
@@ -283,6 +286,7 @@ export function ClusterPermissionsTable({
                             <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
                               {target.clusterName}
                             </strong>
+                            <ClusterHealthIndicator status={target.clusterStatus} />
                           </div>
                           <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
                             {target.clusterAPIURL}
@@ -311,6 +315,7 @@ export function ClusterPermissionsTable({
                             id={`${target.uuid}-run`}
                             isChecked={hasAction(target.clusterAPIURL, 'run')}
                             onChange={() => toggleAction(target.clusterAPIURL, 'run')}
+                            isDisabled={target.online === false}
                             aria-label={`Run permission for ${target.clusterName}`}
                           />
                         </div>
@@ -379,6 +384,7 @@ export function ClusterPermissionsTable({
                           id={`${target.uuid}-run`}
                           isChecked={hasAction(target.clusterAPIURL, 'run')}
                           onChange={() => toggleAction(target.clusterAPIURL, 'run')}
+                          isDisabled={target.online === false}
                           aria-label={`Run permission for ${target.clusterName}`}
                         />
                       </div>

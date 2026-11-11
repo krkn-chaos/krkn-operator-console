@@ -4,8 +4,8 @@
  * Allows users to:
  * - Set baseline score (required, float >= 0)
  * - Select file mode: same for all nodes or per-node
- * - Select metrics file(s) from available files
- * - Override mount path (default: /etc/krkn/metrics.yaml)
+ * - Select alerts file(s) from available files
+ * - Override mount path (default: /etc/krkn/alerts.yaml)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -22,16 +22,14 @@ import {
   Select,
   SelectList,
   SelectOption,
-  SelectGroup,
   FormHelperText,
   HelperText,
   HelperTextItem,
   Alert,
-  Label,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { operatorApi } from '../services/operatorApi';
-import type { ResiliencyScoreConfig, FileInfo, FileTypeResponse } from '../types/api';
+import type { ResiliencyScoreConfig, FileInfo } from '../types/api';
 
 interface ResiliencyScoreModalProps {
   isOpen: boolean;
@@ -47,12 +45,11 @@ export function ResiliencyScoreModal({
   onConfirm,
 }: ResiliencyScoreModalProps) {
   const [baseline, setBaseline] = useState<string>('');
-  const [mountPath, setMountPath] = useState<string>('/etc/krkn/metrics.yaml');
+  const [mountPath, setMountPath] = useState<string>('/etc/krkn/alerts.yaml');
   const [fileMode, setFileMode] = useState<'same' | 'per-node'>('same');
 
   // File selection state
   const [availableFiles, setAvailableFiles] = useState<FileInfo[]>([]);
-  const [fileTypes, setFileTypes] = useState<FileTypeResponse[]>([]);
   const [loadingFiles, setLoadingFiles] = useState<boolean>(false);
   const [selectedFileId, setSelectedFileId] = useState<string>('');
   const [perNodeFileIds, setPerNodeFileIds] = useState<{ [nodeId: string]: string }>({});
@@ -65,23 +62,18 @@ export function ResiliencyScoreModal({
   const [baselineError, setBaselineError] = useState<string>('');
   const [mountPathError, setMountPathError] = useState<string>('');
 
-  // Load available files and file types on mount
+  // Load available files on mount
   useEffect(() => {
     if (!isOpen) return;
 
     const fetchData = async () => {
       setLoadingFiles(true);
       try {
-        const [filesResponse, typesResponse] = await Promise.all([
-          operatorApi.getAvailableFiles(),
-          operatorApi.getFileTypes(),
-        ]);
+        const filesResponse = await operatorApi.getAvailableFiles();
         setAvailableFiles(filesResponse.files);
-        setFileTypes(typesResponse.fileTypes);
       } catch (error) {
         console.error('Failed to load files:', error);
         setAvailableFiles([]);
-        setFileTypes([]);
       } finally {
         setLoadingFiles(false);
       }
@@ -94,7 +86,7 @@ export function ResiliencyScoreModal({
   useEffect(() => {
     if (!isOpen) {
       setBaseline('');
-      setMountPath('/etc/krkn/metrics.yaml');
+      setMountPath('/etc/krkn/alerts.yaml');
       setFileMode('same');
       setSelectedFileId('');
       setPerNodeFileIds({});
@@ -174,34 +166,9 @@ export function ResiliencyScoreModal({
     return file?.fileName || fileId;
   };
 
-  const getFileTypeColor = (fileType: string | undefined): string => {
-    if (!fileType) return '';
-    const type = fileTypes.find(t => t.name === fileType);
-    return type?.color || '';
-  };
-
-  const groupFilesByType = (): { [type: string]: FileInfo[] } => {
-    const grouped: { [type: string]: FileInfo[] } = {};
-
-    availableFiles.forEach(file => {
-      const type = file.fileType || 'Other';
-      if (!grouped[type]) {
-        grouped[type] = [];
-      }
-      grouped[type].push(file);
-    });
-
-    return grouped;
-  };
-
   const renderFileOption = (file: FileInfo) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
       <span>{file.fileName}</span>
-      {file.fileType && (
-        <Label color={getFileTypeColor(file.fileType) ? undefined : 'blue'} style={getFileTypeColor(file.fileType) ? { backgroundColor: getFileTypeColor(file.fileType), color: '#fff' } : {}}>
-          {file.fileType}
-        </Label>
-      )}
       {file.description && (
         <span style={{ fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
           - {file.description}
@@ -232,7 +199,7 @@ export function ResiliencyScoreModal({
           title="Resiliency Score Calculation"
           style={{ marginBottom: '1rem' }}
         >
-          Configure baseline score and metrics file for resiliency calculation during this GraphRun.
+          Configure baseline score and alerts file for resiliency calculation during this GraphRun.
         </Alert>
 
         <FormGroup label="Baseline Score" isRequired>
@@ -270,7 +237,7 @@ export function ResiliencyScoreModal({
             onChange={handleMountPathChange}
             validated={mountPathError ? 'error' : 'success'}
             aria-label="Mount path"
-            placeholder="/etc/krkn/metrics.yaml"
+            placeholder="/etc/krkn/alerts.yaml"
           />
           {mountPathError ? (
             <FormHelperText>
@@ -284,7 +251,7 @@ export function ResiliencyScoreModal({
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Path where metrics file will be mounted in container
+                   Path where alerts file will be mounted in container
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>
@@ -311,7 +278,7 @@ export function ResiliencyScoreModal({
         </FormGroup>
 
         {fileMode === 'same' ? (
-          <FormGroup label="Metrics File">
+          <FormGroup label="Alerts File">
             <Select
               isOpen={isSelectOpen}
               selected={selectedFileId}
@@ -337,14 +304,10 @@ export function ResiliencyScoreModal({
               )}
             >
               <SelectList>
-                {Object.entries(groupFilesByType()).map(([type, files]) => (
-                  <SelectGroup key={type} label={type}>
-                    {files.map(file => (
-                      <SelectOption key={file.fileId} value={file.fileId}>
-                        {renderFileOption(file)}
-                      </SelectOption>
-                    ))}
-                  </SelectGroup>
+                {availableFiles.map((file) => (
+                  <SelectOption key={file.fileId} value={file.fileId}>
+                    {renderFileOption(file)}
+                  </SelectOption>
                 ))}
               </SelectList>
             </Select>
@@ -357,7 +320,7 @@ export function ResiliencyScoreModal({
             </FormHelperText>
           </FormGroup>
         ) : (
-          <FormGroup label="Per-Node Metrics Files">
+          <FormGroup label="Per-Node Alerts Files">
             {nodeIds.length === 0 ? (
               <Alert variant="warning" isInline title="No nodes available">
                 Add nodes to the graph before selecting per-node files
@@ -390,14 +353,10 @@ export function ResiliencyScoreModal({
                     )}
                   >
                     <SelectList>
-                      {Object.entries(groupFilesByType()).map(([type, files]) => (
-                        <SelectGroup key={type} label={type}>
-                          {files.map(file => (
-                            <SelectOption key={file.fileId} value={file.fileId}>
-                              {renderFileOption(file)}
-                            </SelectOption>
-                          ))}
-                        </SelectGroup>
+                      {availableFiles.map((file) => (
+                        <SelectOption key={file.fileId} value={file.fileId}>
+                          {renderFileOption(file)}
+                        </SelectOption>
                       ))}
                     </SelectList>
                   </Select>

@@ -36,6 +36,9 @@ import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
 import { RobotsCard } from './RobotManagement';
+import { CloudCredentialsCard } from './CloudCredentialsCard';
+import { BackupRestoreCard } from './BackupRestoreCard';
+import { SignatureVerificationSettings } from './SignatureVerificationSettings';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -211,6 +214,9 @@ export function Settings() {
               <Tab eventKey={2} title={<TabTitleText>Private Registries</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <RegistriesCard />
+                  <div style={{ marginTop: '2rem' }}>
+                    <SignatureVerificationSettings />
+                  </div>
                 </div>
               </Tab>
             )}
@@ -220,6 +226,15 @@ export function Settings() {
               <Tab eventKey={4} title={<TabTitleText>Elasticsearch</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <ElasticsearchConfigsCard />
+                </div>
+              </Tab>
+            )}
+
+            {/* Cloud Credentials Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={5} title={<TabTitleText>Cloud Credentials</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <CloudCredentialsCard />
                 </div>
               </Tab>
             )}
@@ -323,6 +338,15 @@ export function Settings() {
               </div>
               </Tab>
             )}
+            {/* Backup & Restore Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={6} title={<TabTitleText>Backup & Restore</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <BackupRestoreCard />
+                </div>
+              </Tab>
+            )}
+
             {/* MCP Robots Tab - Admin Only */}
             {isAdmin && (
               <Tab eventKey={7} title={<TabTitleText>MCP Robots</TabTitleText>}>

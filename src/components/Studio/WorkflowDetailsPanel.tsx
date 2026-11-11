@@ -29,7 +29,7 @@ import { CheckIcon, TimesIcon } from '@patternfly/react-icons';
 import { FiX } from 'react-icons/fi';
 import { operatorApi } from '../../services/operatorApi';
 import { workflowsApi } from '../../services/workflowsApi';
-import { useStudioContext, buildGraph } from './StudioContext';
+import { useStudioContext, buildGraph, mergeVisibleCategorySelection } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
@@ -40,7 +40,7 @@ const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 /**
  * Expandable panel showing workflow metadata (name, description, visibility, last saved).
  *
- * Renders inside the Workflow Templates card. Supports read-only and inline-edit modes
+ * Renders inside the Workflow setup card. Supports read-only and inline-edit modes
  * controlled by `isEditingDetails` from StudioContext. When editing starts the panel
  * auto-expands and the toggle is locked until the user saves or cancels.
  *
@@ -55,7 +55,16 @@ const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
  * ```
  */
 export function WorkflowDetailsPanel() {
-  const { savedWorkflow, setSavedWorkflow, workflow, isEditingDetails, setIsEditingDetails } = useStudioContext();
+  const {
+    savedWorkflow,
+    setSavedWorkflow,
+    workflow,
+    isEditingDetails,
+    setIsEditingDetails,
+    selectedCategories = [],
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
   const [isExpanded, setIsExpanded] = useState(true);
@@ -132,6 +141,9 @@ export function WorkflowDetailsPanel() {
     const trimmedName = editName.trim();
     const groupsArray = editAccessType === 'group' && editSelectedGroup ? [editSelectedGroup] : [];
     const snapshotAtSave = { ...workflow };
+    const categories = categoryLoadStatus === 'ready'
+      ? mergeVisibleCategorySelection(savedWorkflow.categories, selectedCategories, visibleCategories)
+      : savedWorkflow.categories ?? selectedCategories;
 
     setIsSaving(true);
     try {
@@ -142,6 +154,7 @@ export function WorkflowDetailsPanel() {
         description: editDescription.trim() || undefined,
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories,
       });
       setSavedWorkflow({
         ...savedWorkflow,
@@ -149,6 +162,7 @@ export function WorkflowDetailsPanel() {
         description: editDescription.trim() || undefined,
         availableToAll: editAccessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories: categories ?? savedWorkflow.categories,
         savedAt: new Date().toISOString(),
       }, snapshotAtSave);
       showSuccess('Workflow updated', `"${trimmedName}" updated successfully`);

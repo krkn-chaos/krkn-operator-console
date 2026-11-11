@@ -27,6 +27,7 @@ import {
   HelperTextItem,
 } from '@patternfly/react-core';
 import { FiX } from 'react-icons/fi';
+import './SaveWorkflowModal.css';
 import { operatorApi } from '../../services/operatorApi';
 import { workflowsApi } from '../../services/workflowsApi';
 import { useStudioContext, buildGraph } from './StudioContext';
@@ -63,7 +64,13 @@ interface SaveWorkflowModalProps {
  * ```
  */
 export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowModalProps) {
-  const { workflow, setSavedWorkflow } = useStudioContext();
+  const {
+    workflow,
+    setSavedWorkflow,
+    selectedCategories = [],
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const { isAdmin } = useRole();
 
@@ -116,13 +123,18 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
     setIsSaving(true);
     setError(null);
     try {
-      const response = await workflowsApi.createWorkflow({
+    const categories = categoryLoadStatus === 'ready'
+      ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+      : selectedCategories;
+
+    const response = await workflowsApi.createWorkflow({
         workflowName: trimmedName,
         graph: buildGraph(workflow),
         studioLayout: workflow,
         description: description.trim() || undefined,
         availableToAll: accessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories,
       });
       setSavedWorkflow({
         workflowId: response.workflowId,
@@ -130,6 +142,7 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
         description: description.trim() || undefined,
         availableToAll: accessType === 'public',
         groups: groupsArray.length > 0 ? groupsArray : undefined,
+        categories,
         savedAt: new Date().toISOString(),
       });
       showSuccess('Workflow saved', `"${trimmedName}" saved successfully`);
@@ -262,7 +275,7 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
         </FormGroup>
 
         {accessType === 'group' && (
-          <FormGroup label="Group" isRequired fieldId="wf-group-input">
+          <FormGroup label="Group" isRequired fieldId="group-search">
             {!isAdmin && availableGroups.length === 1 && (
               <>
                 <Label color="blue">{availableGroups[0].name}</Label>
@@ -302,12 +315,15 @@ export function SaveWorkflowModal({ isOpen, onClose, onSuccess }: SaveWorkflowMo
                       onClick={() => setIsGroupSelectOpen(!isGroupSelectOpen)}
                       isExpanded={isGroupSelectOpen}
                       style={{ width: '100%' }}
+                      className="save-workflow-group-select-toggle"
                     >
                       <TextInputGroup>
                         <TextInputGroupMain
                           value={groupSearchTerm}
                           onClick={() => setIsGroupSelectOpen(true)}
                           onChange={(_e, value) => setGroupSearchTerm(value)}
+                          name="group-search"
+                          inputId="group-search"
                           placeholder={selectedGroup || 'Search or select a group...'}
                         />
                         {groupSearchTerm && (

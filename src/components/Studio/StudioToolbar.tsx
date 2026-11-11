@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Toolbar,
   ToolbarContent,
@@ -10,12 +10,14 @@ import {
   ListItem,
   Spinner,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, DownloadIcon, SaveIcon, TrashIcon, ExclamationCircleIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, DownloadIcon, UploadIcon, SaveIcon, TrashIcon, ExclamationCircleIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
 import { useStudioContext } from './StudioContext';
 import { useNotifications } from '../../hooks';
 import { SaveWorkflowModal } from './SaveWorkflowModal';
 import { SaveWorkflowConfirmModal } from './SaveWorkflowConfirmModal';
+import { parseImportedWorkflow, assembleExportFile } from './studioImport';
+import { downloadJson } from '../../utils/downloadJson';
 
 interface StudioToolbarProps {
   onRunWorkflow: () => void;
@@ -38,13 +40,14 @@ interface StudioToolbarProps {
  * ```
  */
 export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
-  const { addNode, exportWorkflow, clearWorkflow, workflow, savedWorkflow, saveWorkflowToCluster, isDirty, isEditingDetails } = useStudioContext();
-  const { showError } = useNotifications();
+  const { addNode, exportWorkflow, clearWorkflow, importWorkflow, workflow, savedWorkflow, saveWorkflowToCluster, isDirty, isEditingDetails } = useStudioContext();
+  const { showError, showSuccess, showWarning } = useNotifications();
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
   const [isSavingBeforeRun, setIsSavingBeforeRun] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
     const result = exportWorkflow();
@@ -54,13 +57,45 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
       return;
     }
 
-    const blob = new Blob([JSON.stringify(result.graph, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `chaos-workflow-${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    // Write a krknctl-compatible file: the top level is the flat executable
+    // graph, with Studio state embedded under `_studioLayout`/`_metadata` so the
+    // file both runs in krknctl and re-imports losslessly via "Import JSON".
+    const file = assembleExportFile(result.graph, result.studioLayout, result.metadata);
+    downloadJson(file, `chaos-workflow-${Date.now()}.json`);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset the input so selecting the same file again re-fires onChange.
+    event.target.value = '';
+    if (!file) return;
+
+    const hasUnsavedChanges = (savedWorkflow && isDirty) || (!savedWorkflow && workflow.nodes.length > 0);
+    if (hasUnsavedChanges) {
+      if (!confirm('You have unsaved changes. Importing a workflow will discard them. Continue?')) {
+        return;
+      }
+    }
+
+    try {
+      const text = await file.text();
+      const { workflow: imported, lossy } = parseImportedWorkflow(text);
+      importWorkflow(imported);
+      if (lossy) {
+        showWarning(
+          'Workflow imported with limited detail',
+          'This file only contained the executable graph. Positions were auto-arranged and some node settings (registry, global values) may need to be reviewed.'
+        );
+      } else {
+        showSuccess('Workflow imported', `Imported ${imported.nodes.length} node(s) successfully`);
+      }
+    } catch (err) {
+      showError('Import failed', err instanceof Error ? err.message : 'Failed to import workflow');
+    }
   };
 
   const handleSave = () => {
@@ -161,6 +196,24 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
             >
               Export JSON
             </Button>
+          </ToolbarItem>
+
+          <ToolbarItem>
+            <Button
+              variant="secondary"
+              icon={<UploadIcon />}
+              onClick={handleImportClick}
+            >
+              Import JSON
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: 'none' }}
+              onChange={handleImportFile}
+              aria-label="Import workflow JSON file"
+            />
           </ToolbarItem>
 
           <ToolbarItem>

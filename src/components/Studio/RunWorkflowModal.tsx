@@ -3,6 +3,21 @@
  *
  * Uses ClusterMultiSelector to let users choose target clusters,
  * then submits the workflow as a GraphRun.
+ *
+ * @example
+ * ```tsx
+ * <StudioProvider initialWorkflow={workflow}>
+ *   <RunWorkflowModal
+ *     isOpen={isRunWorkflowOpen}
+ *     onClose={handleClose}
+ *     onSuccess={handleSuccess}
+ *     targetFetchState={targetFetch.state}
+ *   />
+ * </StudioProvider>
+ * ```
+ *
+ * The workflow context supplies the graph and saved credential references;
+ * `targetFetchState` must be `ready` with a target request UUID before submit.
  */
 
 import { useState, useEffect } from 'react';
@@ -13,6 +28,11 @@ import {
   Alert,
   Spinner,
   Checkbox,
+  FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
+  TextInput,
 } from '@patternfly/react-core';
 import { ClusterMultiSelector } from '../ClusterMultiSelector';
 import { ResiliencyScoreModal } from '../ResiliencyScoreModal';
@@ -21,6 +41,7 @@ import { useNotifications } from '../../hooks';
 import type { SelectedCluster, CreateGraphRunRequest, Cluster, ResiliencyScoreConfig } from '../../types/api';
 import { useStudioContext } from './StudioContext';
 import { clearAutosave } from './studioAutosave';
+import { useSignatureVerification } from '../../hooks/useSignatureVerification';
 
 interface RunWorkflowModalProps {
   isOpen: boolean;
@@ -41,13 +62,24 @@ export function RunWorkflowModal({
   onSuccess,
   targetFetchState,
 }: RunWorkflowModalProps) {
-  const { exportWorkflow, workflow } = useStudioContext();
+  const {
+    exportWorkflow,
+    workflow,
+    selectedCategories = [],
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
+  const { enabled: signatureVerificationEnabled, error: signatureVerificationError, isLoading: signatureVerificationLoading } = useSignatureVerification();
   const [selectedClusters, setSelectedClusters] = useState<SelectedCluster[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
   const [showResiliencyModal, setShowResiliencyModal] = useState(false);
   const [resiliencyConfig, setResiliencyConfig] = useState<ResiliencyScoreConfig | null>(null);
+  const [maxRetries, setMaxRetries] = useState(3);
+  const unsignedNodes = workflow.nodes.filter(
+    (node) => node.status === 'configured' && node.config && node.config.signature_status !== 'signed',
+  );
 
   // Reset state when modal closes
   useEffect(() => {
@@ -56,8 +88,16 @@ export function RunWorkflowModal({
       setEnableResiliencyScore(false);
       setShowResiliencyModal(false);
       setResiliencyConfig(null);
+      setMaxRetries(3);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && workflow.resiliencyScoreConfig) {
+      setEnableResiliencyScore(true);
+      setResiliencyConfig(workflow.resiliencyScoreConfig);
+    }
+  }, [isOpen, workflow.resiliencyScoreConfig]);
 
   const handleCancel = () => {
     // Delete target request if exists
@@ -95,6 +135,10 @@ export function RunWorkflowModal({
       showError('No clusters selected', 'Please select at least one cluster');
       return;
     }
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+      showError('Invalid retry count', 'Maximum retries must be a non-negative whole number');
+      return;
+    }
 
     // Use provided config or state config
     const configToUse = providedConfig || resiliencyConfig;
@@ -109,6 +153,24 @@ export function RunWorkflowModal({
     const exportResult = exportWorkflow();
     if ('error' in exportResult) {
       showError('Cannot run workflow', exportResult.error);
+      return;
+    }
+
+    if (signatureVerificationLoading) {
+      showError('Signature verification is still loading', 'Please wait and try again.');
+      return;
+    }
+
+    if (signatureVerificationError || signatureVerificationEnabled === null) {
+      showError('Cannot verify image signatures', signatureVerificationError || 'The signature verification setting is unavailable.');
+      return;
+    }
+
+    if (signatureVerificationEnabled && unsignedNodes.length > 0) {
+      showError(
+        'Cannot run workflow',
+        `Only signed images can run while signature verification is enabled: ${unsignedNodes.map((node) => node.config?.scenarioName || node.nodeId).join(', ')}.`,
+      );
       return;
     }
 
@@ -150,10 +212,19 @@ export function RunWorkflowModal({
       });
     }
 
+    const categories = selectedCategories.length > 0
+      ? (categoryLoadStatus === 'ready'
+        ? selectedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+        : selectedCategories)
+      : undefined;
+
     const request: CreateGraphRunRequest = {
       graph,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
+      cloudCredentialRef: workflow.cloudCredentialRef,
+      maxRetries,
+      categories,
     };
 
     setIsSubmitting(true);
@@ -324,11 +395,30 @@ export function RunWorkflowModal({
           </div>
 
           {/* Custom actions aligned left */}
+          <div style={{ marginTop: '1.5rem' }}>
+            <FormGroup label="Maximum retries" fieldId="workflow-max-retries" isRequired>
+              <TextInput
+                id="workflow-max-retries"
+                type="number"
+                min={0}
+                step={1}
+                value={maxRetries}
+                onChange={(_event, value) => setMaxRetries(Math.max(0, Number(value) || 0))}
+                isDisabled={isSubmitting}
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>Retries after the initial attempt for each scenario node. Set to 0 to disable retries.</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+          </div>
+
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
             <Button
               variant="primary"
               onClick={() => handleSubmit()}
-              isDisabled={selectedClusters.length === 0 || isSubmitting}
+              isDisabled={selectedClusters.length === 0 || isSubmitting || signatureVerificationLoading || !!signatureVerificationError || (signatureVerificationEnabled === true && unsignedNodes.length > 0)}
               isLoading={isSubmitting}
               size="lg"
             >
@@ -338,6 +428,34 @@ export function RunWorkflowModal({
               Cancel
             </Button>
           </div>
+          {signatureVerificationEnabled === false && unsignedNodes.length > 0 && (
+            <Alert
+              variant="warning"
+              isInline
+              title="Image signature verification override is active"
+              style={{ marginTop: '1rem' }}
+            >
+              {unsignedNodes.map((node) => (
+                <div key={node.nodeId}>
+                  {node.config?.scenarioName || node.nodeId}: image is not signed and will run because verification is overridden.
+                </div>
+              ))}
+            </Alert>
+          )}
+          {signatureVerificationEnabled === true && unsignedNodes.length > 0 && (
+            <Alert
+              variant="danger"
+              isInline
+              title="Workflow cannot run with unsigned images"
+              style={{ marginTop: '1rem' }}
+            >
+              {unsignedNodes.map((node) => (
+                <div key={node.nodeId}>
+                  {node.config?.scenarioName || node.nodeId}: select a signed image before running.
+                </div>
+              ))}
+            </Alert>
+          )}
         </>
       )}
 

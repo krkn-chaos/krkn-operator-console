@@ -29,6 +29,101 @@ describe('TargetForm', () => {
     });
   });
 
+  describe('cluster name validation', () => {
+    it.each(['cluster with spaces', 'cluster/name', '-cluster', 'cluster.', 'a'.repeat(64)])(
+      'rejects the invalid cluster name %s',
+      async (clusterName) => {
+        const user = userEvent.setup();
+        const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+        await user.type(screen.getByRole('textbox', { name: /cluster name/i }), clusterName);
+        await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+        await user.click(screen.getByRole('button', { name: /create/i }));
+
+        expect(await screen.findByText(/use 1–63 letters, numbers/i)).toBeInTheDocument();
+        expect(mockOnSubmit).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([' cluster', 'cluster '])('rejects leading or trailing spaces in %s', async (clusterName) => {
+      const user = userEvent.setup();
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      await user.type(screen.getByRole('textbox', { name: /cluster name/i }), clusterName);
+      await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      expect(await screen.findByText(/use 1–63 letters, numbers/i)).toBeInTheDocument();
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    it('clears the cluster-name error after the value is corrected', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const nameInput = screen.getByRole('textbox', { name: /cluster name/i });
+      await user.type(nameInput, 'cluster/name');
+      await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      expect(await screen.findByText(/use 1–63 letters, numbers/i)).toBeInTheDocument();
+      await user.clear(nameInput);
+      await user.type(nameInput, 'cluster-name');
+
+      expect(screen.queryByText(/use 1–63 letters, numbers/i)).not.toBeInTheDocument();
+      expect(nameInput).not.toHaveAttribute('aria-invalid', 'true');
+    });
+
+    it('keeps the cluster-name error when an edited value is still invalid', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const nameInput = screen.getByRole('textbox', { name: /cluster name/i });
+      await user.type(nameInput, 'cluster/name');
+      await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      expect(await screen.findByText(/use 1–63 letters, numbers/i)).toBeInTheDocument();
+      await user.type(nameInput, '2');
+
+      expect(screen.getByText(/use 1–63 letters, numbers/i)).toBeInTheDocument();
+      expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    it('allows editing another field when an existing target has a legacy cluster name', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        uuid: 'target-1',
+        clusterName: 'cluster/name',
+        clusterAPIURL: 'https://api.example.com:6443',
+        secretType: 'kubeconfig',
+        ready: true,
+      };
+      const { container } = render(
+        <TargetForm initialData={initialData} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />,
+      );
+      await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+      await user.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ clusterName: 'cluster/name' }));
+      });
+      expect(screen.queryByText(/use 1–63 letters, numbers/i)).not.toBeInTheDocument();
+    });
+
+    it('accepts Kubernetes label characters and the 63-character limit', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<TargetForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const validName = `A${'a'.repeat(59)}_.1`;
+      expect(validName).toHaveLength(63);
+
+      await user.type(screen.getByRole('textbox', { name: /cluster name/i }), validName);
+      await user.type(container.querySelector('#kubeconfig') as HTMLTextAreaElement, 'apiVersion: v1');
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ clusterName: validName }));
+      });
+    });
+  });
+
   describe('kubeconfig file selection', () => {
     it('loads the selected file into the kubeconfig field', async () => {
       const user = userEvent.setup();

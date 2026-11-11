@@ -16,7 +16,7 @@ import { ScenarioConfigStep } from './ScenarioConfigStep';
 import { NodeMetadataStep } from './NodeMetadataStep';
 import { useStudioContext } from './StudioContext';
 import { useScenariosFetch } from '../../hooks';
-import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields } from '../../types/api';
+import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields, SignatureStatus } from '../../types/api';
 
 interface StudioNodeEditorModalProps {
   isOpen: boolean;
@@ -32,7 +32,14 @@ function StudioNodeEditorModalComponent({
   onSave,
 }: StudioNodeEditorModalProps) {
   const { validateNodeId } = useStudioContext();
-  const { scenarios, loading: loadingScenarios, fetchScenarios } = useScenariosFetch();
+  const {
+    scenarios,
+    loading: loadingScenarios,
+    error: scenariosError,
+    loaded: scenariosLoaded,
+    fetchScenarios,
+    resetScenarios,
+  } = useScenariosFetch();
 
   // Step 1: Registry selection
   const [registryType, setRegistryType] = useState<'public' | 'private'>('public');
@@ -40,14 +47,18 @@ function StudioNodeEditorModalComponent({
 
   // Step 2: Scenario selection
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [selectedSignatureStatus, setSelectedSignatureStatus] = useState<SignatureStatus | undefined>();
   const [scenarioImage, setScenarioImage] = useState<string>('');
+  const [scenarioConfigStatus, setScenarioConfigStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
 
   // Step 3: Scenario configuration
   const [formValues, setFormValues] = useState<ScenarioFormValues>({});
   const [globalFormValues, setGlobalFormValues] = useState<ScenarioFormValues>({});
   const [globalTouchedFields, setGlobalTouchedFields] = useState<TouchedFields>({});
   const [scenarioDefaultValues, setScenarioDefaultValues] = useState<ScenarioFormValues>({});
+  const [cloudCredentialRef, setCloudCredentialRef] = useState('');
   const [volumes, setVolumes] = useState<{ [fileId: string]: string }>({});
+  const [resiliencyWeight, setResiliencyWeight] = useState(1);
 
   // Step 4: Node metadata
   const [newNodeId, setNewNodeId] = useState<string>('');
@@ -59,11 +70,17 @@ function StudioNodeEditorModalComponent({
   // Track if we've initialized to prevent repeated initialization
   const hasInitialized = useRef(false);
 
+  // Identifies the current modal session. Bumped on each open so the scenario
+  // detail cache can distinguish within-session step navigation (reuse) from a
+  // new modal session (validate by digest before reuse).
+  const [editSessionId, setEditSessionId] = useState(0);
+
   // Initialize when modal opens
   useEffect(() => {
     if (!isOpen) {
       // Reset initialization flag when modal closes
       hasInitialized.current = false;
+      setScenarioConfigStatus('idle');
       return;
     }
 
@@ -72,63 +89,100 @@ function StudioNodeEditorModalComponent({
     }
 
     hasInitialized.current = true;
+    setEditSessionId((id) => id + 1);
+    resetScenarios();
+    setScenarioConfigStatus('idle');
 
     // Initialize from node data
     if (node.config) {
       setRegistryType(node.config.registryType);
-      setRegistryName(node.config.registryConfig.registryName || '');
+      setRegistryName(node.config.registryConfig?.registryName || '');
       setSelectedScenario(node.config.scenarioName);
+      setSelectedSignatureStatus(node.config.signature_status);
       setScenarioImage(node.config.scenarioImage);
       setFormValues(node.config.scenarioFormValues || {});
       setGlobalFormValues(node.config.globalFormValues || {});
       setGlobalTouchedFields(node.config.globalTouchedFields || {});
+      setCloudCredentialRef(node.config.cloudCredentialRef || '');
       setVolumes(node.config.volumes || {});
+      setResiliencyWeight(node.config.resiliencyWeight ?? 1);
       setScenarioDefaultValues({}); // Will be repopulated when scenario loads
       setNewNodeId(node.nodeId);
-      fetchScenarios(node.config.registryConfig);
     } else {
       setRegistryType('public');
       setRegistryName('');
       setSelectedScenario(null);
+      setSelectedSignatureStatus(undefined);
       setScenarioImage('');
       setFormValues({});
       setGlobalFormValues({});
       setGlobalTouchedFields({});
+      setCloudCredentialRef('');
       setVolumes({});
+      setResiliencyWeight(1);
       setScenarioDefaultValues({});
       setNewNodeId(node.nodeId);
-      fetchScenarios({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // Only trigger on isOpen changes, ignore node reference changes
+  }, [isOpen, resetScenarios]); // Only trigger on isOpen changes, ignore node reference changes
 
   // Handle registry type change
   const handleRegistryTypeChange = useCallback((type: 'public' | 'private') => {
     setRegistryType(type);
     if (type === 'public') {
-      // Public registry - clear registry name and fetch
+      // Public registry - clear the private registry selection.
       setRegistryName('');
-      fetchScenarios({});
     } else {
       // Private registry - reset to trigger auto-select
       setRegistryName('');
     }
     // Clear scenario, form values and defaults when registry changes
     setSelectedScenario(null);
+    setSelectedSignatureStatus(undefined);
     setFormValues({});
     setScenarioDefaultValues({});
-  }, [fetchScenarios]);
+    setCloudCredentialRef('');
+    setScenarioConfigStatus('idle');
+    resetScenarios();
+  }, [resetScenarios]);
 
   // Handle registry name change
   const handleRegistryNameChange = useCallback((name: string) => {
     setRegistryName(name);
-    const config: ScenariosRequest = name ? { registryName: name } : {};
-    fetchScenarios(config);
     // Clear scenario, form values and defaults when registry name changes
     setSelectedScenario(null);
+    setSelectedSignatureStatus(undefined);
     setFormValues({});
     setScenarioDefaultValues({});
-  }, [fetchScenarios]);
+    setCloudCredentialRef('');
+    setScenarioConfigStatus('idle');
+    resetScenarios();
+  }, [resetScenarios]);
+
+  const getSelectedRegistryConfig = useCallback((): ScenariosRequest => (
+    registryType === 'private' && registryName ? { registryName } : {}
+  ), [registryType, registryName]);
+
+  const loadScenariosForSelectedRegistry = useCallback(() => {
+    setScenarioConfigStatus('idle');
+    if (registryType === 'private' && !registryName) {
+      resetScenarios();
+      return;
+    }
+    // Registry changes call resetScenarios (clearing `scenariosLoaded`), so a
+    // completed fetch belongs to the current registry. Skip refetch when the
+    // list is already loaded (or loading) to avoid reloading on back-and-forth
+    // navigation with no registry change. `scenariosLoaded` tracks a successful
+    // fetch independent of count, so an empty result is not refetched.
+    if (loadingScenarios || (scenariosLoaded && !scenariosError)) {
+      return;
+    }
+    void fetchScenarios(getSelectedRegistryConfig());
+  }, [fetchScenarios, getSelectedRegistryConfig, loadingScenarios, registryName, registryType, resetScenarios, scenariosLoaded, scenariosError]);
+
+  const retryFetchScenarios = useCallback(() => {
+    loadScenariosForSelectedRegistry();
+  }, [loadScenariosForSelectedRegistry]);
 
   // Validate node ID
   const handleNodeIdChange = useCallback((value: string) => {
@@ -138,8 +192,10 @@ function StudioNodeEditorModalComponent({
   }, [validateNodeId, node?.nodeId]);
 
   // Wizard step callbacks
-  const handleScenarioSelect = useCallback((scenarioName: string) => {
+  const handleScenarioSelect = useCallback((scenarioName: string, signatureStatus?: SignatureStatus) => {
     setSelectedScenario(scenarioName);
+    setSelectedSignatureStatus(signatureStatus);
+    setScenarioConfigStatus('idle');
 
     // Build image URL
     const registry = registryType === 'private' && registryName
@@ -152,7 +208,16 @@ function StudioNodeEditorModalComponent({
     // Prevents stale values from previous scenario being saved
     setFormValues({});
     setScenarioDefaultValues({});
+    setCloudCredentialRef('');
   }, [registryType, registryName]);
+
+  const handleScenarioConfigLoadStatusChange = useCallback((status: 'loading' | 'loaded' | 'error') => {
+    setScenarioConfigStatus(status);
+  }, []);
+
+  const startScenarioConfigLoad = useCallback(() => {
+    setScenarioConfigStatus('loading');
+  }, []);
 
   // Reset warning when pending input is cleared
   useEffect(() => {
@@ -163,7 +228,14 @@ function StudioNodeEditorModalComponent({
   }, [hasPendingFileInput, pendingFileWarningShown]);
 
   const handleSave = () => {
-    if (!node || !selectedScenario || nodeIdError) return;
+    if (!node || !selectedScenario || nodeIdError || scenarioConfigStatus !== 'loaded') return;
+    if (registryType === 'private' && !registryName) return;
+    if (!scenarios.some((scenario) => scenario.name === selectedScenario)) return;
+
+    if (!Number.isFinite(resiliencyWeight) || resiliencyWeight <= 0) {
+      setValidationWarnings(['Resiliency weight must be greater than 0.']);
+      return;
+    }
 
     // Check for pending file input (file selected or path typed but not added)
     if (hasPendingFileInput && !pendingFileWarningShown) {
@@ -175,7 +247,7 @@ function StudioNodeEditorModalComponent({
     }
 
     // Build registryConfig from primitive
-    const registryConfig: ScenariosRequest = registryName ? { registryName } : {};
+    const registryConfig = getSelectedRegistryConfig();
 
     // Merge default values for optional fields that weren't touched
     const finalFormValues = { ...scenarioDefaultValues, ...formValues };
@@ -187,10 +259,13 @@ function StudioNodeEditorModalComponent({
         registryConfig,
         scenarioName: selectedScenario,
         scenarioImage,
+        signature_status: selectedSignatureStatus,
         scenarioFormValues: finalFormValues,
         globalFormValues,
         globalTouchedFields,
         volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
+        resiliencyWeight,
+        cloudCredentialRef: cloudCredentialRef || undefined,
       },
     };
 
@@ -218,6 +293,12 @@ function StudioNodeEditorModalComponent({
 
   if (!node) return null;
 
+  const selectedScenarioTag = selectedScenario
+    ? scenarios.find((scenario) => scenario.name === selectedScenario)
+    : undefined;
+  const selectedScenarioIsAvailable = !!selectedScenarioTag;
+  const scenarioListIsReady = !loadingScenarios && !scenariosError && selectedScenarioIsAvailable;
+
   const steps: WizardStepConfig[] = [
     {
       id: 'registry-step',
@@ -230,7 +311,7 @@ function StudioNodeEditorModalComponent({
           onRegistryNameChange={handleRegistryNameChange}
         />
       ),
-      isNextDisabled: loadingScenarios,
+      isNextDisabled: registryType === 'private' && !registryName,
     },
     {
       id: 'scenario-step',
@@ -240,24 +321,39 @@ function StudioNodeEditorModalComponent({
           scenarios={scenarios}
           selectedScenario={selectedScenario}
           onSelectScenario={handleScenarioSelect}
+          loading={loadingScenarios}
+          error={scenariosError}
+          onRetry={retryFetchScenarios}
         />
       ),
-      isNextDisabled: !selectedScenario,
+      isNextDisabled: !scenarioListIsReady,
+      isNextLoading: loadingScenarios,
+      isStepDisabled: registryType === 'private' && !registryName,
+      onEnter: loadScenariosForSelectedRegistry,
     },
     {
       id: 'configuration-step',
       name: 'Configuration',
+      isStepDisabled: !scenarioListIsReady,
+      isNextDisabled: scenarioConfigStatus !== 'loaded',
+      isNextLoading: scenarioConfigStatus === 'loading',
+      onEnter: startScenarioConfigLoad,
       component: selectedScenario ? (
         <ScenarioConfigStep
-          key={`${selectedScenario}-${registryName || 'public'}`}
+          key={`${selectedScenario}-${registryType === 'private' ? registryName : 'public'}`}
           scenarioName={selectedScenario}
-          registryName={registryName}
+          registryName={registryType === 'private' ? registryName : ''}
           formValues={formValues}
           globalFormValues={globalFormValues}
           globalTouchedFields={globalTouchedFields}
           onFormChange={setFormValues}
           onGlobalFormChange={handleGlobalFormChange}
           onDefaultValuesLoad={handleDefaultValuesLoad}
+          onLoadStatusChange={handleScenarioConfigLoadStatusChange}
+          cloudCredentialRef={cloudCredentialRef}
+          onCloudCredentialRefChange={setCloudCredentialRef}
+          sessionId={editSessionId}
+          expectedDigest={selectedScenarioTag?.digest}
         />
       ) : null,
     },
@@ -276,9 +372,12 @@ function StudioNodeEditorModalComponent({
             setPendingFileWarningShown(false);
             setValidationWarnings([]);
           }}
-          onPendingChange={setHasPendingFileInput}
-        />
+           onPendingChange={setHasPendingFileInput}
+           resiliencyWeight={resiliencyWeight}
+           onResiliencyWeightChange={setResiliencyWeight}
+         />
       ),
+      isStepDisabled: !scenarioListIsReady || scenarioConfigStatus !== 'loaded',
       isNextDisabled: !!nodeIdError || !newNodeId,
     },
   ];

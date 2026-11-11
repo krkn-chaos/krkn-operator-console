@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GraphRunDetail as GraphRunDetailType, NodeStatus } from '../../types/api';
 
@@ -66,10 +66,23 @@ vi.mock('dagre', () => ({
   },
 }));
 
+const mockDownloadJson = vi.fn();
+vi.mock('../../utils/downloadJson', () => ({
+  downloadJson: (...args: unknown[]) => mockDownloadJson(...args),
+}));
+
 const mockGetGraphRun = vi.fn();
+const mockGetGraphRunConfig = vi.fn();
+const mockCreateGraphRun = vi.fn();
+const mockGetScenarios = vi.fn();
 vi.mock('../../services', () => ({
   graphRunsApi: {
     getGraphRun: (...args: unknown[]) => mockGetGraphRun(...args),
+    getGraphRunConfig: (...args: unknown[]) => mockGetGraphRunConfig(...args),
+    createGraphRun: (...args: unknown[]) => mockCreateGraphRun(...args),
+  },
+  operatorApi: {
+    getScenarios: (...args: unknown[]) => mockGetScenarios(...args),
   },
 }));
 
@@ -120,6 +133,10 @@ const makeMockDetail = (overrides?: Partial<GraphRunDetailType>): GraphRunDetail
 describe('GraphRunDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetScenarios.mockResolvedValue({ scenarios: [
+      { name: 'pod-kill', signature_status: 'signed' },
+      { name: 'net-chaos', signature_status: 'signed' },
+    ] });
   });
 
   describe('Loading State', () => {
@@ -159,6 +176,16 @@ describe('GraphRunDetail', () => {
         expect(screen.getByText(/Failed: 0/)).toBeInTheDocument();
         expect(screen.getByText(/Pending: 0/)).toBeInTheDocument();
       });
+    });
+
+    it('keeps workflow replay in the run actions menu, outside the expanded details', async () => {
+      mockGetGraphRun.mockResolvedValue(makeMockDetail());
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+
+      await waitFor(() => expect(screen.getByText(/Total: 2/)).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Re-run workflow' })).not.toBeInTheDocument();
+      expect(mockGetGraphRunConfig).not.toHaveBeenCalled();
+      expect(mockCreateGraphRun).not.toHaveBeenCalled();
     });
 
     it('should show cluster score in cluster scores section when enabled', async () => {
@@ -324,6 +351,90 @@ describe('GraphRunDetail', () => {
         expect(screen.getByText('91.2')).toBeInTheDocument();
         expect(screen.getByText('Calculating...')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Export JSON', () => {
+    it('exports the graph run as a downloadable krknctl-compatible file', async () => {
+      mockGetGraphRun.mockResolvedValue(makeMockDetail());
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+
+      const exportButton = await screen.findByRole('button', { name: 'Export JSON' });
+      expect(exportButton).not.toBeDisabled();
+      fireEvent.click(exportButton);
+
+      await waitFor(() => expect(mockDownloadJson).toHaveBeenCalledTimes(1));
+      const [payload, filename] = mockDownloadJson.mock.calls[0];
+
+      // Filename carries the graph-run name.
+      expect(filename).toMatch(/^chaos-workflow-test-graph-run-\d+\.json$/);
+      // Top level is the flat executable graph; Studio state under `_` keys.
+      expect(payload['node-a']).toBeDefined();
+      expect(payload['node-b']).toBeDefined();
+      expect(payload._studioLayout.nodes).toHaveLength(2);
+      expect(payload._metadata.graphRunName).toBe('test-graph-run');
+      expect(payload._metadata.nodeCount).toBe(2);
+    });
+
+    it('disables Export JSON when the graph has no real nodes', async () => {
+      const detail = makeMockDetail({
+        spec: { ...makeMockDetail().spec, graph: { _comment: { name: 'note' } } },
+      });
+      mockGetGraphRun.mockResolvedValue(detail);
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+
+      const exportButton = await screen.findByRole('button', { name: 'Export JSON' });
+      expect(exportButton).toBeDisabled();
+    });
+
+    it('alerts and does not download when the graph is invalid', async () => {
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const detail = makeMockDetail({
+        spec: {
+          ...makeMockDetail().spec,
+          graph: {
+            'node-a': { name: 'a', image: 'i', depends_on: 'node-b' },
+            'node-b': { name: 'b', image: 'i', depends_on: 'node-a' },
+          },
+        },
+      });
+      mockGetGraphRun.mockResolvedValue(detail);
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Export JSON' }));
+
+      await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
+      expect(alertSpy.mock.calls[0][0]).toMatch(/Invalid workflow graph/);
+      expect(mockDownloadJson).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
+    });
+
+    it('embeds graph-level resiliency settings in the export', async () => {
+      mockGetGraphRun.mockResolvedValue(makeMockDetail());
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Export JSON' }));
+
+      await waitFor(() => expect(mockDownloadJson).toHaveBeenCalledTimes(1));
+      const [payload] = mockDownloadJson.mock.calls[0];
+      expect(payload._studioLayout.resiliencyScoreConfig).toEqual({
+        baseline: 80.0,
+        mountPath: '/etc/krkn/alerts.yaml',
+      });
+    });
+
+    it('omits resiliency config when the run has scoring disabled', async () => {
+      const detail = makeMockDetail({
+        spec: { ...makeMockDetail().spec, resiliencyScoreEnabled: false },
+      });
+      mockGetGraphRun.mockResolvedValue(detail);
+      render(<GraphRunDetail graphRunName="test-graph-run" />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Export JSON' }));
+
+      await waitFor(() => expect(mockDownloadJson).toHaveBeenCalledTimes(1));
+      const [payload] = mockDownloadJson.mock.calls[0];
+      expect(payload._studioLayout.resiliencyScoreConfig).toBeUndefined();
     });
   });
 

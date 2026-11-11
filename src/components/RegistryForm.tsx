@@ -160,7 +160,7 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         setSkipTls(data.skipTls);
         setInsecure(data.insecure);
         setSelectedGroups(new Set(data.groups));
-        setAvailableToAll(data.availableToAll);
+        setAvailableToAll(data.availableToAll ?? false);
         // Credentials are not returned by API for security
       } catch (error) {
         showError('Failed to load registry', error instanceof Error ? error.message : 'Unknown error');

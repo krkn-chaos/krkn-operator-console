@@ -22,22 +22,68 @@ import {
   EmptyStateBody,
   Title,
   Tooltip,
+  Button,
+  Spinner,
 } from '@patternfly/react-core';
 import { FileCodeIcon } from '@patternfly/react-icons';
 import type { ScenarioTag } from '../../types/api';
+import { SignatureStatusIcon } from '../SignatureStatusIcon';
+import { useSignatureVerification } from '../../hooks/useSignatureVerification';
 
 interface ScenariosListStepProps {
   scenarios: ScenarioTag[];
   selectedScenario: string | null;
-  onSelectScenario: (scenarioName: string) => void;
+  onSelectScenario: (scenarioName: string, signatureStatus?: ScenarioTag['signature_status']) => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export function ScenariosListStep({
   scenarios,
   selectedScenario,
   onSelectScenario,
+  loading = false,
+  error = null,
+  onRetry,
 }: ScenariosListStepProps) {
   const [searchValue, setSearchValue] = useState('');
+  const { enabled: signatureVerificationEnabled, error: signatureVerificationError, isLoading: signatureVerificationLoading } = useSignatureVerification();
+
+  if (loading) {
+    return (
+      <EmptyState>
+        <EmptyStateIcon icon={Spinner} />
+        <Title headingLevel="h4" size="lg">
+          Loading Scenarios
+        </Title>
+        <EmptyStateBody>
+          Loading chaos scenarios from registry...
+        </EmptyStateBody>
+      </EmptyState>
+    );
+  }
+
+  if (error) {
+    return (
+      <EmptyState>
+        <EmptyStateIcon icon={FileCodeIcon} />
+        <Title headingLevel="h4" size="lg">
+          Failed to Load Scenarios
+        </Title>
+        <EmptyStateBody>
+          {error}
+          {onRetry && (
+            <div style={{ marginTop: '1rem' }}>
+              <Button variant="primary" onClick={onRetry}>
+                Retry
+              </Button>
+            </div>
+          )}
+        </EmptyStateBody>
+      </EmptyState>
+    );
+  }
 
   if (!scenarios || scenarios.length === 0) {
     return (
@@ -105,26 +151,34 @@ export function ScenariosListStep({
           aria-label="Scenarios list"
           selectedDataListItemId={selectedScenario || undefined}
           onSelectDataListItem={(_event, id) => {
-            if (!isScenarioBlocked(id)) onSelectScenario(id);
+            const scenario = scenarios.find((item) => item.name === id);
+            const isSigned = scenario?.signature_status === 'signed';
+            if (!isScenarioBlocked(id) && !signatureVerificationError &&
+              (signatureVerificationEnabled !== true || isSigned)) {
+              onSelectScenario(id, scenario?.signature_status);
+            }
           }}
           isCompact
         >
           {sortedScenarios.map((scenario) => {
             const blocked = isScenarioBlocked(scenario.name);
+            const unsigned = scenario.signature_status !== 'signed';
+            const signatureBlocked = signatureVerificationEnabled === true && unsigned;
+            const selectionBlocked = blocked || signatureBlocked || signatureVerificationLoading || !!signatureVerificationError;
             const row = (
               <DataListItem
                 key={scenario.name}
                 id={scenario.name}
                 style={{
-                  cursor: blocked ? 'not-allowed' : 'pointer',
-                  opacity: blocked ? 0.5 : 1,
+                  cursor: selectionBlocked ? 'not-allowed' : 'pointer',
+                  opacity: selectionBlocked ? 0.5 : 1,
                   backgroundColor:
-                    !blocked && selectedScenario === scenario.name
+                    !selectionBlocked && selectedScenario === scenario.name
                       ? 'var(--pf-v5-global--BackgroundColor--200)'
                       : undefined,
-                  pointerEvents: blocked ? 'none' : undefined,
+                  pointerEvents: selectionBlocked ? 'none' : undefined,
                 }}
-                aria-disabled={blocked}
+                aria-disabled={selectionBlocked}
               >
                 <DataListItemRow>
                   <DataListItemCells
@@ -140,15 +194,27 @@ export function ScenariosListStep({
                         </div>
                       </DataListCell>,
                       <DataListCell key="digest" width={2}>
-                        {scenario.digest && (
-                          <div
-                            style={{
-                              fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                              fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
-                              color: 'var(--pf-v5-global--Color--200)',
-                            }}
-                          >
-                            {scenario.digest.substring(0, 19)}...
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                            fontFamily: 'var(--pf-v5-global--FontFamily--monospace)',
+                            color: 'var(--pf-v5-global--Color--200)',
+                          }}
+                        >
+                          {scenario.digest ? `${scenario.digest.substring(0, 19)}...` : 'N/A'}
+                          <SignatureStatusIcon status={scenario.signature_status} />
+                        </div>
+                        {signatureVerificationEnabled === false && unsigned && (
+                          <div style={{ color: 'var(--pf-v5-global--warning-color--100)', fontSize: 'var(--pf-v5-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                            Override active: this image is not signed.
+                          </div>
+                        )}
+                        {signatureBlocked && (
+                          <div style={{ color: 'var(--pf-v5-global--danger-color--100)', fontSize: 'var(--pf-v5-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                            Selection disabled: image must be signed.
                           </div>
                         )}
                       </DataListCell>,

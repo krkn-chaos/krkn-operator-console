@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ResiliencyScoreModal } from './ResiliencyScoreModal';
 import { operatorApi } from '../services/operatorApi';
-import type { AvailableFilesResponse, FileTypesListResponse } from '../types/api';
+import type { AvailableFilesResponse } from '../types/api';
 
 vi.mock('../services/operatorApi');
 
@@ -18,7 +18,6 @@ describe('ResiliencyScoreModal', () => {
         fileName: 'metrics-baseline.yaml',
         description: 'Baseline metrics configuration',
         availableToAll: true,
-        fileType: 'metrics',
       },
       {
         fileId: 'file-2',
@@ -26,26 +25,6 @@ describe('ResiliencyScoreModal', () => {
         description: 'Advanced metrics with custom rules',
         availableToAll: false,
         groups: ['team-a'],
-        fileType: 'config',
-      },
-    ],
-  };
-
-  const mockFileTypes: FileTypesListResponse = {
-    fileTypes: [
-      {
-        name: 'metrics',
-        color: '#0066cc',
-        icon: '',
-        usageCount: 5,
-        createdAt: '2024-01-01T00:00:00Z',
-      },
-      {
-        name: 'config',
-        color: '#28a745',
-        icon: '',
-        usageCount: 3,
-        createdAt: '2024-01-02T00:00:00Z',
       },
     ],
   };
@@ -53,7 +32,6 @@ describe('ResiliencyScoreModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue(mockFiles);
-    vi.mocked(operatorApi.getFileTypes).mockResolvedValue(mockFileTypes);
   });
 
   describe('Modal Rendering', () => {
@@ -68,7 +46,7 @@ describe('ResiliencyScoreModal', () => {
       );
 
       expect(screen.getByText('Configure Resiliency Score')).toBeInTheDocument();
-      expect(screen.getByText(/Configure baseline score and metrics file/i)).toBeInTheDocument();
+      expect(screen.getByText(/Configure baseline score and alerts file/i)).toBeInTheDocument();
     });
 
     it('should not render modal when isOpen is false', () => {
@@ -196,7 +174,7 @@ describe('ResiliencyScoreModal', () => {
       const baselineInput = screen.getByPlaceholderText('e.g., 100.0');
       await user.type(baselineInput, '100');
 
-      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/metrics.yaml');
+      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/alerts.yaml');
       await user.clear(mountPathInput);
 
       const confirmButton = screen.getByRole('button', { name: /confirm/i });
@@ -220,7 +198,7 @@ describe('ResiliencyScoreModal', () => {
       const baselineInput = screen.getByPlaceholderText('e.g., 100.0');
       await user.type(baselineInput, '100');
 
-      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/metrics.yaml');
+      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/alerts.yaml');
       await user.clear(mountPathInput);
       await user.type(mountPathInput, 'relative/path');
 
@@ -242,7 +220,7 @@ describe('ResiliencyScoreModal', () => {
         />
       );
 
-      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/metrics.yaml');
+      const mountPathInput = screen.getByPlaceholderText('/etc/krkn/alerts.yaml');
       await user.clear(mountPathInput);
       await user.type(mountPathInput, '/custom/path/metrics.yaml');
 
@@ -364,7 +342,7 @@ describe('ResiliencyScoreModal', () => {
 
       expect(mockOnConfirm).toHaveBeenCalledWith({
         baseline: 100,
-        mountPath: '/etc/krkn/metrics.yaml',
+        mountPath: '/etc/krkn/alerts.yaml',
         fileId: 'file-1',
       });
     });
@@ -394,7 +372,7 @@ describe('ResiliencyScoreModal', () => {
 
       expect(mockOnConfirm).toHaveBeenCalledWith({
         baseline: 100,
-        mountPath: '/etc/krkn/metrics.yaml',
+        mountPath: '/etc/krkn/alerts.yaml',
       });
     });
   });
@@ -441,7 +419,7 @@ describe('ResiliencyScoreModal', () => {
 
       expect(mockOnConfirm).toHaveBeenCalledWith({
         baseline: 100,
-        mountPath: '/etc/krkn/metrics.yaml',
+        mountPath: '/etc/krkn/alerts.yaml',
         perNodeFiles: {
           'node-1': 'file-1',
           'node-2': 'file-2',

@@ -5,6 +5,8 @@ import App from './App';
 import { AppProvider } from './context/AppContext';
 import { operatorApi } from './services/operatorApi';
 import { studioLeaveGuard } from './components/Studio/studioLeaveGuard';
+import { buildRerunIntent } from './utils/rerunIntent';
+import type { JobConfigResponse, ScenarioRunState } from './types/api';
 
 /**
  * App-level test for Elasticsearch navigation.
@@ -47,7 +49,7 @@ vi.mock('react-router-dom', () => ({
 
 // handleCreateJob calls operatorApi.createTargetRequest via its proceed callback.
 vi.mock('./services/operatorApi', () => ({
-  operatorApi: { createTargetRequest: vi.fn() },
+  operatorApi: { createTargetRequest: vi.fn(), getScenarioRunConfig: vi.fn() },
 }));
 
 // Stub every child component App pulls from the barrel so the render switch is
@@ -58,13 +60,24 @@ vi.mock('./components', () => ({
   ClusterMultiSelector: () => <div>ClusterMultiSelector</div>,
   RegistrySelector: () => <div>RegistrySelector</div>,
   ScenariosList: () => <div>ScenariosList</div>,
-  JobsList: () => <div>JobsList</div>,
+  JobsList: ({ onRerunScenario }: { onRerunScenario: (run: ScenarioRunState) => void }) => (
+    <button
+      onClick={() =>
+        onRerunScenario({ scenarioRunName: 'run-1', scenarioName: 'pod-scenarios' } as ScenarioRunState)
+      }
+    >
+      rerun-run-1
+    </button>
+  ),
   Settings: () => <div>Settings</div>,
   TerminalContent: () => <div>TerminalContent</div>,
   Studio: () => <div>Studio</div>,
   ElasticsearchDataView: () => <div data-testid="elasticsearch-data-view">ElasticsearchDataView</div>,
 }));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
+vi.mock('./components/ResiliencyHistory', () => ({
+  ResiliencyHistoryPage: () => <div data-testid="resiliency-history-page">ResiliencyHistoryPage</div>,
+}));
 vi.mock('./components/ScenarioDetail', () => ({ ScenarioDetail: () => <div>ScenarioDetail</div> }));
 vi.mock('./components/UserForm', () => ({ UserForm: () => <div>UserForm</div> }));
 vi.mock('./components/ChangePasswordForm', () => ({ ChangePasswordForm: () => <div>ChangePasswordForm</div> }));
@@ -103,6 +116,106 @@ describe('App Elasticsearch navigation', () => {
     await waitFor(() => {
       expect(screen.getByTestId('elasticsearch-data-view')).toBeInTheDocument();
     });
+  });
+});
+
+describe('scenario replay handoff', () => {
+  it('carries categories from the replay response into the scenario intent', () => {
+    const config: JobConfigResponse = {
+      targetRequestId: 'target-1',
+      targetClusters: { operator: ['cluster-1'] },
+      scenario: { name: 'pod-scenarios', private: false },
+      kubeconfigPath: '/tmp/kubeconfig',
+      environment: { NAMESPACE: 'default' },
+      cloudCredentialRef: 'aws-ci',
+      categories: ['network', 'reliability'],
+    };
+    const run = { scenarioRunName: 'run-1', scenarioName: 'pod-scenarios' } as ScenarioRunState;
+
+    expect(buildRerunIntent(config, run)).toEqual({
+      scenario: { name: 'pod-scenarios', private: false },
+      clusters: [{ operatorName: 'operator', clusterName: 'cluster-1' }],
+      environment: { NAMESPACE: 'default' },
+      kubeconfigPath: '/tmp/kubeconfig',
+      cloudCredentialRef: 'aws-ci',
+      categories: ['network', 'reliability'],
+    });
+  });
+});
+
+describe('App scenario re-run flow', () => {
+  const config: JobConfigResponse = {
+    targetRequestId: 'target-1',
+    targetClusters: { operator: ['cluster-1'] },
+    scenario: { name: 'pod-scenarios', private: false },
+    kubeconfigPath: '/tmp/kubeconfig',
+    environment: { NAMESPACE: 'default' },
+    cloudCredentialRef: 'aws-ci',
+    categories: ['network', 'reliability'],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    });
+  });
+
+  it('fetches run config, dispatches the replay intent, and starts target creation', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getScenarioRunConfig).mockResolvedValue(config);
+    vi.mocked(operatorApi.createTargetRequest).mockResolvedValue({ uuid: 'uuid-1' });
+    renderApp();
+
+    await user.click(screen.getByText('rerun-run-1'));
+
+    // getScenarioRunConfig receives the scenario run name, then target creation
+    // starts. Reaching createTargetRequest proves the RERUN_SCENARIO dispatch
+    // (buildRerunIntent) between the two calls did not throw.
+    await waitFor(() => {
+      expect(operatorApi.getScenarioRunConfig).toHaveBeenCalledWith('run-1');
+      expect(operatorApi.createTargetRequest).toHaveBeenCalled();
+    });
+    // INIT_SUCCESS advances to the polling phase, which renders LoadingScreen.
+    await waitFor(() => expect(screen.getByText('LoadingScreen')).toBeInTheDocument());
+  });
+
+  it('dispatches the initialization error state when the config request fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getScenarioRunConfig).mockRejectedValue(new Error('boom'));
+    renderApp();
+
+    await user.click(screen.getByText('rerun-run-1'));
+
+    // INIT_ERROR moves the phase to error, which renders ErrorDisplay.
+    await waitFor(() => expect(screen.getByText('ErrorDisplay')).toBeInTheDocument());
+    expect(operatorApi.createTargetRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('App Resiliency History navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    });
+  });
+
+  it('renders ResiliencyHistoryPage after choosing its sidebar destination', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    expect(screen.queryByTestId('resiliency-history-page')).not.toBeInTheDocument();
+    await user.click(screen.getByText('Resiliency History'));
+    await waitFor(() => expect(screen.getByTestId('resiliency-history-page')).toBeInTheDocument());
   });
 });
 

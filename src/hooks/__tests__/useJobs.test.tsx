@@ -26,6 +26,7 @@ function sendWsSnapshot(
   jobs: unknown[],
   pagination = { page: 1, limit: 20, total: jobs.length, totalPages: 1 },
   stats?: { totalJobs: number; succeededJobs: number; failedJobs: number },
+  subscriptionId?: string,
 ) {
   act(() => {
     capturedHandler?.({
@@ -35,6 +36,7 @@ function sendWsSnapshot(
       data: { jobs },
       pagination,
       stats,
+      subscriptionId,
     });
   });
 }
@@ -69,7 +71,7 @@ describe('useJobs', () => {
   it('subscribes to WS with page and limit on connect', () => {
     renderHook(() => useJobs());
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 20);
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 20, [], expect.any(String));
   });
 
   it('does not subscribe when disconnected', () => {
@@ -131,7 +133,7 @@ describe('useJobs', () => {
 
     act(() => { result.current.setPage(2); });
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 2, 20);
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 2, 20, [], expect.any(String));
   });
 
   it('re-subscribes when limit changes', () => {
@@ -142,7 +144,36 @@ describe('useJobs', () => {
 
     act(() => { result.current.setLimit(50); });
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 50);
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 50, [], expect.any(String));
+  });
+
+  it('subscribes with category filters and resubscribes when they change', () => {
+    const { rerender } = renderHook(({ filters }) => useJobs(filters), { initialProps: { filters: [] as string[] } });
+    const firstSubscriptionId = vi.mocked(websocketService.subscribe).mock.calls[0][6];
+
+    rerender({ filters: ['network-chaos'] });
+
+    expect(websocketService.subscribe).toHaveBeenLastCalledWith(
+      'jobs', 'jobs', undefined, 1, 20, ['network-chaos'], expect.any(String),
+    );
+    const subscriptions = vi.mocked(websocketService.subscribe).mock.calls;
+    expect(subscriptions[subscriptions.length - 1]?.[6]).not.toBe(firstSubscriptionId);
+  });
+
+  it('ignores snapshots from an older jobs subscription', () => {
+    const { result, rerender } = renderHook(({ filters }) => useJobs(filters), { initialProps: { filters: [] as string[] } });
+    const oldSubscriptionId = vi.mocked(websocketService.subscribe).mock.calls[0][6] as string;
+    sendWsSnapshot([scenarioJob], undefined, undefined, oldSubscriptionId);
+    expect(result.current.jobs).toHaveLength(1);
+
+    rerender({ filters: ['cluster-reliability'] });
+    const subscriptions = vi.mocked(websocketService.subscribe).mock.calls;
+    const currentSubscriptionId = subscriptions[subscriptions.length - 1]?.[6] as string;
+    sendWsSnapshot([graphJob], undefined, undefined, oldSubscriptionId);
+    expect(result.current.jobs).toEqual([scenarioJob]);
+
+    sendWsSnapshot([graphJob], undefined, undefined, currentSubscriptionId);
+    expect(result.current.jobs).toEqual([graphJob]);
   });
 
   it('sets isLoading true on re-subscribe', () => {

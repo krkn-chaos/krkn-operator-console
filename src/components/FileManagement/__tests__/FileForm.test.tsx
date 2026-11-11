@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
 import { FileForm } from '../FileForm';
-import type { FileTypeResponse } from '../../../types/api';
+
+const fileFormStyles = readFileSync(`${process.cwd()}/src/components/FileManagement/FileForm.css`, 'utf8');
 
 // Mock operatorApi
 vi.mock('../../../services/operatorApi', () => ({
@@ -31,13 +33,11 @@ function createApiError(message: string, status: number, statusText: string): Er
 
 const defaultProps = {
   mode: 'create' as const,
-  availableFileTypes: [] as FileTypeResponse[],
   onSuccess: vi.fn(),
   onCancel: vi.fn(),
-  onRequestNewFileType: vi.fn(),
 };
 
-describe('FileForm error handling', () => {
+describe('FileForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (operatorApi.getGroups as ReturnType<typeof vi.fn>).mockResolvedValue({ groups: [] });
@@ -113,5 +113,50 @@ describe('FileForm error handling', () => {
         screen.getByText('Internal Server Error'),
       ).toBeInTheDocument();
     });
+  });
+
+  it('preserves legacy file type metadata when editing a file', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      fileId: 'legacy-file',
+      fileName: 'legacy-config.yaml',
+      content: 'key: value',
+      availableToAll: true,
+      fileType: 'config',
+    });
+    (operatorApi.updateFile as ReturnType<typeof vi.fn>).mockResolvedValue({ fileId: 'legacy-file' });
+
+    render(
+      <FileForm
+        mode="edit"
+        initialData={{ fileId: 'legacy-file', fileName: 'legacy-config.yaml', availableToAll: true }}
+        onSuccess={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('legacy-config.yaml');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(operatorApi.updateFile).toHaveBeenCalledWith('legacy-file', expect.objectContaining({ fileType: 'config' }));
+    });
+  });
+
+  it('renders the group-select toggle with full-width text', async () => {
+    const user = userEvent.setup();
+    render(<FileForm {...defaultProps} />);
+
+    await user.click(screen.getByRole('radio', { name: 'Assign to group' }));
+
+    const toggle = document.querySelector('.file-form-group-select-toggle');
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toHaveClass('file-form-group-select-toggle');
+
+    const toggleText = toggle?.querySelector('.pf-v5-c-menu-toggle__text');
+    expect(toggleText).toBeInTheDocument();
+    expect(fileFormStyles).toMatch(
+      /\.file-form-group-select-toggle\s+\.pf-v5-c-menu-toggle__text\s*\{\s*width:\s*100%;?\s*\}/,
+    );
   });
 });

@@ -81,7 +81,7 @@ initializing → polling → selecting_cluster → (future states)
 ### Frontend
 - **React** 18+
 - **TypeScript** 5+
-- **PatternFly** 4.x
+- **PatternFly** 5.x
 - **Vite** (build tool)
 
 ### Build & Deploy

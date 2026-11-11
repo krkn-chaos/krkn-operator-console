@@ -4,6 +4,12 @@
  * Shows the environment variables and metadata (scenario image, target clusters)
  * used to configure a scenario run or graph run. Self-contained: manages its own
  * data fetching, loading, and error states with an in-memory cache.
+ *
+ * @example
+ * ```tsx
+ * <ScenarioConfigDisplay scenarioRunName="scenariorun-abc123" />
+ * <ScenarioConfigDisplay graphRunName="graphrun-abc123" />
+ * ```
  */
 
 import { useState, useEffect } from 'react';
@@ -11,7 +17,7 @@ import { Spinner, Alert } from '@patternfly/react-core';
 import { operatorApi } from '../services/operatorApi';
 import { graphRunsApi } from '../services/graphRunsApi';
 import { configCache, cacheSet } from './scenarioConfigCache';
-import type { JobConfigResponse } from '../types/api';
+import type { CreateGraphRunRequest, JobConfigResponse } from '../types/api';
 
 const SENSITIVE_PATTERNS = /PASSWORD|SECRET|TOKEN|KEY|CREDENTIALS/i;
 
@@ -22,7 +28,7 @@ interface ScenarioConfigDisplayProps {
 
 export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: ScenarioConfigDisplayProps) {
   const cacheKey = scenarioRunName ? `scenario:${scenarioRunName}` : graphRunName ? `graph:${graphRunName}` : '';
-  const [config, setConfig] = useState<JobConfigResponse | null>(null);
+  const [config, setConfig] = useState<(JobConfigResponse | CreateGraphRunRequest) | null>(null);
   const [loading, setLoading] = useState(!!cacheKey);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +50,7 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
         setLoading(true);
         setError(null);
 
-        let result: JobConfigResponse;
+        let result: JobConfigResponse | CreateGraphRunRequest;
         if (scenarioRunName) {
           result = await operatorApi.getScenarioRunConfig(scenarioRunName);
         } else if (graphRunName) {
@@ -93,9 +99,6 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
 
   if (!config) return null;
 
-  const envEntries = Object.entries(config.environment || {}).sort(([a], [b]) => a.localeCompare(b));
-  const clusterEntries = Object.entries(config.targetClusters || {});
-
   const dlStyle = { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', margin: 0 } as const;
   const dtStyle = { fontWeight: 'bold' } as const;
   const ddMono = { margin: 0, fontFamily: 'monospace', fontSize: 'var(--pf-v5-global--FontSize--sm)' } as const;
@@ -108,6 +111,29 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
   };
+
+  if ('graph' in config) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+          <p style={labelStyle}>Workflow Graph</p>
+          <dl style={dlStyle}>
+            <dt style={dtStyle}>Nodes:</dt>
+            <dd style={ddMono}>{Object.keys(config.graph).join(', ') || 'No nodes configured'}</dd>
+            <dt style={dtStyle}>Target Clusters:</dt>
+            <dd style={ddMono}>
+              {Object.entries(config.targetClusters).map(([provider, clusters]) => (
+                <div key={provider}>{provider}: {clusters.join(', ')}</div>
+              ))}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    );
+  }
+
+  const envEntries = Object.entries(config.environment || {}).sort(([a], [b]) => a.localeCompare(b));
+  const clusterEntries = Object.entries(config.targetClusters || {});
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

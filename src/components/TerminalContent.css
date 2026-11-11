@@ -116,9 +116,9 @@
 }
 
 .cluster-item {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
 }
 
 .cluster-number {
@@ -131,6 +131,14 @@
 
 .cluster-name {
   margin-left: 0.5rem;
+}
+
+.terminal-cluster-offline {
+  margin-left: 0.5rem;
+  color: var(--pf-v5-global--danger-color--100);
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 /* Terminal prompt */

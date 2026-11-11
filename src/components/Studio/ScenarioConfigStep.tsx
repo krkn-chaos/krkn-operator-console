@@ -17,7 +17,64 @@ import { DynamicFormBuilder } from '../DynamicFormBuilder';
 import { ScenarioParameterSections } from '../ScenarioParameterSections';
 import { operatorApi } from '../../services/operatorApi';
 import { elasticsearchApi } from '../../services/elasticsearchApi';
-import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig } from '../../types/api';
+import { cloudCredentialsApi } from '../../services/cloudCredentialsApi';
+import { hasCloudFields, getCloudDisabledFields, resolveCloudTypeForProvider, resolveEffectiveCloudType, filterScenarioFieldsByCloudType } from '../../utils/cloudProviderUtils';
+import type { ScenarioDetail, ScenarioFormValues, ScenariosRequest, ScenarioGlobals, TouchedFields, ElasticsearchConfig, CloudCredential } from '../../types/api';
+
+/**
+ * Cache of fetched scenario details keyed by registry + scenario name.
+ * The wizard unmounts this step when the user navigates away, so without a
+ * cache every return to the configuration step would refetch. The cache lets a
+ * remount restore the loaded detail synchronously and skip the network call
+ * when nothing changed. Only the field schema is cached here; user-entered form
+ * values live in the parent modal state and are unaffected. A changed
+ * scenario/registry uses a different key.
+ *
+ * Entries are validated across modal sessions by image digest: a cached detail
+ * is reused only when it was loaded in the current session (step-to-step
+ * navigation) or when its digest matches the digest reported by the freshly
+ * fetched scenario list. If the image digest changed (or no digest is
+ * available), the entry is refetched instead of reused, so a moved registry
+ * repository or a re-pushed image is not served stale.
+ */
+interface ScenarioDetailCacheEntry {
+  detail: ScenarioDetail;
+  digest?: string;
+  sessionId: number;
+}
+
+const scenarioDetailCache = new Map<string, ScenarioDetailCacheEntry>();
+
+const scenarioDetailCacheKey = (scenarioName: string, registryName: string): string =>
+  `${registryName}::${scenarioName}`;
+
+/**
+ * Decide whether a cache entry may be reused.
+ * - Same session: always reuse (preserve within-session step navigation).
+ * - Cross session: reuse only when a digest is known and matches the entry's.
+ */
+const canReuseCacheEntry = (
+  entry: ScenarioDetailCacheEntry,
+  sessionId: number,
+  expectedDigest?: string,
+): boolean => {
+  if (entry.sessionId === sessionId) {
+    return true;
+  }
+  return expectedDigest !== undefined && entry.digest === expectedDigest;
+};
+
+const extractDefaultValues = (detail: ScenarioDetail): ScenarioFormValues => {
+  const defaults: ScenarioFormValues = {};
+  if (Array.isArray(detail.fields)) {
+    detail.fields.forEach(field => {
+      if (field.default !== undefined && field.default !== '') {
+        defaults[field.variable] = field.default;
+      }
+    });
+  }
+  return defaults;
+};
 
 interface ScenarioConfigStepProps {
   scenarioName: string;
@@ -28,6 +85,13 @@ interface ScenarioConfigStepProps {
   onFormChange: (values: ScenarioFormValues) => void;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
   onDefaultValuesLoad?: (defaults: ScenarioFormValues) => void;
+  onLoadStatusChange?: (status: 'loading' | 'loaded' | 'error') => void;
+  cloudCredentialRef?: string;
+  onCloudCredentialRefChange?: (name: string) => void;
+  /** Identifies the current modal session; bumped each time the modal opens. */
+  sessionId: number;
+  /** Image digest from the freshly fetched scenario list, used to validate cache. */
+  expectedDigest?: string;
 }
 
 export function ScenarioConfigStep({
@@ -39,6 +103,11 @@ export function ScenarioConfigStep({
   onFormChange,
   onGlobalFormChange,
   onDefaultValuesLoad,
+  onLoadStatusChange,
+  cloudCredentialRef: cloudCredentialRefProp = '',
+  onCloudCredentialRefChange,
+  sessionId,
+  expectedDigest,
 }: ScenarioConfigStepProps) {
   const [scenarioDetail, setScenarioDetail] = useState<ScenarioDetail | null>(null);
   const [scenarioGlobals, setScenarioGlobals] = useState<ScenarioGlobals | null>(null);
@@ -51,14 +120,41 @@ export function ScenarioConfigStep({
   const [selectedEsConfigName, setSelectedEsConfigName] = useState('');
   const [appliedEsConfigName, setAppliedEsConfigName] = useState('');
 
-  // Fetch scenario detail when scenario changes
+  const [cloudCredentials, setCloudCredentials] = useState<CloudCredential[]>([]);
+  const [selectedCloudCredName, setSelectedCloudCredName] = useState(cloudCredentialRefProp);
+  const [appliedCloudCredName, setAppliedCloudCredName] = useState(cloudCredentialRefProp);
+
+  useEffect(() => {
+    setSelectedCloudCredName(cloudCredentialRefProp);
+    setAppliedCloudCredName(cloudCredentialRefProp);
+  }, [cloudCredentialRefProp, scenarioName]);
+
+  const handleFormChange = (values: ScenarioFormValues) => {
+    onFormChange({ ...formValues, ...values });
+  };
   useEffect(() => {
     let mounted = true;
+
+    // Restore from cache on remount (step navigation) without a refetch, but
+    // only when the entry is still valid for the current session/digest.
+    const cacheKey = scenarioDetailCacheKey(scenarioName, registryName);
+    const cachedEntry = scenarioDetailCache.get(cacheKey);
+    if (cachedEntry && canReuseCacheEntry(cachedEntry, sessionId, expectedDigest)) {
+      setScenarioDetail(cachedEntry.detail);
+      setLoading(false);
+      setError(null);
+      onLoadStatusChange?.('loaded');
+      onDefaultValuesLoad?.(extractDefaultValues(cachedEntry.detail));
+      return () => {
+        mounted = false;
+      };
+    }
 
     async function fetchScenarioDetail() {
       setLoading(true);
       setError(null);
       setScenarioDetail(null);
+      onLoadStatusChange?.('loading');
 
       try {
         // Reconstruct registryConfig from registryName to avoid closure issues
@@ -66,26 +162,21 @@ export function ScenarioConfigStep({
         const detail = await operatorApi.getScenarioDetail(scenarioName, config);
 
         if (mounted) {
+          scenarioDetailCache.set(cacheKey, {
+            detail,
+            digest: detail.digest,
+            sessionId,
+          });
           setScenarioDetail(detail);
-
-          // Extract default values from ALL fields
-          const defaults: ScenarioFormValues = {};
-
-          // Fields is a direct array, not separated by required/optional
-          if (Array.isArray(detail.fields)) {
-            detail.fields.forEach(field => {
-              if (field.default !== undefined && field.default !== '') {
-                defaults[field.variable] = field.default;
-              }
-            });
-          }
+          onLoadStatusChange?.('loaded');
 
           // Notify parent of default values
-          onDefaultValuesLoad?.(defaults);
+          onDefaultValuesLoad?.(extractDefaultValues(detail));
         }
       } catch (err) {
         if (mounted) {
           setError(err instanceof Error ? err.message : 'Failed to load scenario details');
+          onLoadStatusChange?.('error');
         }
       } finally {
         if (mounted) {
@@ -99,7 +190,7 @@ export function ScenarioConfigStep({
     return () => {
       mounted = false;
     };
-  }, [scenarioName, registryName, onDefaultValuesLoad]);
+  }, [scenarioName, registryName, sessionId, expectedDigest, onDefaultValuesLoad, onLoadStatusChange]);
 
   // Fetch global parameters when checkbox is toggled
   useEffect(() => {
@@ -144,9 +235,68 @@ export function ScenarioConfigStep({
     elasticsearchApi.listConfigs().then(setEsConfigs).catch(() => { });
   }, [showGlobalParameters]);
 
+  // Cloud fields (CLOUD_TYPE, AWS_*, AZURE_*, etc.) are typically declared as scenario-specific
+  // required/optional fields, not global fields — load credentials up front so the selector
+  // is available without requiring the user to expand Global Parameters.
+  useEffect(() => {
+    cloudCredentialsApi.listAvailable().then(setCloudCredentials).catch(() => { });
+  }, []);
+
   const hasEsGlobalFields = scenarioGlobals?.fields.some(
-    (f) => f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_')
+    (f) => f.variable != null && (f.variable === 'ENABLE_ES' || f.variable.startsWith('ES_'))
   ) ?? false;
+
+  const hasCloudDetailFields = scenarioDetail ? hasCloudFields(scenarioDetail.fields) : false;
+  const hasCloudGlobalFields = scenarioGlobals ? hasCloudFields(scenarioGlobals.fields) : false;
+  const hasCloudCredentialFields = hasCloudDetailFields || hasCloudGlobalFields;
+  const cloudDisabledFields = getCloudDisabledFields(appliedCloudCredName);
+
+  const cloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE')
+    ?? scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+  const appliedCloudCredential = cloudCredentials.find((c) => c.name === appliedCloudCredName);
+  const credentialCloudType = appliedCloudCredential
+    ? resolveCloudTypeForProvider(appliedCloudCredential.provider, cloudTypeField)
+    : undefined;
+  const formCloudTypeValue = formValues?.CLOUD_TYPE ?? globalFormValues?.CLOUD_TYPE;
+  const effectiveCloudType = resolveEffectiveCloudType(cloudTypeField, {
+    credentialCloudType,
+    formCloudType: formCloudTypeValue instanceof File ? undefined : formCloudTypeValue,
+  });
+
+  const applyCloudCredential = (credName: string) => {
+    setSelectedCloudCredName(credName);
+    if (!credName) {
+      setAppliedCloudCredName('');
+      onCloudCredentialRefChange?.('');
+      return;
+    }
+    setAppliedCloudCredName(credName);
+    onCloudCredentialRefChange?.(credName);
+
+    // Sync CLOUD_TYPE to the credential's provider so the form doesn't keep showing
+    // a stale/mismatched value (e.g. default "aws" while an Azure credential is applied).
+    const cred = cloudCredentials.find((c) => c.name === credName);
+    if (!cred) return;
+
+    const detailCloudTypeField = scenarioDetail?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    if (detailCloudTypeField) {
+      const targetValue = resolveCloudTypeForProvider(cred.provider, detailCloudTypeField);
+      if (targetValue) {
+        handleFormChange({ CLOUD_TYPE: targetValue });
+      }
+      return;
+    }
+
+    const globalCloudTypeField = scenarioGlobals?.fields.find((f) => f.variable === 'CLOUD_TYPE');
+    const targetGlobalValue = globalCloudTypeField
+      ? resolveCloudTypeForProvider(cred.provider, globalCloudTypeField)
+      : undefined;
+    if (globalCloudTypeField && targetGlobalValue) {
+      const patch = { ...globalFormValues, CLOUD_TYPE: targetGlobalValue };
+      const touched = { ...globalTouchedFields, CLOUD_TYPE: true };
+      onGlobalFormChange(patch, touched);
+    }
+  };
 
   const applyEsConfig = (configName: string) => {
     setSelectedEsConfigName(configName);
@@ -191,6 +341,24 @@ export function ScenarioConfigStep({
     [scenarioDetail?.fields]
   );
 
+  const cloudFilterOptions = useMemo(
+    () => ({
+      hideCloudTypeWhenCredentialApplied: true,
+      appliedCloudCredName,
+    }),
+    [appliedCloudCredName]
+  );
+
+  const mainFormFields = useMemo(() => {
+    if (!scenarioDetail) return [];
+    const base = hasGroupedScenarioFields
+      ? scenarioDetail.fields
+      : requiredFields;
+    return hasGroupedScenarioFields
+      ? filterScenarioFieldsByCloudType(base, effectiveCloudType, cloudFilterOptions)
+      : base;
+  }, [scenarioDetail, hasGroupedScenarioFields, requiredFields, effectiveCloudType, cloudFilterOptions]);
+
   const allGlobalFields = useMemo(
     () => (scenarioGlobals?.fields || []).map((f) =>
       f.variable?.toUpperCase().includes('PASSWORD') ? { ...f, secret: true } : f
@@ -233,9 +401,10 @@ export function ScenarioConfigStep({
         <CardTitle>{hasGroupedScenarioFields ? 'Parameters' : 'Required Parameters'}</CardTitle>
         <CardBody>
           <DynamicFormBuilder
-            fields={hasGroupedScenarioFields ? (scenarioDetail?.fields || []) : requiredFields}
+            fields={mainFormFields}
             values={formValues}
-            onChange={onFormChange}
+            onChange={handleFormChange}
+            disabledFields={cloudDisabledFields}
           />
         </CardBody>
       </Card>
@@ -243,7 +412,7 @@ export function ScenarioConfigStep({
       <ScenarioParameterSections
         optionalFields={optionalFields}
         formValues={formValues}
-        onFormChange={onFormChange}
+        onFormChange={handleFormChange}
         suppressOptionalSection={hasGroupedScenarioFields}
         allGlobalFields={allGlobalFields}
         globalFormValues={globalFormValues}
@@ -259,6 +428,12 @@ export function ScenarioConfigStep({
         selectedEsConfigName={selectedEsConfigName}
         onSelectEsConfig={applyEsConfig}
         appliedEsConfigName={appliedEsConfigName}
+        hasCloudCredentialFields={hasCloudCredentialFields}
+        cloudCredentials={cloudCredentials}
+        selectedCloudCredName={selectedCloudCredName}
+        onSelectCloudCredential={applyCloudCredential}
+        appliedCloudCredName={appliedCloudCredName}
+        activeCloudType={effectiveCloudType}
       />
     </div>
   );

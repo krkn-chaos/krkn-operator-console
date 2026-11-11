@@ -23,19 +23,26 @@ import type { WorkflowInfo } from '../../types/api';
  *
  * Fetches available templates via `workflowsApi.getAvailableWorkflows` on open
  * and provides a searchable list. The toggle label shows the loaded workflow's
- * name when one is active, or "Load Workflow" otherwise.
+ * name when one is active, or "Load saved workflow" otherwise.
  *
  * Prompts the user for confirmation only when there are unsaved changes
  * (dirty saved workflow or unsaved canvas with nodes).
  *
  * @example
  * ```tsx
- * // Used inside StudioProvider, typically in the Workflow Templates card:
+ * // Used inside StudioProvider, typically in the Workflow setup card:
  * <LoadWorkflowSelect />
  * ```
  */
-export function LoadWorkflowSelect() {
-  const { workflow, loadWorkflow, savedWorkflow, isDirty } = useStudioContext();
+export function LoadWorkflowSelect({ id = 'studio-load-workflow' }: { id?: string }) {
+  const {
+    workflow,
+    loadWorkflow,
+    savedWorkflow,
+    isDirty,
+    visibleCategories = [],
+    categoryLoadStatus = 'error',
+  } = useStudioContext();
   const { showSuccess, showError } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,14 +87,20 @@ export function LoadWorkflowSelect() {
         throw new Error('This workflow has no studio layout and cannot be opened in the visual editor');
       }
 
+      const savedCategories = wfResponse.categories ?? [];
+      const selectedCategories = categoryLoadStatus === 'ready'
+        ? savedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
+        : savedCategories;
+
       loadWorkflow(canvas, {
         workflowId: wfResponse.workflowId,
         workflowName: wfResponse.workflowName,
         description: wfResponse.description,
         availableToAll: wfResponse.availableToAll,
         groups: wfResponse.groups,
+        categories: savedCategories,
         savedAt: wfResponse.updatedAt || wfResponse.createdAt || new Date().toISOString(),
-      });
+      }, selectedCategories);
       showSuccess('Workflow loaded', `"${wfResponse.workflowName}" loaded successfully`);
     } catch (err) {
       showError('Load failed', err instanceof Error ? err.message : 'Failed to load workflow');
@@ -114,12 +127,13 @@ export function LoadWorkflowSelect() {
       toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
         <MenuToggle
           ref={toggleRef}
+          id={id}
           onClick={() => setIsOpen(!isOpen)}
           isExpanded={isOpen}
           isDisabled={isLoadingWorkflow}
           icon={isLoadingWorkflow ? <Spinner size="sm" /> : <FolderOpenIcon />}
         >
-          {isLoadingWorkflow ? 'Loading...' : savedWorkflow ? savedWorkflow.workflowName : 'Load Workflow'}
+          {isLoadingWorkflow ? 'Loading...' : savedWorkflow ? savedWorkflow.workflowName : 'Load saved workflow'}
         </MenuToggle>
       )}
     >

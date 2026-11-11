@@ -9,6 +9,10 @@ import { operatorApi } from '../../services/operatorApi';
 vi.mock('./StudioContext', () => ({
   useStudioContext: vi.fn(),
   buildGraph: vi.fn(() => ({})),
+  mergeVisibleCategorySelection: vi.fn((saved: string[] = [], selected: string[], visible: { name: string }[]) => [
+    ...saved.filter((name) => !visible.some((category) => category.name === name)),
+    ...selected.filter((name) => visible.some((category) => category.name === name)),
+  ].sort()),
 }));
 
 vi.mock('../../hooks', () => ({
@@ -262,6 +266,27 @@ describe('WorkflowDetailsPanel', () => {
     );
 
     expect(mockSetIsEditingDetails).toHaveBeenCalledWith(false);
+  });
+
+  it('preserves saved categories that are not visible during an update', async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(useStudioContext).mockReturnValue(makeContext({
+      isEditingDetails: true,
+      selectedCategories: ['network'],
+      visibleCategories: [{ name: 'network', availableToAll: true }],
+      categoryLoadStatus: 'ready',
+      savedWorkflow: { ...baseSavedWorkflow, categories: ['network', 'private-category'] },
+    }));
+
+    render(<WorkflowDetailsPanel />);
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(workflowsApi.updateWorkflow).toHaveBeenCalledWith('w1', expect.objectContaining({
+        categories: ['network', 'private-category'],
+      }));
+    });
   });
 
   it('shows error notification when save fails', async () => {

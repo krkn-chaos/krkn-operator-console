@@ -529,12 +529,11 @@ describe('graphRunsApi', () => {
   describe('getGraphRunConfig', () => {
     it('should fetch config by graph run name', async () => {
       const mockConfig = {
+        graph: {
+          node1: { scenario: { name: 'pod-scenarios', private: false } },
+        },
         targetRequestId: 'target-001',
         targetClusters: { 'krkn-operator': ['staging'] },
-        scenarioImage: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
-        scenarioName: 'pod-scenarios',
-        kubeconfigPath: '/root/.kube/config',
-        environment: { NAMESPACE: 'default' },
       };
 
       mockFetchJson.mockResolvedValue(mockConfig);
@@ -585,7 +584,7 @@ describe('graphRunsApi', () => {
       expect(errors).toContain('Graph cannot be empty');
     });
 
-    it('should return error for node without name or image', () => {
+    it('should return error for node without a scenario reference', () => {
       const invalidGraph: { [key: string]: GraphScenarioNode } = {
         'node1': {
           env: { FOO: 'bar' },
@@ -594,7 +593,7 @@ describe('graphRunsApi', () => {
 
       const errors = graphRunsApi.validateGraph(invalidGraph);
 
-      expect(errors).toContain("Node 'node1' must have either name or image");
+      expect(errors).toContain("Node 'node1' must have a scenario reference");
     });
 
     it('should return error for invalid depends_on reference', () => {

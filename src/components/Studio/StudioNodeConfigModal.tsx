@@ -79,8 +79,12 @@ export function StudioNodeConfigModal({ node, onClose }: StudioNodeConfigModalPr
             <dd style={ddStyle}>
               {config.registryType === 'private' ? config.registryConfig.registryName || 'private' : 'public'}
             </dd>
-          </dl>
-        </div>
+           </dl>
+           <dl style={{ ...dlStyle, marginTop: '0.5rem' }}>
+             <dt style={dtStyle}>Resiliency Weight:</dt>
+             <dd style={ddStyle}>{config.resiliencyWeight ?? 1}</dd>
+           </dl>
+         </div>
 
         {/* Scenario Variables */}
         {formEntries.length > 0 && (

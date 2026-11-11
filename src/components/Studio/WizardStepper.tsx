@@ -3,9 +3,56 @@
  *
  * Replaces PatternFly Wizard to avoid infinite render loop bug.
  * Provides a simple multi-step form with navigation controls.
+ *
+ * A step may mark its Next button as loading via `isNextLoading`: the button
+ * shows a spinner with a "Loading…" label and blocks advancing (including the
+ * Enter key) until loading clears. Use it for steps that fetch data on enter so
+ * the disabled Next button reads as "busy" rather than broken.
+ *
+ * @example
+ * function Example() {
+ *   const [scenarios, setScenarios] = useState<string[]>([]);
+ *   const [loading, setLoading] = useState(false);
+ *
+ *   const loadScenarios = () => {
+ *     setLoading(true);
+ *     fetchScenarios().then((list) => {
+ *       setScenarios(list);
+ *       setLoading(false);
+ *     });
+ *   };
+ *
+ *   const steps: WizardStepConfig[] = [
+ *     {
+ *       id: 'registry',
+ *       name: 'Registry',
+ *       component: <RegistryStep />,
+ *     },
+ *     {
+ *       id: 'scenario',
+ *       name: 'Scenario',
+ *       component: <ScenarioList scenarios={scenarios} />,
+ *       onEnter: loadScenarios,
+ *       // While loading: spinner + "Loading…", Next blocked.
+ *       isNextLoading: loading,
+ *       // After loading: enabled once a scenario is chosen (normal continuation).
+ *       isNextDisabled: loading || scenarios.length === 0,
+ *     },
+ *   ];
+ *
+ *   return (
+ *     <WizardStepper
+ *       isOpen
+ *       title="Configure Scenario"
+ *       steps={steps}
+ *       onClose={handleClose}
+ *       onSave={handleSave}
+ *     />
+ *   );
+ * }
  */
 
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, ReactNode, KeyboardEvent } from 'react';
 import {
   Modal,
   ModalVariant,
@@ -16,12 +63,16 @@ import {
   ProgressStep,
   Alert,
 } from '@patternfly/react-core';
+import { runOnEnterFromFormControl } from '../../utils/keyboard';
 
 export interface WizardStepConfig {
   id: string;
   name: string;
   component: ReactNode;
   isNextDisabled?: boolean;
+  isNextLoading?: boolean;
+  isStepDisabled?: boolean;
+  onEnter?: () => void;
 }
 
 interface WizardStepperProps {
@@ -32,6 +83,7 @@ interface WizardStepperProps {
   validationWarnings?: string[];
   onClose: () => void;
   onSave: () => void;
+  onCancel?: () => void;
 }
 
 export function WizardStepper({
@@ -42,8 +94,10 @@ export function WizardStepper({
   validationWarnings = [],
   onClose,
   onSave,
+  onCancel,
 }: WizardStepperProps) {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
 
   const currentStep = steps[activeStepIndex];
   const isFirstStep = activeStepIndex === 0;
@@ -56,30 +110,61 @@ export function WizardStepper({
       if (activeElement && activeElement !== document.body) {
         activeElement.blur();
       }
+    } else {
+      setActiveStepIndex(0);
     }
   }, [isOpen]);
 
   const handleNext = () => {
+    if (currentStep.isNextDisabled || currentStep.isNextLoading) return;
     if (!isLastStep) {
-      setActiveStepIndex(prev => prev + 1);
+      const nextStepIndex = activeStepIndex + 1;
+      setActiveStepIndex(nextStepIndex);
+      steps[nextStepIndex]?.onEnter?.();
     } else {
       onSave();
     }
   };
 
+  const handleContentKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    runOnEnterFromFormControl(event, handleNext);
+  };
+
   const handleBack = () => {
     if (!isFirstStep) {
-      setActiveStepIndex(prev => prev - 1);
+      const previousStepIndex = activeStepIndex - 1;
+      setActiveStepIndex(previousStepIndex);
+      steps[previousStepIndex]?.onEnter?.();
     }
   };
 
   const handleStepClick = (stepIndex: number) => {
+    if (stepIndex === activeStepIndex || steps[stepIndex]?.isStepDisabled) return;
     setActiveStepIndex(stepIndex);
+    steps[stepIndex]?.onEnter?.();
+  };
+
+  const handleCancelClick = () => {
+    setShowCancelConfirmation(true);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowCancelConfirmation(false);
+    setActiveStepIndex(0);
+    if (onCancel) {
+      onCancel();
+    } else {
+      onClose();
+    }
+  };
+
+  const handleCancelDismiss = () => {
+    setShowCancelConfirmation(false);
   };
 
   const handleModalClose = () => {
-    setActiveStepIndex(0);
-    onClose();
+    // Clicking X on modal shows confirmation
+    setShowCancelConfirmation(true);
   };
 
   const getStepVariant = (stepIndex: number) => {
@@ -89,12 +174,13 @@ export function WizardStepper({
   };
 
   return (
-    <Modal
-      variant={ModalVariant.large}
-      isOpen={isOpen}
-      onClose={handleModalClose}
-      aria-label={title}
-    >
+    <>
+      <Modal
+        variant={ModalVariant.large}
+        isOpen={isOpen && !showCancelConfirmation}
+        onClose={handleModalClose}
+        aria-label={title}
+      >
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -124,6 +210,7 @@ export function WizardStepper({
                 id={step.id}
                 titleId={`${step.id}-title`}
                 aria-label={step.name}
+                aria-disabled={step.isStepDisabled || undefined}
                 isCurrent={stepIndex === activeStepIndex}
                 onClick={() => handleStepClick(stepIndex)}
               >
@@ -138,7 +225,7 @@ export function WizardStepper({
           flex: 1,
           overflowY: 'auto',
           padding: '1.5rem'
-        }}>
+        }} onKeyDown={handleContentKeyDown}>
           {/* Validation Warnings */}
           {validationWarnings.length > 0 && (
             <Alert
@@ -165,7 +252,7 @@ export function WizardStepper({
           gap: '1rem',
           justifyContent: 'flex-end'
         }}>
-          <Button variant="link" onClick={handleModalClose}>
+          <Button variant="tertiary" onClick={handleCancelClick}>
             Cancel
           </Button>
           {!isFirstStep && (
@@ -176,12 +263,38 @@ export function WizardStepper({
           <Button
             variant="primary"
             onClick={handleNext}
-            isDisabled={currentStep.isNextDisabled}
+            isLoading={currentStep.isNextLoading}
+            isDisabled={currentStep.isNextDisabled || currentStep.isNextLoading}
           >
-            {isLastStep ? 'Save Configuration' : 'Next'}
+            {currentStep.isNextLoading
+              ? 'Loading…'
+              : isLastStep
+                ? 'Save Configuration'
+                : 'Next'}
           </Button>
         </div>
       </div>
-    </Modal>
+      </Modal>
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        variant={ModalVariant.small}
+        title="Cancel configuration?"
+        isOpen={showCancelConfirmation}
+        onClose={handleCancelDismiss}
+        actions={[
+          <Button key="confirm" variant="danger" onClick={handleCancelConfirm}>
+            Yes, cancel
+          </Button>,
+          <Button key="dismiss" variant="link" onClick={handleCancelDismiss}>
+            No, continue editing
+          </Button>,
+        ]}
+      >
+        <p>
+          Are you sure you want to cancel? All unsaved changes will be lost and you will return to the scenario runs list.
+        </p>
+      </Modal>
+    </>
   );
 }

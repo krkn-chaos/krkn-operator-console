@@ -265,4 +265,42 @@ describe('DynamicFormBuilder', () => {
       expect(lastCall.F1).toBe('a');
     });
   });
+
+  describe('server-injected credential fields', () => {
+    it('shows masked placeholder on disabled cloud credential fields', () => {
+      const fields: ScenarioField[] = [
+        {
+          name: 'ibmc-url',
+          variable: 'IBMC_URL',
+          short_description: 'IBM Cloud URL',
+          description: 'IBM Cloud URL',
+          type: 'string',
+          required: false,
+          secret: false,
+          default: '',
+        } as ScenarioField,
+        {
+          name: 'ibmc-api-key',
+          variable: 'IBMC_APIKEY',
+          short_description: 'IBM Cloud API key',
+          description: 'IBM Cloud API Key',
+          type: 'string',
+          required: false,
+          secret: true,
+          default: '',
+        } as ScenarioField,
+      ];
+
+      render(
+        <DynamicFormBuilder
+          fields={fields}
+          values={{}}
+          onChange={vi.fn()}
+          disabledFields={['IBMC_URL', 'IBMC_APIKEY']}
+        />
+      );
+
+      expect(screen.getAllByPlaceholderText('••••••••')).toHaveLength(2);
+    });
+  });
 });

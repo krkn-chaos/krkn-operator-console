@@ -24,7 +24,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
   const isFirstMessageRef = useRef<boolean>(true);
 
   const isPending = status === 'Pending';
-  const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'Stopped';
+  const isTerminal = status === 'Succeeded' || status === 'Failed' || status === 'MaxRetriesExceeded' || status === 'Stopped';
   const follow = !isTerminal;
 
   const connectionId = `logs-${jobId}`;
