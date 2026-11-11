@@ -906,10 +906,6 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       : base;
   }, [scenarioDetail, hasGroupedScenarioFields, effectiveCloudType, cloudFilterOptions]);
 
-  const clusterNames = useMemo(
-    () => state.selectedClusters.map((cluster) => cluster.clusterName),
-    [state.selectedClusters],
-  );
   const scenarioFields = useMemo(() => scenarioDetail?.fields ?? [], [scenarioDetail?.fields]);
   const {
     scenarioOptions: scenarioClusterOptions,
@@ -918,7 +914,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     loadOptions: loadClusterOptions,
   } = useClusterParameterOptions({
     uuid: state.uuid,
-    clusterNames,
+    clusters: state.selectedClusters,
     scenarioName,
     scenarioFields,
     globalFields: allGlobalFields,

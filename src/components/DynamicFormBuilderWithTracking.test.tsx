@@ -148,6 +148,65 @@ describe('DynamicFormBuilderWithTracking', () => {
   });
 
   describe('touched field tracking', () => {
+    it('tracks selected ready cluster options without reloading discovery', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const onClusterOptionsOpen = vi.fn();
+      render(
+        <DynamicFormBuilderWithTracking
+          fields={[makeStringField('NODE_NAME', 'Node name')]}
+          values={{}}
+          touchedFields={{}}
+          onChange={onChange}
+          clusterOptions={{ NODE_NAME: { options: ['worker-1'], status: 'ready' } }}
+          onClusterOptionsOpen={onClusterOptionsOpen}
+        />,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Show Node name options' }));
+      expect(onClusterOptionsOpen).not.toHaveBeenCalled();
+      await user.click(screen.getByText('worker-1'));
+      expect(onChange).toHaveBeenCalledWith({ NODE_NAME: 'worker-1' }, { NODE_NAME: true });
+    });
+
+    it('uses masked password fallback for a disabled secret despite cluster options', () => {
+      const field = { ...makeStringField('API_KEY', 'API key'), secret: true, mutually_excludes: 'ENABLED' } as ScenarioField;
+      const enabled = { ...makeStringField('ENABLED', 'Enabled'), type: 'boolean', mutually_excludes: 'API_KEY' } as ScenarioField;
+      render(
+        <DynamicFormBuilderWithTracking
+          fields={[enabled, field]}
+          values={{ ENABLED: 'true', API_KEY: 'stored-secret' }}
+          touchedFields={{}}
+          onChange={vi.fn()}
+          clusterOptions={{ API_KEY: { options: ['worker-1'], status: 'ready' } }}
+        />,
+      );
+
+      const input = screen.getByLabelText('API key') as HTMLInputElement;
+      expect(input.type).toBe('password');
+      expect(input).toHaveValue('***');
+      expect(input).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Show API key options' })).not.toBeInTheDocument();
+    });
+
+    it('masks a disabled non-secret field with cluster options', () => {
+      const enabled = { ...makeStringField('ENABLED', 'Enabled'), type: 'boolean', mutually_excludes: 'NODE_NAME' } as ScenarioField;
+      render(
+        <DynamicFormBuilderWithTracking
+          fields={[enabled, makeStringField('NODE_NAME', 'Node name')]}
+          values={{ ENABLED: 'true', NODE_NAME: 'worker-private' }}
+          touchedFields={{}}
+          onChange={vi.fn()}
+          clusterOptions={{ NODE_NAME: { options: ['worker-1'], status: 'ready' } }}
+        />,
+      );
+
+      const input = screen.getByRole('combobox', { name: 'Node name' });
+      expect(input).toHaveValue('***');
+      expect(input).toBeDisabled();
+      expect(screen.queryByDisplayValue('worker-private')).not.toBeInTheDocument();
+    });
+
     it('should call onChange with updated touchedFields when a field is modified', async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();

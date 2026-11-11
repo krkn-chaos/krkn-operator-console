@@ -101,7 +101,7 @@ class OperatorApiClient extends BaseApiClient {
   /**
    * POST /terminal
    * Execute a command on a remote cluster via kubectl/oc
-   * @param request - Terminal request with cluster_id, uuid, and command
+   * @param request - Terminal request with cluster_id, operator_name, uuid, and command
    * @returns Promise with decoded stdout, stderr, and exit code
    */
   async executeTerminalCommand(request: TerminalRequest): Promise<{
