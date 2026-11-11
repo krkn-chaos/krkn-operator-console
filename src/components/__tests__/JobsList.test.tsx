@@ -427,6 +427,28 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('Rolled back')).toBeInTheDocument();
     });
+
+    it('shows partial rollback until every target cluster has a successful rollback', () => {
+      const sourceRun = {
+        scenarioRunName: 'source-run', scenarioName: 'node-cpu-hog', phase: 'Failed' as const,
+        totalTargets: 2, successfulJobs: 0, failedJobs: 2, runningJobs: 0,
+        clusterJobs: [
+          { providerName: 'provider', clusterName: 'cluster-a', jobId: 'attempt-a', podName: 'pod-a', phase: 'Failed' as const },
+          { providerName: 'provider', clusterName: 'cluster-b', jobId: 'attempt-b', podName: 'pod-b', phase: 'Failed' as const },
+        ],
+      };
+      const firstRollback = { scenarioRunName: 'rollback-a', sourceJobId: 'attempt-a', phase: 'Succeeded' as const, createdAt: '2026-11-10T11:00:00Z' };
+      const secondRollback = { scenarioRunName: 'rollback-b', sourceJobId: 'attempt-b', phase: 'Succeeded' as const, createdAt: '2026-11-10T11:01:00Z' };
+
+      setMockJobs([makeScenarioJobItem('source-run', { scenarioRun: sourceRun, rollbackRuns: [firstRollback] })]);
+      const { rerender } = render(<JobsList {...defaultProps()} />);
+      expect(screen.getByText('Partially rolled back')).toBeInTheDocument();
+
+      setMockJobs([makeScenarioJobItem('source-run', { scenarioRun: sourceRun, rollbackRuns: [firstRollback, secondRollback] })]);
+      rerender(<JobsList {...defaultProps()} />);
+      expect(screen.getByText('Rolled back')).toBeInTheDocument();
+      expect(screen.queryByText('Partially rolled back')).not.toBeInTheDocument();
+    });
   });
 
   describe('Loading Run Details', () => {
