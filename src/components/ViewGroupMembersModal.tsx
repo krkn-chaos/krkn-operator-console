@@ -16,12 +16,16 @@ import {
   DataListItemCells,
   DataListCell,
   Label,
+  Flex,
+  FlexItem,
 } from '@patternfly/react-core';
-import { UsersIcon, TrashIcon, PlusCircleIcon } from '@patternfly/react-icons';
+import { UsersIcon, TrashIcon, PlusCircleIcon, RobotIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
+import { robotsApi } from '../services/robotsApi';
 import { useNotifications } from '../hooks';
+import { isApiError } from '../utils/apiClient';
 import { AddMembersModal } from './AddMembersModal';
-import type { GroupMemberDetails } from '../types/api';
+import type { GroupMemberDetails, RobotDetails } from '../types/api';
 
 /**
  * ViewGroupMembersModal component props
@@ -98,6 +102,11 @@ export function ViewGroupMembersModal({
     name: string;
   } | null>(null);
   const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
+  // Robot accounts are NOT returned by the members API (KrknUser-only), so they
+  // are fetched separately and filtered client-side by group membership labels.
+  const [groupRobots, setGroupRobots] = useState<RobotDetails[]>([]);
+  const [robotsAvailable, setRobotsAvailable] = useState(false);
+  const [robotsError, setRobotsError] = useState<string | null>(null);
   const { showSuccess, showError } = useNotifications();
 
   /**
@@ -119,11 +128,41 @@ export function ViewGroupMembersModal({
   };
 
   /**
+   * Fetch robot accounts that are members of this group.
+   *
+   * The group members API only covers KrknUser accounts, so robot membership
+   * (stored as `group.krkn.krkn-chaos.dev/<group>` labels on KrknRobot CRs) is
+   * fetched via the robots API and filtered client-side.
+   *
+   * A 404 means the operator version does not support robots — the section is
+   * silently hidden in that case.
+   */
+  const loadRobots = async () => {
+    setRobotsAvailable(false);
+    setRobotsError(null);
+    try {
+      const response = await robotsApi.listRobots();
+      setGroupRobots(response.robots.filter((robot) => robot.groups.includes(groupName)));
+      setRobotsAvailable(true);
+    } catch (err) {
+      if (isApiError(err) && err.status === 404) {
+        // Old operator without robot support — hide the section silently
+        setGroupRobots([]);
+        return;
+      }
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load robot accounts';
+      setGroupRobots([]);
+      setRobotsError(errorMessage);
+    }
+  };
+
+  /**
    * Load group members when modal opens
    */
   useEffect(() => {
     if (isOpen) {
       loadMembers();
+      loadRobots();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, groupName]); // Reload when modal opens or group changes
@@ -214,7 +253,7 @@ export function ViewGroupMembersModal({
           <Alert variant="danger" title="Error loading members" isInline>
             {error}
           </Alert>
-        ) : members.length === 0 ? (
+        ) : members.length === 0 && groupRobots.length === 0 ? (
           <EmptyState>
             <EmptyStateIcon icon={UsersIcon} />
             <Title headingLevel="h2" size="lg">
@@ -225,6 +264,7 @@ export function ViewGroupMembersModal({
             </EmptyStateBody>
           </EmptyState>
         ) : (
+          <>
           <DataList aria-label="Group members list" isCompact>
             {members.map((member) => (
               <DataListItem key={member.userId}>
@@ -270,6 +310,69 @@ export function ViewGroupMembersModal({
               </DataListItem>
             ))}
           </DataList>
+
+          {/* Robot accounts (read-only) — membership is managed in Settings → MCP Robots */}
+          {robotsAvailable && (
+            <div style={{ marginTop: '1.5rem' }}>
+              <Title headingLevel="h3" size="md" style={{ marginBottom: '0.5rem' }}>
+                <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapXs' }}>
+                  <FlexItem>
+                    <RobotIcon />
+                  </FlexItem>
+                  <FlexItem>Robot accounts ({groupRobots.length})</FlexItem>
+                </Flex>
+              </Title>
+              {robotsError ? (
+                <Alert variant="warning" title="Error loading robot accounts" isInline>
+                  {robotsError}
+                </Alert>
+              ) : groupRobots.length === 0 ? (
+                <p style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                  No robot accounts are members of this group. Manage robot membership in
+                  Settings → MCP Robots.
+                </p>
+              ) : (
+                <DataList aria-label="Robot accounts in group" isCompact>
+                  {groupRobots.map((robot) => (
+                    <DataListItem key={robot.name}>
+                      <DataListItemRow>
+                        <DataListItemCells
+                          dataListCells={[
+                            <DataListCell key="name" width={2}>
+                              <div>
+                                <div style={{ marginBottom: '0.25rem' }}>
+                                  <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                                    {robot.name}
+                                  </strong>
+                                </div>
+                                <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
+                                  {robot.description || 'No description'}
+                                </div>
+                              </div>
+                            </DataListCell>,
+                            <DataListCell key="status" width={1}>
+                              <div>
+                                <div style={{ marginBottom: '0.25rem' }}>
+                                  <strong>Status:</strong>
+                                </div>
+                                <Label color={robot.disabled ? 'red' : 'green'}>
+                                  {robot.disabled ? 'Disabled' : 'Enabled'}
+                                </Label>
+                              </div>
+                            </DataListCell>,
+                          ]}
+                        />
+                      </DataListItemRow>
+                    </DataListItem>
+                  ))}
+                </DataList>
+              )}
+              <p style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)', marginTop: '0.5rem' }}>
+                Robot accounts are read-only here. Manage robot membership in Settings → MCP Robots.
+              </p>
+            </div>
+          )}
+          </>
         )}
       </Modal>
 

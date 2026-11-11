@@ -145,6 +145,35 @@ Administrators can delete user accounts with built-in safety mechanisms to preve
 6. Success notification is displayed
 7. User list automatically refreshes
 
+## Robot accounts (MCP)
+
+In addition to human users, the console supports **robot accounts** — machine identities used by automated clients (CI pipelines, scripts, AI agents) to call the MCP endpoint. Robots authenticate with bearer tokens, never log in to the console UI, and are not console users.
+
+**What they are:**
+- Machine identities for the MCP endpoint, backed by `KrknRobot` custom resources
+- They are never console users — they cannot log in to the UI and do not appear in the user list
+- Each robot authenticates with a single bearer token issued at creation
+
+**Where they are managed:**
+- Settings → MCP Robots (admin only)
+- Admins can create robots, edit their group membership, disable/re-enable them, issue new tokens, and revoke them
+
+**Group membership model:**
+- A robot's group membership is stored as `group.krkn.krkn-chaos.dev/<group>` labels on the `KrknRobot` custom resource
+- Group membership determines which clusters and actions the robot can access through the MCP endpoint
+- Membership is not a permission policy by itself — the group's cluster permissions define what the robot may do
+- The group members API (`GET /api/v1/groups/{name}/members`) only covers human users (`KrknUser`); robots are shown separately in the group members modal (read-only) and are counted in the delete-group confirmation warning
+
+**Disable vs revoke:**
+- **Disable** is reversible — re-enabling a disabled robot reactivates its unexpired token
+- **Revoke** is permanent — the token is destroyed and a new one must be issued
+
+**Token expiry:**
+- Robot tokens expire 90 days after issuance
+
+**MCP endpoint:**
+- Robots authenticate against `<origin>/api/mcp`
+
 ## Usage Examples
 
 ### Creating a New User
@@ -488,7 +517,7 @@ The following features are planned for future releases:
 ### Integration
 - LDAP/Active Directory integration
 - SAML/OAuth2 single sign-on (SSO)
-- API key management for service accounts
+- ~~API key management for service accounts~~ (delivered — robot accounts with MCP tokens, see "Robot accounts (MCP)")
 - Webhook notifications for user events
 
 ### User Experience

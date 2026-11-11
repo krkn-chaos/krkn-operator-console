@@ -674,6 +674,82 @@ export const handlers = [
     HttpResponse.json({ groupName: params.groupName as string, userId: params.userId as string, message: 'Member removed' }),
   ),
 
+  // ─── MCP ROBOTS (admin-managed service accounts) ───
+  http.get(`${BASE}/robots`, () =>
+    HttpResponse.json({
+      robots: [
+        {
+          name: 'ci-runner',
+          description: 'CI pipeline robot for automated chaos runs',
+          disabled: false,
+          groups: ['chaos-engineers'],
+          tokenId: 'tok-ci-001',
+          tokenIssuedAt: '2026-10-01T12:00:00Z',
+          tokenExpiresAt: '2027-01-01T12:00:00Z',
+          lastUsedAt: '2026-11-10T09:30:00Z',
+          createdAt: '2026-10-01T12:00:00Z',
+        },
+        {
+          name: 'nightly-batch',
+          description: 'Nightly batch execution robot',
+          disabled: true,
+          groups: [],
+          tokenId: '',
+          createdAt: '2026-09-15T08:00:00Z',
+        },
+      ],
+      total: 2,
+      mcpEnabled: true,
+    }),
+  ),
+  http.get(`${BASE}/robots/:name`, ({ params }) =>
+    HttpResponse.json({
+      name: params.name as string,
+      description: 'CI pipeline robot for automated chaos runs',
+      disabled: false,
+      groups: ['chaos-engineers'],
+      tokenId: 'tok-ci-001',
+      tokenIssuedAt: '2026-10-01T12:00:00Z',
+      tokenExpiresAt: '2027-01-01T12:00:00Z',
+      lastUsedAt: '2026-11-10T09:30:00Z',
+      createdAt: '2026-10-01T12:00:00Z',
+    }),
+  ),
+  http.post(`${BASE}/robots`, () =>
+    HttpResponse.json({
+      name: 'new-robot',
+      description: '',
+      disabled: false,
+      groups: [],
+      tokenId: '',
+      createdAt: '2026-11-11T00:00:00Z',
+    }, { status: 201 }),
+  ),
+  http.patch(`${BASE}/robots/:name`, ({ params }) =>
+    HttpResponse.json({
+      name: params.name as string,
+      description: 'Updated robot',
+      disabled: false,
+      groups: ['chaos-engineers'],
+      tokenId: 'tok-ci-001',
+      createdAt: '2026-10-01T12:00:00Z',
+    }),
+  ),
+  http.delete(`${BASE}/robots/:name`, () =>
+    new HttpResponse(null, { status: 204 }),
+  ),
+  http.post(`${BASE}/robots/:name/token`, () =>
+    HttpResponse.json({
+      token: 'krkn_robot_demo.PREVIEW-NOT-A-REAL-TOKEN',
+      tokenId: 'tok-preview-001',
+      expiresAt: '2027-02-11T00:00:00Z',
+      message: 'Token issued — copy it now, it will not be shown again',
+    }, { status: 201 }),
+  ),
+  http.delete(`${BASE}/robots/:name/token`, () =>
+    new HttpResponse(null, { status: 204 }),
+  ),
+
   // ─── REGISTRIES (CRUD) ───
   http.get(`${BASE}/registries`, () =>
     HttpResponse.json({ registries: mockRegistries }),

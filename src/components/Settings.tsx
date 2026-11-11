@@ -35,6 +35,7 @@ import { ProviderConfigTab } from './ProviderConfigTab';
 import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
+import { RobotsCard } from './RobotManagement';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -320,6 +321,14 @@ export function Settings() {
                   </>
                 )}
               </div>
+              </Tab>
+            )}
+            {/* MCP Robots Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={7} title={<TabTitleText>MCP Robots</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <RobotsCard onNavigateToGroups={() => setActiveTabKey(1)} />
+                </div>
               </Tab>
             )}
           </Tabs>
