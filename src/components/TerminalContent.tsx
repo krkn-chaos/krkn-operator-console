@@ -300,6 +300,7 @@ export function TerminalContent({ isOpen, onClose }: TerminalContentProps) {
     try {
       const result = await operatorApi.executeTerminalCommand({
         cluster_id: selectedCluster.clusterName,
+        provider: selectedCluster.operatorSource,
         uuid: discoveryUuid,
         command,
       });
