@@ -789,7 +789,7 @@ describe('ScenarioDetail', () => {
       expect(operatorApi.runScenario).not.toHaveBeenCalled();
     });
 
-    it('should run scenario when run button clicked in preview mode', async () => {
+    it('runs without a workspace when the workspace catalog is empty', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
       vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
@@ -812,7 +812,28 @@ describe('ScenarioDetail', () => {
       });
 
       await waitFor(() => {
-        expect(operatorApi.runScenario).toHaveBeenCalled();
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ workspace: undefined, rollbackEnabled: false }),
+        );
+      });
+    });
+
+    it('runs without rollback when workspace discovery fails before preview', async () => {
+      const user = userEvent.setup();
+      vi.mocked(workspacesApi.listAvailable).mockRejectedValueOnce(new Error('workspace catalog unavailable'));
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      expect(await screen.findByText('Configuration Preview')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ workspace: undefined, rollbackEnabled: false }),
+        );
       });
     });
 

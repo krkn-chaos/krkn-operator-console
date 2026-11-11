@@ -506,9 +506,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           return;
         }
       } catch {
-        setValidationErrors(['Unable to check available workspaces. Please retry.']);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
+        // Workspace discovery only controls the optional rollback reminder.
+        // A run without rollback does not require the catalog to be available.
       } finally {
         setCheckingWorkspaces(false);
       }
