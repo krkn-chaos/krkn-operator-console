@@ -49,7 +49,7 @@ vi.mock('react-router-dom', () => ({
 
 // handleCreateJob calls operatorApi.createTargetRequest via its proceed callback.
 vi.mock('./services/operatorApi', () => ({
-  operatorApi: { createTargetRequest: vi.fn() },
+  operatorApi: { createTargetRequest: vi.fn(), getScenarioRunConfig: vi.fn() },
 }));
 
 // Stub every child component App pulls from the barrel so the render switch is
@@ -60,7 +60,15 @@ vi.mock('./components', () => ({
   ClusterMultiSelector: () => <div>ClusterMultiSelector</div>,
   RegistrySelector: () => <div>RegistrySelector</div>,
   ScenariosList: () => <div>ScenariosList</div>,
-  JobsList: () => <div>JobsList</div>,
+  JobsList: ({ onRerunScenario }: { onRerunScenario: (run: ScenarioRunState) => void }) => (
+    <button
+      onClick={() =>
+        onRerunScenario({ scenarioRunName: 'run-1', scenarioName: 'pod-scenarios' } as ScenarioRunState)
+      }
+    >
+      rerun-run-1
+    </button>
+  ),
   Settings: () => <div>Settings</div>,
   TerminalContent: () => <div>TerminalContent</div>,
   Studio: () => <div>Studio</div>,
@@ -132,6 +140,60 @@ describe('scenario replay handoff', () => {
       cloudCredentialRef: 'aws-ci',
       categories: ['network', 'reliability'],
     });
+  });
+});
+
+describe('App scenario re-run flow', () => {
+  const config: JobConfigResponse = {
+    targetRequestId: 'target-1',
+    targetClusters: { operator: ['cluster-1'] },
+    scenario: { name: 'pod-scenarios', private: false },
+    kubeconfigPath: '/tmp/kubeconfig',
+    environment: { NAMESPACE: 'default' },
+    cloudCredentialRef: 'aws-ci',
+    categories: ['network', 'reliability'],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    });
+  });
+
+  it('fetches run config, dispatches the replay intent, and starts target creation', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getScenarioRunConfig).mockResolvedValue(config);
+    vi.mocked(operatorApi.createTargetRequest).mockResolvedValue({ uuid: 'uuid-1' });
+    renderApp();
+
+    await user.click(screen.getByText('rerun-run-1'));
+
+    // getScenarioRunConfig receives the scenario run name, then target creation
+    // starts. Reaching createTargetRequest proves the RERUN_SCENARIO dispatch
+    // (buildRerunIntent) between the two calls did not throw.
+    await waitFor(() => {
+      expect(operatorApi.getScenarioRunConfig).toHaveBeenCalledWith('run-1');
+      expect(operatorApi.createTargetRequest).toHaveBeenCalled();
+    });
+    // INIT_SUCCESS advances to the polling phase, which renders LoadingScreen.
+    await waitFor(() => expect(screen.getByText('LoadingScreen')).toBeInTheDocument());
+  });
+
+  it('dispatches the initialization error state when the config request fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getScenarioRunConfig).mockRejectedValue(new Error('boom'));
+    renderApp();
+
+    await user.click(screen.getByText('rerun-run-1'));
+
+    // INIT_ERROR moves the phase to error, which renders ErrorDisplay.
+    await waitFor(() => expect(screen.getByText('ErrorDisplay')).toBeInTheDocument());
+    expect(operatorApi.createTargetRequest).not.toHaveBeenCalled();
   });
 });
 
