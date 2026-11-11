@@ -51,34 +51,60 @@ export function ClusterOptionInput({
   const choices = [...options, ...(canCreate ? [CREATE_CUSTOM] : [])];
   const listId = `${id}-cluster-options`;
 
-  const closeOptions = () => {
+  const closeOptions = (clearSearch = false) => {
     setIsOpen(false);
-    setSearch('');
+    if (clearSearch) setSearch('');
     setFocusedIndex(-1);
   };
 
   const openOptions = () => {
     if (isDisabled || isOpen) return;
     setIsOpen(true);
-    if (optionState.status === 'idle' || optionState.status === 'ready') onOptionsOpen?.();
+    if (optionState.status === 'idle') onOptionsOpen?.();
+  };
+
+  const selectedListNames = (): string[] => {
+    const trimmed = value.trimStart();
+    const closingBracket = trimmed.indexOf(']');
+    if (trimmed.startsWith('[') && closingBracket >= 0) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed.slice(0, closingBracket + 1));
+        if (Array.isArray(parsed) && parsed.every((name) => typeof name === 'string')) return parsed;
+      } catch {
+        return trimmed.slice(1, closingBracket).split(',')
+          .map((name) => name.trim().replace(/^(['"])(.*)\1$/, '$2')).filter(Boolean);
+      }
+    }
+    const names = value.split(',').map((name) => name.trim()).filter(Boolean);
+    if (search) names.pop();
+    return names;
   };
 
   const chooseOption = (selected: string) => {
     if (selected !== CREATE_CUSTOM) {
-      if (optionState.selectionMode === 'comma') {
+      if (optionState.selectionMode === 'list') {
+        onChange(JSON.stringify([...new Set([...selectedListNames(), selected])]));
+      } else if (optionState.selectionMode === 'comma') {
         const names = value.split(',').map((name) => name.trim());
         if (search) names.pop();
         onChange([...new Set([...names.filter(Boolean), selected])].join(','));
       } else {
         onChange(selected);
       }
+    } else if (optionState.selectionMode === 'list' && !value.trimStart().startsWith('[')) {
+      onChange(JSON.stringify(value.split(',').map((name) => name.trim()).filter(Boolean)));
     }
-    closeOptions();
+    closeOptions(true);
   };
 
   const handleInputChange = (nextValue: string) => {
     onChange(nextValue);
-    setSearch(optionState.selectionMode === 'comma' ? nextValue.split(',').pop() ?? '' : nextValue);
+    if (optionState.selectionMode === 'list' && nextValue.trimStart().startsWith('[') && nextValue.includes(']')) {
+      setSearch(nextValue.slice(nextValue.lastIndexOf(']') + 1).replace(/^,/, ''));
+    } else {
+      setSearch(optionState.selectionMode === 'comma' || optionState.selectionMode === 'list'
+        ? nextValue.split(',').pop() ?? '' : nextValue);
+    }
     setFocusedIndex(-1);
     openOptions();
   };
@@ -128,10 +154,7 @@ export function ClusterOptionInput({
           status={validated === 'error' ? 'danger' : undefined}
           onClick={() => {
             if (isOpen) closeOptions();
-            else {
-              setSearch('');
-              openOptions();
-            }
+            else openOptions();
           }}
         >
           <TextInputGroup isPlain isDisabled={isDisabled}>
@@ -145,7 +168,7 @@ export function ClusterOptionInput({
               aria-activedescendant={focusedIndex >= 0 ? `${listId}-${focusedIndex}` : undefined}
               value={value}
               placeholder={placeholder}
-              onClick={() => { if (!isOpen) { setSearch(''); openOptions(); } }}
+              onClick={() => { if (!isOpen) openOptions(); }}
               onChange={(_event, nextValue) => handleInputChange(nextValue)}
               onKeyDown={handleInputKeyDown}
             />
@@ -158,7 +181,7 @@ export function ClusterOptionInput({
                   onClick={(event) => {
                     event.stopPropagation();
                     onChange('');
-                    closeOptions();
+                    closeOptions(true);
                     inputRef.current?.focus();
                   }}
                 >
@@ -170,7 +193,7 @@ export function ClusterOptionInput({
         </MenuToggle>
       )}
     >
-      {optionState.status === 'loading' ? (
+      {optionState.status === 'loading' && optionState.options.length === 0 ? (
         <div role="status">Loading cluster options…</div>
       ) : optionState.status === 'error' ? (
         <div role="status">
@@ -178,21 +201,29 @@ export function ClusterOptionInput({
           <Button variant="link" onClick={onOptionsOpen}>Retry</Button>
         </div>
       ) : (
-        <SelectList id={listId}>
-          {options.map((option, index) => (
-            <SelectOption key={option} id={`${listId}-${index}`} isFocused={focusedIndex === index} value={option}>
-              {option}
-            </SelectOption>
-          ))}
-          {canCreate && (
-            <SelectOption id={`${listId}-${options.length}`} isFocused={focusedIndex === options.length} value={CREATE_CUSTOM}>
-              Use &quot;{query}&quot;
-            </SelectOption>
+        <>
+          {optionState.status === 'loading' && <div role="status">Refreshing cluster options…</div>}
+          <SelectList id={listId}>
+            {options.map((option, index) => (
+              <SelectOption key={option} id={`${listId}-${index}`} isFocused={focusedIndex === index} value={option}>
+                {option}
+              </SelectOption>
+            ))}
+            {canCreate && (
+              <SelectOption id={`${listId}-${options.length}`} isFocused={focusedIndex === options.length} value={CREATE_CUSTOM}>
+                Use &quot;{query}&quot;
+              </SelectOption>
+            )}
+            {choices.length === 0 && (
+              <SelectOption isDisabled value="__empty__">No cluster options. Type custom value.</SelectOption>
+            )}
+          </SelectList>
+          {optionState.status === 'ready' && onOptionsOpen && (
+            <Button variant="link" aria-label={`Refresh ${label} options`} onClick={onOptionsOpen}>
+              Refresh options
+            </Button>
           )}
-          {choices.length === 0 && (
-            <SelectOption isDisabled value="__empty__">No cluster options. Type custom value.</SelectOption>
-          )}
-        </SelectList>
+        </>
       )}
     </Select>
   );

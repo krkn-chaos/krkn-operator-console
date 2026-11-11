@@ -11,6 +11,7 @@ export interface CreateTargetResponse {
 
 export interface TerminalRequest {
   cluster_id: string;  // Cluster name from KrknTargetRequest
+  provider?: string;   // Provider containing cluster; optional for legacy callers
   uuid: string;        // KrknTargetRequest UUID
   command: string;     // Full command (e.g., 'kubectl get pods -n default')
 }

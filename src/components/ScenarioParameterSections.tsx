@@ -95,6 +95,10 @@ export function ScenarioParameterSections({
   const visibleRequiredGlobalFields = filterFieldsByCloudType(requiredGlobalFields, activeCloudType, cloudFilterOptions);
   const visibleOptionalGlobalFields = filterFieldsByCloudType(optionalGlobalFields, activeCloudType, cloudFilterOptions);
   const appliedCloudCredProvider = cloudCredentials.find((c) => c.name === appliedCloudCredName)?.provider;
+  const globalSections = [
+    { title: 'Required Global Parameters', fields: visibleRequiredGlobalFields, marginBottom: true },
+    { title: 'Optional Global Parameters', fields: visibleOptionalGlobalFields, marginBottom: false },
+  ];
 
   return (
     <>
@@ -221,12 +225,12 @@ export function ScenarioParameterSections({
                 </CardBody>
               </Card>
             )}
-            {visibleRequiredGlobalFields.length > 0 && (
-              <Card style={{ marginBottom: '1rem' }}>
-                <CardTitle>Required Global Parameters</CardTitle>
+            {globalSections.map(({ title, fields, marginBottom }) => fields.length > 0 && (
+              <Card key={title} style={marginBottom ? { marginBottom: '1rem' } : undefined}>
+                <CardTitle>{title}</CardTitle>
                 <CardBody>
                   <DynamicFormBuilderWithTracking
-                    fields={visibleRequiredGlobalFields}
+                    fields={fields}
                     values={globalFormValues}
                     touchedFields={globalTouchedFields}
                     onChange={onGlobalFormChange}
@@ -236,23 +240,7 @@ export function ScenarioParameterSections({
                   />
                 </CardBody>
               </Card>
-            )}
-            {visibleOptionalGlobalFields.length > 0 && (
-              <Card>
-                <CardTitle>Optional Global Parameters</CardTitle>
-                <CardBody>
-                  <DynamicFormBuilderWithTracking
-                    fields={visibleOptionalGlobalFields}
-                    values={globalFormValues}
-                    touchedFields={globalTouchedFields}
-                    onChange={onGlobalFormChange}
-                    disabledFields={disabledFields}
-                    clusterOptions={globalClusterOptions}
-                    onClusterOptionsOpen={onGlobalClusterOptionsOpen}
-                  />
-                </CardBody>
-              </Card>
-            )}
+            ))}
           </>
         ) : null}
       </ExpandableSection>

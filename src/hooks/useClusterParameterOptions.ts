@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioField, ScenarioFormValues } from '../types/api';
+import type { ScenarioField, ScenarioFormValues, SelectedCluster } from '../types/api';
 import { clusterOptionQueryKey, discoverClusterOptions, getClusterOptionSource, type ClusterFieldOptionState } from '../utils/clusterParameterOptions';
 
 interface ClusterParameterOptionsArgs {
   uuid: string | null;
-  clusterNames: string[];
+  clusters: SelectedCluster[];
   scenarioName: string;
   scenarioFields: ScenarioField[];
   globalFields: ScenarioField[];
@@ -15,7 +15,7 @@ interface ClusterParameterOptionsArgs {
 }
 
 export function useClusterParameterOptions({
-  uuid, clusterNames, scenarioName, scenarioFields, globalFields,
+  uuid, clusters, scenarioName, scenarioFields, globalFields,
   scenarioValues, globalValues, active,
 }: ClusterParameterOptionsArgs) {
   const [queryStates, setQueryStates] = useState<Record<string, ClusterFieldOptionState>>({});
@@ -47,9 +47,9 @@ export function useClusterParameterOptions({
     if (!source) return null;
     return {
       source,
-      key: clusterOptionQueryKey(uuid ?? '', clusterNames, source, namespaceExpression, podName),
+      key: clusterOptionQueryKey(uuid ?? '', clusters, source, namespaceExpression, podName),
     };
-  }, [uuid, clusterNames, scenarioName, scenarioFields, globalFields,
+  }, [uuid, clusters, scenarioName, scenarioFields, globalFields,
     scenarioValues, globalValues, namespaceExpression, podName]);
 
   const getFieldStates = (fields: ScenarioField[], global: boolean): Record<string, ClusterFieldOptionState> => {
@@ -74,52 +74,55 @@ export function useClusterParameterOptions({
   };
 
   const loadOptions = useCallback((variable: string, global = false, automatic = false) => {
-    if (!uuid || clusterNames.length === 0) return;
+    if (!uuid || clusters.length === 0) return;
     const query = getQuery(variable, global);
     if (!query || pending.current.has(query.key)) return;
     if (automatic && queryStates[query.key]) return;
 
-    setQueryStates((previous) => ({ ...previous, [query.key]: { options: [], status: 'loading' } }));
+    setQueryStates((previous) => ({
+      ...previous, [query.key]: { options: previous[query.key]?.options ?? [], status: 'loading' },
+    }));
     const request = discoverClusterOptions({
-      uuid, clusterNames, source: query.source, namespaceExpression, podName,
-      cache: listCache.current,
-      getNodeNames: async (targetUUID, clusterName) => (await operatorApi.getNodes(targetUUID, clusterName)).nodes,
-      runCommand: async (clusterName, command) => operatorApi.executeTerminalCommand({
-        cluster_id: clusterName, uuid, command,
+      uuid, clusters, source: query.source, namespaceExpression, podName,
+      cache: listCache.current, refresh: !automatic && Boolean(queryStates[query.key]),
+      getNodeNames: async (targetUUID, cluster) => (await operatorApi.getNodes(targetUUID, cluster.clusterName, cluster.operatorName)).nodes,
+      runCommand: async (cluster, command) => operatorApi.executeTerminalCommand({
+        cluster_id: cluster.clusterName, provider: cluster.operatorName, uuid, command,
       }),
     }).then((options) => {
       setQueryStates((previous) => ({ ...previous, [query.key]: { options, status: 'ready' } }));
     }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Cluster option lookup failed';
+      const terminalCode = error instanceof Error && error.message.startsWith('TERMINAL_ERROR:')
+        ? error.message.split(':')[1] : '';
       setQueryStates((previous) => ({ ...previous, [query.key]: {
         options: [], status: 'error',
-        error: message.startsWith('TERMINAL_ERROR:403:')
+        error: terminalCode === '403'
           ? 'Permission denied while loading cluster options.'
-          : message.startsWith('TERMINAL_ERROR:500:')
-            ? 'Cluster command failed while loading options.'
-            : message,
+          : terminalCode === '404'
+            ? 'Command unavailable on this cluster.'
+            : terminalCode === '500'
+              ? 'Cluster command failed while loading options.'
+              : 'Unable to load cluster options.',
       } }));
     }).finally(() => pending.current.delete(query.key));
     pending.current.set(query.key, request);
-  }, [uuid, clusterNames, getQuery, queryStates, namespaceExpression, podName]);
+  }, [uuid, clusters, getQuery, queryStates, namespaceExpression, podName]);
 
   useEffect(() => {
-    if (!active || !uuid || clusterNames.length === 0) return;
+    if (!active || !uuid || clusters.length === 0) return;
     const fields = [
       ...scenarioFields.map((field) => ({ field, global: false })),
       ...globalFields.map((field) => ({ field, global: true })),
     ];
-    const hasNamespaceField = fields.some(({ field }) =>
-      ['NAMESPACE', 'KUBE_VIRT_NAMESPACE'].includes(field.variable.toUpperCase()));
     const timer = window.setTimeout(() => {
       for (const { field, global } of fields) {
         const source = getQuery(field.variable, global)?.source;
-        if (!source || (source.namespaced && hasNamespaceField && !namespaceExpression)) continue;
+        if (!source || source.namespaced) continue;
         loadOptions(field.variable, global, true);
       }
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [active, uuid, clusterNames, scenarioFields, globalFields, namespaceExpression, getQuery, loadOptions]);
+  }, [active, uuid, clusters, scenarioFields, globalFields, namespaceExpression, getQuery, loadOptions]);
 
   return {
     scenarioOptions: getFieldStates(scenarioFields, false),

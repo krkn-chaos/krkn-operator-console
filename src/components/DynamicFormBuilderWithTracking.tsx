@@ -17,7 +17,7 @@ import {
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, TouchedFields, StringField, EnumField } from '../types/api';
 import { getInjectedFieldPlaceholder, isSecretField } from '../utils/fieldUtils';
-import { ClusterOptionInput } from './ClusterOptionInput';
+import { ClusterAwareField } from './ClusterAwareField';
 import type { ClusterFieldOptionState } from '../utils/clusterParameterOptions';
 
 interface DynamicFormBuilderWithTrackingProps {
@@ -189,6 +189,7 @@ export function DynamicFormBuilderWithTracking({
       case 'string': {
         const stringField = field as StringField;
         const isDisabled = disabledFields.has(field.variable);
+        const displayValue = isFieldDisabled && !isInjectedField && isDisabled ? '***' : value as string;
         return (
           <FormGroup
             key={field.variable}
@@ -196,30 +197,26 @@ export function DynamicFormBuilderWithTracking({
             isRequired={field.required}
             fieldId={field.variable}
           >
-            {clusterOptions?.[field.variable] && !isSecretField(field) ? (
-              <ClusterOptionInput
-                id={field.variable}
-                label={field.short_description}
-                value={value as string}
-                onChange={(val) => handleChange(field.variable, val)}
-                validated={validated}
-                placeholder={injectedPlaceholder ?? field.default}
-                isDisabled={isFieldDisabled}
-                optionState={clusterOptions[field.variable]}
-                onOptionsOpen={() => onClusterOptionsOpen?.(field.variable)}
-              />
-            ) : (
-              <TextInput
+            <ClusterAwareField
+              field={field}
+              value={displayValue}
+              onChange={(val) => handleChange(field.variable, val)}
+              validated={validated}
+              placeholder={injectedPlaceholder ?? field.default}
+              isDisabled={isFieldDisabled}
+              clusterOptions={clusterOptions}
+              onOptionsOpen={onClusterOptionsOpen}
+              fallback={<TextInput
                 id={field.variable}
                 type={isSecretField(field) ? 'password' : 'text'}
-                value={isFieldDisabled && !isInjectedField && isDisabled ? '***' : value as string}
+                value={displayValue}
                 onChange={(_event, val) => handleChange(field.variable, val)}
                 validated={validated}
                 placeholder={injectedPlaceholder ?? field.default}
                 autoComplete={isSecretField(field) ? 'off' : undefined}
                 isDisabled={isFieldDisabled}
-              />
-            )}
+              />}
+            />
             {field.description && (
               <FormHelperText>
                 <HelperText>

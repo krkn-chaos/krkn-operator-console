@@ -97,7 +97,7 @@ class OperatorApiClient extends BaseApiClient {
   /**
    * POST /terminal
    * Execute a command on a remote cluster via kubectl/oc
-   * @param request - Terminal request with cluster_id, uuid, and command
+   * @param request - Terminal request with cluster_id, uuid, command, and optional provider
    * @returns Promise with decoded stdout, stderr, and exit code
    */
   async executeTerminalCommand(request: TerminalRequest): Promise<{
@@ -167,14 +167,16 @@ class OperatorApiClient extends BaseApiClient {
   }
 
   /**
-   * GET /nodes?id={uuid}&cluster-name={clusterName}
+   * GET /nodes?id={uuid}&cluster-name={clusterName}&provider={provider}
    * Get nodes from selected cluster
    * @param uuid - Target request UUID
    * @param clusterName - Cluster name
+   * @param provider - Provider containing cluster; optional for legacy callers
    * @returns Promise with nodes data
    */
-  async getNodes(uuid: string, clusterName: string): Promise<NodesResponse> {
-    return this.fetchJson<NodesResponse>(`/nodes?id=${uuid}&cluster-name=${encodeURIComponent(clusterName)}`);
+  async getNodes(uuid: string, clusterName: string, provider?: string): Promise<NodesResponse> {
+    const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : '';
+    return this.fetchJson<NodesResponse>(`/nodes?id=${encodeURIComponent(uuid)}&cluster-name=${encodeURIComponent(clusterName)}${providerQuery}`);
   }
 
   /**

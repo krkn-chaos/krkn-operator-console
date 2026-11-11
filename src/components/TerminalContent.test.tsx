@@ -221,6 +221,24 @@ describe('TerminalContent', () => {
     expect(await screen.findByText('Connected to cluster: unknown-cluster')).toBeInTheDocument();
   });
 
+  it('sends discovered provider with terminal command', async () => {
+    const user = userEvent.setup();
+    mockUseClusterDiscovery.mockReturnValue({
+      clusters: [{ uuid: '1', clusterName: 'shared', operatorSource: 'provider-b', clusterAPIURL: 'https://b', ready: true }],
+      discoveryUuid: 'test-uuid', isLoading: false, error: null, startDiscovery: vi.fn(), reset: vi.fn(),
+    });
+    vi.mocked(operatorApi.executeTerminalCommand).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 });
+
+    render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
+    await user.type(screen.getByRole('textbox'), '1{Enter}');
+    expect(await screen.findByText('Connected to cluster: shared')).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox'), 'kubectl get pods{Enter}');
+
+    await waitFor(() => expect(operatorApi.executeTerminalCommand).toHaveBeenCalledWith({
+      cluster_id: 'shared', provider: 'provider-b', uuid: 'test-uuid', command: 'kubectl get pods',
+    }));
+  });
+
   it('should show help message with available commands when ? is typed', async () => {
     const user = userEvent.setup();
     render(<TerminalContent isOpen={true} onClose={mockOnClose} />);
