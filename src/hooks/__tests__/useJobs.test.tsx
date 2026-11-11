@@ -154,7 +154,7 @@ describe('useJobs', () => {
     rerender({ filters: ['network-chaos'] });
 
     expect(websocketService.subscribe).toHaveBeenLastCalledWith(
-      'jobs', 'jobs', undefined, 1, 20, ['network-chaos'], expect.any(String),
+      'jobs', 'jobs', undefined, 1, 20, ['network-chaos'], expect.any(String), true,
     );
     const subscriptions = vi.mocked(websocketService.subscribe).mock.calls;
     expect(subscriptions[subscriptions.length - 1]?.[6]).not.toBe(firstSubscriptionId);
