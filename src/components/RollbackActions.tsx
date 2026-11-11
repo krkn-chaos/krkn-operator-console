@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Button, Modal, ModalVariant, Spinner } from '@patternfly/react-core';
 import { HistoryIcon } from '@patternfly/react-icons';
+import { useRollbackAvailability } from '../hooks/useRollbackAvailability';
 import { operatorApi } from '../services/operatorApi';
-import type { ClusterJob, RollbackAvailability } from '../types/api';
+import type { ClusterJob } from '../types/api';
 
 interface RollbackActionsProps {
   scenarioRunName: string;
@@ -15,27 +16,10 @@ export function RollbackActions({ scenarioRunName, job }: RollbackActionsProps) 
     () => [...new Set([...(job.attemptHistory ?? []).map((attempt) => attempt.jobId), job.jobId])],
     [job.attemptHistory, job.jobId]
   );
-  const [availability, setAvailability] = useState<Record<string, RollbackAvailability>>({});
+  const { availability, setAvailability } = useRollbackAvailability(scenarioRunName, attemptIds, true);
   const [confirmJobId, setConfirmJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const inspect = async () => {
-      const results = await Promise.all(attemptIds.map(async (jobId) => {
-        try {
-          return await operatorApi.getRollbackAvailability(scenarioRunName, jobId);
-        } catch (cause) {
-          return { jobId, state: 'error' as const, message: cause instanceof Error ? cause.message : 'Inspection failed' };
-        }
-      }));
-      if (active) setAvailability(Object.fromEntries(results.map((result) => [result.jobId, result])));
-    };
-    void inspect();
-    const timer = window.setInterval(() => { void inspect(); }, 5000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [attemptIds, scenarioRunName]);
 
   const start = async () => {
     if (!confirmJobId) return;

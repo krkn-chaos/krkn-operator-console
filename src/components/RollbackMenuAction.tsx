@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Button, DropdownItem, Menu, MenuContent, MenuItem, MenuList, Modal, ModalVariant, Spinner } from '@patternfly/react-core';
 import { HistoryIcon, TopologyIcon } from '@patternfly/react-icons';
 import { useNotifications } from '../hooks/useNotifications';
+import { useRollbackAvailability } from '../hooks/useRollbackAvailability';
 import { operatorApi } from '../services/operatorApi';
 import type { ClusterJob, RollbackAvailability } from '../types/api';
 
@@ -44,29 +45,7 @@ export function RollbackMenuAction({ runName, rollbackEnabled, jobs, isJobsLoadi
     }
     return [...found.values()];
   }, [jobs]);
-  const [availability, setAvailability] = useState<Record<string, RollbackAvailability>>({});
-
-  useEffect(() => {
-    if (!isMenuOpen) {
-      setAvailability({});
-      return;
-    }
-    if (!rollbackEnabled || attempts.length === 0) return;
-    let active = true;
-    const inspect = async () => {
-      const results = await Promise.all(attempts.map(async ({ jobId }) => {
-        try {
-          return await operatorApi.getRollbackAvailability(runName, jobId);
-        } catch (cause) {
-          return { jobId, state: 'error' as const, canExecute: false, message: cause instanceof Error ? cause.message : 'Rollback inspection failed' };
-        }
-      }));
-      if (active) setAvailability(Object.fromEntries(results.map((result) => [result.jobId, result])));
-    };
-    void inspect();
-    const timer = window.setInterval(() => { void inspect(); }, 5000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [attempts, isMenuOpen, rollbackEnabled, runName]);
+  const { availability } = useRollbackAvailability(runName, attempts.map(({ jobId }) => jobId), isMenuOpen && rollbackEnabled);
 
   const executable = attempts.filter(({ jobId }) => canExecuteRollback(availability[jobId]));
   let reason: string | undefined;

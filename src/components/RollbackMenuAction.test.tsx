@@ -94,7 +94,7 @@ describe('RollbackMenuAction', () => {
     await waitFor(() => expect(screen.getByText('Rollback').closest('button')).not.toHaveAttribute('aria-disabled'));
     await user.click(screen.getByText('Rollback'));
     expect(screen.getByText(/Run rollback for krkn-operator-acm\/krkn-operator-acm-2/)).toBeVisible();
-    expect(screen.queryByText('Rollback')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Rollback')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'Confirm rollback' })).toBeVisible());
     expect(operatorApi.startRollback).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Execute rollback' }));
