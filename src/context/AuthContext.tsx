@@ -9,7 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { operatorApi } from '../services/operatorApi';
 import { setUnauthorizedHandler } from '../utils/apiClient';
-import { AUTH_STORAGE_KEYS } from '../types/auth';
+import { AUTH_SESSION_STORAGE_KEY } from '../types/auth';
 import type { User, LoginRequest, RegisterRequest } from '../types/auth';
 
 /**
@@ -215,9 +215,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const handleStorage = (event: StorageEvent) => {
       if (event.storageArea !== localStorage) return;
-      // Token is written last on login and removed first on logout. Storage
-      // events run after the originating task, so the full session is visible.
-      if (event.key !== AUTH_STORAGE_KEYS.TOKEN && event.key !== null) return;
+      // Auth state is committed in one storage value, so each event sees a full session.
+      if (event.key !== AUTH_SESSION_STORAGE_KEY && event.key !== null) return;
       syncAuthFromStorage(true);
     };
 
@@ -274,10 +273,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [authSessionRevision, expireSession, state.isAuthenticated]);
 
   const login = useCallback(async (request: LoginRequest) => {
-    const tokenAtLoginStart = authService.getToken();
+    const sessionVersionAtLoginStart = authService.getSessionVersion();
 
     try {
-      const response = await authService.login(request, tokenAtLoginStart);
+      const response = await authService.login(request, sessionVersionAtLoginStart);
       if (!response) {
         syncAuthFromStorage();
         return;
@@ -307,11 +306,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       const currentToken = authService.getToken();
       const currentUser = authService.getUser();
+      const currentSessionVersion = authService.getSessionVersion();
       const currentExpiresAt = authService.getTokenExpiresAt();
       const currentExpiresAtMs = currentExpiresAt ? Date.parse(currentExpiresAt) : Number.NaN;
       const newerValidSession =
         currentToken !== null &&
-        currentToken !== tokenAtLoginStart &&
+        currentSessionVersion.generation !== sessionVersionAtLoginStart.generation &&
         currentUser !== null &&
         Number.isFinite(currentExpiresAtMs) &&
         currentExpiresAtMs > Date.now() &&
@@ -360,7 +360,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAdmin,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Remount account-scoped state below this provider when authenticated user changes.
+  return <AuthContext.Provider key={state.user?.userId ?? ''} value={value}>{children}</AuthContext.Provider>;
 }
 
 /**

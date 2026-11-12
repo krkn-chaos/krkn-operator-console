@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTH_STORAGE_KEYS } from './types/auth';
+import { AUTH_SESSION_STORAGE_KEY, AUTH_STORAGE_KEYS } from './types/auth';
 
 const { createRootMock, workerStartMock } = vi.hoisted(() => {
   const renderMock = vi.fn();
@@ -45,17 +45,19 @@ describe('console startup preview authentication', () => {
     await vi.waitFor(() => expect(createRootMock).toHaveBeenCalledOnce());
 
     expect(workerStartMock).toHaveBeenCalledOnce();
-    expect(localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN)).toBe('mock-preview-jwt-token');
-    expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_EMAIL)).toBe('admin@preview.local');
-    expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_ROLE)).toBe('admin');
-    expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_NAME)).toBe('Preview');
-    expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_SURNAME)).toBe('User');
-    expect(localStorage.getItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION)).toBe('Krkn');
-
-    const expiresAt = localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
-    expect(expiresAt).not.toBeNull();
-    expect(Date.parse(expiresAt!)).toBeGreaterThan(startedAt + 23 * 60 * 60 * 1000);
-    expect(Date.parse(expiresAt!)).toBeLessThan(startedAt + 25 * 60 * 60 * 1000);
+    const record = JSON.parse(localStorage.getItem(AUTH_SESSION_STORAGE_KEY)!);
+    expect(record.session).toMatchObject({
+      token: 'mock-preview-jwt-token',
+      user: {
+        userId: 'admin@preview.local',
+        role: 'admin',
+        name: 'Preview',
+        surname: 'User',
+        organization: 'Krkn',
+      },
+    });
+    expect(Date.parse(record.session.expiresAt)).toBeGreaterThan(startedAt + 23 * 60 * 60 * 1000);
+    expect(Date.parse(record.session.expiresAt)).toBeLessThan(startedAt + 25 * 60 * 60 * 1000);
 
     for (const key of [
       AUTH_STORAGE_KEYS.TOKEN,

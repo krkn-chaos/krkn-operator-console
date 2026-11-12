@@ -3,11 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { AuthProvider, useAuth } from '../AuthContext';
+import { AppProvider, useAppContext } from '../AppContext';
 import { authService } from '../../services/authService';
 import { operatorApi } from '../../services/operatorApi';
 import { setUnauthorizedHandler } from '../../utils/apiClient';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
-import { AUTH_STORAGE_KEYS } from '../../types/auth';
+import { AUTH_SESSION_STORAGE_KEY } from '../../types/auth';
 import type { User, UserRole } from '../../types/auth';
 
 vi.mock('../../services/authService');
@@ -74,7 +75,7 @@ function renderAuthProvider(
 function dispatchAuthStorageEvent(): void {
   const event = new Event('storage') as StorageEvent;
   Object.defineProperties(event, {
-    key: { value: AUTH_STORAGE_KEYS.TOKEN },
+    key: { value: AUTH_SESSION_STORAGE_KEY },
     storageArea: { value: window.localStorage },
   });
   window.dispatchEvent(event);
@@ -87,6 +88,7 @@ describe('AuthProvider - loadAndStoreGroups', () => {
     vi.mocked(authService.getUser).mockReturnValue(null);
     vi.mocked(authService.getToken).mockReturnValue(null);
     vi.mocked(authService.getTokenExpiresAt).mockReturnValue(null);
+    vi.mocked(authService.getSessionVersion).mockReturnValue({ generation: 0, logoutGeneration: 0 });
     vi.mocked(authService.isTokenExpired).mockReturnValue(false);
     vi.mocked(authService.logout).mockImplementation(() => true);
     vi.mocked(operatorApi.getGroups).mockResolvedValue({ groups: [] });
@@ -301,6 +303,71 @@ describe('AuthProvider - loadAndStoreGroups', () => {
     });
 
     expect(await screen.findByTestId('login-route')).toBeInTheDocument();
+  });
+
+  it('resets account-scoped application state when another tab switches users', async () => {
+    const firstUser: User = { userId: 'first@example.com', name: 'First', surname: 'User', role: 'user' };
+    const secondUser: User = { userId: 'second@example.com', name: 'Second', surname: 'User', role: 'user' };
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    vi.mocked(authService.getUser).mockReturnValue(firstUser);
+    vi.mocked(authService.getToken).mockReturnValue('first-token');
+    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(expiresAt);
+
+    let app!: ReturnType<typeof useAppContext>;
+    function AccountStateReader() {
+      app = useAppContext();
+      const { state } = useAuth();
+      return <span data-testid="account-id">{state.user?.userId ?? 'none'}</span>;
+    }
+
+    renderAuthProvider(<AppProvider><AccountStateReader /></AppProvider>);
+    await waitFor(() => expect(screen.getByTestId('account-id').textContent).toBe(firstUser.userId));
+
+    act(() => {
+      app.dispatch({ type: 'LOAD_SCENARIO_RUNS_SUCCESS', payload: { runs: [{
+        scenarioRunName: 'first-run', scenarioName: 'pod-scenarios', phase: 'Running',
+        totalTargets: 1, successfulJobs: 0, failedJobs: 0, runningJobs: 1,
+        clusterJobs: [], createdAt: '2026-01-01T00:00:00Z',
+      }] } });
+      app.dispatch({ type: 'LOAD_GRAPH_RUNS_SUCCESS', payload: { runs: [{
+        name: 'first-graph', namespace: 'krkn-operator-system',
+        creationTimestamp: '2026-01-01T00:00:00Z', phase: 'Running',
+        ownerUserId: firstUser.userId, targetRequestId: 'target-1',
+        summary: { totalNodes: 1, completedNodes: 0, runningNodes: 1, failedNodes: 0, pendingNodes: 0 },
+      }] } });
+      app.dispatch({ type: 'TOGGLE_CLUSTER', payload: { cluster: {
+        operatorName: 'operator', clusterName: 'first-cluster', clusterApiUrl: 'https://first.example',
+      } } });
+      app.dispatch({ type: 'PROVIDERS_LOADED', payload: { providers: [
+        { name: 'first-provider', active: true, lastHeartbeat: null },
+      ] } });
+      app.dispatch({ type: 'PROVIDER_CONFIG_CREATE_SUCCESS', payload: { uuid: 'first-config' } });
+      app.dispatch({ type: 'PROVIDER_CONFIG_READY', payload: { data: {
+        'first-provider': { configMap: 'first-config', namespace: 'first-namespace', fields: [] },
+      } } });
+      app.dispatch({ type: 'UPDATE_SCENARIO_FORM', payload: { formValues: { namespace: 'first-user' } } });
+    });
+
+    expect(app.state.scenarioRuns).toHaveLength(1);
+    expect(app.state.graphRuns).toHaveLength(1);
+    expect(app.state.selectedClusters).toHaveLength(1);
+    expect(app.state.providers).toHaveLength(1);
+    expect(app.state.providerConfigUuid).toBe('first-config');
+    expect(app.state.providerConfigData?.['first-provider']?.configMap).toBe('first-config');
+    expect(app.state.scenarioFormValues).toEqual({ namespace: 'first-user' });
+
+    vi.mocked(authService.getUser).mockReturnValue(secondUser);
+    vi.mocked(authService.getToken).mockReturnValue('second-token');
+    act(() => dispatchAuthStorageEvent());
+
+    expect(screen.getByTestId('account-id').textContent).toBe(secondUser.userId);
+    expect(app.state.scenarioRuns).toEqual([]);
+    expect(app.state.graphRuns).toEqual([]);
+    expect(app.state.selectedClusters).toEqual([]);
+    expect(app.state.providers).toBeNull();
+    expect(app.state.providerConfigUuid).toBeNull();
+    expect(app.state.providerConfigData).toBeNull();
+    expect(app.state.scenarioFormValues).toBeNull();
   });
 
   it('clears an expired session during startup', async () => {

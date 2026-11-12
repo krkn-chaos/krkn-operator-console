@@ -101,3 +101,10 @@ export const AUTH_STORAGE_KEYS = {
   USER_GROUPS: 'user_groups',
   TOKEN_EXPIRES_AT: 'token_expires_at',
 } as const;
+
+export const AUTH_SESSION_STORAGE_KEY = 'auth_session_v1';
+
+export interface AuthSessionVersion {
+  generation: number;
+  logoutGeneration: number;
+}
