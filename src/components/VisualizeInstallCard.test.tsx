@@ -41,12 +41,14 @@ describe('VisualizeInstallCard', () => {
       uuid: 'target-1',
       clusterName: 'cluster1',
       clusterAPIURL: 'https://api.cluster1.example.com:6443',
+      secretType: 'kubeconfig',
       ready: true,
     },
     {
       uuid: 'target-2',
       clusterName: 'cluster2',
       clusterAPIURL: 'https://api.cluster2.example.com:6443',
+      secretType: 'kubeconfig',
       ready: true,
     },
   ];
@@ -140,7 +142,7 @@ describe('VisualizeInstallCard', () => {
 
     it('should call createInstance with form data when submitting', async () => {
       const user = userEvent.setup();
-      vi.mocked(visualizeApi.createInstance).mockResolvedValue(undefined);
+      vi.mocked(visualizeApi.createInstance).mockResolvedValue({ message: 'Installation started' });
 
       render(<VisualizeInstallCard />);
 
@@ -221,7 +223,7 @@ describe('VisualizeInstallCard', () => {
 
     it('should call deleteInstance when deletion is confirmed', async () => {
       const user = userEvent.setup();
-      vi.mocked(visualizeApi.deleteInstance).mockResolvedValue(undefined);
+      vi.mocked(visualizeApi.deleteInstance).mockResolvedValue({ message: 'Instance deleted' });
       vi.mocked(visualizeApi.listInstances).mockResolvedValue([]); // Return empty after delete
 
       render(<VisualizeInstallCard />);
