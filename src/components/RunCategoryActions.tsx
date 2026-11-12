@@ -29,7 +29,7 @@ interface RunCategoryActionsProps {
   onOpenCategories: () => void;
   onToggleCategory: (category: CategoryResponse) => void;
   onDelete: () => void;
-  /** When set, report actions (preview/download) are shown in the menu. */
+  /** When set, report status checks and report actions are enabled in the menu. */
   runId?: string;
   /** Used to stop polling once the run completes. */
   runPhase?: string;

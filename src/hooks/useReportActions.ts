@@ -6,7 +6,7 @@ interface UseReportActionsOptions {
   runId?: string;
   runName: string;
   runPhase?: string;
-  /** Delay first status request until `load` is called. */
+  /** Skip automatic status request on mount; `load` or `retry` starts one. */
   defer?: boolean;
   /** Poll after an unavailable status response. Defaults to true. */
   poll?: boolean;

@@ -22,13 +22,20 @@ describe('useReportActions', () => {
     global.URL.revokeObjectURL = vi.fn();
   });
 
-  it('skips polling when runId is undefined', () => {
+  it('does not load or retry report status when runId is undefined', () => {
     const { result } = renderHook(() =>
       useReportActions({ runName: 'test-run' }),
     );
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.hasReports).toBe(false);
+
+    act(() => result.current.load());
+    expect(result.current.isLoading).toBe(false);
+    expect(mockGetReportStatus).not.toHaveBeenCalled();
+
+    act(() => result.current.retry());
+    expect(result.current.isLoading).toBe(false);
     expect(mockGetReportStatus).not.toHaveBeenCalled();
   });
 

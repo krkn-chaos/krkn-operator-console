@@ -164,6 +164,27 @@ describe('RunCategoryActions', () => {
     expect(mockLoad).toHaveBeenCalledOnce();
   });
 
+  it('does not load report status again when Reports flyout is triggered twice', () => {
+    render(<RunCategoryActions {...defaultProps} runId="run-123" />);
+    fireEvent.click(screen.getByLabelText('Actions for run run-123'));
+
+    const reportsItem = screen.getByText('Reports');
+    fireEvent.mouseEnter(reportsItem);
+    fireEvent.mouseEnter(reportsItem);
+
+    expect(mockLoad).toHaveBeenCalledOnce();
+  });
+
+  it('does not load report status when Reports flyout opens while loading', () => {
+    mockReportReturn = { ...mockReportReturn, isLoading: true };
+    render(<RunCategoryActions {...defaultProps} runId="run-123" />);
+    fireEvent.click(screen.getByLabelText('Actions for run run-123'));
+
+    fireEvent.mouseEnter(screen.getByText('Checking reports…'));
+
+    expect(mockLoad).not.toHaveBeenCalled();
+  });
+
   it('offers an explicit status retry when no reports are available', () => {
     mockReportReturn = {
       ...mockReportReturn,
