@@ -110,7 +110,9 @@ export function TriggerNodeEditorModal({ isOpen, node, onClose, onSave }: Props)
   const triggerFields = useMemo(
     () => {
       const normalized = fields
-      .filter(field => (field.type === 'group' && field.name === 'triggers') || field.group === 'triggers')
+      .filter(field => (field.type === 'group' && field.name === 'triggers') ||
+        field.group === 'triggers' || SHARED_TRIGGER_FIELDS.includes(field.variable) ||
+        Boolean(CONDITION_TYPE_BY_FIELD[field.variable]))
       .map(field => {
         if (field.type === 'group') {
           return !field.variable ? { ...field, variable: 'triggers' } : field;
