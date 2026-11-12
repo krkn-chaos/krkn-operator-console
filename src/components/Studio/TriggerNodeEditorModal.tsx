@@ -200,7 +200,10 @@ export function TriggerNodeEditorModal({ isOpen, node, onClose, onSave }: Props)
     }
 
     setConditions(restoredConditions);
-    nextConditionId.current = restoredConditions.length + 1;
+    nextConditionId.current = restoredConditions.reduce(
+      (maxId, condition) => Math.max(maxId, condition.id),
+      0
+    ) + 1;
 
     // The trigger workload image is not a catalog scenario, so load its
     // krknctl.input_fields metadata through the direct detail endpoint.

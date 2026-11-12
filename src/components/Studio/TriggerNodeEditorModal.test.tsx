@@ -158,6 +158,25 @@ describe('TriggerNodeEditorModal', () => {
     });
   });
 
+  it('allocates a fresh ID after unsupported serialized conditions are filtered out', async () => {
+    const serialized = JSON.stringify([
+      { type: 'unsupported', unknown: 'value' },
+      { type: 'http', url: 'https://service.example/health' },
+    ]);
+    renderModal(makeTriggerNode({ TRIGGERS_CONDITIONS_JSON: serialized }));
+
+    expect((await screen.findByLabelText('TRIGGER_HTTP_URL') as HTMLInputElement).value)
+      .toBe('https://service.example/health');
+    fireEvent.click(screen.getByText('Add trigger condition'));
+
+    const triggerTypes = screen.getAllByLabelText('TRIGGER_TYPE');
+    fireEvent.change(triggerTypes[1], { target: { value: 'prometheus' } });
+
+    expect(await screen.findByLabelText('TRIGGER_PROM_QUERY')).toBeInTheDocument();
+    expect((screen.getByLabelText('TRIGGER_HTTP_URL') as HTMLInputElement).value)
+      .toBe('https://service.example/health');
+  });
+
   it('rejects saving when a condition is missing required fields', async () => {
     const onSave = renderModal();
 
