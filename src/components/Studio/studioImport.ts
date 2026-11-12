@@ -285,6 +285,7 @@ function computeDepths(graph: { [nodeId: string]: GraphScenarioNode }): Map<stri
  * `scenario.name` identity and falling back to the legacy top-level `name`.
  */
 export function resolveScenarioName(node: GraphScenarioNode): string {
+  if (node.nodeType === 'trigger') return 'trigger';
   return node.scenario?.name ?? node.name ?? '';
 }
 
@@ -306,12 +307,13 @@ export function graphNodeToStudioConfig(
 ): NonNullable<StudioNode['config']> {
   const scenarioName = resolveScenarioName(node);
   return {
+    ...(node.nodeType === 'trigger' ? { nodeType: 'trigger' as const } : {}),
     registryType: node.scenario?.private ? 'private' : 'public',
     registryConfig: node.scenario?.registryName
       ? { registryName: node.scenario.registryName }
       : {},
     scenarioName,
-    scenarioImage: node.image ?? `krkn-hub:${scenarioName}`,
+    scenarioImage: node.nodeType === 'trigger' ? 'quay.io/krkn-chaos/krkn-hub:trigger' : node.image ?? `krkn-hub:${scenarioName}`,
     signature_status: node.scenario?.signature_status,
     scenarioFormValues: { ...(node.env ?? {}) },
     volumes: node.volumes,
@@ -374,6 +376,7 @@ export function reconstructWorkflowFromGraph(
 
     const node: StudioNode = {
       nodeId,
+      ...(scenario.nodeType === 'trigger' ? { nodeType: 'trigger' as const } : {}),
       status: isConfigured ? 'configured' : 'unconfigured',
       position: {
         x: ORIGIN_X + depth * LAYER_X_SPACING,

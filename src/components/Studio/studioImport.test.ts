@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseImportedWorkflow, reconstructWorkflowFromGraph, buildStudioExport } from './studioImport';
+import { buildGraph } from './StudioContext';
 import type { StudioWorkflow, GraphScenarioNode } from '../../types/api';
 
 /** A small, fully-configured studio workflow used across the lossless tests. */
@@ -184,6 +185,51 @@ describe('parseImportedWorkflow', () => {
 });
 
 describe('reconstructWorkflowFromGraph', () => {
+  it('round-trips trigger node identity and condition environment through the graph', () => {
+    const conditions = JSON.stringify([
+      { type: 'http', url: 'https://service.example/health' },
+      { type: 'k8s', apiVersion: 'apps/v1', kind: 'Deployment', name: 'api' },
+    ]);
+    const graph: { [nodeId: string]: GraphScenarioNode } = {
+      'wait-node': {
+        nodeType: 'trigger',
+        name: 'legacy-trigger-name',
+        scenario: { name: 'legacy-trigger-name', private: false },
+        env: { TRIGGERS_CONDITIONS_JSON: conditions, TRIGGERS_MODE: 'any_of' },
+      },
+      'run-chaos': {
+        scenario: { name: 'node-cpu-hog', private: false },
+        depends_on: 'wait-node',
+      },
+    };
+
+    const workflow = reconstructWorkflowFromGraph(graph);
+    const triggerNode = workflow.nodes.find(node => node.nodeId === 'wait-node');
+
+    expect(triggerNode?.nodeType).toBe('trigger');
+    expect(triggerNode?.status).toBe('configured');
+    expect(triggerNode?.config).toMatchObject({
+      nodeType: 'trigger',
+      scenarioName: 'trigger',
+      scenarioImage: 'quay.io/krkn-chaos/krkn-hub:trigger',
+      scenarioFormValues: {
+        TRIGGERS_CONDITIONS_JSON: conditions,
+        TRIGGERS_MODE: 'any_of',
+      },
+    });
+    expect(workflow.edges).toEqual([
+      { id: 'wait-node-run-chaos', source: 'wait-node', target: 'run-chaos' },
+    ]);
+
+    const rebuiltGraph = buildGraph(workflow);
+    expect(rebuiltGraph['wait-node']).toMatchObject({
+      nodeType: 'trigger',
+      scenario: { name: 'trigger', private: false },
+      env: { TRIGGERS_CONDITIONS_JSON: conditions, TRIGGERS_MODE: 'any_of' },
+    });
+    expect(rebuiltGraph['run-chaos'].depends_on).toBe('wait-node');
+  });
+
   it('marks nodes configured when a scenario name is present', () => {
     const graph: { [nodeId: string]: GraphScenarioNode } = {
       'node-full': { name: 'pod-scenarios', image: 'img:1', env: { A: '1' } },
