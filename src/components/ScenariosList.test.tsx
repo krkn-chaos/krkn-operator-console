@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ScenariosList } from './ScenariosList';
 import { AppContext } from '../context/AppContext';
-import type { AppState, Scenario } from '../types/api';
+import type { AppState, ScenarioTag } from '../types/api';
 
 vi.mock('../hooks', () => ({
   useNotifications: () => ({
@@ -15,35 +15,23 @@ vi.mock('../hooks', () => ({
 describe('ScenariosList', () => {
   const mockDispatch = vi.fn();
 
-  const mockScenarios: Scenario[] = [
+  const mockScenarios: ScenarioTag[] = [
     {
       name: 'pod-scenarios',
-      title: 'Pod Scenarios',
-      description: 'Kill random pods',
-      tags: [
-        { name: 'category', value: 'kubernetes' },
-        { name: 'component', value: 'pods' },
-      ],
       digest: 'sha256:abc123',
       size: 1024 * 512,
-      last_updated: '2024-01-15T10:30:00Z',
+      lastModified: '2024-01-15T10:30:00Z',
     },
     {
       name: 'node-scenarios',
-      title: 'Node Scenarios',
-      description: 'Drain or cordon nodes',
-      tags: [
-        { name: 'category', value: 'kubernetes' },
-        { name: 'component', value: 'nodes' },
-      ],
       digest: 'sha256:def456',
       size: 1024 * 768,
-      last_updated: '2024-01-20T14:45:00Z',
+      lastModified: '2024-01-20T14:45:00Z',
     },
   ];
 
   const baseState: AppState = {
-    phase: 'selecting_scenario',
+    phase: 'selecting_scenarios',
     uuid: 'test-uuid-123',
     selectedClusters: [
       { operatorName: 'krkn-operator', clusterName: 'cluster1', clusterApiUrl: 'https://api.cluster1.example.com:6443' },
@@ -73,10 +61,15 @@ describe('ScenariosList', () => {
     providerConfigUuid: null,
     providerConfigStatus: 'idle',
     providerConfigData: null,
+    isRerunFlow: false,
     rerunIntent: null,
+    rerunCategories: [],
     startInPreview: false,
-    rerunScenarioImage: null,
+    rerunScenario: null,
     rerunKubeconfigPath: null,
+    rerunCloudCredentialRef: null,
+    rerunWorkspace: null,
+    rerunRollbackEnabled: false,
     notifications: [],
   };
 
@@ -170,8 +163,8 @@ describe('ScenariosList', () => {
     it('should render all scenarios', () => {
       renderWithContext();
 
-      expect(screen.getByText('Pod Scenarios')).toBeInTheDocument();
-      expect(screen.getByText('Node Scenarios')).toBeInTheDocument();
+      expect(screen.getByText('pod-scenarios')).toBeInTheDocument();
+      expect(screen.getByText('node-scenarios')).toBeInTheDocument();
     });
 
     it('should have Configure button for each scenario', () => {

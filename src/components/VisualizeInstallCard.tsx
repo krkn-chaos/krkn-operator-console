@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   CardTitle,
@@ -297,6 +297,7 @@ export function VisualizeInstallCard() {
   const [logsModalInstance, setLogsModalInstance] = useState<string | null>(null);
   const [logs, setLogs] = useState<string>('');
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const logsRequestId = useRef(0);
 
   const fetchData = useCallback(async () => {
     try {
@@ -380,17 +381,30 @@ export function VisualizeInstallCard() {
   };
 
   const handleViewLogs = async (name: string) => {
+    const requestId = ++logsRequestId.current;
     setLogsModalInstance(name);
     setLoadingLogs(true);
     setLogs('');
     try {
       const response = await visualizeApi.getLogs(name);
-      setLogs(response.logs || 'No logs available');
+      if (requestId === logsRequestId.current) {
+        setLogs(response.logs || 'No logs available');
+      }
     } catch (err) {
-      setLogs(`Failed to load logs: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      if (requestId === logsRequestId.current) {
+        setLogs(`Failed to load logs: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
     } finally {
-      setLoadingLogs(false);
+      if (requestId === logsRequestId.current) {
+        setLoadingLogs(false);
+      }
     }
+  };
+
+  const handleCloseLogsModal = () => {
+    logsRequestId.current += 1;
+    setLogsModalInstance(null);
+    setLoadingLogs(false);
   };
 
   if (loading) {
@@ -531,12 +545,12 @@ export function VisualizeInstallCard() {
         variant={ModalVariant.large}
         title={`Installation Logs: ${logsModalInstance}`}
         isOpen={!!logsModalInstance}
-        onClose={() => setLogsModalInstance(null)}
+        onClose={handleCloseLogsModal}
         actions={[
           <Button key="refresh" variant="secondary" onClick={() => logsModalInstance && handleViewLogs(logsModalInstance)} isDisabled={loadingLogs}>
             Refresh
           </Button>,
-          <Button key="close" variant="link" onClick={() => setLogsModalInstance(null)}>
+          <Button key="close" variant="link" onClick={handleCloseLogsModal}>
             Close
           </Button>,
         ]}

@@ -1869,13 +1869,13 @@ export interface VisualizeConfig {
   /** Name of the Elasticsearch config to use (optional) */
   elasticsearchConfigName?: string;
   /** Grafana admin password */
-  grafanaPassword: string;
+  grafanaPassword?: string;
   /** Prometheus URL (auto-detected for OpenShift if not provided) */
   prometheusUrl?: string;
   /** Prometheus bearer token (auto-generated for OpenShift if not provided) */
   prometheusBearerToken?: string;
   /** Current deployment status */
-  status?: 'Pending' | 'Installing' | 'Ready' | 'Failed';
+  status?: 'Pending' | 'Installing' | 'Ready' | 'Failed' | 'Deleting';
   /** Grafana dashboard URL (available after deployment) */
   grafanaUrl?: string;
   /** Error message if deployment failed */

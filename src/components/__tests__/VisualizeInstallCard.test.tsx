@@ -4,7 +4,12 @@ import { VisualizeInstallCard } from '../VisualizeInstallCard';
 import { visualizeApi } from '../../services/visualizeApi';
 import { elasticsearchApi } from '../../services/elasticsearchApi';
 import { targetsApi } from '../../services/targetsApi';
-import type { VisualizeConfig, ElasticsearchConfig, TargetResponse } from '../../types/api';
+import type {
+  VisualizeConfig,
+  ElasticsearchConfig,
+  TargetResponse,
+  VisualizeLogsResponse,
+} from '../../types/api';
 
 // Mock the APIs
 vi.mock('../../services/visualizeApi');
@@ -54,7 +59,7 @@ describe('VisualizeInstallCard', () => {
     vi.clearAllMocks();
     vi.mocked(visualizeApi.listInstances).mockResolvedValue(mockInstances);
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue(mockEsConfigs);
-    vi.mocked(targetsApi.listTargets).mockResolvedValue({ targets: mockTargets });
+    vi.mocked(targetsApi.listTargets).mockResolvedValue(mockTargets);
   });
 
   it('renders loading spinner initially', () => {
@@ -119,6 +124,39 @@ describe('VisualizeInstallCard', () => {
       expect(link).toHaveAttribute('href', 'https://grafana.example.com');
       expect(link).toHaveAttribute('target', '_blank');
     });
+  });
+
+  it('ignores an older logs response after another instance is selected', async () => {
+    const secondInstance: VisualizeConfig = {
+      ...mockInstances[0],
+      name: 'second-visualize',
+    };
+    vi.mocked(visualizeApi.listInstances).mockResolvedValue([
+      mockInstances[0],
+      secondInstance,
+    ]);
+
+    let resolveFirst!: (value: VisualizeLogsResponse) => void;
+    let resolveSecond!: (value: VisualizeLogsResponse) => void;
+    vi.mocked(visualizeApi.getLogs)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+
+    render(<VisualizeInstallCard />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /View Logs/i })).toHaveLength(2);
+    });
+
+    const viewLogsButtons = screen.getAllByRole('button', { name: /View Logs/i });
+    fireEvent.click(viewLogsButtons[0]);
+    fireEvent.click(viewLogsButtons[1]);
+
+    resolveSecond({ logs: 'second instance logs', status: 'Ready' });
+    await waitFor(() => expect(screen.getByText('second instance logs')).toBeInTheDocument());
+
+    resolveFirst({ logs: 'first instance logs', status: 'Ready' });
+    await waitFor(() => expect(screen.queryByText('first instance logs')).not.toBeInTheDocument());
+    expect(screen.getByText('second instance logs')).toBeInTheDocument();
   });
 
   it('handles delete confirmation', async () => {
