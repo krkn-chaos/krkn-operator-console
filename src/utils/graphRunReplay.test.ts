@@ -33,6 +33,8 @@ describe('loadGraphRunReplay', () => {
           scenario: { name: 'pod-kill', private: true, registryName: 'private-registry' },
           image: 'quay.io/krkn-chaos/krkn-hub:pod-scenarios',
           cloudCredentialRef: 'aws-credential',
+          workspace: { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' },
+          rollbackEnabled: true,
           env: { NAMESPACE: 'default' },
         },
         'node-2': {
@@ -70,6 +72,8 @@ describe('loadGraphRunReplay', () => {
         scenarioName: 'pod-kill',
         signature_status: 'signed',
         cloudCredentialRef: 'aws-credential',
+        workspace: { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' },
+        rollbackEnabled: true,
         scenarioFormValues: { NAMESPACE: 'default' },
       },
     });

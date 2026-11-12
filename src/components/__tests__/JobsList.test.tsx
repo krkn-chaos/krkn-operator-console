@@ -16,6 +16,10 @@ vi.mock('../../hooks/useRole', () => ({
   useRole: () => ({ isAdmin: false, role: 'user' }),
 }));
 
+vi.mock('../../hooks/useNotifications', () => ({
+  useNotifications: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
+}));
+
 vi.mock('../../hooks/useActiveRunsPoller', () => ({
   useActiveRunsPoller: () => ({ activeRuns: null, loading: false, error: null }),
 }));
@@ -385,6 +389,43 @@ describe('JobsList', () => {
       render(<JobsList {...defaultProps()} />);
       expect(screen.getByText('test-graph-run')).toBeInTheDocument();
       expect(screen.getByText('cpu-hog')).toBeInTheDocument();
+    });
+  });
+
+  describe('Grouped rollback runs', () => {
+    it('shows rollback progress beneath the source cluster without changing the scenario phase', () => {
+      setMockJobs([makeScenarioJobItem('source-run', {
+        scenarioRun: {
+          scenarioRunName: 'source-run', scenarioName: 'node-cpu-hog', phase: 'Failed',
+          totalTargets: 1, successfulJobs: 0, failedJobs: 1, runningJobs: 0,
+          clusterJobs: [{ providerName: 'provider', clusterName: 'cluster-a', jobId: 'source-attempt', podName: 'source-pod', phase: 'Failed' }],
+        },
+        rollbackRuns: [{ scenarioRunName: 'rollback-run', sourceJobId: 'source-attempt', phase: 'Running', ownerUserId: 'rollback-user@test.com', createdAt: '2026-11-10T10:00:00Z' }],
+      })]);
+      const props = defaultProps();
+      props.expandedRunIds = new Set(['source-run']);
+      render(<JobsList {...props} />);
+
+      expect(screen.getByText('Rolling back')).toBeInTheDocument();
+      expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
+      expect(screen.getByLabelText('Rollback history for cluster-a').querySelector('summary strong')).toHaveTextContent('Rollback');
+      expect(screen.getByText(/rollback-user@test.com/)).toBeInTheDocument();
+    });
+
+    it('derives the indicator from the latest rollback execution for an attempt', () => {
+      setMockJobs([makeScenarioJobItem('source-run', {
+        scenarioRun: {
+          scenarioRunName: 'source-run', scenarioName: 'node-cpu-hog', phase: 'Failed',
+          totalTargets: 1, successfulJobs: 0, failedJobs: 1, runningJobs: 0,
+          clusterJobs: [{ providerName: 'provider', clusterName: 'cluster-a', jobId: 'source-attempt', podName: 'source-pod', phase: 'Failed' }],
+        },
+        rollbackRuns: [
+          { scenarioRunName: 'rollback-2', sourceJobId: 'source-attempt', phase: 'Succeeded', createdAt: '2026-11-10T11:00:00Z' },
+          { scenarioRunName: 'rollback-1', sourceJobId: 'source-attempt', phase: 'Failed', createdAt: '2026-11-10T10:00:00Z' },
+        ],
+      })]);
+      render(<JobsList {...defaultProps()} />);
+      expect(screen.getByText('Rolled back')).toBeInTheDocument();
     });
   });
 

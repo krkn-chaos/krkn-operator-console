@@ -16,16 +16,22 @@ import {
   HelperText,
   HelperTextItem,
   Alert,
+  Switch,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import { FileSelector } from '../FileSelector';
-import type { FileReference } from '../../types/api';
+import { WorkspaceSelector } from '../WorkspaceSelector';
+import type { FileReference, WorkspaceSelection } from '../../types/api';
 
 interface NodeMetadataStepProps {
   nodeId: string;
   onNodeIdChange: (nodeId: string) => void;
   nodeIdError?: string;
   currentNodeId?: string; // Current node ID (for validation exclusion)
+  workspace?: WorkspaceSelection;
+  rollbackEnabled?: boolean;
+  onRollbackEnabledChange?: (enabled: boolean) => void;
+  onWorkspaceChange?: (workspace?: WorkspaceSelection) => void;
   volumes?: { [fileId: string]: string }; // fileId -> mountPath mapping
   onVolumesChange?: (volumes: { [fileId: string]: string }) => void;
   onPendingChange?: (hasPending: boolean) => void;
@@ -37,6 +43,10 @@ export function NodeMetadataStep({
   nodeId,
   onNodeIdChange,
   nodeIdError,
+  workspace,
+  onWorkspaceChange,
+  rollbackEnabled = false,
+  onRollbackEnabledChange,
   volumes = {},
   onVolumesChange,
   onPendingChange,
@@ -113,6 +123,17 @@ export function NodeMetadataStep({
           </HelperText>
         </FormHelperText>
       </FormGroup>
+
+      <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
+        <Switch id="node-rollback-enabled" label="Enable rollback" isChecked={rollbackEnabled} onChange={(_event, checked) => onRollbackEnabledChange?.(checked)} />
+        <WorkspaceSelector id="node-workspace" value={workspace} onChange={(selected) => onWorkspaceChange?.(selected)} />
+        {rollbackEnabled && !workspace && <Alert variant="warning" title="Select a workspace to enable rollback" isInline />}
+        {rollbackEnabled && (
+          <Alert variant="info" title="Why retries are disabled" isInline>
+            A retry can change the cluster again and leave another set of rollback files. With rollback enabled, each target runs once so rollback uses the files from a single attempt.
+          </Alert>
+        )}
+      </div>
 
       <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
         <div style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>

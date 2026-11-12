@@ -148,11 +148,12 @@ class WebSocketService {
     limit?: number,
     categories?: string[],
     subscriptionId?: string,
+    groupRollbacks?: boolean,
   ): void {
     const conn = this.connections.get(connectionId);
     if (!conn) return;
 
-    const sub: Subscription = { resource, ids, page, limit, categories, subscriptionId };
+    const sub: Subscription = { resource, ids, page, limit, categories, subscriptionId, groupRollbacks };
     const existingIdx = conn.subscriptions.findIndex(
       s => s.resource === resource && JSON.stringify(s.ids) === JSON.stringify(ids)
     );
@@ -163,7 +164,7 @@ class WebSocketService {
     }
 
     if (conn.ws?.readyState === WebSocket.OPEN) {
-      this.sendClientMessage(conn, { action: 'subscribe', resource, ids, page, limit, categories, subscriptionId });
+      this.sendClientMessage(conn, { action: 'subscribe', resource, ids, page, limit, categories, subscriptionId, groupRollbacks });
     }
   }
 
@@ -354,7 +355,7 @@ class WebSocketService {
   private resubscribeAll(conn: ManagedConnection): void {
     if (!conn.options.subscriptionMode) return;
     for (const sub of conn.subscriptions) {
-      this.sendClientMessage(conn, { action: 'subscribe', resource: sub.resource, ids: sub.ids, page: sub.page, limit: sub.limit, categories: sub.categories });
+      this.sendClientMessage(conn, { action: 'subscribe', resource: sub.resource, ids: sub.ids, page: sub.page, limit: sub.limit, categories: sub.categories, subscriptionId: sub.subscriptionId, groupRollbacks: sub.groupRollbacks });
     }
   }
 

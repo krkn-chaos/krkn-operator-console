@@ -185,6 +185,11 @@ export function RunWorkflowModal({
 
     // Apply resiliency score file mappings to graph nodes
     const graph = { ...exportResult.graph };
+    const missingWorkspaceNode = Object.entries(graph).find(([, node]) => node.rollbackEnabled && !node.workspace?.name);
+    if (missingWorkspaceNode) {
+      showError('Cannot run workflow', `Rollback requires a workspace for node ${missingWorkspaceNode[0]}.`);
+      return;
+    }
     if (configToUse) {
       Object.keys(graph).forEach((nodeId) => {
         const node = graph[nodeId];
@@ -408,7 +413,7 @@ export function RunWorkflowModal({
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem>Retries after the initial attempt for each scenario node. Set to 0 to disable retries.</HelperTextItem>
+                  <HelperTextItem>Retries after the initial attempt. Nodes with rollback enabled always use 0 retries.</HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>

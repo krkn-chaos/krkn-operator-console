@@ -89,6 +89,8 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
         },
         env,
         volumes: node.config.volumes,
+        workspace: node.config.workspace,
+        rollbackEnabled: node.config.rollbackEnabled,
         depends_on: incomingEdge?.source,
         resiliencyWeight: node.config.resiliencyWeight ?? 1,
         cloudCredentialRef: node.config.cloudCredentialRef,

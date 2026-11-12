@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ScenarioDetail } from './ScenarioDetail';
@@ -6,6 +6,7 @@ import { AppContext } from '../context/AppContext';
 import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
+import { workspacesApi } from '../services/workspacesApi';
 import type { AppState } from '../types/api';
 import type {
   ScenarioDetail as ScenarioDetailType,
@@ -20,6 +21,7 @@ import type {
 vi.mock('../services/operatorApi');
 vi.mock('../services/elasticsearchApi');
 vi.mock('../services/cloudCredentialsApi');
+vi.mock('../services/workspacesApi');
 vi.mock('../services/signatureVerificationApi', () => ({
   signatureVerificationApi: {
     getSettings: vi.fn().mockResolvedValue({ enabled: true }),
@@ -126,6 +128,8 @@ describe('ScenarioDetail', () => {
     rerunScenario: null,
     rerunKubeconfigPath: null,
     rerunCloudCredentialRef: null,
+    rerunWorkspace: null,
+    rerunRollbackEnabled: false,
     notifications: [],
   };
 
@@ -165,6 +169,7 @@ describe('ScenarioDetail', () => {
     vi.mocked(operatorApi.getCategories).mockResolvedValue({ categories: [], total: 0 });
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
     vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
+    vi.mocked(workspacesApi.listAvailable).mockResolvedValue([]);
   });
 
   describe('Signature verification loading', () => {
@@ -784,7 +789,7 @@ describe('ScenarioDetail', () => {
       expect(operatorApi.runScenario).not.toHaveBeenCalled();
     });
 
-    it('should run scenario when run button clicked in preview mode', async () => {
+    it('runs without a workspace when the workspace catalog is empty', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
       vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
@@ -807,8 +812,106 @@ describe('ScenarioDetail', () => {
       });
 
       await waitFor(() => {
-        expect(operatorApi.runScenario).toHaveBeenCalled();
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ workspace: undefined, rollbackEnabled: false }),
+        );
       });
+    });
+
+    it('runs without rollback when workspace discovery fails before preview', async () => {
+      const user = userEvent.setup();
+      vi.mocked(workspacesApi.listAvailable).mockRejectedValueOnce(new Error('workspace catalog unavailable'));
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      expect(await screen.findByText('Configuration Preview')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      await waitFor(() => {
+        expect(operatorApi.runScenario).toHaveBeenCalledWith(
+          expect.objectContaining({ workspace: undefined, rollbackEnabled: false }),
+        );
+      });
+    });
+
+    it('confirms preview when workspaces exist but rollback is disabled', async () => {
+      const user = userEvent.setup();
+      vi.mocked(workspacesApi.listAvailable).mockResolvedValue([{ name: 'shared', available: true, availableToAll: true }]);
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      const confirmation = await screen.findByRole('dialog', { name: 'Rollback is not enabled' });
+      expect(confirmation).toHaveTextContent('Workspaces are available, but rollback is not enabled.');
+      await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
+      expect(screen.getByRole('button', { name: /Preview Configuration/i })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(within(screen.getByRole('dialog', { name: 'Rollback is not enabled' })).getByRole('button', { name: 'Continue' }));
+      expect(screen.getByText('Configuration Preview')).toBeInTheDocument();
+    });
+
+    it('explains why retries are disabled when rollback is enabled', async () => {
+      const user = userEvent.setup();
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
+      await user.click(screen.getByLabelText('Enable rollback'));
+      expect(screen.getByText(/A retry can change the cluster again and leave another set of rollback files/)).toBeInTheDocument();
+      expect(screen.getByText('Why retries are disabled').closest('.pf-v5-c-alert')).toHaveClass('pf-m-info');
+    });
+
+    it('requires a workspace when rollback is enabled', async () => {
+      const user = userEvent.setup();
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' }, rerunRollbackEnabled: true });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      expect(await screen.findByText(/Enable rollback requires a workspace/)).toBeInTheDocument();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('keeps workspace selection independent from rollback', async () => {
+      const user = userEvent.setup();
+      const workspace = { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' };
+      vi.mocked(operatorApi.runScenario).mockResolvedValue(mockCreateResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockActiveRuns);
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' }, rerunWorkspace: workspace });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ workspace, rollbackEnabled: false }),
+      ));
+    });
+
+    it('sends rollback enabled with the selected workspace', async () => {
+      const user = userEvent.setup();
+      const workspace = { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' };
+      vi.mocked(operatorApi.runScenario).mockResolvedValue(mockCreateResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockActiveRuns);
+      renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' }, rerunWorkspace: workspace, rerunRollbackEnabled: true });
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ workspace, rollbackEnabled: true, maxRetries: 0 }),
+      ));
+    });
+
+    it('hydrates workspace and rollback after replay details arrive', async () => {
+      const user = userEvent.setup();
+      const workspace = { name: 'shared', workspaceUid: 'wrapper-uid', claimUid: 'pvc-uid' };
+      vi.mocked(operatorApi.runScenario).mockResolvedValue(mockCreateResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValue(mockActiveRuns);
+      const view = renderWithContext({ phase: 'loading_scenario_detail', scenarioDetail: null });
+      view.rerender(
+        <AppContext.Provider value={{ state: { ...baseState, rerunWorkspace: workspace, rerunRollbackEnabled: true }, dispatch: mockDispatch }}>
+          <ScenarioDetail scenarioName="pod-scenarios" registryConfig={null} />
+        </AppContext.Provider>,
+      );
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ workspace, rollbackEnabled: true }),
+      ));
     });
 
     it('preserves the declared mount path for a touched global file parameter', async () => {

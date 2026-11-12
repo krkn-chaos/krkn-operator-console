@@ -97,7 +97,7 @@ export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsRe
     activeSubscriptionIdRef.current = subscriptionId;
 
     setIsLoading(true);
-    websocketService.subscribe('jobs', 'jobs', undefined, page, limit, categories, subscriptionId);
+    websocketService.subscribe('jobs', 'jobs', undefined, page, limit, categories, subscriptionId, true);
   }, [connectionState, page, limit, categories, subscriptionKey, refreshVersion]);
 
   return {

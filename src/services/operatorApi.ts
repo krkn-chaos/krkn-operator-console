@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { BaseApiClient, authenticatedFetch } from '../utils/apiClient';
+import { parseRollbackAvailability } from './rollbackAvailability';
 import type {
   CreateTargetResponse,
   ClustersResponse,
@@ -37,6 +38,7 @@ import type {
   UnifiedJobsResponse,
   ScenarioRunListResponse,
   ReportStatus,
+  RollbackAvailability,
 } from '../types/api';
 
 class OperatorApiClient extends BaseApiClient {
@@ -239,6 +241,14 @@ class OperatorApiClient extends BaseApiClient {
    */
   async getScenarioRunStatus(scenarioRunName: string): Promise<ScenarioRunStatusResponse> {
     return this.fetchJson<ScenarioRunStatusResponse>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}`);
+  }
+
+  async getRollbackAvailability(scenarioRunName: string, jobId: string): Promise<RollbackAvailability> {
+    return parseRollbackAvailability(await this.fetchJson<unknown>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/rollback/${encodeURIComponent(jobId)}`), jobId);
+  }
+
+  async startRollback(scenarioRunName: string, jobId: string): Promise<RollbackAvailability> {
+    return parseRollbackAvailability(await this.fetchJson<unknown>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/rollback/${encodeURIComponent(jobId)}`, { method: 'POST' }), jobId);
   }
 
   /**

@@ -25,6 +25,7 @@ export interface SubscribeMessage {
   page?: number;
   limit?: number;
   categories?: string[];
+  groupRollbacks?: boolean;
   /** Correlates snapshots to the subscription that requested them. */
   subscriptionId?: string;
 }
@@ -63,6 +64,7 @@ export interface Subscription {
   page?: number;
   limit?: number;
   categories?: string[];
+  groupRollbacks?: boolean;
   subscriptionId?: string;
 }
 

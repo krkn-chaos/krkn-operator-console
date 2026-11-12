@@ -159,6 +159,14 @@ describe('StudioNodeEditorModal resiliency weight', () => {
     scenarioConfigMockState.loadStatus = 'loaded';
   });
 
+  it('explains why rollback disables retries for a workflow node', async () => {
+    renderEditor(configuredNode());
+    const user = await advanceEditorToNodeSettings();
+    await user.click(screen.getByLabelText('Enable rollback'));
+    expect(screen.getByText(/A retry can change the cluster again and leave another set of rollback files/)).toBeInTheDocument();
+    expect(screen.getByText('Why retries are disabled').closest('.pf-v5-c-alert')).toHaveClass('pf-m-info');
+  });
+
   it('initializes a saved weight and persists an edited valid weight', async () => {
     const onSave = renderEditor(configuredNode(2.5));
     await advanceEditorToNodeSettings();
