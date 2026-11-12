@@ -2,7 +2,7 @@
  * Authentication service for krkn-operator-console
  *
  * Handles user authentication, registration, and session management.
- * Uses sessionStorage for security (cleared on tab close).
+ * Uses localStorage so an authenticated session is shared across tabs.
  */
 
 import type {
@@ -12,18 +12,157 @@ import type {
   RegisterResponse,
   IsRegisteredResponse,
   AuthError,
+  AuthSessionVersion,
   User,
 } from '../types/auth';
-import { AUTH_STORAGE_KEYS, RateLimitError } from '../types/auth';
+import { AUTH_SESSION_STORAGE_KEY, AUTH_STORAGE_KEYS, RateLimitError } from '../types/auth';
 
 import { config } from '../config';
 
 const API_BASE = `${config.apiBaseUrl}/auth`;
+const AUTH_STORAGE_KEY_LIST = Object.values(AUTH_STORAGE_KEYS);
+const LEGACY_SESSION_MIGRATED_KEY = 'legacy_session_migrated';
+
+interface AuthSession {
+  token: string | null;
+  user: User | null;
+  expiresAt: string | null;
+}
+
+interface AuthSessionRecord extends AuthSessionVersion {
+  version: 1;
+  session: AuthSession | null;
+}
+
+function clearAuthStorage(storage: Storage): void {
+  AUTH_STORAGE_KEY_LIST.forEach(key => storage.removeItem(key));
+}
+
+function readUserFromStorage(storage: Storage): User | null {
+  const userId = storage.getItem(AUTH_STORAGE_KEYS.USER_EMAIL);
+  const name = storage.getItem(AUTH_STORAGE_KEYS.USER_NAME);
+  const surname = storage.getItem(AUTH_STORAGE_KEYS.USER_SURNAME);
+  const role = storage.getItem(AUTH_STORAGE_KEYS.USER_ROLE);
+  const organization = storage.getItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
+
+  if (!userId || !name || !surname || !role) {
+    return null;
+  }
+
+  const groupsJson = storage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
+  let groups: string[] | undefined;
+  if (groupsJson) {
+    try { groups = JSON.parse(groupsJson); } catch { /* ignore */ }
+  }
+
+  return {
+    userId,
+    name,
+    surname,
+    role: role as User['role'],
+    organization: organization || undefined,
+    groups,
+  };
+}
+
+function readLegacySession(storage: Storage): AuthSession {
+  return {
+    token: storage.getItem(AUTH_STORAGE_KEYS.TOKEN),
+    user: readUserFromStorage(storage),
+    expiresAt: storage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT),
+  };
+}
+
+function hasLegacyAuth(storage: Storage): boolean {
+  return AUTH_STORAGE_KEY_LIST.some(key => storage.getItem(key) !== null);
+}
+
+function emptySession(session: AuthSession): boolean {
+  return session.token === null && session.user === null && session.expiresAt === null;
+}
 
 /**
  * Authentication service class
  */
 class AuthService {
+  private readSessionRecord(): AuthSessionRecord {
+    const storedRecord = localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+    if (storedRecord !== null) {
+      clearAuthStorage(sessionStorage);
+      try {
+        const record = JSON.parse(storedRecord) as AuthSessionRecord;
+        if (
+          record.version === 1 &&
+          Number.isInteger(record.generation) &&
+          Number.isInteger(record.logoutGeneration) &&
+          (record.session === null || typeof record.session === 'object')
+        ) return record;
+      } catch {
+        // Replace malformed auth data with a logged-out record.
+      }
+
+      const record = { version: 1, generation: 1, logoutGeneration: 1, session: null } as const;
+      this.writeSessionRecord(record);
+      return record;
+    }
+
+    if (hasLegacyAuth(localStorage)) {
+      const record: AuthSessionRecord = {
+        version: 1,
+        generation: 1,
+        logoutGeneration: 0,
+        session: readLegacySession(localStorage),
+      };
+      clearAuthStorage(localStorage);
+      this.writeSessionRecord(record);
+      return record;
+    }
+
+    const legacyWasMigrated = localStorage.getItem(LEGACY_SESSION_MIGRATED_KEY) !== null;
+    if (hasLegacyAuth(sessionStorage)) {
+      const legacySession = readLegacySession(sessionStorage);
+      const expiresAtMs = legacySession.expiresAt ? Date.parse(legacySession.expiresAt) : Number.NaN;
+      const validLegacySession = Boolean(
+        legacySession.token && legacySession.user &&
+        Number.isFinite(expiresAtMs) && expiresAtMs > Date.now(),
+      );
+      const record: AuthSessionRecord = {
+        version: 1,
+        generation: 1,
+        logoutGeneration: legacyWasMigrated ? 1 : 0,
+        session: !legacyWasMigrated && validLegacySession ? legacySession : null,
+      };
+      clearAuthStorage(sessionStorage);
+      this.writeSessionRecord(record);
+      return record;
+    }
+
+    if (legacyWasMigrated) {
+      const record = { version: 1, generation: 1, logoutGeneration: 1, session: null } as const;
+      this.writeSessionRecord(record);
+      return record;
+    }
+
+    return { version: 1, generation: 0, logoutGeneration: 0, session: null };
+  }
+
+  private writeSessionRecord(record: AuthSessionRecord): void {
+    localStorage.setItem(LEGACY_SESSION_MIGRATED_KEY, '1');
+    localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(record));
+  }
+
+  private updateSession(update: Partial<AuthSession>): void {
+    const current = this.readSessionRecord();
+    const session = { token: null, user: null, expiresAt: null, ...current.session, ...update };
+    const nextSession = emptySession(session) ? null : session;
+    if (JSON.stringify(nextSession) === JSON.stringify(current.session)) return;
+    this.writeSessionRecord({
+      ...current,
+      generation: current.generation + 1,
+      session: nextSession,
+    });
+  }
+
   /**
    * Check if an admin user is already registered
    * @returns True if admin exists, false if first admin needed
@@ -83,10 +222,15 @@ class AuthService {
   /**
    * Login user and store session data
    * @param request - Login credentials
-   * @returns Login response with token and user info
+   * @param expectedVersion - Shared session version observed when request started
+   * @returns Login response with token and user info, or null if a newer session won
    */
-  async login(request: LoginRequest): Promise<LoginResponse> {
+  async login(
+    request: LoginRequest,
+    expectedVersion?: AuthSessionVersion,
+  ): Promise<LoginResponse | null> {
     try {
+      const versionAtRequestStart = expectedVersion ?? this.getSessionVersion();
       const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,16 +258,28 @@ class AuthService {
 
       const data: LoginResponse = await response.json();
 
-      // Store auth data in sessionStorage
-      this.setToken(data.token);
-      this.setUser({
-        userId: data.userId,
-        name: data.name,
-        surname: data.surname,
-        role: data.role,
-        organization: data.organization,
+      const current = this.readSessionRecord();
+      if (
+        current.generation !== versionAtRequestStart.generation ||
+        current.logoutGeneration !== versionAtRequestStart.logoutGeneration
+      ) return null;
+
+      this.writeSessionRecord({
+        version: 1,
+        generation: current.generation + 1,
+        logoutGeneration: current.logoutGeneration,
+        session: {
+          token: data.token,
+          expiresAt: data.expiresAt,
+          user: {
+            userId: data.userId,
+            name: data.name,
+            surname: data.surname,
+            role: data.role,
+            organization: data.organization,
+          },
+        },
       });
-      sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT, data.expiresAt);
 
       return data;
     } catch (error) {
@@ -132,95 +288,88 @@ class AuthService {
   }
 
   /**
-   * Logout user and clear session data
+   * Logout user and clear session data. When expectedToken is provided, only
+   * clear storage if it still matches token used by the failed request.
    */
-  logout(): void {
-    this.clearToken();
-    this.clearUser();
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
+  logout(expectedToken?: string | null): boolean {
+    const current = this.readSessionRecord();
+    if (
+      expectedToken !== undefined &&
+      (current.session?.token ?? null) !== expectedToken
+    ) {
+      return false;
+    }
+
+    this.writeSessionRecord({
+      version: 1,
+      generation: current.generation + 1,
+      logoutGeneration: current.logoutGeneration + 1,
+      session: null,
+    });
+    clearAuthStorage(localStorage);
+    clearAuthStorage(sessionStorage);
+    return true;
   }
 
   /**
-   * Get JWT token from sessionStorage
+   * Get JWT token from localStorage
    * @returns JWT token or null if not found
    */
   getToken(): string | null {
-    return sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN);
+    return this.readSessionRecord().session?.token ?? null;
   }
 
   /**
-   * Store JWT token in sessionStorage
+   * Store JWT token in localStorage
    * @param token - JWT token
    */
   setToken(token: string): void {
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, token);
+    this.updateSession({ token });
   }
 
   /**
-   * Clear JWT token from sessionStorage
+   * Clear JWT token from localStorage
    */
   clearToken(): void {
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.TOKEN);
+    this.updateSession({ token: null });
   }
 
   /**
-   * Get user info from sessionStorage
+   * Get user info from localStorage
    * @returns User object or null if not found
    */
   getUser(): User | null {
-    const userId = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_EMAIL);
-    const name = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_NAME);
-    const surname = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_SURNAME);
-    const role = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_ROLE);
-    const organization = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
-
-    if (!userId || !name || !surname || !role) {
-      return null;
-    }
-
-    const groupsJson = sessionStorage.getItem(AUTH_STORAGE_KEYS.USER_GROUPS);
-    let groups: string[] | undefined;
-    if (groupsJson) {
-      try { groups = JSON.parse(groupsJson); } catch { /* ignore */ }
-    }
-
-    return {
-      userId,
-      name,
-      surname,
-      role: role as User['role'],
-      organization: organization || undefined,
-      groups,
-    };
+    return this.readSessionRecord().session?.user ?? null;
   }
 
   /**
-   * Store user info in sessionStorage
+   * Store user info in localStorage
    * @param user - User object
    */
   setUser(user: User): void {
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_EMAIL, user.userId);
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_NAME, user.name);
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_SURNAME, user.surname);
-    sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_ROLE, user.role);
-    if (user.organization) {
-      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION, user.organization);
-    }
-    if (user.groups) {
-      sessionStorage.setItem(AUTH_STORAGE_KEYS.USER_GROUPS, JSON.stringify(user.groups));
-    }
+    this.updateSession({ user });
+  }
+
+  setSession(user: User, token: string, expiresAt: string): void {
+    const current = this.readSessionRecord();
+    this.writeSessionRecord({
+      version: 1,
+      generation: current.generation + 1,
+      logoutGeneration: current.logoutGeneration,
+      session: { user, token, expiresAt },
+    });
   }
 
   /**
-   * Clear user info from sessionStorage
+   * Clear user info from localStorage
    */
   clearUser(): void {
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_EMAIL);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_NAME);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_SURNAME);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_ROLE);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_ORGANIZATION);
-    sessionStorage.removeItem(AUTH_STORAGE_KEYS.USER_GROUPS);
+    this.updateSession({ user: null });
+  }
+
+  getSessionVersion(): AuthSessionVersion {
+    const { generation, logoutGeneration } = this.readSessionRecord();
+    return { generation, logoutGeneration };
   }
 
   /**
@@ -238,7 +387,7 @@ class AuthService {
    * @returns ISO 8601 timestamp or null
    */
   getTokenExpiresAt(): string | null {
-    return sessionStorage.getItem(AUTH_STORAGE_KEYS.TOKEN_EXPIRES_AT);
+    return this.readSessionRecord().session?.expiresAt ?? null;
   }
 
   /**

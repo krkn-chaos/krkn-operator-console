@@ -10,7 +10,7 @@
 export type UserRole = 'admin' | 'user';
 
 /**
- * User information stored in session
+ * User information stored with the authenticated session
  */
 export interface User {
   userId: string; // Email address
@@ -89,7 +89,7 @@ export class RateLimitError extends Error {
 }
 
 /**
- * Session storage keys for auth data
+ * Browser storage keys for auth data
  */
 export const AUTH_STORAGE_KEYS = {
   TOKEN: 'jwt_token',
@@ -101,3 +101,10 @@ export const AUTH_STORAGE_KEYS = {
   USER_GROUPS: 'user_groups',
   TOKEN_EXPIRES_AT: 'token_expires_at',
 } as const;
+
+export const AUTH_SESSION_STORAGE_KEY = 'auth_session_v1';
+
+export interface AuthSessionVersion {
+  generation: number;
+  logoutGeneration: number;
+}

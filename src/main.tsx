@@ -4,22 +4,20 @@ import { BrowserRouter } from 'react-router-dom';
 import { AppRouter } from './AppRouter';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
+import { authService } from './services/authService';
 import '@patternfly/react-core/dist/styles/base.css';
 import './index.css';
 
 async function enablePreviewMode() {
   if (!import.meta.env.VITE_PREVIEW_MODE) return;
 
-  sessionStorage.setItem('jwt_token', 'mock-preview-jwt-token');
-  sessionStorage.setItem('user_email', 'admin@preview.local');
-  sessionStorage.setItem('user_role', 'admin');
-  sessionStorage.setItem('user_name', 'Preview');
-  sessionStorage.setItem('user_surname', 'User');
-  sessionStorage.setItem('user_organization', 'Krkn');
-  sessionStorage.setItem(
-    'token_expires_at',
-    new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-  );
+  authService.setSession({
+    userId: 'admin@preview.local',
+    role: 'admin',
+    name: 'Preview',
+    surname: 'User',
+    organization: 'Krkn',
+  }, 'mock-preview-jwt-token', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
 
   try {
     const { worker } = await import('./mocks/browser');
