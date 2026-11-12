@@ -83,8 +83,23 @@ describe('ElasticsearchAlertsTab', () => {
     expect(elasticsearchApi.queryAlerts).toHaveBeenCalledWith('prod-es', 50, '2026-09-20', '2026-09-29');
   });
 
-  it('re-queries sortable alert fields and preserves active filters', async () => {
+  it('queries the server with active filters when sorting', async () => {
     const user = userEvent.setup();
+    vi.mocked(elasticsearchApi.queryAlerts).mockReset();
+    const filteredAlert = {
+      ...result.documents[0],
+      source: { ...(result.documents[0].source as Record<string, unknown>), alertname: 'FilteredServerResult' },
+    };
+    vi.mocked(elasticsearchApi.queryAlerts).mockImplementation((...args) => {
+      if (!args[4]) return Promise.resolve(result);
+      const hasFilters = args.length === 6;
+      return Promise.resolve({
+        documents: [hasFilters ? filteredAlert : result.documents[1]],
+        total: hasFilters ? 1 : 50,
+        sortBy: args[4].sortBy,
+        sortOrder: args[4].sortOrder,
+      });
+    });
     renderAlerts();
     await user.click(screen.getByRole('button', { name: 'Query Alerts' }));
     await screen.findByText('KubeAPIServerLatencyHigh');
@@ -98,17 +113,27 @@ describe('ElasticsearchAlertsTab', () => {
       expect(elasticsearchApi.queryAlerts).toHaveBeenLastCalledWith(
         'prod-es', 50, '2026-09-20', '2026-09-29',
         { sortBy: 'phase', sortOrder: 'asc' },
+        [{ key: 'phase', value: 'during' }],
       );
     });
+    await screen.findByText('FilteredServerResult');
+    expect(elasticsearchApi.queryAlerts).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Phase: during')).toBeInTheDocument();
+    expect(screen.queryByText('No alerts match the filters')).not.toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: 'Sort Phase descending' }));
+    await user.click(screen.getByRole('button', { name: 'Sort Phase descending' }));
     await waitFor(() => {
       expect(elasticsearchApi.queryAlerts).toHaveBeenLastCalledWith(
         'prod-es', 50, '2026-09-20', '2026-09-29',
         { sortBy: 'phase', sortOrder: 'desc' },
+        [{ key: 'phase', value: 'during' }],
       );
     });
+    expect(elasticsearchApi.queryAlerts).toHaveBeenCalledTimes(3);
+    expect(screen.getByText('FilteredServerResult')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear all filters' }));
+    expect(await screen.findByText('NodeFilesystemAlmostFull')).toBeInTheDocument();
   });
 
   it('server-sorts by severity', async () => {

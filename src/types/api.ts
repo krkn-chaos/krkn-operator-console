@@ -1662,6 +1662,11 @@ export interface AlertSortOptions {
   sortOrder: ElasticsearchSortOrder;
 }
 
+export interface AlertFieldFilter {
+  key: string;
+  value: string;
+}
+
 export interface QueryTelemetryRequest {
   // Exactly one of configName or inline must be supplied.
   configName?: string;
@@ -1798,6 +1803,7 @@ export interface QueryAlertsRequest {
   size?: number;
   startDate?: string;
   endDate?: string;
+  filters?: AlertFieldFilter[];
   sortBy?: AlertSortField;
   sortOrder?: ElasticsearchSortOrder;
 }

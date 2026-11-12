@@ -20,7 +20,7 @@ import { DatabaseIcon } from '@patternfly/react-icons';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { useNotifications } from '../hooks';
 import { usePagination } from '../hooks/usePagination';
-import type { AlertDocument, AlertSortField, AlertSortOptions, ElasticsearchConfig } from '../types/api';
+import type { AlertDocument, AlertFieldFilter, AlertSortField, AlertSortOptions, ElasticsearchConfig } from '../types/api';
 import { getFieldValue, matchesFieldFilters } from '../utils/elasticsearchFieldFilters';
 import { ElasticsearchFilterControls } from './ElasticsearchFilterControls';
 import { SortableHeader } from './SortableHeader';
@@ -88,6 +88,12 @@ function alertSummaryField(document: AlertDocument, field: string): string {
   return value === undefined || value === null ? '—' : String(value);
 }
 
+function sameFilters(left: AlertFieldFilter[], right: AlertFieldFilter[]): boolean {
+  return left.length === right.length && left.every((filter, index) => (
+    filter.key === right[index].key && filter.value === right[index].value
+  ));
+}
+
 function formatAlertCreatedAt(document: AlertDocument): string {
   const raw = getFieldValue(document.source, 'created_at');
   if (raw === undefined || raw === null) return '—';
@@ -108,9 +114,9 @@ function formatAlertCreatedAt(document: AlertDocument): string {
  *
  * The parent owns the selected config and query controls so Telemetry and
  * Alerts can share them. Results are queried from the saved config, filtered
- * with active field chips, paginated, and rendered with sortable columns. Fixed
- * summary fields use Elasticsearch sorting when response confirms it; older
- * operators fall back to sorting returned documents locally.
+ * with active field chips, paginated, and rendered with sortable columns.
+ * Sort requests include active field chips so Elasticsearch filters before
+ * applying the requested order and result limit.
  *
  * @example
  * ```tsx
@@ -143,17 +149,26 @@ export function ElasticsearchAlertsTab({
   const [documents, setDocuments] = useState<AlertDocument[]>([]);
   const [querying, setQuerying] = useState(false);
   const [hasQueried, setHasQueried] = useState(false);
-  const [filters, setFilters] = useState<Array<{ key: string; value: string }>>([]);
+  const [filters, setFilters] = useState<AlertFieldFilter[]>([]);
+  const [filteredSortResult, setFilteredSortResult] = useState<{
+    filters: AlertFieldFilter[];
+    documents: AlertDocument[];
+  } | null>(null);
   const [draftFilter, setDraftFilter] = useState({ key: '', value: '' });
   const latestRequestId = useRef(0);
   const [sortColumn, setSortColumn] = useState<AlertSortColumn>('severity');
   const [sortAscending, setSortAscending] = useState(true);
   const [serverSortActive, setServerSortActive] = useState(false);
   const filteredDocuments = useMemo(() => {
-    return documents.filter(document => matchesFieldFilters(document.source, filters));
-  }, [documents, filters]);
+    const sourceDocuments = filteredSortResult && sameFilters(filters, filteredSortResult.filters)
+      ? filteredSortResult.documents
+      : documents;
+    return sourceDocuments.filter(document => matchesFieldFilters(document.source, filters));
+  }, [documents, filters, filteredSortResult]);
   const sortedDocuments = useMemo(() => {
-    if (serverSortActive) return filteredDocuments;
+    if (serverSortActive && (filters.length === 0 || (filteredSortResult && sameFilters(filters, filteredSortResult.filters)))) {
+      return filteredDocuments;
+    }
     const sorted = [...filteredDocuments].sort((left, right) => {
       const field = sortColumn === 'uuid' ? 'run_uuid' : sortColumn;
       const leftValue = sortColumn === 'severity' ? alertSeverity(left) : alertSummaryField(left, field);
@@ -161,7 +176,7 @@ export function ElasticsearchAlertsTab({
       return leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' });
     });
     return sortAscending ? sorted : sorted.reverse();
-  }, [filteredDocuments, serverSortActive, sortAscending, sortColumn]);
+  }, [filteredDocuments, filters, filteredSortResult, serverSortActive, sortAscending, sortColumn]);
   const { page, perPage, totalItems, paginatedData, setPage, handleSetPage, handlePerPageSelect } = usePagination(sortedDocuments, { initialPerPage: 10 });
 
   const selected = configs.find(config => config.name === selectedConfig);
@@ -176,6 +191,8 @@ export function ElasticsearchAlertsTab({
     setHasQueried(false);
     setQuerying(false);
     setFilters([]);
+    setFilteredSortResult(null);
+    setServerSortActive(false);
     setDraftFilter({ key: '', value: '' });
   }, [selectedConfig, startDate, endDate, size]);
 
@@ -204,10 +221,20 @@ export function ElasticsearchAlertsTab({
         endDate || undefined,
       ] as const;
       const result = sort
-        ? await elasticsearchApi.queryAlerts(...args, sort)
+        ? filters.length > 0
+          ? await elasticsearchApi.queryAlerts(...args, sort, filters)
+          : await elasticsearchApi.queryAlerts(...args, sort)
         : await elasticsearchApi.queryAlerts(...args);
       if (latestRequestId.current !== requestId || selectedConfig !== requestConfig) return;
-      setDocuments(result.documents || []);
+      if (sort && filters.length > 0) {
+        setFilteredSortResult({
+          filters: filters.map(filter => ({ ...filter })),
+          documents: result.documents || [],
+        });
+      } else {
+        setDocuments(result.documents || []);
+        setFilteredSortResult(null);
+      }
       if (!preserveFilters) {
         setFilters([]);
         setDraftFilter({ key: '', value: '' });
@@ -255,6 +282,8 @@ export function ElasticsearchAlertsTab({
   const addFilter = () => {
     if (!draftFilter.key) return;
     setFilters(current => [...current, draftFilter]);
+    setFilteredSortResult(null);
+    setServerSortActive(false);
     setDraftFilter({ key: '', value: '' });
   };
 
@@ -301,7 +330,7 @@ export function ElasticsearchAlertsTab({
       </Flex>
 
       <Alert variant="info" isInline title="Alert sorting uses Max results" style={{ marginTop: '0.75rem' }}>
-        Sortable headers re-query alerts ordered by the selected column, capped at {size.trim() || 'the default result limit'}. The returned rows may differ from the current set. Increase Max results and run the query again to include more alerts.
+        Sortable headers query alerts ordered by the selected column. Active field filters apply before results are capped at {size.trim() || 'the default result limit'}. Increase Max results and run the query again to include more alerts.
       </Alert>
 
       <Flex spaceItems={{ default: 'spaceItemsSm' }} style={{ marginTop: '0.75rem' }}>
@@ -311,7 +340,11 @@ export function ElasticsearchAlertsTab({
             <FlexItem key={`${filter.key}-${index}`}>
               <Label
                 color="blue"
-                onClose={() => setFilters(current => current.filter((_, filterIndex) => filterIndex !== index))}
+                onClose={() => {
+                  setFilters(current => current.filter((_, filterIndex) => filterIndex !== index));
+                  setFilteredSortResult(null);
+                  setServerSortActive(false);
+                }}
               >
                 {label}: {filter.value || '(any)'}
               </Label>
@@ -320,7 +353,11 @@ export function ElasticsearchAlertsTab({
         })}
         {filters.length > 0 && (
           <FlexItem>
-            <Button variant="link" isInline onClick={() => setFilters([])}>
+            <Button variant="link" isInline onClick={() => {
+              setFilters([]);
+              setFilteredSortResult(null);
+              setServerSortActive(false);
+            }}>
               Clear all filters
             </Button>
           </FlexItem>
