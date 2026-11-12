@@ -232,6 +232,7 @@ function App() {
               onDeleteScenarioRun={handleDeleteScenarioRun}
               onDeleteJob={handleDeleteJob}
               onRerunScenario={handleRerunScenario}
+              onLoadRunDetails={(run) => fetchRunDetails(run.scenarioRunName, run)}
               scenarioRunDetails={state.scenarioRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
               onToggleGraphRunAccordion={(graphRunName) =>

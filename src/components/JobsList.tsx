@@ -206,6 +206,7 @@ interface JobsListProps {
   onDeleteScenarioRun: (scenarioRunName: string) => Promise<void>;
   onDeleteJob: (jobId: string) => Promise<void>;
   onRerunScenario: (run: ScenarioRunState) => void;
+  onLoadRunDetails?: (run: ScenarioRunState) => void;
   scenarioRunDetails?: ScenarioRunState[];
   expandedGraphRunIds: Set<string>;
   onToggleGraphRunAccordion: (graphRunName: string) => void;
@@ -222,6 +223,7 @@ export function JobsList({
   onDeleteScenarioRun,
   onDeleteJob,
   onRerunScenario,
+  onLoadRunDetails,
   scenarioRunDetails = [],
   expandedGraphRunIds,
   onToggleGraphRunAccordion,

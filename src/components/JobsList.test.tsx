@@ -207,6 +207,19 @@ describe('JobsList', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Rollback was not enabled for this run');
   });
 
+  it('loads rollback jobs when the run menu opens without expanding the run', async () => {
+    const user = userEvent.setup();
+    const onLoadRunDetails = vi.fn();
+    const onToggleRunAccordion = vi.fn();
+    setMockJobs([makeScenarioJobItem('run-a', 'Failed', { rollbackEnabled: true, clusterJobs: [] })]);
+    render(<JobsList {...defaultProps} onLoadRunDetails={onLoadRunDetails} onToggleRunAccordion={onToggleRunAccordion} />);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for run run-a' }));
+
+    expect(onLoadRunDetails).toHaveBeenCalledWith(expect.objectContaining({ scenarioRunName: 'run-a' }));
+    expect(onToggleRunAccordion).not.toHaveBeenCalled();
+  });
+
   it('uses rollback enablement from the run stream when a jobs snapshot omits it', async () => {
     const user = userEvent.setup();
     const job: ClusterJob = {
