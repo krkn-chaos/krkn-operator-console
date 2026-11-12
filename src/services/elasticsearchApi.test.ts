@@ -191,4 +191,28 @@ describe('elasticsearchApi.queryAlerts', () => {
       sortOrder: 'desc',
     });
   });
+
+  it('sends alert filters with server sorting', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ documents: [], total: 0 }));
+
+    await elasticsearchApi.queryAlerts(
+      'prod-es',
+      25,
+      '2025-01-01',
+      '2025-01-02',
+      { sortBy: 'phase', sortOrder: 'asc' },
+      [{ key: 'phase', value: 'during' }],
+    );
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(options.body as string)).toEqual({
+      configName: 'prod-es',
+      size: 25,
+      startDate: '2025-01-01',
+      endDate: '2025-01-02',
+      sortBy: 'phase',
+      sortOrder: 'asc',
+      filters: [{ key: 'phase', value: 'during' }],
+    });
+  });
 });

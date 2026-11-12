@@ -10,6 +10,7 @@ import type {
   InlineElasticsearchConnection,
   TelemetrySortOptions,
   AlertSortOptions,
+  AlertFieldFilter,
 } from '../types/api';
 
 const API_BASE = '/api/v1';
@@ -128,10 +129,11 @@ class ElasticsearchApi extends BaseApiClient {
     startDate?: string,
     endDate?: string,
     sort?: AlertSortOptions,
+    filters?: AlertFieldFilter[],
   ): Promise<QueryAlertsResponse> {
     return this.fetchJson<QueryAlertsResponse>('/elasticsearch-alerts-query', {
       method: 'POST',
-      body: JSON.stringify({ configName, size, startDate, endDate, ...sort }),
+      body: JSON.stringify({ configName, size, startDate, endDate, ...sort, filters }),
     });
   }
 }
