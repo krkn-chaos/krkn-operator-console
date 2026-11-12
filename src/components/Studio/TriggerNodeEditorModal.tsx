@@ -44,7 +44,7 @@ const CONDITION_CONFIG_KEYS: Record<string, Record<string, string>> = {
 const REQUIRED_CONDITION_FIELDS: Record<string, string[]> = {
   command: ['TRIGGER_COMMAND'],
   http: ['TRIGGER_HTTP_URL'],
-  k8s: ['TRIGGER_K8S_API_VERSION', 'TRIGGER_K8S_KIND', 'TRIGGER_K8S_NAME', 'TRIGGER_K8S_CONDITION'],
+  k8s: ['TRIGGER_K8S_API_VERSION', 'TRIGGER_K8S_KIND', 'TRIGGER_K8S_NAME'],
   prometheus: ['TRIGGER_PROM_QUERY', 'TRIGGER_PROM_URL'],
 };
 
@@ -92,21 +92,6 @@ function conditionFromConfig(config: Record<string, unknown>, id: number): Trigg
     if (value !== undefined && value !== null) values[field] = value as string | number | boolean;
   }
   return { id, values };
-}
-
-function buildCondition(values: ScenarioFormValues): Record<string, unknown> {
-  const type = String(values[TRIGGER_TYPE_FIELD] ?? 'command');
-  const fieldMap = CONDITION_CONFIG_KEYS[type] ?? {};
-  const condition: Record<string, unknown> = { type };
-
-  for (const [field, configKey] of Object.entries(fieldMap)) {
-    const value = values[field];
-    if (value === undefined || value === '') continue;
-    condition[configKey] = field === 'TRIGGER_EXPECTED_RC' || field === 'TRIGGER_HTTP_EXPECTED_STATUS'
-      ? Number(value)
-      : value;
-  }
-  return condition;
 }
 
 export function TriggerNodeEditorModal({ isOpen, node, onClose, onSave }: Props) {
@@ -215,8 +200,10 @@ export function TriggerNodeEditorModal({ isOpen, node, onClose, onSave }: Props)
     setConditions(restoredConditions);
     nextConditionId.current = restoredConditions.length + 1;
 
-    operatorApi.getScenarioGlobals('trigger', {}).then(globals => {
-      setFields(globals.fields);
+    // The trigger workload image is not a catalog scenario, so load its
+    // krknctl.input_fields metadata through the direct detail endpoint.
+    operatorApi.getScenarioDetail('trigger', {}).then(detail => {
+      setFields(detail.fields);
     }).catch(err => {
       setLoadError(err instanceof Error ? err.message : 'Unable to load trigger parameters');
     }).finally(() => setLoading(false));
@@ -267,11 +254,25 @@ export function TriggerNodeEditorModal({ isOpen, node, onClose, onSave }: Props)
       return;
     }
 
-    const conditionConfigs = conditions.map(condition => buildCondition(condition.values));
+    const conditionTypes = conditions.map(condition => String(condition.values[TRIGGER_TYPE_FIELD] ?? 'command'));
+    if (new Set(conditionTypes).size !== conditionTypes.length) {
+      setError('Each trigger type can only be configured once per node.');
+      return;
+    }
+
+    // The trigger image consumes these flat environment variables directly.
+    // It does not consume TRIGGERS_CONDITIONS_JSON.
     const scenarioFormValues: ScenarioFormValues = {
       ...sharedValues,
-      [CONDITIONS_JSON_FIELD]: JSON.stringify(conditionConfigs),
     };
+    for (const condition of conditions) {
+      const type = String(condition.values[TRIGGER_TYPE_FIELD] ?? 'command');
+      for (const [field, value] of Object.entries(condition.values)) {
+        if (field !== TRIGGER_TYPE_FIELD && CONDITION_TYPE_BY_FIELD[field] === type && value !== '') {
+          scenarioFormValues[field] = value;
+        }
+      }
+    }
 
     onSave(node.nodeId, {
       nodeId,

@@ -8,7 +8,7 @@ import { TriggerNodeEditorModal } from './TriggerNodeEditorModal';
 
 vi.mock('../../services/operatorApi', () => ({
   operatorApi: {
-    getScenarioGlobals: vi.fn(),
+    getScenarioDetail: vi.fn(),
   },
 }));
 
@@ -76,7 +76,7 @@ function renderModal(node = makeTriggerNode(), onSave = vi.fn()) {
 describe('TriggerNodeEditorModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(operatorApi.getScenarioGlobals).mockResolvedValue({ fields: triggerFields } as never);
+    vi.mocked(operatorApi.getScenarioDetail).mockResolvedValue({ fields: triggerFields } as never);
   });
 
   it('saves multiple configured conditions as TRIGGERS_CONDITIONS_JSON', async () => {
@@ -103,13 +103,16 @@ describe('TriggerNodeEditorModal', () => {
     const updates = vi.mocked(onSave).mock.calls[0][1];
     expect(updates.nodeType).toBe('trigger');
     expect(updates.config?.scenarioFormValues).toMatchObject({ TRIGGERS_MODE: 'any_of' });
-    expect(JSON.parse(String(updates.config?.scenarioFormValues?.TRIGGERS_CONDITIONS_JSON))).toEqual([
-      { type: 'command', inline: 'kubectl get pods' },
-      { type: 'http', url: 'https://service.example/health' },
-    ]);
+    expect(updates.config?.scenarioFormValues).toMatchObject({
+      TRIGGER_COMMAND: 'kubectl get pods',
+      TRIGGER_HTTP_URL: 'https://service.example/health',
+      TRIGGERS_MODE: 'any_of',
+    });
+    expect(updates.config?.scenarioFormValues).not.toHaveProperty('TRIGGERS_CONDITIONS_JSON');
+    expect(operatorApi.getScenarioDetail).toHaveBeenCalledWith('trigger', {});
   });
 
-  it('restores legacy flat trigger fields and saves them in the condition format', async () => {
+  it('restores legacy flat trigger fields and saves image environment variables', async () => {
     const onSave = renderModal(makeTriggerNode({
       TRIGGER_TYPE: 'http',
       TRIGGER_HTTP_URL: 'https://legacy.example/health',
@@ -125,14 +128,11 @@ describe('TriggerNodeEditorModal', () => {
 
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
     const updates = vi.mocked(onSave).mock.calls[0][1];
-    expect(JSON.parse(String(updates.config?.scenarioFormValues?.TRIGGERS_CONDITIONS_JSON))).toEqual([
-      {
-        type: 'http',
-        url: 'https://legacy.example/health',
-        method: 'POST',
-        expected_status: 202,
-      },
-    ]);
+    expect(updates.config?.scenarioFormValues).toMatchObject({
+      TRIGGER_HTTP_URL: 'https://legacy.example/health',
+      TRIGGER_HTTP_METHOD: 'POST',
+      TRIGGER_HTTP_EXPECTED_STATUS: 202,
+    });
   });
 
   it('restores serialized conditions through condition config conversion', async () => {
@@ -150,9 +150,11 @@ describe('TriggerNodeEditorModal', () => {
 
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
     const updates = vi.mocked(onSave).mock.calls[0][1];
-    expect(JSON.parse(String(updates.config?.scenarioFormValues?.TRIGGERS_CONDITIONS_JSON))).toEqual([
-      { type: 'http', url: 'https://service.example/health', method: 'GET', expected_status: 204 },
-    ]);
+    expect(updates.config?.scenarioFormValues).toMatchObject({
+      TRIGGER_HTTP_URL: 'https://service.example/health',
+      TRIGGER_HTTP_METHOD: 'GET',
+      TRIGGER_HTTP_EXPECTED_STATUS: 204,
+    });
   });
 
   it('rejects saving when a condition is missing required fields', async () => {
