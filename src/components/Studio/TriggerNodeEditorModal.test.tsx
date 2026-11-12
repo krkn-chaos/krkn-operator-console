@@ -38,13 +38,19 @@ vi.mock('../DynamicFormBuilder', () => ({
 }));
 
 const triggerFields = [
-  { name: 'Trigger type', short_description: '', description: '', variable: 'TRIGGER_TYPE', type: 'enum', allowed_values: 'command,http,k8s,prometheus', separator: ',', group: 'triggers' },
-  { name: 'Command', short_description: '', description: '', variable: 'TRIGGER_COMMAND', type: 'string', group: 'triggers', trigger_type: 'command' },
-  { name: 'Expected return code', short_description: '', description: '', variable: 'TRIGGER_EXPECTED_RC', type: 'number', group: 'triggers', trigger_type: 'command' },
-  { name: 'HTTP URL', short_description: '', description: '', variable: 'TRIGGER_HTTP_URL', type: 'string', group: 'triggers', trigger_type: 'http' },
-  { name: 'HTTP method', short_description: '', description: '', variable: 'TRIGGER_HTTP_METHOD', type: 'string', group: 'triggers', trigger_type: 'http' },
-  { name: 'HTTP status', short_description: '', description: '', variable: 'TRIGGER_HTTP_EXPECTED_STATUS', type: 'number', group: 'triggers', trigger_type: 'http' },
-  { name: 'Trigger mode', short_description: '', description: '', variable: 'TRIGGERS_MODE', type: 'enum', allowed_values: 'all_of,any_of', separator: ',', group: 'triggers' },
+  { name: 'Command', short_description: '', description: '', variable: 'TRIGGER_COMMAND', type: 'string' },
+  { name: 'Expected return code', short_description: '', description: '', variable: 'TRIGGER_EXPECTED_RC', type: 'number' },
+  { name: 'HTTP URL', short_description: '', description: '', variable: 'TRIGGER_HTTP_URL', type: 'string' },
+  { name: 'HTTP method', short_description: '', description: '', variable: 'TRIGGER_HTTP_METHOD', type: 'string' },
+  { name: 'Kubernetes API version', short_description: '', description: '', variable: 'TRIGGER_K8S_API_VERSION', type: 'string' },
+  { name: 'Kubernetes kind', short_description: '', description: '', variable: 'TRIGGER_K8S_KIND', type: 'string' },
+  { name: 'Kubernetes name', short_description: '', description: '', variable: 'TRIGGER_K8S_NAME', type: 'string' },
+  { name: 'Prometheus query', short_description: '', description: '', variable: 'TRIGGER_PROM_QUERY', type: 'string' },
+  { name: 'Prometheus URL', short_description: '', description: '', variable: 'TRIGGER_PROM_URL', type: 'string' },
+  { name: 'Trigger mode', short_description: '', description: '', variable: 'TRIGGERS_MODE', type: 'enum', allowed_values: 'all_of,any_of', separator: ',' },
+  { name: 'Trigger timeout', short_description: '', description: '', variable: 'TRIGGERS_TIMEOUT', type: 'number' },
+  { name: 'Trigger interval', short_description: '', description: '', variable: 'TRIGGERS_INTERVAL', type: 'number' },
+  { name: 'Timeout behavior', short_description: '', description: '', variable: 'TRIGGERS_ON_TIMEOUT', type: 'enum', allowed_values: 'fail,run_anyway,skip', separator: ',' },
 ];
 
 function makeTriggerNode(scenarioFormValues: Record<string, string | number | boolean> = {}): StudioNode {
@@ -79,7 +85,7 @@ describe('TriggerNodeEditorModal', () => {
     vi.mocked(operatorApi.getScenarioDetail).mockResolvedValue({ fields: triggerFields } as never);
   });
 
-  it('saves multiple configured conditions as TRIGGERS_CONDITIONS_JSON', async () => {
+  it('loads the trigger image schema and saves its flat environment variables', async () => {
     const onSave = renderModal();
 
     await waitFor(() => expect(screen.getByLabelText('TRIGGER_COMMAND')).toBeInTheDocument());
@@ -131,21 +137,17 @@ describe('TriggerNodeEditorModal', () => {
     expect(updates.config?.scenarioFormValues).toMatchObject({
       TRIGGER_HTTP_URL: 'https://legacy.example/health',
       TRIGGER_HTTP_METHOD: 'POST',
-      TRIGGER_HTTP_EXPECTED_STATUS: 202,
     });
   });
 
   it('restores serialized conditions through condition config conversion', async () => {
     const serialized = JSON.stringify([
-      { type: 'http', url: 'https://service.example/health', method: 'GET', expected_status: 204 },
+      { type: 'http', url: 'https://service.example/health', method: 'GET' },
     ]);
     const onSave = renderModal(makeTriggerNode({ TRIGGERS_CONDITIONS_JSON: serialized }));
 
     expect((await screen.findByLabelText('TRIGGER_HTTP_URL') as HTMLInputElement).value)
       .toBe('https://service.example/health');
-    expect((screen.getByLabelText('TRIGGER_HTTP_EXPECTED_STATUS') as HTMLInputElement).value)
-      .toBe('204');
-
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
@@ -153,7 +155,6 @@ describe('TriggerNodeEditorModal', () => {
     expect(updates.config?.scenarioFormValues).toMatchObject({
       TRIGGER_HTTP_URL: 'https://service.example/health',
       TRIGGER_HTTP_METHOD: 'GET',
-      TRIGGER_HTTP_EXPECTED_STATUS: 204,
     });
   });
 
