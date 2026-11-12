@@ -6,6 +6,10 @@ interface UseReportActionsOptions {
   runId?: string;
   runName: string;
   runPhase?: string;
+  /** Skip automatic status request on mount; `load` or `retry` starts one. */
+  defer?: boolean;
+  /** Poll after an unavailable status response. Defaults to true. */
+  poll?: boolean;
 }
 
 interface UseReportActionsResult {
@@ -21,22 +25,25 @@ interface UseReportActionsResult {
   handleDownload: (format: 'html' | 'pdf') => Promise<void>;
   handlePreview: (format: 'html' | 'pdf') => Promise<void>;
   closePreview: () => void;
+  load: () => void;
   retry: () => void;
 }
 
 const MAX_POLLS = 180;
 
 /**
- * Polls for report availability and provides download/preview actions.
- * Skips polling when `runId` is undefined (e.g. graph runs without reports).
+ * Checks report availability and provides download/preview actions.
+ * Polls by default; callers can defer the first check or disable polling.
+ * Skips checks when `runId` is undefined (e.g. graph runs without reports).
  *
  * @example
  * const report = useReportActions({ runId: 'run-1', runName: 'run-1', runPhase: 'Succeeded' });
  * if (report.hasHtml) report.handleDownload('html');
  */
-export function useReportActions({ runId, runName, runPhase }: UseReportActionsOptions): UseReportActionsResult {
+export function useReportActions({ runId, runName, runPhase, defer = false, poll = true }: UseReportActionsOptions): UseReportActionsResult {
   const [reportStatus, setReportStatus] = useState<ReportStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(!!runId);
+  const [isRequested, setIsRequested] = useState(!defer);
+  const [isLoading, setIsLoading] = useState(!!runId && !defer);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState<'html' | 'pdf' | null>(null);
   const [isPreviewing, setIsPreviewing] = useState<'html' | 'pdf' | null>(null);
@@ -46,7 +53,7 @@ export function useReportActions({ runId, runName, runPhase }: UseReportActionsO
   const isCompleted = runPhase && ['Succeeded', 'PartiallyFailed', 'Failed'].includes(runPhase);
 
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !isRequested) return;
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
@@ -60,7 +67,7 @@ export function useReportActions({ runId, runName, runPhase }: UseReportActionsO
         setError(null);
 
         if (status.htmlAvailable || status.pdfAvailable) { setIsLoading(false); return; }
-        if (isCompleted) { setIsLoading(false); return; }
+        if (isCompleted || !poll) { setIsLoading(false); return; }
 
         attempts += 1;
         pollCount.current = attempts;
@@ -79,7 +86,7 @@ export function useReportActions({ runId, runName, runPhase }: UseReportActionsO
 
     void checkStatus();
     return () => { cancelled = true; if (timeout) clearTimeout(timeout); };
-  }, [runId, isCompleted, retryToken]);
+  }, [runId, isCompleted, isRequested, poll, retryToken]);
 
   useEffect(() => {
     return () => { if (preview?.url) URL.revokeObjectURL(preview.url); };
@@ -124,11 +131,18 @@ export function useReportActions({ runId, runName, runPhase }: UseReportActionsO
 
   const closePreview = () => setPreview(null);
 
+  const load = () => {
+    if (!runId) return;
+    setIsRequested(true);
+    setIsLoading(true);
+  };
+
   const retry = () => {
     setError(null);
     pollCount.current = 0;
     setReportStatus(null);
-    setIsLoading(true);
+    setIsRequested(true);
+    setIsLoading(!!runId);
     setRetryToken((t) => t + 1);
   };
 
@@ -148,6 +162,7 @@ export function useReportActions({ runId, runName, runPhase }: UseReportActionsO
     handleDownload,
     handlePreview,
     closePreview,
+    load,
     retry,
   };
 }

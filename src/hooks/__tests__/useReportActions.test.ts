@@ -22,14 +22,116 @@ describe('useReportActions', () => {
     global.URL.revokeObjectURL = vi.fn();
   });
 
-  it('skips polling when runId is undefined', () => {
+  it('does not load or retry report status when runId is undefined', () => {
     const { result } = renderHook(() =>
       useReportActions({ runName: 'test-run' }),
     );
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.hasReports).toBe(false);
+
+    act(() => result.current.load());
+    expect(result.current.isLoading).toBe(false);
     expect(mockGetReportStatus).not.toHaveBeenCalled();
+
+    act(() => result.current.retry());
+    expect(result.current.isLoading).toBe(false);
+    expect(mockGetReportStatus).not.toHaveBeenCalled();
+  });
+
+  it('defers a one-shot status check until explicitly loaded', async () => {
+    vi.useFakeTimers();
+    mockGetReportStatus.mockResolvedValue({
+      generated: false,
+      htmlAvailable: false,
+      pdfAvailable: false,
+    });
+
+    try {
+      const { result } = renderHook(() =>
+        useReportActions({ runId: 'run-1', runName: 'test-run', defer: true, poll: false }),
+      );
+
+      expect(result.current.isLoading).toBe(false);
+      expect(mockGetReportStatus).not.toHaveBeenCalled();
+
+      await act(async () => {
+        result.current.load();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.reportStatus?.htmlAvailable).toBe(false);
+      expect(mockGetReportStatus).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rechecks deferred status only when retry is requested', async () => {
+    vi.useFakeTimers();
+    mockGetReportStatus.mockResolvedValue({
+      generated: false,
+      htmlAvailable: false,
+      pdfAvailable: false,
+    });
+
+    try {
+      const { result } = renderHook(() =>
+        useReportActions({ runId: 'run-1', runName: 'test-run', defer: true, poll: false }),
+      );
+
+      await act(async () => {
+        result.current.load();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(mockGetReportStatus).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+
+      await act(async () => {
+        result.current.retry();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mockGetReportStatus).toHaveBeenCalledTimes(2);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps polling by default for existing callers', async () => {
+    vi.useFakeTimers();
+    mockGetReportStatus.mockResolvedValue({
+      generated: false,
+      htmlAvailable: false,
+      pdfAvailable: false,
+    });
+
+    try {
+      const { unmount } = renderHook(() =>
+        useReportActions({ runId: 'run-1', runName: 'test-run' }),
+      );
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(mockGetReportStatus).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(mockGetReportStatus).toHaveBeenCalledTimes(2);
+
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('polls for report status when runId is provided', async () => {
