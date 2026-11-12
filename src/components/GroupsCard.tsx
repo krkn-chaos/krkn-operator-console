@@ -28,9 +28,11 @@ import {
   DataListCell,
   Pagination,
   PaginationVariant,
+  Alert,
 } from '@patternfly/react-core';
 import { PlusCircleIcon, UsersIcon, EditIcon, TrashIcon, EllipsisVIcon, SortAmountDownIcon, SortAmountUpIcon } from '@patternfly/react-icons';
 import { groupsApi } from '../services/groupsApi';
+import { robotsApi } from '../services/robotsApi';
 import { useNotifications } from '../hooks';
 import { usePagination } from '../hooks/usePagination';
 import { CreateGroupModal } from './CreateGroupModal';
@@ -98,6 +100,9 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
   const [deletingGroupName, setDeletingGroupName] = useState<string | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [viewMembersGroupName, setViewMembersGroupName] = useState<string | null>(null);
+  // Number of robot accounts that will lose membership when the pending
+  // delete-group confirmation is confirmed. `null` = not loaded / unavailable.
+  const [deleteRobotCount, setDeleteRobotCount] = useState<number | null>(null);
   const { showSuccess, showError } = useNotifications();
 
   // Pagination hook
@@ -160,6 +165,22 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
 
   const handleDelete = (name: string) => {
     setConfirmDeleteGroup({ name });
+    setDeleteRobotCount(null);
+
+    // Robot memberships are not returned by the members API, so fetch the robot
+    // list and count members of this group for the confirmation warning.
+    // A 404 (old operator without robot support) or any other failure simply
+    // leaves the count unset — the warning line is then omitted.
+    robotsApi
+      .listRobots()
+      .then((response) => {
+        setDeleteRobotCount(
+          response.robots.filter((robot) => robot.groups.includes(name)).length
+        );
+      })
+      .catch(() => {
+        setDeleteRobotCount(null);
+      });
   };
 
   const handleViewMembers = (groupName: string) => {
@@ -422,8 +443,18 @@ export function GroupsCard({ onGroupsChange }: GroupsCardProps = {}) {
           </Button>,
         ]}
       >
-        Are you sure you want to delete group <strong>{confirmDeleteGroup?.name}</strong>? All users
-        will be removed from this group.
+        <div>
+          <p>Are you sure you want to delete group <strong>{confirmDeleteGroup?.name}</strong>? All users
+          will be removed from this group.</p>
+          {deleteRobotCount !== null && deleteRobotCount > 0 && (
+            <Alert
+              variant="warning"
+              isInline
+              title={`${deleteRobotCount} robot account${deleteRobotCount !== 1 ? 's' : ''} will lose membership in this group`}
+              style={{ marginTop: '0.5rem' }}
+            />
+          )}
+        </div>
       </Modal>
 
       {/* View Group Members Modal */}
