@@ -1096,9 +1096,12 @@ export const handlers = [
   // ─── BACKUPS ───
 
   http.post(`${BASE}/backup`, () =>
-    HttpResponse.json({
-      jobId: 'backup-' + Date.now().toString(36),
-      message: 'Backup started successfully',
+    new HttpResponse(new Blob(['mock-backup-archive'], { type: 'application/gzip' }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/gzip',
+        'Content-Disposition': 'attachment; filename="krkn-backup-mock.tar.gz"',
+      },
     }),
   ),
   http.get(`${BASE}/backup/:jobId`, ({ params }) =>
@@ -1113,7 +1116,15 @@ export const handlers = [
   http.post(`${BASE}/restore`, () =>
     HttpResponse.json({
       jobId: 'restore-' + Date.now().toString(36),
+      status: 'in_progress',
       message: 'Restore started successfully',
+    }),
+  ),
+  http.post(`${BASE}/restore/url`, () =>
+    HttpResponse.json({
+      jobId: 'restore-url-' + Date.now().toString(36),
+      status: 'in_progress',
+      message: 'Remote restore started successfully',
     }),
   ),
   http.get(`${BASE}/backups`, () => {
