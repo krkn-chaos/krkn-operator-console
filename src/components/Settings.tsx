@@ -39,6 +39,7 @@ import { CloudCredentialsCard } from './CloudCredentialsCard';
 import { WorkspacesCard } from './WorkspacesCard';
 import { BackupRestoreCard } from './BackupRestoreCard';
 import { SignatureVerificationSettings } from './SignatureVerificationSettings';
+import { VisualizeInstallCard } from './VisualizeInstallCard';
 
 export function Settings() {
   const { state, dispatch } = useAppContext();
@@ -245,6 +246,14 @@ export function Settings() {
               </Tab>
             )}
 
+            {isAdmin && (
+              <Tab eventKey={7} title={<TabTitleText>krkn-visualize</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <VisualizeInstallCard />
+                </div>
+              </Tab>
+            )}
+
             {/* Provider Configuration Tab - Admin Only */}
             {isAdmin && (
               <Tab eventKey={3} title={<TabTitleText>Provider Configuration</TabTitleText>}>
@@ -347,7 +356,7 @@ export function Settings() {
 
             {/* Backup & Restore Tab - Admin Only */}
             {isAdmin && (
-              <Tab eventKey={7} title={<TabTitleText>Backup & Restore</TabTitleText>}>
+              <Tab eventKey={8} title={<TabTitleText>Backup & Restore</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <BackupRestoreCard />
                 </div>
