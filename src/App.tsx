@@ -1,6 +1,6 @@
 import { Page, PageSection, Masthead, MastheadMain, MastheadBrand, MastheadToggle, MastheadContent, Alert, AlertActionCloseButton, AlertGroup, Button, Modal, ModalVariant, Spinner } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
 import { useAuth } from './context/AuthContext';
@@ -22,9 +22,14 @@ import { operatorApi } from './services/operatorApi';
 import { graphRunsApi } from './services';
 import { usersApi } from './services/usersApi';
 import { useNotifications } from './hooks';
-import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState } from './types/api';
+import { krknAiApi } from './services/krknAiApi';
+import type { SelectedCluster, UpdateUserRequest, ChangePasswordRequest, ScenarioRunState, JobConfigResponse } from './types/api';
+import { KrknAIPage } from './components/KrknAI/KrknAIPage';
 import { buildRerunIntent } from './utils/rerunIntent';
 import { loadGraphRunReplay } from './utils/graphRunReplay';
+
+const KRKN_AI_STATUS_RETRY_BASE_MS = 10_000;
+const KRKN_AI_STATUS_MAX_RETRIES = 3;
 
 function App() {
   const { state, dispatch } = useAppContext();
@@ -34,6 +39,11 @@ function App() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
+  const [linkedAiRunName, setLinkedAiRunName] = useState<string | null>(null);
+  const [krknAIStatus, setKrknAIStatus] = useState<'pending' | 'enabled' | 'disabled' | 'error'>('pending');
+  const [krknAIStatusRetryVersion, setKrknAIStatusRetryVersion] = useState(0);
+  const krknAIEnabled = krknAIStatus === 'enabled';
+  const handleInitialAiRunHandled = useCallback(() => setLinkedAiRunName(null), []);
   const { isAdmin } = useRole();
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -49,6 +59,53 @@ function App() {
     }
     localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
   }, [isDarkTheme]);
+
+  // Resolve operator enablement before exposing Krkn-AI navigation and job origins.
+  useEffect(() => {
+    let disposed = false;
+    let retries = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let controller: AbortController | undefined;
+
+    const loadStatus = () => {
+      const requestController = new AbortController();
+      controller = requestController;
+      setKrknAIStatus('pending');
+      void krknAiApi.getStatus({ signal: requestController.signal }).then(({ enabled }) => {
+        if (!disposed && !requestController.signal.aborted) {
+          setKrknAIStatus(enabled ? 'enabled' : 'disabled');
+        }
+      }).catch((error: unknown) => {
+        if (disposed || requestController.signal.aborted) return;
+        // A failed check is not a disabled feature; retry transient failures with bounded exponential backoff.
+        setKrknAIStatus('error');
+        const status = typeof error === 'object' && error !== null && 'status' in error
+          ? error.status
+          : undefined;
+        const transient = typeof status !== 'number' || status === 408 || status === 429 || status >= 500;
+        if (transient && retries < KRKN_AI_STATUS_MAX_RETRIES) {
+          const delay = KRKN_AI_STATUS_RETRY_BASE_MS * 2 ** retries;
+          retryTimer = setTimeout(() => {
+            retryTimer = undefined;
+            loadStatus();
+          }, delay);
+          retries += 1;
+        }
+      });
+    };
+
+    loadStatus();
+    return () => {
+      disposed = true;
+      clearTimeout(retryTimer);
+      controller?.abort();
+    };
+  }, [krknAIStatusRetryVersion]);
+
+  const handleRetryKrknAIStatus = () => {
+    setKrknAIStatus('pending');
+    setKrknAIStatusRetryVersion((version) => version + 1);
+  };
 
   // Initialize and manage the workflow
   useTargetPoller();
@@ -178,11 +235,14 @@ function App() {
     proceed();
   };
 
-  const handleRerunScenario = async (run: ScenarioRunState) => {
+  const startScenarioReplay = async (
+    run: Pick<ScenarioRunState, 'scenarioName' | 'registryName'>,
+    loadConfig: () => Promise<JobConfigResponse>,
+  ) => {
     dispatch({ type: 'INIT_START' });
 
     try {
-      const config = await operatorApi.getScenarioRunConfig(run.scenarioRunName);
+      const config = await loadConfig();
 
       dispatch({ type: 'RERUN_SCENARIO', payload: buildRerunIntent(config, run) });
 
@@ -231,7 +291,7 @@ function App() {
               }
               onDeleteScenarioRun={handleDeleteScenarioRun}
               onDeleteJob={handleDeleteJob}
-              onRerunScenario={handleRerunScenario}
+              onRerunScenario={(run) => startScenarioReplay(run, () => operatorApi.getScenarioRunConfig(run.scenarioRunName))}
               onLoadRunDetails={(run) => fetchRunDetails(run.scenarioRunName, run)}
               scenarioRunDetails={state.scenarioRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}
@@ -240,11 +300,42 @@ function App() {
               }
               onDeleteGraphRun={handleDeleteGraphRun}
               onReplayWorkflow={handleReplayWorkflow}
+              krknAIEnabled={krknAIEnabled}
+              onOpenKrknAIRun={krknAIEnabled ? (name) => {
+                setLinkedAiRunName(name);
+                dispatch({ type: 'NAVIGATE_TO_KRKN_AI' });
+              } : undefined}
               loadingRunDetails={state.loadingRunDetails}
             />
           </PageSection>
         );
       }
+
+      case 'krkn_ai':
+        return krknAIEnabled
+          ? (
+            <PageSection>
+              <KrknAIPage
+                initialRunName={linkedAiRunName}
+                onInitialRunHandled={handleInitialAiRunHandled}
+                onReplayScenario={(scenario) => {
+                  const childRunName = scenario.childRunName;
+                  if (!childRunName) return;
+                  void startScenarioReplay(
+                    { scenarioName: scenario.scenarioType ?? '', registryName: scenario.registryName },
+                    () => operatorApi.getScenarioRunConfig(childRunName),
+                  );
+                }}
+              />
+            </PageSection>
+          )
+          : (
+            <PageSection>
+              <Alert variant="info" title="Krkn-AI is unavailable" isInline>
+                Enable <code>krknAI.enabled: true</code> in the operator Helm chart and deploy a compatible operator release.
+              </Alert>
+            </PageSection>
+          );
 
       case 'settings':
         return <Settings />;
@@ -357,6 +448,13 @@ function App() {
     return true;
   };
 
+
+  const handleNavigateToKrknAI = () => {
+    if (!krknAIEnabled) return;
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_KRKN_AI' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
   const handleNavigateToSettings = () => {
     const proceed = () => dispatch({ type: 'NAVIGATE_TO_SETTINGS' });
     if (!checkStudioGuard(proceed)) return;
@@ -450,10 +548,12 @@ function App() {
     <AppSidebar
       pinned={isSidebarPinned}
       activePhase={state.phase}
+      showKrknAI={krknAIEnabled}
       isAdmin={isAdmin}
       userName={`${authState.user?.name ?? ''} ${authState.user?.surname ?? ''}`.trim()}
       isDarkTheme={isDarkTheme}
       onNavigateJobs={handleNavigateToHome}
+      onNavigateKrknAI={handleNavigateToKrknAI}
       onRunScenario={handleCreateJob}
       onNavigateStudio={handleNavigateToStudio}
       onOpenFiles={handleNavigateToFiles}
@@ -508,6 +608,11 @@ function App() {
     <Page header={header}>
       {appSidebar}
       <div className="app-content--with-sidebar" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingLeft: SIDEBAR_RAIL_WIDTH }}>
+        {import.meta.env.VITE_PREVIEW_MODE === 'true' && (
+          <PageSection style={{ padding: '0.75rem 1.5rem 0', flexShrink: 0 }}>
+            <Alert isInline variant="info" title="Mock preview — API data is simulated; no cluster operations are performed" />
+          </PageSection>
+        )}
         {state.notifications.length > 0 && (
           <div style={{ padding: '1rem 1rem 0 1rem' }}>
             <AlertGroup>
@@ -526,6 +631,21 @@ function App() {
               ))}
             </AlertGroup>
           </div>
+        )}
+        {krknAIStatus === 'error' && (
+          <PageSection>
+            <Alert variant="warning" title="Krkn-AI status is unavailable" isInline>
+              Krkn-AI features are unavailable until the operator status can be checked.
+              {' '}
+              <Button
+                variant="link"
+                aria-label="Retry Krkn-AI status check"
+                onClick={handleRetryKrknAIStatus}
+              >
+                Retry
+              </Button>
+            </Alert>
+          </PageSection>
         )}
         <PageSection isFilled>{renderContent()}</PageSection>
       </div>

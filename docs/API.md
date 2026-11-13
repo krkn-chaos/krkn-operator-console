@@ -388,6 +388,25 @@ Executes a chaos scenario on selected clusters.
 
 ---
 
+## Krkn-AI Run Cancellation
+
+Requests cancellation without deleting the run or its collected results.
+
+**Endpoint:** `POST /api/v1/krkn-ai/runs/{name}/cancel`
+
+**Authorization:** The caller must have `ActionCancel` access to the run's target.
+
+**Responses:**
+- `202 Accepted` — cancellation was requested; the run progresses through `Cancelling` to `Cancelled`.
+- `200 OK` — the run was already cancelled.
+- `409 Conflict` — the run completed naturally or is being deleted.
+
+The cancellation request is recorded as `spec.cancelRequested: true`. It is
+separate from `DELETE /api/v1/krkn-ai/runs/{name}`, which remains destructive.
+After execution reaches `Cancelled`, keep reading the run and its results until
+cleanup and artifact finalization settle; a missing result snapshot is not a
+deleted run.
+
 ## Elasticsearch / Telemetry Endpoints
 
 Base URL: `/api/v1`

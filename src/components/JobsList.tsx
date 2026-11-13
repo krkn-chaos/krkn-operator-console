@@ -45,11 +45,13 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
+  BanIcon,
   TrashIcon,
   LockIcon,
   TopologyIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
+
 import { LogViewer } from './LogViewer';
 import { ActiveRunsSummary } from './ActiveRunsSummary';
 import { GraphRunDetail } from './GraphRunDetail';
@@ -57,12 +59,14 @@ import { JobStatsSummary } from './JobStatsSummary';
 import { useRole } from '../hooks/useRole';
 import { useActiveRunsPoller } from '../hooks/useActiveRunsPoller';
 import { useJobs } from '../hooks/useJobs';
+import { useKrknAIOrigins } from '../hooks/useKrknAIOrigins';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
 import { JobDiagnosticAlert } from './JobDiagnosticAlert';
 import { operatorApi } from '../services/operatorApi';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
+import { getJobPhaseDisplay } from '../utils/jobPhaseDisplay';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
 import './JobsList.css';
 
@@ -71,7 +75,6 @@ import type {
   ScenarioRunState,
   ScenarioRunPhase,
   ClusterJob,
-  ClusterJobPhase,
   GraphRunListItem,
   GraphRunSummary,
   GraphClusterScore,
@@ -168,6 +171,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
         totalTargets: sr.totalTargets,
         successfulJobs: sr.successfulJobs,
         failedJobs: sr.failedJobs,
+        cancelledJobs: sr.cancelledJobs,
         runningJobs: sr.runningJobs,
         clusterJobs: sr.clusterJobs ?? [],
         createdAt: item.createdAt,
@@ -212,6 +216,8 @@ interface JobsListProps {
   onToggleGraphRunAccordion: (graphRunName: string) => void;
   onDeleteGraphRun: (graphRunName: string) => Promise<void>;
   onReplayWorkflow?: (graphRunName: string) => Promise<void>;
+  onOpenKrknAIRun?: (name: string) => void;
+  krknAIEnabled?: boolean;
   loadingRunDetails: Set<string>;
 }
 
@@ -229,6 +235,8 @@ export function JobsList({
   onToggleGraphRunAccordion,
   onDeleteGraphRun,
   onReplayWorkflow,
+  onOpenKrknAIRun,
+  krknAIEnabled = true,
   loadingRunDetails,
 }: JobsListProps) {
   const { isAdmin } = useRole();
@@ -248,6 +256,7 @@ export function JobsList({
     snapshotVersion,
     refresh: refreshJobs,
   } = useJobs(categoryFilters);
+  const { origins: aiOrigins, error: aiOriginError, refresh: refreshAiOrigins } = useKrknAIOrigins(jobs, krknAIEnabled);
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
@@ -319,30 +328,16 @@ export function JobsList({
         return { icon: <HourglassHalfIcon />, color: 'orange' as const, label: 'Pending' };
       case 'Running':
         return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'blue' as const, label: 'Running' };
+      case 'Cancelling':
+        return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'orange' as const, label: 'Cancelling' };
       case 'Succeeded':
         return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
       case 'PartiallyFailed':
         return { icon: <ExclamationTriangleIcon />, color: 'orange' as const, label: 'Partially Failed' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
-      case 'MaxRetriesExceeded':
-        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
-      default:
-        return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
-    }
-  };
-
-  // Get job phase display
-  const getJobPhaseDisplay = (phase: ClusterJobPhase) => {
-    switch (phase) {
-      case 'Pending':
-        return { icon: <HourglassHalfIcon />, color: 'orange' as const, label: 'Pending' };
-      case 'Running':
-        return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'blue' as const, label: 'Running' };
-      case 'Succeeded':
-        return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
-      case 'Failed':
-        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'Cancelled':
+        return { icon: <BanIcon />, color: 'grey' as const, label: 'Cancelled' };
       case 'MaxRetriesExceeded':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
@@ -652,6 +647,11 @@ export function JobsList({
           loading={activeRunsLoading}
           error={activeRunsError}
         />
+        {aiOriginError && (
+          <Alert variant="warning" title="Krkn-AI origins unavailable" isInline>
+            {aiOriginError} <Button variant="link" isInline onClick={refreshAiOrigins}>Retry origin lookup</Button>
+          </Alert>
+        )}
         {categoryError && (
           <Alert
             variant="danger"
@@ -1204,6 +1204,19 @@ export function JobsList({
                                 </div>
                               </Tooltip>
                             )}
+                            {aiOrigins[run.scenarioRunName] && onOpenKrknAIRun && (
+                              <Tooltip content={`Triggered by Krkn-AI run ${aiOrigins[run.scenarioRunName]}`}>
+                                <Button
+                                  variant="link"
+                                  isInline
+                                  icon={<TopologyIcon />}
+                                  aria-label={`Open Krkn-AI run ${aiOrigins[run.scenarioRunName]} for scenario ${run.scenarioRunName}`}
+                                  onClick={() => onOpenKrknAIRun(aiOrigins[run.scenarioRunName])}
+                                >
+                                  Krkn-AI · {aiOrigins[run.scenarioRunName]}
+                                </Button>
+                              </Tooltip>
+                            )}
                           </div>
                         </DataListCell>,
                         <DataListCell key="owner" width={2} className="jobs-list-summary-cell--owner">
@@ -1237,7 +1250,7 @@ export function JobsList({
                               <strong>Jobs:</strong>
                             </div>
                             <Tooltip
-                              content={`${run.successfulJobs} succeeded, ${run.failedJobs} failed, ${run.runningJobs} running`}
+                              content={`${run.successfulJobs} succeeded, ${run.failedJobs} failed, ${run.cancelledJobs ?? 0} cancelled, ${run.runningJobs} running`}
                             >
                               <Label className="jobs-list-compact-label" isCompact color="blue" icon={<HiOutlineRocketLaunch />}>
                                 <span className="jobs-list-job-counts">
@@ -1249,6 +1262,11 @@ export function JobsList({
                                   <span className="jobs-list-job-counts__failed">
                                     <ExclamationCircleIcon aria-hidden="true" />
                                     {run.failedJobs}
+                                  </span>
+                                  <span className="jobs-list-job-counts__separator" aria-hidden="true">/</span>
+                                  <span className="jobs-list-job-counts__cancelled">
+                                    <BanIcon aria-hidden="true" />
+                                    {run.cancelledJobs ?? 0}
                                   </span>
                                   <span className="jobs-list-job-counts__separator" aria-hidden="true">/</span>
                                   <span className="jobs-list-job-counts__running">

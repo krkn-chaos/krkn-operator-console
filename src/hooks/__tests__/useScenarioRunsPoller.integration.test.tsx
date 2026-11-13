@@ -146,6 +146,23 @@ describe('useScenarioRunsPoller handleMessage integration', () => {
     );
   });
 
+  it('keeps cancelled run phase when a stale WebSocket update reports Running', () => {
+    mockScenarioRuns = [makeRunState({ phase: 'Cancelled', cancelledJobs: 1 })];
+    renderHook(() => useScenarioRunsPoller());
+
+    sendWsMessage({
+      resource: 'run',
+      id: 'run-001',
+      event: 'updated',
+      data: { scenarioRunName: 'run-001', phase: 'Running', totalTargets: 2, successfulJobs: 0, failedJobs: 0, cancelledJobs: 1, runningJobs: 1, clusterJobs: [] },
+    });
+
+    expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'UPDATE_SCENARIO_RUN',
+      payload: { run: expect.objectContaining({ phase: 'Cancelled', cancelledJobs: 1 }) },
+    }));
+  });
+
   it('triggers fetchRunDetails on terminal transition when WS has no clusterJobs', async () => {
     const restResponse: ScenarioRunStatusResponse = {
       scenarioRunName: 'run-001',
@@ -395,14 +412,15 @@ describe('useScenarioRunsPoller fetchRunDetails', () => {
     await act(async () => { resolveFirst!(); });
   });
 
-  it('clears fetchedDetails when API returns empty clusterJobs', async () => {
+  it('updates empty cluster-job details and allows them to be retried', async () => {
     const emptyDetails: ScenarioRunStatusResponse = {
       scenarioRunName: 'run-001',
-      phase: 'Running',
+      phase: 'Cancelled',
       totalTargets: 1,
       successfulJobs: 0,
       failedJobs: 0,
-      runningJobs: 1,
+      cancelledJobs: 1,
+      runningJobs: 0,
       clusterJobs: [],
     };
     vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValue(emptyDetails);
@@ -414,13 +432,14 @@ describe('useScenarioRunsPoller fetchRunDetails', () => {
       await result.current.fetchRunDetails('run-001', base);
     });
 
-    expect(mockDispatch).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'UPDATE_SCENARIO_RUN' }),
-    );
+    expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'UPDATE_SCENARIO_RUN',
+      payload: { run: expect.objectContaining({ phase: 'Cancelled', cancelledJobs: 1, clusterJobs: [] }) },
+    }));
 
     vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValue({
       ...emptyDetails,
-      clusterJobs: [{ providerName: 'krkn', clusterName: 'c1', jobId: 'j1', podName: 'p1', phase: 'Running', startTime: '' }],
+      clusterJobs: [{ providerName: 'krkn', clusterName: 'c1', jobId: 'j1', podName: 'p1', phase: 'Cancelled', startTime: '' }],
     });
 
     await act(async () => {

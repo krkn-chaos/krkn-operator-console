@@ -20,9 +20,10 @@ import type { AvailableRegistry } from '../../types/api';
 
 interface RegistrySelectorStepProps {
   registryType: 'public' | 'private';
-  registryName: string; // PRIMITIVE instead of object
+  registryName: string;
   onRegistryTypeChange: (type: 'public' | 'private') => void;
-  onRegistryNameChange: (name: string) => void; // PRIMITIVE callback
+  onRegistryNameChange: (name: string) => void;
+  onRegistriesLoaded?: (registries: AvailableRegistry[]) => void;
 }
 
 export function RegistrySelectorStep({
@@ -30,6 +31,7 @@ export function RegistrySelectorStep({
   registryName,
   onRegistryTypeChange,
   onRegistryNameChange,
+  onRegistriesLoaded,
 }: RegistrySelectorStepProps) {
   const [availableRegistries, setAvailableRegistries] = useState<AvailableRegistry[]>([]);
   const [loadingRegistries, setLoadingRegistries] = useState(false);
@@ -44,6 +46,7 @@ export function RegistrySelectorStep({
       try {
         const registries = await registriesApi.getAvailableRegistries();
         setAvailableRegistries(registries);
+        onRegistriesLoaded?.(registries);
 
         // Auto-select first registry ONLY if:
         // - We're in private mode
@@ -60,13 +63,15 @@ export function RegistrySelectorStep({
         }
       } catch (error) {
         setRegistryError(error instanceof Error ? error.message : 'Failed to load registries');
-      } finally {
+        onRegistriesLoaded?.([]);
+      }
+      finally {
         setLoadingRegistries(false);
       }
     }
 
     fetchRegistries();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onRegistriesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset auto-select flag when switching registry types
   useEffect(() => {
@@ -116,6 +121,7 @@ export function RegistrySelectorStep({
               onChange={(_event, value) => onRegistryNameChange(value)}
               aria-label="Select private registry"
             >
+              <FormSelectOption value="" label="Select a private registry" isPlaceholder />
               {availableRegistries.map((registry) => (
                 <FormSelectOption
                   key={registry.name}

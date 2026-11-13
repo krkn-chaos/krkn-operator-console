@@ -29,14 +29,14 @@ import {
   FlexItem,
 } from '@patternfly/react-core';
 import {
-  HourglassHalfIcon,
-  SyncAltIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
+  BanIcon,
 } from '@patternfly/react-icons';
 import type { NodeStatus, ScenarioRunStatusResponse, ClusterJobPhase } from '../types/api';
 import { operatorApi } from '../services';
 import { LogViewer } from './LogViewer';
+import { getJobPhaseDisplay } from '../utils/jobPhaseDisplay';
 
 interface NodeDetailModalProps {
   /** Node status from GraphRun */
@@ -55,26 +55,6 @@ function formatTimestamp(dateString?: string): string {
     return date.toLocaleString();
   } catch {
     return dateString;
-  }
-}
-
-/**
- * Get job phase display properties
- */
-function getJobPhaseDisplay(phase: ClusterJobPhase) {
-  switch (phase) {
-    case 'Pending':
-      return { icon: <HourglassHalfIcon />, color: 'orange' as const, label: 'Pending' };
-    case 'Running':
-      return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'blue' as const, label: 'Running' };
-    case 'Succeeded':
-      return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
-    case 'Failed':
-      return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
-    case 'MaxRetriesExceeded':
-      return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
-    default:
-      return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
   }
 }
 
@@ -293,7 +273,7 @@ export function NodeDetailModal({ nodeStatus, onClose }: NodeDetailModalProps) {
             <DescriptionListGroup>
               <DescriptionListTerm>Phase</DescriptionListTerm>
               <DescriptionListDescription>
-                <Label color={scenarioRun.phase === 'Succeeded' ? 'green' : scenarioRun.phase === 'Failed' ? 'red' : 'blue'}>
+                <Label color={scenarioRun.phase === 'Succeeded' ? 'green' : scenarioRun.phase === 'Failed' ? 'red' : scenarioRun.phase === 'Cancelled' ? 'grey' : scenarioRun.phase === 'Cancelling' ? 'orange' : 'blue'} icon={scenarioRun.phase === 'Cancelled' ? <BanIcon /> : undefined}>
                   {scenarioRun.phase}
                 </Label>
               </DescriptionListDescription>
@@ -316,6 +296,11 @@ export function NodeDetailModal({ nodeStatus, onClose }: NodeDetailModalProps) {
                   <FlexItem>
                     <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>
                       ✗ {scenarioRun.failedJobs}
+                    </span>
+                  </FlexItem>
+                  <FlexItem>
+                    <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>
+                      ⊘ {scenarioRun.cancelledJobs ?? 0}
                     </span>
                   </FlexItem>
                   <FlexItem>

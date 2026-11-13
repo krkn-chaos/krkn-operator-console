@@ -90,6 +90,7 @@ function makeScenarioJobItem(
     createdAt?: string;
     scenarioName?: string;
     ownerUserId?: string;
+    cancelledJobs?: number;
     rollbackEnabled?: boolean;
     isRollback?: boolean;
   } = {},
@@ -107,6 +108,7 @@ function makeScenarioJobItem(
       totalTargets: 1,
       successfulJobs: (opts.clusterJobs || []).filter(j => j.phase === 'Succeeded').length,
       failedJobs: (opts.clusterJobs || []).filter(j => j.phase === 'Failed').length,
+      cancelledJobs: opts.cancelledJobs,
       runningJobs: (opts.clusterJobs || []).filter(j => j.phase === 'Running').length,
       clusterJobs: opts.clusterJobs || [],
       customRunName: opts.customRunName,
@@ -477,17 +479,38 @@ describe('JobsList - Run actions menu', () => {
       phase,
     });
     setMockJobs([makeScenarioJobItem('counts-run', 'Running', {
-      clusterJobs: [makeJob('Succeeded', 'succeeded'), makeJob('Failed', 'failed'), makeJob('Running', 'running')],
+      clusterJobs: [makeJob('Succeeded', 'succeeded'), makeJob('Failed', 'failed'), makeJob('Cancelled', 'cancelled'), makeJob('Running', 'running')],
+      cancelledJobs: 1,
     })]);
 
     render(<JobsList {...defaultProps} />);
 
     const jobCounts = screen.getByRole('list', { name: 'Scenario runs list' })
       .querySelector('.jobs-list-job-counts');
-    expect(jobCounts?.textContent).toBe('1/1/1');
+    expect(jobCounts?.textContent).toBe('1/1/1/1');
     await user.hover(jobCounts as HTMLElement);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('1 succeeded, 1 failed, 1 running');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('1 succeeded, 1 failed, 1 cancelled, 1 running');
   });
+  it('shows cancelled run and child-job counts in the list summary', () => {
+    setMockJobs([makeScenarioJobItem('cancelled-run', 'Cancelled', {
+      clusterJobs: [{
+        providerName: 'krkn-operator',
+        clusterName: 'cluster-1',
+        jobId: 'cancelled-job',
+        podName: 'pod-cancelled',
+        phase: 'Cancelled',
+      }],
+      cancelledJobs: 1,
+    })]);
+
+    render(<JobsList {...defaultProps} />);
+
+    const runsList = screen.getByRole('list', { name: 'Scenario runs list' });
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
+    expect(runsList.querySelector('.jobs-list-summary-cell--status svg')).not.toBeNull();
+    expect(runsList.querySelector('.jobs-list-job-counts')?.textContent).toBe('0/0/1/0');
+  });
+
 
   it('shows graph node counts and their descriptive tooltip', async () => {
     const user = userEvent.setup();
