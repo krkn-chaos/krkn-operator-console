@@ -1,6 +1,6 @@
 # API Documentation
 
-This document describes the REST API endpoints used by the krkn-operator-console.
+This document describes the REST and WebSocket API endpoints used by the krkn-operator-console.
 
 ## Table of Contents
 
@@ -9,6 +9,7 @@ This document describes the REST API endpoints used by the krkn-operator-console
 - [Scenario Endpoints](#scenario-endpoints)
 - [Elasticsearch / Telemetry Endpoints](#elasticsearch--telemetry-endpoints)
 - [User Management Endpoints](#user-management-endpoints)
+- [Jobs WebSocket Subscription](#jobs-websocket-subscription)
 - [Error Responses](#error-responses)
 
 ## Authentication
@@ -408,6 +409,8 @@ Retrieves telemetry documents from Elasticsearch for a given time range. Support
   "page": 1,
   "startDate": "2024-01-01",
   "endDate": "2024-01-31",
+  "sortBy": "scenario_type",
+  "sortOrder": "asc",
   "filters": {
     "scenario_type": ["pod_disruption_scenarios"],
     "cloud_type": ["aws"]
@@ -505,6 +508,8 @@ if (response.ok) {
 - `startDate` (string, optional) - Start date in "yyyy-MM-dd" format
 - `endDate` (string, optional) - End date in "yyyy-MM-dd" format
 - `filters` (object, optional) - Facet filters as category key → array of allowed values. Documents match when each listed category matches one of its values. Allowed categories: `scenario_type`, `job_status`, `cloud_infrastructure`, `cloud_type`, `major_version`, `network_plugins`. Unknown filter categories are rejected with `400 Bad Request`.
+- `sortBy` (string, optional) - Telemetry sort key: `scenario_type`, `start_timestamp`, `end_timestamp`, or `status`. Scenario-backed keys sort by the representative scenario shown in each table row; Status includes the displayed scenario exit status.
+- `sortOrder` (string, optional) - Sort direction: `asc` or `desc`. Provide together with `sortBy`; omitting both keeps timestamp descending.
 
 **Note:** Exactly one of `configName` or `inline` must be provided.
 
@@ -647,6 +652,33 @@ if (response.ok) {
   - `count` (integer) - Documents with this value in the matched window
 
 **Note:** Stats counts apply to entire matched window, not just returned page. `stats.pass + stats.fail` may exceed `total`.
+
+### Query Alerts
+
+Retrieves alert documents from the saved Elasticsearch config's alerts index.
+
+**Endpoint:** `POST /api/v1/elasticsearch-alerts-query`
+
+**Request Body:**
+```json
+{
+  "configName": "my-es-config",
+  "size": 100,
+  "startDate": "2024-01-01",
+  "endDate": "2024-01-31",
+  "sortBy": "severity",
+  "sortOrder": "desc"
+}
+```
+
+**Request Fields:**
+- `configName` (string, required) - Saved Elasticsearch config with an alerts index.
+- `size` (integer, optional) - Maximum number of returned documents (default: 50, max: 500).
+- `startDate`, `endDate` (string, optional) - Date bounds in `yyyy-MM-dd` format.
+- `sortBy` (string, optional) - Alert sort key: `uuid`, `phase`, `created_at`, or `severity`.
+- `sortOrder` (string, optional) - `asc` or `desc`; provide together with `sortBy`. Omit both to keep `created_at` descending.
+
+Unknown sort keys, invalid directions, or incomplete sort options return `400 Bad Request`.
 
 ---
 
@@ -986,6 +1018,31 @@ curl -X DELETE \
   'https://api.example.com/api/v1/users/old.user%40example.com' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 ```
+
+---
+
+## Jobs WebSocket Subscription
+
+The `/api/v2/ws/jobs` subscription streams a server-sorted, paginated list of scenario and graph runs. Optional `filters` are applied before sorting and pagination:
+
+```json
+{
+  "action": "subscribe",
+  "resource": "jobs",
+  "page": 1,
+  "limit": 20,
+  "sortBy": "createdAt",
+  "sortOrder": "desc",
+  "filters": {
+    "owner": "alice@example.com",
+    "createdAtFrom": "2026-10-01T00:00:00.000Z",
+    "createdAtTo": "2026-10-31T23:59:59.000Z",
+    "runName": "chaos"
+  }
+}
+```
+
+`filters` fields are optional. `owner` matches exactly; `createdAtFrom` and `createdAtTo` are inclusive RFC3339 timestamps; `runName` is a case-insensitive substring of a scenario run ID, custom run name, or graph run name. Active fields combine with AND. Omitting `filters` preserves unfiltered subscription behavior.
 
 ---
 

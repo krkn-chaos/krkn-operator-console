@@ -1625,6 +1625,25 @@ export interface InlineElasticsearchConnection {
   telemetryIndex: string;
 }
 
+export type ElasticsearchSortOrder = 'asc' | 'desc';
+export type TelemetrySortField = 'scenario_type' | 'start_timestamp' | 'end_timestamp' | 'status';
+export type AlertSortField = 'uuid' | 'phase' | 'created_at' | 'severity';
+
+export interface TelemetrySortOptions {
+  sortBy: TelemetrySortField;
+  sortOrder: ElasticsearchSortOrder;
+}
+
+export interface AlertSortOptions {
+  sortBy: AlertSortField;
+  sortOrder: ElasticsearchSortOrder;
+}
+
+export interface AlertFieldFilter {
+  key: string;
+  value: string;
+}
+
 export interface QueryTelemetryRequest {
   // Exactly one of configName or inline must be supplied.
   configName?: string;
@@ -1640,6 +1659,8 @@ export interface QueryTelemetryRequest {
   // Selected facet filters keyed by category (e.g. "cloud_type"). Values within a
   // category are OR-ed, categories are AND-ed. Unknown categories are rejected.
   filters?: Record<string, string[]>;
+  sortBy?: TelemetrySortField;
+  sortOrder?: ElasticsearchSortOrder;
 }
 
 // Run-level cluster/infrastructure metadata surfaced for an expanded row. All
@@ -1749,6 +1770,9 @@ export interface AlertDocument {
 export interface QueryAlertsResponse {
   documents: AlertDocument[];
   total: number;
+  /** Present only when operator validated and applied requested server sort. */
+  sortBy?: AlertSortField;
+  sortOrder?: ElasticsearchSortOrder;
 }
 
 export interface QueryAlertsRequest {
@@ -1756,6 +1780,9 @@ export interface QueryAlertsRequest {
   size?: number;
   startDate?: string;
   endDate?: string;
+  filters?: AlertFieldFilter[];
+  sortBy?: AlertSortField;
+  sortOrder?: ElasticsearchSortOrder;
 }
 
 // Cloud Credential Types

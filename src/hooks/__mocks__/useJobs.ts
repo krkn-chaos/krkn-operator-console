@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import type { UnifiedJobItem, PaginationMeta, JobStatsSummary } from '../../types/api';
+import type { JobsSortField, JobsSortOrder } from '../../types/websocket';
 
 const state = {
   jobs: [] as UnifiedJobItem[],
@@ -13,9 +14,35 @@ const state = {
   setLimit: vi.fn(),
 };
 
-export function useJobs() {
+export function useJobs(
+  _categoryFilters: string[] = [],
+  _sortBy: JobsSortField = 'createdAt',
+  _sortOrder: JobsSortOrder = 'desc',
+  filters?: { owner?: string; createdAtFrom?: string; createdAtTo?: string; runName?: string },
+) {
+  const jobs = state.jobs.filter((job) => {
+    const owner = job.type === 'graphRun' ? job.graphRun?.ownerUserId : job.scenarioRun?.ownerUserId;
+    if (filters?.owner && owner !== filters.owner) return false;
+
+    if (filters?.createdAtFrom || filters?.createdAtTo) {
+      const createdAt = new Date(job.createdAt).getTime();
+      if (Number.isNaN(createdAt)) return false;
+      if (filters.createdAtFrom && createdAt < new Date(filters.createdAtFrom).getTime()) return false;
+      if (filters.createdAtTo && createdAt > new Date(filters.createdAtTo).getTime()) return false;
+    }
+
+    if (filters?.runName) {
+      const needle = filters.runName.toLowerCase();
+      const names = job.type === 'graphRun'
+        ? [job.name]
+        : [job.scenarioRun?.scenarioRunName || job.name, job.scenarioRun?.customRunName || ''];
+      if (!names.some((name) => name.toLowerCase().includes(needle))) return false;
+    }
+    return true;
+  });
+
   return {
-    jobs: state.jobs,
+    jobs,
     pagination: state.pagination,
     stats: state.stats,
     hasReceivedStats: state.hasReceivedStats,
