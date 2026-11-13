@@ -8,9 +8,9 @@ metadata:
     app.kubernetes.io/component: web-console
     app.kubernetes.io/part-of: krkn-operator
   annotations:
-    # Uncomment and configure for your ingress controller
-    # nginx.ingress.kubernetes.io/rewrite-target: /
-    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Allow component-config discovery to finish while preserving NGINX Ingress WebSocket handling.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "360"
 spec:
   ingressClassName: nginx  # Change to your ingress class
   rules:

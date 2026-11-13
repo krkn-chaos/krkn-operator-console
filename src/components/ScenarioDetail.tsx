@@ -540,6 +540,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         totalTargets: statusResponse.totalTargets,
         successfulJobs: statusResponse.successfulJobs,
         failedJobs: statusResponse.failedJobs,
+        cancelledJobs: statusResponse.cancelledJobs,
         runningJobs: statusResponse.runningJobs,
         clusterJobs: statusResponse.clusterJobs,
         createdAt: new Date().toISOString(),

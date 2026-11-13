@@ -2,9 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { LogViewer } from './LogViewer';
+import { krknAiApi } from '../services/krknAiApi';
 import { websocketService } from '../services/websocketService';
 
-vi.mock('../hooks/useWebSocket', () => ({ useWebSocket: vi.fn() }));
+vi.mock('../hooks/useWebSocket', () => ({
+  useWebSocket: vi.fn(() => ({ connectionState: 'disconnected' })),
+}));
 
 vi.mock('../services/authService', () => ({
   authService: {
@@ -39,6 +42,20 @@ describe('LogViewer download', () => {
     render(<LogViewer {...defaultProps} status="MaxRetriesExceeded" />);
 
     expect(buildUrl).toHaveBeenCalledWith(defaultProps.scenarioRunName, defaultProps.jobId, false);
+  });
+  it('loads a stopped child scenario log from its parent run artifact path', async () => {
+    const getRunFile = vi.spyOn(krknAiApi, 'getRunFile').mockResolvedValue('partial scenario log');
+    render(
+      <LogViewer
+        {...defaultProps}
+        status="Stopped"
+        parentRunName="parent-run"
+        logPath="logs/scenario.log"
+      />,
+    );
+
+    expect(await screen.findByText('partial scenario log')).toBeInTheDocument();
+    expect(getRunFile).toHaveBeenCalledWith('parent-run', 'logs/scenario.log');
   });
 
   describe('dropdown UI', () => {

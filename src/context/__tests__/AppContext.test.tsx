@@ -33,6 +33,37 @@ const makeGraphRun = (overrides: Partial<GraphRunState> = {}): GraphRunState => 
 });
 
 describe('AppContext reducer', () => {
+  describe('Krkn AI navigation', () => {
+    it('returns from the mock AI page to the jobs list', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'NAVIGATE_TO_KRKN_AI' });
+      });
+      expect(capturedState.phase).toBe('krkn_ai');
+
+      act(() => {
+        capturedDispatch({ type: 'GO_BACK' });
+      });
+      expect(capturedState.phase).toBe('jobs_list');
+    });
+  });
+  describe('resiliency history navigation', () => {
+    it('returns from resiliency history to the jobs list', () => {
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'NAVIGATE_TO_RESILIENCY_HISTORY' });
+      });
+      expect(capturedState.phase).toBe('resiliency_history');
+
+      act(() => {
+        capturedDispatch({ type: 'GO_BACK' });
+      });
+      expect(capturedState.phase).toBe('jobs_list');
+    });
+  });
+
   describe('rerun cluster refresh', () => {
     it('refreshes clusters before loading rerun details', () => {
       renderWithProvider();

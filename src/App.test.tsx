@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App';
@@ -20,6 +20,12 @@ import type { JobConfigResponse, ScenarioRunState } from './types/api';
  * Everything below App/AppSidebar is stubbed so the test stays focused on the
  * navigation path rather than child-component internals or network I/O.
  */
+
+const appMocks = vi.hoisted(() => ({
+  krknAI: {
+    getStatus: vi.fn().mockResolvedValue({ enabled: true }),
+  },
+}));
 
 // Poller hooks perform network I/O on mount; stub them out.
 vi.mock('./hooks', () => ({
@@ -51,6 +57,7 @@ vi.mock('react-router-dom', () => ({
 vi.mock('./services/operatorApi', () => ({
   operatorApi: { createTargetRequest: vi.fn(), getScenarioRunConfig: vi.fn() },
 }));
+vi.mock('./services/krknAiApi', () => ({ krknAiApi: appMocks.krknAI }));
 
 // Stub every child component App pulls from the barrel so the render switch is
 // observable without mounting real pages (which do their own network I/O).
@@ -73,6 +80,9 @@ vi.mock('./components', () => ({
   TerminalContent: () => <div>TerminalContent</div>,
   Studio: () => <div>Studio</div>,
   ElasticsearchDataView: () => <div data-testid="elasticsearch-data-view">ElasticsearchDataView</div>,
+}));
+vi.mock('./components/KrknAI/KrknAIPage', () => ({
+  KrknAIPage: () => <div data-testid="krkn-ai-page">KrknAIPage</div>,
 }));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
 vi.mock('./components/ResiliencyHistory', () => ({
@@ -143,7 +153,7 @@ describe('scenario replay handoff', () => {
   });
 });
 
-describe('App scenario re-run flow', () => {
+describe('App scenario re-run and Krkn AI navigation', () => {
   const config: JobConfigResponse = {
     targetRequestId: 'target-1',
     targetClusters: { operator: ['cluster-1'] },
@@ -158,11 +168,30 @@ describe('App scenario re-run flow', () => {
     vi.clearAllMocks();
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => void store.set(k, v),
-      removeItem: (k: string) => void store.delete(k),
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
       clear: () => store.clear(),
     });
+  });
+
+  it('renders the Krkn AI page from the sidebar destination when enabled', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    expect(screen.queryByTestId('krkn-ai-page')).not.toBeInTheDocument();
+
+    await screen.findByText('Krkn AI');
+    await user.click(screen.getByText('Krkn AI'));
+    await waitFor(() => expect(screen.getByTestId('krkn-ai-page')).toBeInTheDocument());
+  });
+
+  it('hides the Krkn AI listing and navigation when the operator feature is disabled', async () => {
+    appMocks.krknAI.getStatus.mockResolvedValueOnce({ enabled: false });
+    renderApp();
+
+    await waitFor(() => expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Krkn AI')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('krkn-ai-page')).not.toBeInTheDocument();
   });
 
   it('fetches run config, dispatches the replay intent, and starts target creation', async () => {
@@ -202,9 +231,9 @@ describe('App Resiliency History navigation', () => {
     vi.clearAllMocks();
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => void store.set(k, v),
-      removeItem: (k: string) => void store.delete(k),
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
       clear: () => store.clear(),
     });
   });
@@ -286,5 +315,86 @@ describe('App scenario creation guard', () => {
 
     expect(guard).toHaveBeenCalledTimes(1);
     expect(operatorApi.createTargetRequest).not.toHaveBeenCalled();
+  });
+});
+describe('App Krkn-AI status', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    appMocks.krknAI.getStatus.mockReset().mockResolvedValue({ enabled: true });
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('offers an accessible retry after a failed status request and enables without reload', async () => {
+    const user = userEvent.setup();
+    appMocks.krknAI.getStatus.mockRejectedValueOnce(Object.assign(new Error('temporary outage'), { status: 503 }))
+      .mockResolvedValueOnce({ enabled: true });
+    const { unmount } = renderApp();
+
+    const retry = await screen.findByRole('button', { name: 'Retry Krkn-AI status check' });
+    expect(screen.queryByText('Krkn AI')).not.toBeInTheDocument();
+    await user.click(retry);
+
+    await waitFor(() => {
+      expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Krkn AI')).toBeInTheDocument();
+    });
+    unmount();
+  });
+
+  it('automatically restores navigation after an HTTP 503 without reloading', async () => {
+    vi.useFakeTimers();
+    appMocks.krknAI.getStatus.mockRejectedValueOnce(Object.assign(new Error('temporary outage'), { status: 503 }));
+    const { unmount } = renderApp();
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByText('Krkn AI')).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(screen.getByText('Krkn AI')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry Krkn-AI status check' })).not.toBeInTheDocument();
+    unmount();
+  });
+
+  it('retries transient status failures at bounded intervals', async () => {
+    vi.useFakeTimers();
+    appMocks.krknAI.getStatus.mockRejectedValue(new Error('temporary outage'));
+    const { unmount } = renderApp();
+    await act(async () => { await Promise.resolve(); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_999); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(3);
+    await act(async () => { await vi.advanceTimersByTimeAsync(40_000); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(4);
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(4);
+    unmount();
+  });
+
+  it('does not retry a confirmed disabled status', async () => {
+    vi.useFakeTimers();
+    appMocks.krknAI.getStatus.mockResolvedValue({ enabled: false });
+    const { unmount } = renderApp();
+    await act(async () => { await Promise.resolve(); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Krkn AI')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry Krkn-AI status check' })).not.toBeInTheDocument();
+    unmount();
   });
 });

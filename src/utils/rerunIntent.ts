@@ -1,7 +1,10 @@
 import type { JobConfigResponse, RerunIntent, ScenarioRunState } from '../types/api';
 
-/** Build the state handoff used when a scenario run is replayed from its job configuration. */
-export function buildRerunIntent(config: JobConfigResponse, run: ScenarioRunState): RerunIntent {
+/** Build the state handoff used when a scenario run is replayed from its saved configuration. */
+export function buildRerunIntent(
+  config: JobConfigResponse,
+  run: Pick<ScenarioRunState, 'scenarioName' | 'registryName'>,
+): RerunIntent {
   const clusters = Object.entries(config.targetClusters).flatMap(
     ([operatorName, clusterNames]) => clusterNames.map(clusterName => ({ operatorName, clusterName })),
   );
