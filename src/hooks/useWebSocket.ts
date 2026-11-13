@@ -26,6 +26,7 @@ interface UseWebSocketReturn {
     subscriptionId?: string,
     sortBy?: JobsSortField,
     sortOrder?: JobsSortOrder,
+    groupRollbacks?: boolean,
   ) => void;
   unsubscribe: (resource: string, ids?: string[]) => void;
 }
@@ -102,8 +103,9 @@ export function useWebSocket(
       subscriptionId?: string,
       sortBy?: JobsSortField,
       sortOrder?: JobsSortOrder,
+      groupRollbacks?: boolean,
     ) => {
-      if (sortBy === undefined && sortOrder === undefined) {
+      if (sortBy === undefined && sortOrder === undefined && groupRollbacks === undefined) {
         websocketService.subscribe(connectionId, resource, ids, page, limit, categories, subscriptionId);
         return;
       }
@@ -115,6 +117,7 @@ export function useWebSocket(
         limit,
         categories,
         subscriptionId,
+        groupRollbacks,
         sortBy,
         sortOrder,
       );

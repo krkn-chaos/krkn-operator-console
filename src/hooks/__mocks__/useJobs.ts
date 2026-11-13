@@ -16,42 +16,29 @@ const state = {
 
 export function useJobs(
   _categoryFilters: string[] = [],
-  sortBy: JobsSortField = 'createdAt',
-  sortOrder: JobsSortOrder = 'desc',
+  _sortBy: JobsSortField = 'createdAt',
+  _sortOrder: JobsSortOrder = 'desc',
+  filters?: { owner?: string; createdAtFrom?: string; createdAtTo?: string; runName?: string },
 ) {
-  const jobs = [...state.jobs].sort((left, right) => {
-    let leftValue: string | number = '';
-    let rightValue: string | number = '';
-    switch (sortBy) {
-      case 'createdAt':
-        leftValue = new Date(left.createdAt).getTime() || 0;
-        rightValue = new Date(right.createdAt).getTime() || 0;
-        break;
-      case 'status':
-        leftValue = left.type === 'graphRun'
-          ? left.graphRun?.phase === 'Completed' ? 'Succeeded' : left.graphRun?.phase || 'Pending'
-          : left.scenarioRun?.phase || 'Pending';
-        rightValue = right.type === 'graphRun'
-          ? right.graphRun?.phase === 'Completed' ? 'Succeeded' : right.graphRun?.phase || 'Pending'
-          : right.scenarioRun?.phase || 'Pending';
-        break;
-      case 'name':
-        leftValue = left.type === 'graphRun'
-          ? left.name
-          : left.scenarioRun?.customRunName?.trim() || left.scenarioRun?.scenarioRunName || left.name;
-        rightValue = right.type === 'graphRun'
-          ? right.name
-          : right.scenarioRun?.customRunName?.trim() || right.scenarioRun?.scenarioRunName || right.name;
-        break;
-      case 'owner':
-        leftValue = (left.type === 'graphRun' ? left.graphRun?.ownerUserId : left.scenarioRun?.ownerUserId) || '';
-        rightValue = (right.type === 'graphRun' ? right.graphRun?.ownerUserId : right.scenarioRun?.ownerUserId) || '';
-        break;
+  const jobs = state.jobs.filter((job) => {
+    const owner = job.type === 'graphRun' ? job.graphRun?.ownerUserId : job.scenarioRun?.ownerUserId;
+    if (filters?.owner && owner !== filters.owner) return false;
+
+    if (filters?.createdAtFrom || filters?.createdAtTo) {
+      const createdAt = new Date(job.createdAt).getTime();
+      if (Number.isNaN(createdAt)) return false;
+      if (filters.createdAtFrom && createdAt < new Date(filters.createdAtFrom).getTime()) return false;
+      if (filters.createdAtTo && createdAt > new Date(filters.createdAtTo).getTime()) return false;
     }
-    const comparison = typeof leftValue === 'number' && typeof rightValue === 'number'
-      ? leftValue - rightValue
-      : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: 'base' });
-    return sortOrder === 'asc' ? comparison : -comparison;
+
+    if (filters?.runName) {
+      const needle = filters.runName.toLowerCase();
+      const names = job.type === 'graphRun'
+        ? [job.name]
+        : [job.scenarioRun?.scenarioRunName || job.name, job.scenarioRun?.customRunName || ''];
+      if (!names.some((name) => name.toLowerCase().includes(needle))) return false;
+    }
+    return true;
   });
 
   return {

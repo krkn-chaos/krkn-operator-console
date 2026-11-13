@@ -71,7 +71,7 @@ describe('useJobs', () => {
   it('subscribes to WS with page and limit on connect', () => {
     renderHook(() => useJobs());
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 20, [], expect.any(String), true, 'createdAt', 'desc');
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 20, [], expect.any(String), true, 'createdAt', 'desc', undefined);
   });
 
   it('does not subscribe when disconnected', () => {
@@ -133,7 +133,7 @@ describe('useJobs', () => {
 
     act(() => { result.current.setPage(2); });
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 2, 20, [], expect.any(String), true, 'createdAt', 'desc');
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 2, 20, [], expect.any(String), true, 'createdAt', 'desc', undefined);
   });
 
   it('re-subscribes when limit changes', () => {
@@ -144,7 +144,7 @@ describe('useJobs', () => {
 
     act(() => { result.current.setLimit(50); });
 
-    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 50, [], expect.any(String), true, 'createdAt', 'desc');
+    expect(websocketService.subscribe).toHaveBeenCalledWith('jobs', 'jobs', undefined, 1, 50, [], expect.any(String), true, 'createdAt', 'desc', undefined);
   });
 
   it('subscribes with category filters and resubscribes when they change', () => {
@@ -154,10 +154,33 @@ describe('useJobs', () => {
     rerender({ filters: ['network-chaos'] });
 
     expect(websocketService.subscribe).toHaveBeenLastCalledWith(
-      'jobs', 'jobs', undefined, 1, 20, ['network-chaos'], expect.any(String), true, 'createdAt', 'desc',
+      'jobs', 'jobs', undefined, 1, 20, ['network-chaos'], expect.any(String), true, 'createdAt', 'desc', undefined,
     );
     const subscriptions = vi.mocked(websocketService.subscribe).mock.calls;
     expect(subscriptions[subscriptions.length - 1]?.[6]).not.toBe(firstSubscriptionId);
+  });
+
+  it('sends owner, date, and run-name filters with the sorted jobs subscription', () => {
+    const filters = {
+      owner: 'alice@example.com',
+      createdAtFrom: '2026-10-01T00:00:00.000Z',
+      createdAtTo: '2026-10-31T23:59:59.000Z',
+      runName: 'chaos',
+    };
+    const { rerender } = renderHook(({ activeFilters }) => {
+      return useJobs([], 'name', 'asc', activeFilters);
+    }, { initialProps: { activeFilters: filters } });
+
+    expect(websocketService.subscribe).toHaveBeenLastCalledWith(
+      'jobs', 'jobs', undefined, 1, 20, [], expect.any(String), true, 'name', 'asc', filters,
+    );
+
+    const updatedFilters = { ...filters, runName: 'chaos-2' };
+    rerender({ activeFilters: updatedFilters });
+
+    expect(websocketService.subscribe).toHaveBeenLastCalledWith(
+      'jobs', 'jobs', undefined, 1, 20, [], expect.any(String), true, 'name', 'asc', updatedFilters,
+    );
   });
 
   it('ignores snapshots from an older jobs subscription', () => {

@@ -271,6 +271,16 @@ export function JobsList({
   const [isCategorySelectOpen, setIsCategorySelectOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<RunSortColumn>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [ownerFilter, setOwnerFilter] = useState<string>('');
+  const [dateTimeFrom, setDateTimeFrom] = useState<Date | undefined>();
+  const [dateTimeTo, setDateTimeTo] = useState<Date | undefined>();
+  const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
+  const jobFilters = useMemo(() => ({
+    owner: ownerFilter || undefined,
+    createdAtFrom: isValidDate(dateTimeFrom) ? dateTimeFrom!.toISOString() : undefined,
+    createdAtTo: isValidDate(dateTimeTo) ? dateTimeTo!.toISOString() : undefined,
+    runName: customRunNameFilter || undefined,
+  }), [ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter]);
   const {
     jobs,
     pagination,
@@ -283,17 +293,13 @@ export function JobsList({
     isLoading,
     snapshotVersion,
     refresh: refreshJobs,
-  } = useJobs(categoryFilters, sortColumn, sortDirection);
+  } = useJobs(categoryFilters, sortColumn, sortDirection, jobFilters);
   const { origins: aiOrigins, error: aiOriginError, refresh: refreshAiOrigins } = useKrknAIOrigins(jobs, krknAIEnabled);
   const [deletingRun, setDeletingRun] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [confirmDeleteRun, setConfirmDeleteRun] = useState<string | null>(null);
   const [confirmDeleteJob, setConfirmDeleteJob] = useState<{ jobId: string; jobName: string } | null>(null);
-  const [ownerFilter, setOwnerFilter] = useState<string>('');
-  const [dateTimeFrom, setDateTimeFrom] = useState<Date | undefined>();
-  const [dateTimeTo, setDateTimeTo] = useState<Date | undefined>();
   const [timeRangeError, setTimeRangeError] = useState('');
-  const [customRunNameFilter, setCustomRunNameFilter] = useState<string>('');
   const [isOwnerSelectOpen, setIsOwnerSelectOpen] = useState(false);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const sortedCategories = useMemo(() => sortByLabel(categories, (category) => category.name), [categories]);
@@ -456,6 +462,7 @@ export function JobsList({
   };
 
   const onFromDateChange = (_event: React.FormEvent, inputDate: string, newFromDate?: Date) => {
+    setPage(1);
     if (!newFromDate) return;
     if (isValidDate(newFromDate) && inputDate === yyyyMMddFormat(newFromDate)) {
       newFromDate.setHours(0, 0, 0, 0);
@@ -465,6 +472,7 @@ export function JobsList({
   };
 
   const onFromTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPage(1);
     const value = e.target.value;
     if (!value) return;
     const [h, m, s] = value.split(':').map(Number);
@@ -512,6 +520,7 @@ export function JobsList({
   };
 
   const onToDateChange = (_event: React.FormEvent, inputDate: string, newToDate?: Date) => {
+    setPage(1);
     if (!newToDate) return;
     if (isValidDate(newToDate) && inputDate === yyyyMMddFormat(newToDate)) {
       newToDate.setHours(23, 59, 59, 0);
@@ -521,6 +530,7 @@ export function JobsList({
   };
 
   const onToTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPage(1);
     const value = e.target.value;
     if (!value) return;
     const [h, m, s] = value.split(':').map(Number);
@@ -561,36 +571,16 @@ export function JobsList({
     ), (owner) => owner);
   }, [unifiedRuns]);
 
-  // Client-side filtering on current page
+  // Category overrides can change locally before the next server snapshot arrives.
   const filteredUnifiedRuns = useMemo((): UnifiedRunItem[] => {
     return unifiedRuns.filter((item) => {
-      const owner = item.type === 'graph' ? item.ownerUserId : item.run.ownerUserId;
-      if (ownerFilter && owner !== ownerFilter) return false;
-
-      if (isValidDate(dateTimeFrom) || isValidDate(dateTimeTo)) {
-        const dateStr = item.type === 'graph' ? item.createdAt : item.run.createdAt;
-        const runDate = new Date(dateStr);
-        if (isNaN(runDate.getTime())) return false;
-        if (isValidDate(dateTimeFrom) && runDate < dateTimeFrom!) return false;
-        if (isValidDate(dateTimeTo) && runDate > dateTimeTo!) return false;
-      }
-
       const runName = item.type === 'graph' ? item.graphRunName : item.run.scenarioRunName;
       const runType = item.type === 'graph' ? 'graph-runs' : 'scenario-runs';
       const assignedCategories = categoryOverrides[runCategoryKey(runType, runName)] ?? item.categories;
       if (categoryFilters.length > 0 && !categoryFilters.some((name) => assignedCategories.includes(name))) return false;
-
-      if (customRunNameFilter) {
-        const needle = customRunNameFilter.toLowerCase();
-        const haystacks = item.type === 'graph'
-          ? [item.graphRunName.toLowerCase()]
-          : [item.run.scenarioRunName.toLowerCase(), ...(item.run.customRunName ? [item.run.customRunName.toLowerCase()] : [])];
-        if (!haystacks.some((h) => h.includes(needle))) return false;
-      }
-
       return true;
     });
-  }, [unifiedRuns, ownerFilter, dateTimeFrom, dateTimeTo, customRunNameFilter, categoryFilters, categoryOverrides]);
+  }, [unifiedRuns, categoryFilters, categoryOverrides]);
 
   const handleSort = (column: RunSortColumn) => {
     const nextDirection = sortColumn === column
@@ -715,7 +705,7 @@ export function JobsList({
         )}
 
         {/* Filters Box */}
-        {(jobs.length > 0 || categoryFilters.length > 0) && (
+        {(jobs.length > 0 || hasActiveFilters) && (
           <Card
             isCompact
             style={{
@@ -794,7 +784,10 @@ export function JobsList({
                   <TextInput
                     type="text"
                     value={customRunNameFilter}
-                    onChange={(_event, value) => setCustomRunNameFilter(value)}
+                    onChange={(_event, value) => {
+                      setCustomRunNameFilter(value);
+                      setPage(1);
+                    }}
                     placeholder="Search by run name…"
                     aria-label="Filter by run name"
                     style={{ width: '222px' }}
@@ -802,7 +795,7 @@ export function JobsList({
                 </div>
 
                 {/* Owner Filter - Search with Autocomplete (Admin Only) */}
-                {isAdmin && uniqueOwners.length > 0 && (
+                {isAdmin && (uniqueOwners.length > 0 || ownerFilter) && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       Filter by User:
@@ -812,7 +805,10 @@ export function JobsList({
                     {ownerFilter ? (
                       <Label
                         color="blue"
-                        onClose={() => setOwnerFilter('')}
+                        onClose={() => {
+                          setOwnerFilter('');
+                          setPage(1);
+                        }}
                         closeBtnAriaLabel="Remove user filter"
                       >
                         {ownerFilter}
@@ -823,6 +819,7 @@ export function JobsList({
                         onOpenChange={(isOpen) => setIsOwnerSelectOpen(isOpen)}
                         onSelect={(_event, value) => {
                           setOwnerFilter(value as string);
+                          setPage(1);
                           setIsOwnerSelectOpen(false);
                         }}
                         toggle={(toggleRef) => (
@@ -850,7 +847,7 @@ export function JobsList({
                 )}
 
                 {/* Date From Filter */}
-                {jobs.length > 0 && (
+                {(jobs.length > 0 || hasActiveFilters) && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       From:
@@ -882,7 +879,7 @@ export function JobsList({
                 )}
 
                 {/* Date To Filter */}
-                {jobs.length > 0 && (
+                {(jobs.length > 0 || hasActiveFilters) && (
                   <div>
                     <div style={{ marginBottom: '0.5rem', fontSize: 'var(--pf-v5-global--FontSize--sm)', fontWeight: 'bold' }}>
                       To:
