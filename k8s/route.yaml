@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/name: krkn-operator-console
     app.kubernetes.io/component: web-console
     app.kubernetes.io/part-of: krkn-operator
+  annotations:
+    haproxy.router.openshift.io/timeout: 360s
 spec:
   to:
     kind: Service

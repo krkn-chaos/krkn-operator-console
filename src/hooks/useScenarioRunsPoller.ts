@@ -6,7 +6,7 @@ import { websocketService } from '../services/websocketService';
 import type { ServerMessage } from '../types/websocket';
 import type { ScenarioRunState, ScenarioRunStatusResponse } from '../types/api';
 
-export const TERMINAL_PHASES = ['Succeeded', 'Failed', 'PartiallyFailed'];
+export const TERMINAL_PHASES = ['Succeeded', 'Failed', 'PartiallyFailed', 'Cancelled'];
 
 /**
  * Hook to receive real-time scenario run updates via WebSocket.
@@ -36,25 +36,30 @@ export function useScenarioRunsPoller() {
     dispatch({ type: 'SET_RUN_DETAILS_LOADING', payload: { scenarioRunName: runName, loading: true } });
     try {
       const details = await operatorApi.getScenarioRunStatus(runName);
-      if (!details.clusterJobs || details.clusterJobs.length === 0) {
-        fetchedDetailsRef.current.delete(runName);
-        return;
-      }
-
+      const clusterJobs = details.clusterJobs ?? [];
       const preserveTerminal = TERMINAL_PHASES.includes(base.phase);
       dispatch({
         type: 'UPDATE_SCENARIO_RUN',
         payload: {
           run: preserveTerminal
-            ? { ...base, clusterJobs: details.clusterJobs, rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled, isRollback: details.isRollback ?? base.isRollback, resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled, resiliencyScores: details.resiliencyScores }
+            ? {
+                ...base,
+                clusterJobs,
+                cancelledJobs: details.cancelledJobs ?? base.cancelledJobs,
+                rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled,
+                isRollback: details.isRollback ?? base.isRollback,
+                resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled,
+                resiliencyScores: details.resiliencyScores,
+              }
             : {
                 ...base,
                 phase: details.phase,
                 totalTargets: details.totalTargets,
                 successfulJobs: details.successfulJobs,
                 failedJobs: details.failedJobs,
+                cancelledJobs: details.cancelledJobs ?? base.cancelledJobs,
                 runningJobs: details.runningJobs,
-                clusterJobs: details.clusterJobs,
+                clusterJobs,
                 rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled,
                 isRollback: details.isRollback ?? base.isRollback,
                 ownerUserId: details.ownerUserId || base.ownerUserId,
@@ -67,6 +72,7 @@ export function useScenarioRunsPoller() {
               },
         },
       });
+      if (clusterJobs.length === 0) fetchedDetailsRef.current.delete(runName);
     } catch {
       fetchedDetailsRef.current.delete(runName);
     } finally {
@@ -94,6 +100,7 @@ export function useScenarioRunsPoller() {
           totalTargets: run.totalTargets,
           successfulJobs: run.successfulJobs,
           failedJobs: run.failedJobs,
+          cancelledJobs: run.cancelledJobs,
           runningJobs: run.runningJobs,
           clusterJobs: run.clusterJobs || [],
           createdAt: runAny.creationTimestamp || run.creationTimestamp || (run.clusterJobs && run.clusterJobs[0]?.startTime) || '',
@@ -132,10 +139,11 @@ export function useScenarioRunsPoller() {
         rollbackEnabled: data.rollbackEnabled ?? existing?.rollbackEnabled,
         isRollback: data.isRollback ?? existing?.isRollback,
         scenarioName: data.scenarioName || existing?.scenarioName || runName.replace(/-[a-f0-9]{8}$/, ''),
-        phase: data.phase,
+        phase: existing && TERMINAL_PHASES.includes(existing.phase) ? existing.phase : data.phase,
         totalTargets: data.totalTargets,
         successfulJobs: data.successfulJobs,
         failedJobs: data.failedJobs,
+        cancelledJobs: data.cancelledJobs ?? existing?.cancelledJobs,
         runningJobs: data.runningJobs,
         clusterJobs: hasWsJobs ? data.clusterJobs : (existing?.clusterJobs || []),
         createdAt: existing?.createdAt || data.creationTimestamp || '',
@@ -200,8 +208,7 @@ export function useScenarioRunsPoller() {
 
       for (const runName of expandedIds) {
         const run = runs.find(r => r.scenarioRunName === runName);
-        if (!run) continue;
-        if (['Succeeded', 'Failed', 'PartiallyFailed'].includes(run.phase)) continue;
+        if (!run || TERMINAL_PHASES.includes(run.phase)) continue;
         if (inFlightRef.current.has(runName)) continue;
 
         fetchedDetailsRef.current.delete(runName);
@@ -235,6 +242,7 @@ export function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): bool
   if (prev.runningJobs !== next.runningJobs) return true;
   if (prev.successfulJobs !== next.successfulJobs) return true;
   if (prev.failedJobs !== next.failedJobs) return true;
+  if (prev.cancelledJobs !== next.cancelledJobs) return true;
   if (prev.customRunName !== next.customRunName) return true;
   const prevScores = prev.resiliencyScores;
   const nextScores = next.resiliencyScores;

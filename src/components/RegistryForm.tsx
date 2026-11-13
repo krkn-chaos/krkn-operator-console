@@ -19,7 +19,17 @@ import {
 import { registriesApi } from '../services/registriesApi';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications } from '../hooks';
-import type { CreateRegistryRequest, UpdateRegistryRequest, GroupDetails, AuthType } from '../types/api';
+import type {
+  CreateRegistryRequest,
+  UpdateRegistryRequest,
+  GroupDetails,
+  AuthType,
+  WorkloadImageRole,
+} from '../types/api';
+import { DEFAULT_WORKLOAD_IMAGE_TAGS, WORKLOAD_IMAGE_ROLES } from '../types/api';
+
+const DEFAULT_AI_OPERATOR_TAG = 'krkn-ai-operator';
+const DEFAULT_AI_SERVICE_TAG = 'krkn-ai-service';
 
 /**
  * Registry Form component props
@@ -107,6 +117,14 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
   const [name, setName] = useState('');
   const [registryUrl, setRegistryUrl] = useState('');
   const [scenarioRepository, setScenarioRepository] = useState('');
+  const [aiOrchestratorTag, setAiOrchestratorTag] = useState('');
+  const [aiResultUploaderTag, setAiResultUploaderTag] = useState('');
+  const [workloadImageTags, setWorkloadImageTags] = useState<Record<WorkloadImageRole, string>>({
+    hog: '',
+    tools: '',
+    synFlood: '',
+    networkChaos: '',
+  });
   const [authType, setAuthType] = useState<AuthType>('token');
   const [token, setToken] = useState('');
   const [username, setUsername] = useState('');
@@ -155,6 +173,14 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         setName(data.name);
         setRegistryUrl(data.registryUrl);
         setScenarioRepository(data.scenarioRepository);
+        setAiOrchestratorTag(data.aiOrchestratorTag ?? '');
+        setAiResultUploaderTag(data.aiResultUploaderTag ?? '');
+        setWorkloadImageTags({
+          hog: data.workloadImageTags?.hog ?? '',
+          tools: data.workloadImageTags?.tools ?? '',
+          synFlood: data.workloadImageTags?.synFlood ?? '',
+          networkChaos: data.workloadImageTags?.networkChaos ?? '',
+        });
         setAuthType(data.authType);
         setDescription(data.description || '');
         setSkipTls(data.skipTls);
@@ -228,21 +254,28 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
     }
 
     setSubmitting(true);
+    const workloadTags = Object.fromEntries(
+      WORKLOAD_IMAGE_ROLES.flatMap((role) => {
+        const tag = workloadImageTags[role].trim();
+        return tag ? [[role, tag]] : [];
+      }),
+    ) as Partial<Record<WorkloadImageRole, string>>;
 
     try {
       if (isEditMode) {
-        // EDIT MODE
         const data: UpdateRegistryRequest = {
           registryUrl: registryUrl.trim(),
           scenarioRepository: scenarioRepository.trim(),
           authType,
+          aiOrchestratorTag: aiOrchestratorTag.trim(),
+          aiResultUploaderTag: aiResultUploaderTag.trim(),
+          workloadImageTags: workloadTags,
           description: description.trim() || undefined,
           skipTls,
           insecure,
           groups: Array.from(selectedGroups),
           availableToAll,
         };
-
         // Add credentials only if provided
         if (username.trim()) {
           data.username = username.trim(); // Include username if provided
@@ -258,21 +291,22 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         await registriesApi.updateRegistry(registryName, data);
         showSuccess('Registry updated', `Registry "${registryName}" has been updated successfully`);
       } else {
-        // CREATE MODE
         const data: CreateRegistryRequest = {
           name: name.trim(),
           registryUrl: registryUrl.trim(),
           scenarioRepository: scenarioRepository.trim(),
           authType,
-          username: username.trim(), // Always include username
-          // Password field contains either token or password depending on authType
+          username: username.trim(),
           password: authType === 'token' ? token.trim() : password.trim(),
+          aiOrchestratorTag: aiOrchestratorTag.trim() || undefined,
+          aiResultUploaderTag: aiResultUploaderTag.trim() || undefined,
+          workloadImageTags: Object.keys(workloadTags).length ? workloadTags : undefined,
           description: description.trim() || undefined,
           skipTls,
           insecure,
           groups: Array.from(selectedGroups),
           availableToAll,
-        }
+        };
 
         await registriesApi.createRegistry(data);
         showSuccess('Registry created', `Registry "${name}" has been created successfully`);
@@ -378,6 +412,28 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
           </FormHelperText>
         )}
       </FormGroup>
+      <Card isCompact>
+        <CardBody>
+          <h3>Krkn-AI and workload image tags</h3>
+          <p>Tags share the registry/repository above. Enter tags only; leave blank for defaults.</p>
+          <FormGroup label="krkn-ai operator tag" fieldId="aiOrchestratorTag">
+            <TextInput id="aiOrchestratorTag" value={aiOrchestratorTag} placeholder={DEFAULT_AI_OPERATOR_TAG} onChange={(_event, value) => setAiOrchestratorTag(value)} />
+          </FormGroup>
+          <FormGroup label="krkn-ai service tag" fieldId="aiResultUploaderTag">
+            <TextInput id="aiResultUploaderTag" value={aiResultUploaderTag} placeholder={DEFAULT_AI_SERVICE_TAG} onChange={(_event, value) => setAiResultUploaderTag(value)} />
+          </FormGroup>
+          {WORKLOAD_IMAGE_ROLES.map((role) => (
+            <FormGroup key={role} label={`${role} workload tag`} fieldId={`workload-${role}`}>
+              <TextInput
+                id={`workload-${role}`}
+                value={workloadImageTags[role]}
+                placeholder={DEFAULT_WORKLOAD_IMAGE_TAGS[role]}
+                onChange={(_event, value) => setWorkloadImageTags((current) => ({ ...current, [role]: value }))}
+              />
+            </FormGroup>
+          ))}
+        </CardBody>
+      </Card>
 
       {/* Description */}
       <FormGroup label="Description" fieldId="description">

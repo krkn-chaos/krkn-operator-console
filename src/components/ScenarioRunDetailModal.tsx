@@ -33,6 +33,7 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
+  BanIcon,
   LockIcon,
 } from '@patternfly/react-icons';
 import { HiOutlineRocketLaunch } from 'react-icons/hi2';
@@ -42,7 +43,8 @@ import { ReportDownloadButton } from './ReportDownloadButton';
 import { JobDiagnosticAlert } from './JobDiagnosticAlert';
 import { RollbackActions } from './RollbackActions';
 import { operatorApi } from '../services/operatorApi';
-import type { ScenarioRunStatusResponse, ClusterJobPhase } from '../types/api';
+import type { ScenarioRunStatusResponse } from '../types/api';
+import { getJobPhaseDisplay } from '../utils/jobPhaseDisplay';
 
 interface ScenarioRunDetailModalProps {
   /** ScenarioRun name (from NodeStatus.scenarioRunRef) */
@@ -127,29 +129,16 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
         return { icon: <HourglassHalfIcon />, color: 'orange' as const, label: 'Pending' };
       case 'Running':
         return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'blue' as const, label: 'Running' };
+      case 'Cancelling':
+        return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'orange' as const, label: 'Cancelling' };
       case 'Succeeded':
         return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
       case 'PartiallyFailed':
         return { icon: <ExclamationTriangleIcon />, color: 'orange' as const, label: 'Partially Failed' };
       case 'Failed':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
-      case 'MaxRetriesExceeded':
-        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
-      default:
-        return { icon: <ExclamationCircleIcon />, color: 'grey' as const, label: phase };
-    }
-  };
-
-  const getJobPhaseDisplay = (phase: ClusterJobPhase) => {
-    switch (phase) {
-      case 'Pending':
-        return { icon: <HourglassHalfIcon />, color: 'orange' as const, label: 'Pending' };
-      case 'Running':
-        return { icon: <SyncAltIcon className="pf-m-spin" />, color: 'blue' as const, label: 'Running' };
-      case 'Succeeded':
-        return { icon: <CheckCircleIcon />, color: 'green' as const, label: 'Succeeded' };
-      case 'Failed':
-        return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Failed' };
+      case 'Cancelled':
+        return { icon: <BanIcon />, color: 'grey' as const, label: 'Cancelled' };
       case 'MaxRetriesExceeded':
         return { icon: <ExclamationCircleIcon />, color: 'red' as const, label: 'Max retries exceeded' };
       default:
@@ -237,6 +226,9 @@ export function ScenarioRunDetailModal({ scenarioRunName, isOpen, onClose }: Sce
                   </span>
                   <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>
                     ✗ {run.failedJobs}
+                  </span>
+                  <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>
+                    ⊘ {run.cancelledJobs ?? 0}
                   </span>
                   <span style={{ color: 'var(--pf-v5-global--info-color--100)' }}>
                     ⟳ {run.runningJobs}

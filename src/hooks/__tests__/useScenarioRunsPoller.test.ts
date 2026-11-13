@@ -97,14 +97,16 @@ function makeRunState(overrides: Partial<ScenarioRunState> = {}): ScenarioRunSta
 }
 
 describe('TERMINAL_PHASES', () => {
-  it('includes Succeeded, Failed, and PartiallyFailed', () => {
+  it('includes all settled scenario run phases', () => {
     expect(TERMINAL_PHASES).toContain('Succeeded');
     expect(TERMINAL_PHASES).toContain('Failed');
     expect(TERMINAL_PHASES).toContain('PartiallyFailed');
+    expect(TERMINAL_PHASES).toContain('Cancelled');
   });
 
   it('does not include active phases', () => {
     expect(TERMINAL_PHASES).not.toContain('Running');
+    expect(TERMINAL_PHASES).not.toContain('Cancelling');
     expect(TERMINAL_PHASES).not.toContain('Pending');
     expect(TERMINAL_PHASES).not.toContain('');
   });
@@ -113,7 +115,9 @@ describe('TERMINAL_PHASES', () => {
     ['Running', 'Succeeded', true],
     ['Running', 'Failed', true],
     ['Running', 'PartiallyFailed', true],
+    ['Running', 'Cancelled', true],
     ['Pending', 'Succeeded', true],
+    ['Cancelling', 'Cancelled', true],
     ['Succeeded', 'Failed', false],
     ['Failed', 'Succeeded', false],
     ['Running', 'Running', false],
@@ -175,6 +179,12 @@ describe('hasChanges', () => {
   it('detects customRunName change', () => {
     const prev = makeRunState({ customRunName: undefined });
     const next = makeRunState({ customRunName: 'new-name' });
+    expect(hasChanges(prev, next)).toBe(true);
+  });
+
+  it('detects cancelledJobs change', () => {
+    const prev = makeRunState({ cancelledJobs: 0 });
+    const next = makeRunState({ cancelledJobs: 1 });
     expect(hasChanges(prev, next)).toBe(true);
   });
 

@@ -8,7 +8,7 @@ import '@patternfly/react-core/dist/styles/base.css';
 import './index.css';
 
 async function enablePreviewMode() {
-  if (!import.meta.env.VITE_PREVIEW_MODE) return;
+  if (import.meta.env.VITE_PREVIEW_MODE !== 'true') return;
 
   sessionStorage.setItem('jwt_token', 'mock-preview-jwt-token');
   sessionStorage.setItem('user_email', 'admin@preview.local');
@@ -24,11 +24,13 @@ async function enablePreviewMode() {
   try {
     const { worker } = await import('./mocks/browser');
     await worker.start({
-      onUnhandledRequest: 'bypass',
+      onUnhandledRequest(request, print) {
+        if (new URL(request.url).pathname.startsWith('/api/')) print.error();
+      },
       serviceWorker: { url: `${import.meta.env.BASE_URL}mockServiceWorker.js` },
     });
   } catch (e) {
-    console.warn('MSW failed to start:', e);
+    throw new Error(`Preview mock data could not start: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -44,4 +46,11 @@ enablePreviewMode().then(() => {
       </BrowserRouter>
     </React.StrictMode>,
   );
+}).catch((error) => {
+  console.error(error);
+  const root = document.getElementById('root');
+  if (root) {
+    root.setAttribute('role', 'alert');
+    root.textContent = 'Preview mock data could not start. Reload the page to try again.';
+  }
 });

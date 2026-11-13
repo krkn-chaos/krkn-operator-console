@@ -67,6 +67,7 @@ describe('operatorApi - Terminal Methods', () => {
 
       const result = await operatorApi.executeTerminalCommand({
         cluster_id: 'test-cluster',
+        operator_name: 'krkn-operator',
         uuid: 'test-uuid',
         command: 'kubectl get pods',
       });
@@ -91,6 +92,7 @@ describe('operatorApi - Terminal Methods', () => {
 
       const result = await operatorApi.executeTerminalCommand({
         cluster_id: 'test-cluster',
+        operator_name: 'krkn-operator',
         uuid: 'test-uuid',
         command: 'kubectl get pod nonexistent',
       });
@@ -98,6 +100,22 @@ describe('operatorApi - Terminal Methods', () => {
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe('Error: pod not found');
       expect(result.exitCode).toBe(1);
+    });
+    it('shows API-level 400 details instead of treating them as command output', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: 'ambiguous_cluster', message: 'operator_name is required' }),
+      } as Response);
+
+      await expect(
+        operatorApi.executeTerminalCommand({
+          cluster_id: 'test-cluster',
+          operator_name: 'krkn-operator',
+          uuid: 'test-uuid',
+          command: 'kubectl get namespaces -o json',
+        })
+      ).rejects.toThrow('operator_name is required');
     });
 
     it('should throw TERMINAL_ERROR:404 for command not found', async () => {
@@ -109,10 +127,27 @@ describe('operatorApi - Terminal Methods', () => {
       await expect(
         operatorApi.executeTerminalCommand({
           cluster_id: 'test-cluster',
+          operator_name: 'krkn-operator',
           uuid: 'test-uuid',
           command: 'invalidcommand',
         })
       ).rejects.toThrow('TERMINAL_ERROR:404:invalidcommand');
+    });
+    it('prefers the backend detail for target lookup 404 errors', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ message: 'provider kubeconfig not found' }),
+      } as Response);
+
+      await expect(
+        operatorApi.executeTerminalCommand({
+          cluster_id: 'test-cluster',
+          operator_name: 'krkn-operator',
+          uuid: 'test-uuid',
+          command: 'kubectl get namespaces -o json',
+        })
+      ).rejects.toThrow('provider kubeconfig not found');
     });
 
     it('should throw TERMINAL_ERROR:403 for permission denied', async () => {
@@ -124,6 +159,7 @@ describe('operatorApi - Terminal Methods', () => {
       await expect(
         operatorApi.executeTerminalCommand({
           cluster_id: 'test-cluster',
+          operator_name: 'krkn-operator',
           uuid: 'test-uuid',
           command: 'kubectl delete pod',
         })
@@ -139,6 +175,7 @@ describe('operatorApi - Terminal Methods', () => {
       await expect(
         operatorApi.executeTerminalCommand({
           cluster_id: 'test-cluster',
+          operator_name: 'krkn-operator',
           uuid: 'test-uuid',
           command: 'kubectl get pods',
         })
@@ -163,6 +200,7 @@ describe('operatorApi - Terminal Methods', () => {
 
       const result = await operatorApi.executeTerminalCommand({
         cluster_id: 'test-cluster',
+        operator_name: 'krkn-operator',
         uuid: 'test-uuid',
         command: 'kubectl version',
       });

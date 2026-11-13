@@ -150,6 +150,7 @@
 
 .jobs-list-job-counts__succeeded,
 .jobs-list-job-counts__failed,
+.jobs-list-job-counts__cancelled,
 .jobs-list-job-counts__running,
 .jobs-list-graph-node-counts__completed {
   display: inline-flex;
@@ -170,6 +171,9 @@
 
 .jobs-list-job-counts__failed {
   color: var(--pf-v5-global--danger-color--100);
+}
+.jobs-list-job-counts__cancelled {
+  color: var(--pf-v5-global--Color--200);
 }
 
 .jobs-list-job-counts__running {

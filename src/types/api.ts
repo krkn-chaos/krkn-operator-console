@@ -11,6 +11,7 @@ export interface CreateTargetResponse {
 
 export interface TerminalRequest {
   cluster_id: string;  // Cluster name from KrknTargetRequest
+  operator_name: string; // Provider name from KrknTargetRequest.targetData
   uuid: string;        // KrknTargetRequest UUID
   command: string;     // Full command (e.g., 'kubectl get pods -n default')
 }
@@ -371,8 +372,8 @@ export interface JobsListResponse {
 
 // NEW API Types for ScenarioRun (CRD-based)
 
-export type ScenarioRunPhase = 'Pending' | 'Running' | 'Succeeded' | 'PartiallyFailed' | 'Failed' | 'MaxRetriesExceeded';
-export type ClusterJobPhase = 'Pending' | 'Running' | 'Retrying' | 'Succeeded' | 'Failed' | 'MaxRetriesExceeded';
+export type ScenarioRunPhase = 'Pending' | 'Running' | 'Cancelling' | 'Succeeded' | 'PartiallyFailed' | 'Failed' | 'Cancelled' | 'MaxRetriesExceeded';
+export type ClusterJobPhase = 'Creating' | 'Pending' | 'Running' | 'Retrying' | 'Cancelling' | 'Succeeded' | 'Failed' | 'Cancelled' | 'MaxRetriesExceeded';
 
 export interface ClusterJob {
   providerName: string; // Provider that owns this cluster (e.g., 'krkn-operator', 'krkn-operator-acm')
@@ -415,6 +416,7 @@ export interface ScenarioRunStatusResponse {
   totalTargets: number;
   successfulJobs: number;
   failedJobs: number;
+  cancelledJobs?: number;
   runningJobs: number;
   clusterJobs: ClusterJob[];
   creationTimestamp?: string;
@@ -449,6 +451,7 @@ export interface ScenarioRunState {
   totalTargets: number;
   successfulJobs: number;
   failedJobs: number;
+  cancelledJobs?: number;
   runningJobs: number;
   clusterJobs: ClusterJob[];
   createdAt: string;
@@ -517,6 +520,7 @@ export type AppPhase =
   | 'files' // File management page
   | 'categories' // Category management page
   | 'elasticsearch_data' // Elasticsearch telemetry data table page
+  | 'krkn_ai' // Mock Krkn AI console
   | 'resiliency_history' // Resiliency history analytics page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
@@ -688,6 +692,7 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_FILES' }
   | { type: 'NAVIGATE_TO_CATEGORIES' }
   | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
+  | { type: 'NAVIGATE_TO_KRKN_AI' }
   | { type: 'NAVIGATE_TO_RESILIENCY_HISTORY' }
 
   // Notifications
@@ -778,7 +783,24 @@ export interface GroupMemberOperationResponse {
 
 export type AuthType = 'token' | 'password';
 
-export interface RegistryDetails {
+export type WorkloadImageRole = 'hog' | 'tools' | 'synFlood' | 'networkChaos';
+
+export const WORKLOAD_IMAGE_ROLES: WorkloadImageRole[] = ['hog', 'tools', 'synFlood', 'networkChaos'];
+
+export const DEFAULT_WORKLOAD_IMAGE_TAGS: Record<WorkloadImageRole, string> = {
+  hog: 'workload-krkn-hog',
+  tools: 'workload-krkn-tools',
+  synFlood: 'workload-krkn-syn-flood',
+  networkChaos: 'workload-krkn-network-chaos',
+};
+
+export interface RegistryImageTags {
+  aiOrchestratorTag?: string;
+  aiResultUploaderTag?: string;
+  workloadImageTags?: Partial<Record<WorkloadImageRole, string>>;
+}
+
+export interface RegistryDetails extends RegistryImageTags {
   name: string;
   registryUrl: string;
   scenarioRepository: string;
@@ -794,7 +816,7 @@ export interface RegistryDetails {
   updatedBy?: string;
 }
 
-export interface CreateRegistryRequest {
+export interface CreateRegistryRequest extends RegistryImageTags {
   name: string;
   registryUrl: string;
   scenarioRepository: string;
@@ -808,7 +830,7 @@ export interface CreateRegistryRequest {
   availableToAll?: boolean;
 }
 
-export interface UpdateRegistryRequest {
+export interface UpdateRegistryRequest extends RegistryImageTags {
   registryUrl?: string;
   scenarioRepository?: string;
   authType?: AuthType;
@@ -830,7 +852,7 @@ export interface RegistryOperationResponse {
   message?: string;
 }
 
-export interface AvailableRegistry {
+export interface AvailableRegistry extends RegistryImageTags {
   name: string;
   registryUrl: string;
   scenarioRepository: string;
@@ -840,6 +862,7 @@ export interface AvailableRegistry {
 export interface AvailableRegistriesResponse {
   registries: AvailableRegistry[];
 }
+
 
 // Graph Run API Types
 
