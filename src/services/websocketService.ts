@@ -17,6 +17,7 @@ import type {
   ConnectionStateHandler,
   JobsSortField,
   JobsSortOrder,
+  JobsSubscriptionFilters,
   Subscription,
   WebSocketConnectionOptions,
   ManagedConnection,
@@ -132,6 +133,7 @@ class WebSocketService {
    * @param subscriptionId - Optional correlation ID for the requested snapshot
    * @param sortBy - Optional jobs sort field
    * @param sortOrder - Optional jobs sort direction
+   * @param filters - Optional owner, creation time, and run-name filters
    *
    * @example
    * ```ts
@@ -156,11 +158,15 @@ class WebSocketService {
     groupRollbacks?: boolean,
     sortBy?: JobsSortField,
     sortOrder?: JobsSortOrder,
+    filters?: JobsSubscriptionFilters,
   ): void {
     const conn = this.connections.get(connectionId);
     if (!conn) return;
 
-    const sub: Subscription = { resource, ids, page, limit, categories, subscriptionId, groupRollbacks, sortBy, sortOrder };
+    const activeFilters = filters && (filters.owner || filters.createdAtFrom || filters.createdAtTo || filters.runName)
+      ? filters
+      : undefined;
+    const sub: Subscription = { resource, ids, page, limit, categories, subscriptionId, groupRollbacks, sortBy, sortOrder, filters: activeFilters };
     const existingIdx = conn.subscriptions.findIndex(
       s => s.resource === resource && JSON.stringify(s.ids) === JSON.stringify(ids)
     );
@@ -172,7 +178,7 @@ class WebSocketService {
 
     if (conn.ws?.readyState === WebSocket.OPEN) {
       this.sendClientMessage(conn, {
-        action: 'subscribe', resource, ids, page, limit, categories, subscriptionId, groupRollbacks, sortBy, sortOrder,
+        action: 'subscribe', resource, ids, page, limit, categories, subscriptionId, groupRollbacks, sortBy, sortOrder, filters: activeFilters,
       });
     }
   }
@@ -371,6 +377,7 @@ class WebSocketService {
         page: sub.page,
         limit: sub.limit,
         categories: sub.categories,
+        filters: sub.filters,
         subscriptionId: sub.subscriptionId,
         groupRollbacks: sub.groupRollbacks,
         sortBy: sub.sortBy,

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { operatorApi } from '../services/operatorApi';
 import type { ClusterJob, UnifiedJobItem, ScenarioRunState, ScenarioRunStatusResponse, GraphRunListItem } from '../types/api';
-import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJobsMock } from '../hooks/__mocks__/useJobs';
+import { setMockJobs, setMockIsLoading, setMockPagination, setMockStats, resetJobsMock, _mockState } from '../hooks/__mocks__/useJobs';
 
 vi.mock('../hooks/useJobs');
 
@@ -469,63 +469,57 @@ describe('JobsList', () => {
   });
 
   describe('Run sorting', () => {
-    it.each([
-      {
-        label: 'Status',
-        ascending: ['alpha-run', 'bravo-run', 'charlie-run'],
-        descending: ['charlie-run', 'bravo-run', 'alpha-run'],
-      },
-      {
-        label: 'Run Name',
-        ascending: ['alpha-run', 'bravo-run', 'charlie-run'],
-        descending: ['charlie-run', 'bravo-run', 'alpha-run'],
-      },
-      {
-        label: 'User',
-        ascending: ['bravo-run', 'charlie-run', 'alpha-run'],
-        descending: ['alpha-run', 'charlie-run', 'bravo-run'],
-      },
-    ])('sorts by $label in both directions and updates accessible labels', async ({ label, ascending, descending }) => {
+    it.each(['Status', 'Run Name', 'User'])('keeps snapshot order while sorting by %s and updates accessible labels', async (label) => {
       const user = userEvent.setup();
-      setMockJobs(makeSortableRunItems());
+      const items = makeSortableRunItems();
+      const snapshot = [items[0], items[2], items[1]];
+      const snapshotOrder = snapshot.map((job) => job.name);
+      setMockJobs(snapshot);
       render(<JobsList {...defaultProps} />);
 
       const sortButton = screen.getByRole('button', { name: `Sort by ${label}` });
       expect(sortButton).toHaveAttribute('aria-pressed', 'false');
+      expect(getRenderedPrimaryRunNames()).toEqual(snapshotOrder);
 
       await user.click(sortButton);
-      expect(getRenderedPrimaryRunNames()).toEqual(ascending);
+      expect(getRenderedPrimaryRunNames()).toEqual(snapshotOrder);
       expect(sortButton).toHaveAccessibleName(`Sort ${label} descending`);
       expect(sortButton).toHaveAttribute('aria-pressed', 'true');
 
       await user.click(sortButton);
-      expect(getRenderedPrimaryRunNames()).toEqual(descending);
+      expect(getRenderedPrimaryRunNames()).toEqual(snapshotOrder);
       expect(sortButton).toHaveAccessibleName(`Sort ${label} ascending`);
       expect(sortButton).toHaveAttribute('aria-pressed', 'true');
     });
 
-    it('sorts by Created date in both directions and updates accessible labels', async () => {
+    it('renders a new server snapshot in its supplied order', async () => {
       const user = userEvent.setup();
-      setMockJobs(makeSortableRunItems());
-      render(<JobsList {...defaultProps} />);
+      const items = makeSortableRunItems();
+      const initialSnapshot = [items[0], items[2], items[1]];
+      setMockJobs(initialSnapshot);
+      const { rerender } = render(<JobsList {...defaultProps} />);
 
-      const sortButton = screen.getByRole('button', { name: 'Sort Created ascending' });
-      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
-      expect(getRenderedPrimaryRunNames()).toEqual(['charlie-run', 'bravo-run', 'alpha-run']);
+      await user.click(screen.getByRole('button', { name: 'Sort by Status' }));
 
-      await user.click(sortButton);
-      expect(getRenderedPrimaryRunNames()).toEqual(['alpha-run', 'bravo-run', 'charlie-run']);
-      expect(sortButton).toHaveAccessibleName('Sort Created descending');
-      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
-
-      await user.click(sortButton);
-      expect(getRenderedPrimaryRunNames()).toEqual(['charlie-run', 'bravo-run', 'alpha-run']);
-      expect(sortButton).toHaveAccessibleName('Sort Created ascending');
-      expect(sortButton).toHaveAttribute('aria-pressed', 'true');
+      const sortedSnapshot = [initialSnapshot[2], initialSnapshot[1], initialSnapshot[0]];
+      setMockJobs(sortedSnapshot);
+      rerender(<JobsList {...defaultProps} />);
+      expect(getRenderedPrimaryRunNames()).toEqual(sortedSnapshot.map((job) => job.name));
     });
   });
 
   describe('Run Name Filter', () => {
+    it('resets to the first page when the run-name filter changes', async () => {
+      const user = userEvent.setup();
+      setMockJobs([makeGraphJobItem('graphrun-abc123')]);
+      setMockPagination({ page: 3, limit: 20, total: 50, totalPages: 3 });
+      render(<JobsList {...defaultProps} />);
+
+      await user.type(screen.getByRole('textbox', { name: /Filter by run name/i }), 'chaos');
+
+      expect(_mockState.setPage).toHaveBeenCalledWith(1);
+    });
+
     it('matches a graph run by name and shows the row', async () => {
       const user = userEvent.setup();
       setMockJobs([makeGraphJobItem('graphrun-abc123')]);

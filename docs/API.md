@@ -1,6 +1,6 @@
 # API Documentation
 
-This document describes the REST API endpoints used by the krkn-operator-console.
+This document describes the REST and WebSocket API endpoints used by the krkn-operator-console.
 
 ## Table of Contents
 
@@ -9,6 +9,7 @@ This document describes the REST API endpoints used by the krkn-operator-console
 - [Scenario Endpoints](#scenario-endpoints)
 - [Elasticsearch / Telemetry Endpoints](#elasticsearch--telemetry-endpoints)
 - [User Management Endpoints](#user-management-endpoints)
+- [Jobs WebSocket Subscription](#jobs-websocket-subscription)
 - [Error Responses](#error-responses)
 
 ## Authentication
@@ -507,7 +508,7 @@ if (response.ok) {
 - `startDate` (string, optional) - Start date in "yyyy-MM-dd" format
 - `endDate` (string, optional) - End date in "yyyy-MM-dd" format
 - `filters` (object, optional) - Facet filters as category key → array of allowed values. Documents match when each listed category matches one of its values. Allowed categories: `scenario_type`, `job_status`, `cloud_infrastructure`, `cloud_type`, `major_version`, `network_plugins`. Unknown filter categories are rejected with `400 Bad Request`.
-- `sortBy` (string, optional) - Telemetry sort key: `scenario_type`, `start_timestamp`, `end_timestamp`, `namespace`, or `status`. Scenario-backed keys sort by the representative scenario shown in each table row; Status includes the displayed scenario exit status.
+- `sortBy` (string, optional) - Telemetry sort key: `scenario_type`, `start_timestamp`, `end_timestamp`, or `status`. Scenario-backed keys sort by the representative scenario shown in each table row; Status includes the displayed scenario exit status.
 - `sortOrder` (string, optional) - Sort direction: `asc` or `desc`. Provide together with `sortBy`; omitting both keeps timestamp descending.
 
 **Note:** Exactly one of `configName` or `inline` must be provided.
@@ -1017,6 +1018,31 @@ curl -X DELETE \
   'https://api.example.com/api/v1/users/old.user%40example.com' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 ```
+
+---
+
+## Jobs WebSocket Subscription
+
+The `/api/v2/ws/jobs` subscription streams a server-sorted, paginated list of scenario and graph runs. Optional `filters` are applied before sorting and pagination:
+
+```json
+{
+  "action": "subscribe",
+  "resource": "jobs",
+  "page": 1,
+  "limit": 20,
+  "sortBy": "createdAt",
+  "sortOrder": "desc",
+  "filters": {
+    "owner": "alice@example.com",
+    "createdAtFrom": "2026-10-01T00:00:00.000Z",
+    "createdAtTo": "2026-10-31T23:59:59.000Z",
+    "runName": "chaos"
+  }
+}
+```
+
+`filters` fields are optional. `owner` matches exactly; `createdAtFrom` and `createdAtTo` are inclusive RFC3339 timestamps; `runName` is a case-insensitive substring of a scenario run ID, custom run name, or graph run name. Active fields combine with AND. Omitting `filters` preserves unfiltered subscription behavior.
 
 ---
 
