@@ -320,6 +320,105 @@ describe('BackupRestoreCard', () => {
       });
     });
 
+    it('should show encrypted download label when passphrase is entered', async () => {
+      render(<BackupRestoreCard />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      const passphraseInput = screen.getByPlaceholderText('Passphrase');
+      await user.type(passphraseInput, 'my-secret');
+
+      expect(screen.getByRole('button', { name: /download encrypted backup/i })).toBeInTheDocument();
+    });
+
+    it('should pass passphrase to downloadBackup API', async () => {
+      vi.mocked(backupRestoreApi.downloadBackup).mockResolvedValue();
+
+      render(<BackupRestoreCard />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      const passphraseInput = screen.getByPlaceholderText('Passphrase');
+      await user.type(passphraseInput, 'test-pass');
+      await user.click(screen.getByRole('button', { name: /download encrypted backup/i }));
+
+      await waitFor(() => {
+        expect(backupRestoreApi.downloadBackup).toHaveBeenCalledWith('test-pass');
+      });
+    });
+
+    it('should pass undefined when backup passphrase is empty', async () => {
+      vi.mocked(backupRestoreApi.downloadBackup).mockResolvedValue();
+
+      render(<BackupRestoreCard />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      await user.click(screen.getByRole('button', { name: /download backup/i }));
+
+      await waitFor(() => {
+        expect(backupRestoreApi.downloadBackup).toHaveBeenCalledWith(undefined);
+      });
+    });
+
+    it('should clear restore passphrase when modal opens', async () => {
+      render(<BackupRestoreCard />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      await user.click(screen.getByRole('button', { name: /upload & restore/i }));
+
+      await waitFor(() => {
+        const restorePassInput = screen.getByLabelText(/Passphrase \(required for encrypted/i);
+        expect(restorePassInput).toHaveValue('');
+      });
+    });
+
+    it('should pass passphrase to uploadRestore API', async () => {
+      vi.mocked(backupRestoreApi.uploadRestore).mockResolvedValue({
+        jobId: 'restore-enc',
+        status: 'in_progress',
+      });
+      vi.mocked(backupRestoreApi.getRestoreStatus).mockResolvedValue({
+        jobId: 'restore-enc',
+        status: 'completed',
+      });
+
+      render(<BackupRestoreCard />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      await user.click(screen.getByRole('button', { name: /upload & restore/i }));
+
+      const fileInput = screen.getByTestId('restore-file-input');
+      await user.upload(fileInput, createTestFile('backup.tar.gz.enc'));
+
+      await waitFor(() => {
+        const restorePassInputs = screen.getAllByPlaceholderText('Passphrase');
+        const restorePassInput = restorePassInputs[restorePassInputs.length - 1];
+        expect(restorePassInput).toBeInTheDocument();
+      });
+
+      const restorePassInputs = screen.getAllByPlaceholderText('Passphrase');
+      const restorePassInput = restorePassInputs[restorePassInputs.length - 1];
+      await user.type(restorePassInput, 'decrypt-me');
+
+      const confirmButtons = screen.getAllByRole('button', { name: /upload & restore/i });
+      await user.click(confirmButtons[confirmButtons.length - 1]);
+
+      await waitFor(() => {
+        expect(backupRestoreApi.uploadRestore).toHaveBeenCalledWith(
+          expect.any(File),
+          'decrypt-me'
+        );
+      });
+    });
+
+    it('should accept encrypted .tar.gz.enc files in restore file input', async () => {
+      render(<BackupRestoreCard />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      await user.click(screen.getByRole('button', { name: /upload & restore/i }));
+
+      const fileInput = screen.getByTestId('restore-file-input');
+      expect(fileInput).toHaveAttribute('accept', '.tar.gz,.tar.gz.enc');
+    });
+
     it('should stop polling on unmount', async () => {
       vi.mocked(backupRestoreApi.uploadRestore).mockResolvedValue({
         jobId: 'restore-unmount',
