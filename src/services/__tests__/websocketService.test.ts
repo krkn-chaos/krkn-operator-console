@@ -355,6 +355,43 @@ describe('WebSocketService', () => {
       websocketService.disconnect('test-resub-page');
     });
 
+    it('should preserve jobs filters when reconnecting', () => {
+      const filters = {
+        owner: 'alice@example.com',
+        createdAtFrom: '2026-10-01T00:00:00.000Z',
+        runName: 'chaos',
+      };
+      websocketService.connect('test-resub-filtered-jobs', 'ws://localhost/test', {
+        baseReconnectDelay: 100,
+      });
+      const ws1 = MockWebSocket.latest!;
+      ws1.simulateOpen();
+
+      websocketService.subscribe(
+        'test-resub-filtered-jobs', 'jobs', undefined, 2, 10, [], 'filtered-sub', true, 'name', 'asc', filters,
+      );
+      ws1.simulateClose(1006);
+      vi.advanceTimersByTime(100);
+
+      const ws2 = MockWebSocket.latest!;
+      ws2.simulateOpen();
+
+      expect(JSON.parse(ws2.sent[0])).toEqual({
+        action: 'subscribe',
+        resource: 'jobs',
+        page: 2,
+        limit: 10,
+        categories: [],
+        subscriptionId: 'filtered-sub',
+        groupRollbacks: true,
+        sortBy: 'name',
+        sortOrder: 'asc',
+        filters,
+      });
+
+      websocketService.disconnect('test-resub-filtered-jobs');
+    });
+
     it('should re-subscribe after reconnect', () => {
       websocketService.connect('test-resub', 'ws://localhost/test', {
         baseReconnectDelay: 100,

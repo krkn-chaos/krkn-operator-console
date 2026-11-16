@@ -17,6 +17,16 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
+export type JobsSortField = 'createdAt' | 'status' | 'name' | 'owner';
+export type JobsSortOrder = 'asc' | 'desc';
+
+export interface JobsSubscriptionFilters {
+  owner?: string;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  runName?: string;
+}
+
 // Client → Server messages (subscription pattern only)
 export interface SubscribeMessage {
   action: 'subscribe';
@@ -26,6 +36,9 @@ export interface SubscribeMessage {
   limit?: number;
   categories?: string[];
   groupRollbacks?: boolean;
+  filters?: JobsSubscriptionFilters;
+  sortBy?: JobsSortField;
+  sortOrder?: JobsSortOrder;
   /** Correlates snapshots to the subscription that requested them. */
   subscriptionId?: string;
 }
@@ -65,6 +78,9 @@ export interface Subscription {
   limit?: number;
   categories?: string[];
   groupRollbacks?: boolean;
+  filters?: JobsSubscriptionFilters;
+  sortBy?: JobsSortField;
+  sortOrder?: JobsSortOrder;
   subscriptionId?: string;
 }
 

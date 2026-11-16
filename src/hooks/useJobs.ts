@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { websocketService } from '../services/websocketService';
-import type { ServerMessage, PaginationMeta } from '../types/websocket';
+import type { JobsSortField, JobsSortOrder, JobsSubscriptionFilters, PaginationMeta, ServerMessage } from '../types/websocket';
 import type { UnifiedJobItem, JobStatsSummary } from '../types/api';
 
 const DEFAULT_PAGE = 1;
@@ -9,6 +9,7 @@ const DEFAULT_LIMIT = 20;
 const EMPTY_PAGINATION: PaginationMeta = { page: 0, limit: 0, total: 0, totalPages: 0 };
 const EMPTY_STATS: JobStatsSummary = { totalJobs: 0, succeededJobs: 0, failedJobs: 0 };
 const EMPTY_CATEGORIES: string[] = [];
+const EMPTY_FILTERS: JobsSubscriptionFilters = {};
 
 interface UseJobsReturn {
   jobs: UnifiedJobItem[];
@@ -27,11 +28,16 @@ interface UseJobsReturn {
 /**
  * Hook providing a unified paginated jobs list via WebSocket.
  *
- * Subscribes to WS resource 'jobs' with page/limit and optional category filters.
+ * Subscribes to WS resource 'jobs' with page, limit, filters, and sort.
  * Backend sends a snapshot automatically on subscribe and on every change.
- * When page or limit changes, re-subscribes to get the new page.
+ * Page, limit, filters, or sort changes create a fresh subscription.
  */
-export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsReturn {
+export function useJobs(
+  categoryFilters: string[] = EMPTY_CATEGORIES,
+  sortBy: JobsSortField = 'createdAt',
+  sortOrder: JobsSortOrder = 'desc',
+  jobFilters: JobsSubscriptionFilters = EMPTY_FILTERS,
+): UseJobsReturn {
   const [jobs, setJobs] = useState<UnifiedJobItem[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta>(EMPTY_PAGINATION);
   const [stats, setStats] = useState<JobStatsSummary>(EMPTY_STATS);
@@ -48,7 +54,17 @@ export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsRe
   const desiredSubscriptionKeyRef = useRef('');
   const categories = useMemo(() => [...new Set(categoryFilters)].sort(), [categoryFilters]);
   const categoriesKey = categories.join('\u0000');
-  const subscriptionKey = `${page}:${limit}:${categoriesKey}`;
+  const filters = useMemo(() => {
+    const activeFilters = {
+      owner: jobFilters.owner || undefined,
+      createdAtFrom: jobFilters.createdAtFrom || undefined,
+      createdAtTo: jobFilters.createdAtTo || undefined,
+      runName: jobFilters.runName || undefined,
+    };
+    return Object.values(activeFilters).some(Boolean) ? activeFilters : undefined;
+  }, [jobFilters.owner, jobFilters.createdAtFrom, jobFilters.createdAtTo, jobFilters.runName]);
+  const filtersKey = JSON.stringify(filters ?? {});
+  const subscriptionKey = `${page}:${limit}:${categoriesKey}:${sortBy}:${sortOrder}:${filtersKey}`;
   if (desiredSubscriptionKeyRef.current !== subscriptionKey) {
     desiredSubscriptionKeyRef.current = subscriptionKey;
     activeSubscriptionIdRef.current = null;
@@ -97,8 +113,8 @@ export function useJobs(categoryFilters: string[] = EMPTY_CATEGORIES): UseJobsRe
     activeSubscriptionIdRef.current = subscriptionId;
 
     setIsLoading(true);
-    websocketService.subscribe('jobs', 'jobs', undefined, page, limit, categories, subscriptionId, true);
-  }, [connectionState, page, limit, categories, subscriptionKey, refreshVersion]);
+    websocketService.subscribe('jobs', 'jobs', undefined, page, limit, categories, subscriptionId, true, sortBy, sortOrder, filters);
+  }, [connectionState, page, limit, categories, subscriptionKey, refreshVersion, sortBy, sortOrder, filters]);
 
   return {
     jobs,
