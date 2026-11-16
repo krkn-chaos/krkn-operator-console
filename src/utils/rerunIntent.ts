@@ -13,7 +13,7 @@ export function buildRerunIntent(config: JobConfigResponse, run: ScenarioRunStat
       ...(run.registryName ? { registryName: run.registryName } : {}),
     },
     clusters,
-    environment: config.environment,
+    environment: config.environment ?? {},
     kubeconfigPath: config.kubeconfigPath,
     ...(config.cloudCredentialRef ? { cloudCredentialRef: config.cloudCredentialRef } : {}),
     categories: config.categories,

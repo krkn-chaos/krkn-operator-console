@@ -1,7 +1,8 @@
 import { render, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { AppProvider, useAppContext } from '../AppContext';
-import type { GraphRunState, AppAction } from '../../types/api';
+import { buildRerunIntent } from '../../utils/rerunIntent';
+import type { GraphRunState, AppAction, JobConfigResponse, ScenarioRunState } from '../../types/api';
 
 let capturedDispatch: React.Dispatch<AppAction>;
 let capturedState: ReturnType<typeof useAppContext>['state'];
@@ -76,6 +77,40 @@ describe('AppContext reducer', () => {
       act(() => capturedDispatch({ type: 'CLUSTERS_SELECTED' }));
       expect(capturedState.phase).toBe('loading_scenario_detail');
       expect(capturedState.selectedScenario).toBe('pod-scenarios');
+    });
+  });
+
+  describe('rerun of a run saved without environment variables', () => {
+    it('opens the scenario form with its defaults and the saved run settings', () => {
+      const config: JobConfigResponse = {
+        targetRequestId: 'target-1',
+        targetClusters: { operator: ['cluster'] },
+        scenario: { name: 'pod-scenarios', private: false },
+        kubeconfigPath: '/home/krkn/.kube/config',
+      };
+      renderWithProvider();
+
+      act(() => {
+        capturedDispatch({ type: 'RERUN_SCENARIO', payload: buildRerunIntent(config, {} as ScenarioRunState) });
+        capturedDispatch({
+          type: 'SCENARIO_DETAIL_SUCCESS',
+          payload: {
+            scenarioDetail: {
+              name: 'pod-scenarios',
+              title: 'Pod Scenarios',
+              description: 'Kill pods',
+              fields: [
+                { name: 'namespace', short_description: 'Namespace', description: 'Namespace', variable: 'NAMESPACE', type: 'string', default: 'default' },
+              ],
+            },
+          },
+        });
+      });
+
+      expect(capturedState.phase).toBe('configuring_scenario');
+      expect(capturedState.scenarioFormValues).toEqual({ NAMESPACE: 'default' });
+      expect(capturedState.rerunScenario).toEqual({ name: 'pod-scenarios', private: false });
+      expect(capturedState.rerunKubeconfigPath).toBe('/home/krkn/.kube/config');
     });
   });
 
