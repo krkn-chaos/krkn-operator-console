@@ -19,7 +19,12 @@ import {
 import { registriesApi } from '../services/registriesApi';
 import { groupsApi } from '../services/groupsApi';
 import { useNotifications } from '../hooks';
-import type { CreateRegistryRequest, UpdateRegistryRequest, GroupDetails, AuthType } from '../types/api';
+import type {
+  CreateRegistryRequest,
+  UpdateRegistryRequest,
+  GroupDetails,
+  AuthType,
+} from '../types/api';
 
 /**
  * Registry Form component props
@@ -231,7 +236,6 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
 
     try {
       if (isEditMode) {
-        // EDIT MODE
         const data: UpdateRegistryRequest = {
           registryUrl: registryUrl.trim(),
           scenarioRepository: scenarioRepository.trim(),
@@ -242,7 +246,6 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
           groups: Array.from(selectedGroups),
           availableToAll,
         };
-
         // Add credentials only if provided
         if (username.trim()) {
           data.username = username.trim(); // Include username if provided
@@ -258,21 +261,19 @@ export function RegistryForm({ registryName, onSubmit, onCancel }: RegistryFormP
         await registriesApi.updateRegistry(registryName, data);
         showSuccess('Registry updated', `Registry "${registryName}" has been updated successfully`);
       } else {
-        // CREATE MODE
         const data: CreateRegistryRequest = {
           name: name.trim(),
           registryUrl: registryUrl.trim(),
           scenarioRepository: scenarioRepository.trim(),
           authType,
-          username: username.trim(), // Always include username
-          // Password field contains either token or password depending on authType
+          username: username.trim(),
           password: authType === 'token' ? token.trim() : password.trim(),
           description: description.trim() || undefined,
           skipTls,
           insecure,
           groups: Array.from(selectedGroups),
           availableToAll,
-        }
+        };
 
         await registriesApi.createRegistry(data);
         showSuccess('Registry created', `Registry "${name}" has been created successfully`);

@@ -1,4 +1,7 @@
 import { ws } from 'msw';
+import type { ScenarioRunStatusResponse } from '../types/api';
+import { listPreviewAiChildren } from './krknAiState';
+import { krknAiWebsocketHandlers } from './krknAiWebsocketHandlers';
 
 // Mock data for WebSocket updates (matches REST mock data shapes)
 const mockScenarioRunUpdate = {
@@ -170,12 +173,30 @@ export function createRunsMessage(
   runId = scenarioRun.scenarioRunName,
 ) {
   if (resource === 'jobs') {
+    const representatives = new Map<string, ScenarioRunStatusResponse>();
+    for (const { parentRunName, run } of listPreviewAiChildren()) {
+      const existing = representatives.get(parentRunName);
+      if (!existing || (existing.phase === 'Succeeded' && run.phase !== 'Succeeded')) representatives.set(parentRunName, run);
+    }
+    const children = [...representatives.values()];
+    const jobs = [...mockJobsSnapshot.jobs, ...children.map((run) => ({
+      type: 'scenarioRun' as const,
+      name: run.scenarioRunName,
+      createdAt: run.creationTimestamp ?? '2026-10-01T10:36:19Z',
+      scenarioRun: run,
+    }))];
+    const pagination = { ...mockJobsSnapshot.pagination, total: jobs.length };
+    const stats = {
+      totalJobs: mockJobsSnapshot.stats.totalJobs + children.length,
+      succeededJobs: mockJobsSnapshot.stats.succeededJobs + children.filter((run) => run.phase === 'Succeeded').length,
+      failedJobs: mockJobsSnapshot.stats.failedJobs + children.filter((run) => run.phase === 'Failed').length,
+    };
     return {
       resource: 'jobs',
       event: 'snapshot',
-      data: mockJobsSnapshot,
-      pagination: mockJobsSnapshot.pagination,
-      stats: mockJobsSnapshot.stats,
+      data: { ...mockJobsSnapshot, jobs, pagination, stats },
+      pagination,
+      stats,
     };
   }
 
@@ -290,6 +311,7 @@ const dashboardHandler = dashboardWs.addEventListener('connection', ({ client })
 });
 
 const logsHandler = logsWs.addEventListener('connection', ({ client }) => {
+  if (String(client.url).includes('/scenarios/run/preview-ai-child-')) return;
   const isFailedJob = (client as unknown as { url?: string }).url?.includes('job-failed-001') === true;
   const mockLines = getMockLogLines(isFailedJob ? 'job-failed-001' : 'job-ghi-001');
 
@@ -306,4 +328,4 @@ const logsHandler = logsWs.addEventListener('connection', ({ client }) => {
   client.addEventListener('close', () => clearInterval(interval));
 });
 
-export const websocketHandlers = [runsHandler, graphrunsHandler, dashboardHandler, logsHandler];
+export const websocketHandlers = [...krknAiWebsocketHandlers, runsHandler, graphrunsHandler, dashboardHandler, logsHandler];

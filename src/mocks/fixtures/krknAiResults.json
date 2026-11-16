@@ -1,0 +1,2541 @@
+{
+  "source": "Sanitized Robot Shop health/query/raw measurements from a local example run. Aggregate and normalized scores are preview simulations; private endpoints, selectors, identifiers, credentials, and original logs are omitted.",
+  "createdAt": "2026-10-01T10:36:19Z",
+  "configuredGenerations": 2,
+  "populationSize": 2,
+  "bestFitness": 84,
+  "averageFitness": 60,
+  "baselineFitness": 20,
+  "fitnessProgression": [
+    {
+      "generation": 0,
+      "best": 52,
+      "average": 44
+    },
+    {
+      "generation": 1,
+      "best": 84,
+      "average": 76
+    }
+  ],
+  "fitnessItems": [
+    {
+      "id": 0,
+      "query": "(sum(increase(kube_pod_container_status_restarts_total{namespace=\"robot-shop\"}[$range$]))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 1,
+      "query": "(sum(kube_pod_status_phase{namespace=\"robot-shop\", phase=~\"Pending|Failed|Unknown\"})) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 2,
+      "query": "(sum(kube_pod_container_status_last_terminated_reason{namespace=\"robot-shop\", reason=\"OOMKilled\"})) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 3,
+      "query": "(max(rate(container_cpu_cfs_throttled_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]) / rate(container_cpu_cfs_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 4,
+      "query": "(sum(kube_node_status_condition{condition=~\"MemoryPressure|DiskPressure|PIDPressure\", status=\"true\"})) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 5,
+      "query": "(sum(rate(apiserver_request_total{code=~\"5..\"}[$range$])) / sum(rate(apiserver_request_total[$range$]))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 6,
+      "query": "(histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\"}[$range$])) by (le))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 7,
+      "query": "(sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"} == bool 0)) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 8,
+      "query": "(clamp_min(sum(kube_deployment_spec_replicas{namespace=\"robot-shop\"} - kube_deployment_status_replicas_available{namespace=\"robot-shop\"}), 0)) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 9,
+      "query": "(clamp_min(sum(kube_statefulset_status_replicas{namespace=\"robot-shop\"} - kube_statefulset_status_replicas_ready{namespace=\"robot-shop\"}), 0)) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 10,
+      "query": "(sum(kube_pod_container_status_waiting_reason{namespace=\"robot-shop\", reason=\"CrashLoopBackOff\"})) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 11,
+      "query": "(clamp_min(sum(kube_poddisruptionbudget_status_desired_healthy{namespace=\"robot-shop\"} - kube_poddisruptionbudget_status_current_healthy{namespace=\"robot-shop\"}), 0)) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 12,
+      "query": "(sum(kube_persistentvolumeclaim_status_phase{namespace=\"robot-shop\", phase=\"Pending\"})) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 13,
+      "query": "(histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 14,
+      "query": "((sum(rate(etcd_request_errors_total[$range$])) / sum(rate(etcd_requests_total[$range$]))) and (sum(rate(etcd_requests_total[$range$])) > 0)) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 15,
+      "query": "(max(apiserver_storage_size_bytes)) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 16,
+      "query": "(sum(etcd_server_has_leader == bool 0)) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 17,
+      "query": "(max(increase(etcd_server_leader_changes_seen_total[$range$]))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 18,
+      "query": "(sum(increase(etcd_server_proposals_failed_total[$range$]))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 19,
+      "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 20,
+      "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    },
+    {
+      "id": 21,
+      "query": "(histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket[$range$])) by (le))) or vector(0)",
+      "type": "range",
+      "weight": 1
+    }
+  ],
+  "scenarios": [
+    {
+      "generation": 0,
+      "scenarioId": "baseline",
+      "scenarioType": "dummy-scenario",
+      "parameters": [
+        {
+          "name": "duration",
+          "value": 30
+        },
+        {
+          "name": "exit-status",
+          "value": 0
+        }
+      ],
+      "command": "Preview: run dummy-scenario",
+      "origin": null,
+      "parentIds": [],
+      "durationSeconds": 35.113131207999686,
+      "returnCode": 0,
+      "fitnessResult": {
+        "fitnessScore": 20,
+        "scores": [
+          {
+            "id": 0,
+            "rawScore": 0,
+            "normalizedScore": 0.01,
+            "query": "(sum(increase(kube_pod_container_status_restarts_total{namespace=\"robot-shop\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 1,
+            "rawScore": 0,
+            "normalizedScore": 0.02,
+            "query": "(sum(kube_pod_status_phase{namespace=\"robot-shop\", phase=~\"Pending|Failed|Unknown\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 2,
+            "rawScore": 0,
+            "normalizedScore": 0.03,
+            "query": "(sum(kube_pod_container_status_last_terminated_reason{namespace=\"robot-shop\", reason=\"OOMKilled\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 3,
+            "rawScore": 0,
+            "normalizedScore": 0.04,
+            "query": "(max(rate(container_cpu_cfs_throttled_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]) / rate(container_cpu_cfs_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 4,
+            "rawScore": 0,
+            "normalizedScore": 0.05,
+            "query": "(sum(kube_node_status_condition{condition=~\"MemoryPressure|DiskPressure|PIDPressure\", status=\"true\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 5,
+            "rawScore": 0,
+            "normalizedScore": 0.06,
+            "query": "(sum(rate(apiserver_request_total{code=~\"5..\"}[$range$])) / sum(rate(apiserver_request_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 6,
+            "rawScore": 0.03913757110766808,
+            "normalizedScore": 0.07,
+            "query": "(histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\"}[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 7,
+            "rawScore": 0,
+            "normalizedScore": 0.08,
+            "query": "(sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"} == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 8,
+            "rawScore": 0,
+            "normalizedScore": 0.09,
+            "query": "(clamp_min(sum(kube_deployment_spec_replicas{namespace=\"robot-shop\"} - kube_deployment_status_replicas_available{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 9,
+            "rawScore": 0,
+            "normalizedScore": 0.1,
+            "query": "(clamp_min(sum(kube_statefulset_status_replicas{namespace=\"robot-shop\"} - kube_statefulset_status_replicas_ready{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 10,
+            "rawScore": 0,
+            "normalizedScore": 0.11,
+            "query": "(sum(kube_pod_container_status_waiting_reason{namespace=\"robot-shop\", reason=\"CrashLoopBackOff\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 11,
+            "rawScore": 0,
+            "normalizedScore": 0.12,
+            "query": "(clamp_min(sum(kube_poddisruptionbudget_status_desired_healthy{namespace=\"robot-shop\"} - kube_poddisruptionbudget_status_current_healthy{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 12,
+            "rawScore": 0,
+            "normalizedScore": 0.13,
+            "query": "(sum(kube_persistentvolumeclaim_status_phase{namespace=\"robot-shop\", phase=\"Pending\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 13,
+            "rawScore": 0.017524397998068396,
+            "normalizedScore": 0.14,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 14,
+            "rawScore": 0,
+            "normalizedScore": 0.15,
+            "query": "((sum(rate(etcd_request_errors_total[$range$])) / sum(rate(etcd_requests_total[$range$]))) and (sum(rate(etcd_requests_total[$range$])) > 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 15,
+            "rawScore": 65200128,
+            "normalizedScore": 0.16,
+            "query": "(max(apiserver_storage_size_bytes)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 16,
+            "rawScore": 0,
+            "normalizedScore": 0.17,
+            "query": "(sum(etcd_server_has_leader == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 17,
+            "rawScore": 0,
+            "normalizedScore": 0.18,
+            "query": "(max(increase(etcd_server_leader_changes_seen_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 18,
+            "rawScore": 0,
+            "normalizedScore": 0.19,
+            "query": "(sum(increase(etcd_server_proposals_failed_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 19,
+            "rawScore": 0.003974651162790698,
+            "normalizedScore": 0.2,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 20,
+            "rawScore": 0.004386666666666661,
+            "normalizedScore": 0.21,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 21,
+            "rawScore": 0.025325714285714285,
+            "normalizedScore": 0.22,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          }
+        ],
+        "healthCheckFailureScore": 0,
+        "healthCheckResponseTimeScore": 0.08387435984471306,
+        "krknFailureScore": 0
+      },
+      "healthChecks": [
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:26:48.637765",
+          "elapsedSeconds": 0.013618,
+          "responseTimeSeconds": 0.011379,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:26:53.645681",
+          "elapsedSeconds": 5.021534,
+          "responseTimeSeconds": 0.006876,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:26:58.653789",
+          "elapsedSeconds": 10.029642,
+          "responseTimeSeconds": 0.007204,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:03.662092",
+          "elapsedSeconds": 15.037945,
+          "responseTimeSeconds": 0.007459,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:08.670601",
+          "elapsedSeconds": 20.046454,
+          "responseTimeSeconds": 0.007678,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:13.677838",
+          "elapsedSeconds": 25.053691,
+          "responseTimeSeconds": 0.006394,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:18.687908",
+          "elapsedSeconds": 30.063761,
+          "responseTimeSeconds": 0.009229,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:23.697094",
+          "elapsedSeconds": 35.072947,
+          "responseTimeSeconds": 0.008334,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:26:48.641937",
+          "elapsedSeconds": 0.01779,
+          "responseTimeSeconds": 0.014405,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:26:50.650871",
+          "elapsedSeconds": 2.026724,
+          "responseTimeSeconds": 0.008066,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:26:52.660779",
+          "elapsedSeconds": 4.036632,
+          "responseTimeSeconds": 0.008898,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:26:54.669767",
+          "elapsedSeconds": 6.04562,
+          "responseTimeSeconds": 0.008147,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:26:56.678519",
+          "elapsedSeconds": 8.054372,
+          "responseTimeSeconds": 0.007868,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:26:58.686032",
+          "elapsedSeconds": 10.061885,
+          "responseTimeSeconds": 0.006787,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:00.695433",
+          "elapsedSeconds": 12.071286,
+          "responseTimeSeconds": 0.008512,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:02.704134",
+          "elapsedSeconds": 14.079987,
+          "responseTimeSeconds": 0.007845,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:04.712877",
+          "elapsedSeconds": 16.08873,
+          "responseTimeSeconds": 0.007818,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:06.721813",
+          "elapsedSeconds": 18.097666,
+          "responseTimeSeconds": 0.008042,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:08.730488",
+          "elapsedSeconds": 20.106341,
+          "responseTimeSeconds": 0.007786,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:10.738410",
+          "elapsedSeconds": 22.114263,
+          "responseTimeSeconds": 0.007096,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:12.748274",
+          "elapsedSeconds": 24.124127,
+          "responseTimeSeconds": 0.008967,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:14.757405",
+          "elapsedSeconds": 26.133258,
+          "responseTimeSeconds": 0.008256,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:16.766057",
+          "elapsedSeconds": 28.14191,
+          "responseTimeSeconds": 0.00775,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:18.775069",
+          "elapsedSeconds": 30.150922,
+          "responseTimeSeconds": 0.008097,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:20.783886",
+          "elapsedSeconds": 32.159739,
+          "responseTimeSeconds": 0.007954,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:22.792596",
+          "elapsedSeconds": 34.168449,
+          "responseTimeSeconds": 0.007859,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        }
+      ],
+      "logPath": "logs/scenario_baseline.log",
+      "fitnessState": "final"
+    },
+    {
+      "generation": 0,
+      "scenarioId": "0",
+      "scenarioType": "pod-scenarios",
+      "parameters": [
+        {
+          "name": "namespace",
+          "value": "robot-shop"
+        },
+        {
+          "name": "pod-label",
+          "value": "preview"
+        },
+        {
+          "name": "name-pattern",
+          "value": "preview"
+        },
+        {
+          "name": "disruption-count",
+          "value": 1
+        },
+        {
+          "name": "kill-timeout",
+          "value": 60
+        },
+        {
+          "name": "expected-recovery-time",
+          "value": 60
+        }
+      ],
+      "command": "Preview: run pod-scenarios",
+      "origin": "initial",
+      "parentIds": [],
+      "durationSeconds": 45.121234948001074,
+      "returnCode": 0,
+      "fitnessResult": {
+        "fitnessScore": 36,
+        "scores": [
+          {
+            "id": 0,
+            "rawScore": 0,
+            "normalizedScore": 0.02,
+            "query": "(sum(increase(kube_pod_container_status_restarts_total{namespace=\"robot-shop\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 1,
+            "rawScore": 0,
+            "normalizedScore": 0.04,
+            "query": "(sum(kube_pod_status_phase{namespace=\"robot-shop\", phase=~\"Pending|Failed|Unknown\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 2,
+            "rawScore": 0,
+            "normalizedScore": 0.06,
+            "query": "(sum(kube_pod_container_status_last_terminated_reason{namespace=\"robot-shop\", reason=\"OOMKilled\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 3,
+            "rawScore": 0.07692307692307691,
+            "normalizedScore": 0.08,
+            "query": "(max(rate(container_cpu_cfs_throttled_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]) / rate(container_cpu_cfs_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 4,
+            "rawScore": 0,
+            "normalizedScore": 0.1,
+            "query": "(sum(kube_node_status_condition{condition=~\"MemoryPressure|DiskPressure|PIDPressure\", status=\"true\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 5,
+            "rawScore": 0,
+            "normalizedScore": 0.12,
+            "query": "(sum(rate(apiserver_request_total{code=~\"5..\"}[$range$])) / sum(rate(apiserver_request_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 6,
+            "rawScore": 0.03338504581468977,
+            "normalizedScore": 0.14,
+            "query": "(histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\"}[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 7,
+            "rawScore": 0,
+            "normalizedScore": 0.16,
+            "query": "(sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"} == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 8,
+            "rawScore": 0,
+            "normalizedScore": 0.18,
+            "query": "(clamp_min(sum(kube_deployment_spec_replicas{namespace=\"robot-shop\"} - kube_deployment_status_replicas_available{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 9,
+            "rawScore": 0,
+            "normalizedScore": 0.2,
+            "query": "(clamp_min(sum(kube_statefulset_status_replicas{namespace=\"robot-shop\"} - kube_statefulset_status_replicas_ready{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 10,
+            "rawScore": 0,
+            "normalizedScore": 0.22,
+            "query": "(sum(kube_pod_container_status_waiting_reason{namespace=\"robot-shop\", reason=\"CrashLoopBackOff\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 11,
+            "rawScore": 0,
+            "normalizedScore": 0.24,
+            "query": "(clamp_min(sum(kube_poddisruptionbudget_status_desired_healthy{namespace=\"robot-shop\"} - kube_poddisruptionbudget_status_current_healthy{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 12,
+            "rawScore": 0,
+            "normalizedScore": 0.26,
+            "query": "(sum(kube_persistentvolumeclaim_status_phase{namespace=\"robot-shop\", phase=\"Pending\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 13,
+            "rawScore": 0.016527360222563965,
+            "normalizedScore": 0.28,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 14,
+            "rawScore": 0,
+            "normalizedScore": 0.3,
+            "query": "((sum(rate(etcd_request_errors_total[$range$])) / sum(rate(etcd_requests_total[$range$]))) and (sum(rate(etcd_requests_total[$range$])) > 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 15,
+            "rawScore": 65200128,
+            "normalizedScore": 0.32,
+            "query": "(max(apiserver_storage_size_bytes)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 16,
+            "rawScore": 0,
+            "normalizedScore": 0.34,
+            "query": "(sum(etcd_server_has_leader == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 17,
+            "rawScore": 0,
+            "normalizedScore": 0.36,
+            "query": "(max(increase(etcd_server_leader_changes_seen_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 18,
+            "rawScore": 0,
+            "normalizedScore": 0.38,
+            "query": "(sum(increase(etcd_server_proposals_failed_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 19,
+            "rawScore": 0.003998322580645161,
+            "normalizedScore": 0.4,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 20,
+            "rawScore": 0.0039805,
+            "normalizedScore": 0.42,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 21,
+            "rawScore": 0.025248,
+            "normalizedScore": 0.44,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          }
+        ],
+        "healthCheckFailureScore": 0,
+        "healthCheckResponseTimeScore": 0.10032069152055557,
+        "krknFailureScore": 0.03
+      },
+      "healthChecks": [
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:26.322292",
+          "elapsedSeconds": 0.010826,
+          "responseTimeSeconds": 0.008606,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:31.329897",
+          "elapsedSeconds": 5.018431,
+          "responseTimeSeconds": 0.006823,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:36.338785",
+          "elapsedSeconds": 10.027319,
+          "responseTimeSeconds": 0.008025,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:41.346754",
+          "elapsedSeconds": 15.035288,
+          "responseTimeSeconds": 0.007118,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:46.355418",
+          "elapsedSeconds": 20.043952,
+          "responseTimeSeconds": 0.00768,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:51.362943",
+          "elapsedSeconds": 25.051477,
+          "responseTimeSeconds": 0.006705,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:27:56.370706",
+          "elapsedSeconds": 30.05924,
+          "responseTimeSeconds": 0.006788,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:01.378362",
+          "elapsedSeconds": 35.066896,
+          "responseTimeSeconds": 0.006748,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:06.386313",
+          "elapsedSeconds": 40.074847,
+          "responseTimeSeconds": 0.007038,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:11.394334",
+          "elapsedSeconds": 45.082868,
+          "responseTimeSeconds": 0.007137,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:26.322564",
+          "elapsedSeconds": 0.011098,
+          "responseTimeSeconds": 0.008095,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:28.330985",
+          "elapsedSeconds": 2.019519,
+          "responseTimeSeconds": 0.007628,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:30.340821",
+          "elapsedSeconds": 4.029355,
+          "responseTimeSeconds": 0.008793,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:32.350218",
+          "elapsedSeconds": 6.038752,
+          "responseTimeSeconds": 0.00841,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:34.358617",
+          "elapsedSeconds": 8.047151,
+          "responseTimeSeconds": 0.00756,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:36.366699",
+          "elapsedSeconds": 10.055233,
+          "responseTimeSeconds": 0.007388,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:38.376417",
+          "elapsedSeconds": 12.064951,
+          "responseTimeSeconds": 0.008821,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:40.384652",
+          "elapsedSeconds": 14.073186,
+          "responseTimeSeconds": 0.007396,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:42.393582",
+          "elapsedSeconds": 16.082116,
+          "responseTimeSeconds": 0.007919,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:44.402804",
+          "elapsedSeconds": 18.091338,
+          "responseTimeSeconds": 0.008347,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:46.411722",
+          "elapsedSeconds": 20.100256,
+          "responseTimeSeconds": 0.008189,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:48.419627",
+          "elapsedSeconds": 22.108161,
+          "responseTimeSeconds": 0.006991,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:50.431934",
+          "elapsedSeconds": 24.120468,
+          "responseTimeSeconds": 0.011252,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:52.440892",
+          "elapsedSeconds": 26.129426,
+          "responseTimeSeconds": 0.008063,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:54.451124",
+          "elapsedSeconds": 28.139658,
+          "responseTimeSeconds": 0.009237,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:56.460280",
+          "elapsedSeconds": 30.148814,
+          "responseTimeSeconds": 0.00819,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:27:58.468764",
+          "elapsedSeconds": 32.157298,
+          "responseTimeSeconds": 0.007647,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:00.478137",
+          "elapsedSeconds": 34.166671,
+          "responseTimeSeconds": 0.008483,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:02.487519",
+          "elapsedSeconds": 36.176053,
+          "responseTimeSeconds": 0.008546,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:04.496055",
+          "elapsedSeconds": 38.184589,
+          "responseTimeSeconds": 0.0077,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:06.503685",
+          "elapsedSeconds": 40.192219,
+          "responseTimeSeconds": 0.006732,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:08.513106",
+          "elapsedSeconds": 42.20164,
+          "responseTimeSeconds": 0.008527,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:10.521754",
+          "elapsedSeconds": 44.210288,
+          "responseTimeSeconds": 0.007722,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        }
+      ],
+      "logPath": "logs/scenario_0.log",
+      "fitnessState": "final"
+    },
+    {
+      "generation": 0,
+      "scenarioId": "1",
+      "scenarioType": "container-scenarios",
+      "parameters": [
+        {
+          "name": "namespace",
+          "value": "robot-shop"
+        },
+        {
+          "name": "label-selector",
+          "value": "preview"
+        },
+        {
+          "name": "disruption-count",
+          "value": 1
+        },
+        {
+          "name": "container-name",
+          "value": "preview"
+        },
+        {
+          "name": "action",
+          "value": "preview"
+        },
+        {
+          "name": "expected-recovery-time",
+          "value": 60
+        }
+      ],
+      "command": "Preview: run container-scenarios",
+      "origin": "initial",
+      "parentIds": [],
+      "durationSeconds": 15.069864241002506,
+      "returnCode": 0,
+      "fitnessResult": {
+        "fitnessScore": 52,
+        "scores": [
+          {
+            "id": 0,
+            "rawScore": 0,
+            "normalizedScore": 0.03,
+            "query": "(sum(increase(kube_pod_container_status_restarts_total{namespace=\"robot-shop\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 1,
+            "rawScore": 0,
+            "normalizedScore": 0.06,
+            "query": "(sum(kube_pod_status_phase{namespace=\"robot-shop\", phase=~\"Pending|Failed|Unknown\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 2,
+            "rawScore": 0,
+            "normalizedScore": 0.09,
+            "query": "(sum(kube_pod_container_status_last_terminated_reason{namespace=\"robot-shop\", reason=\"OOMKilled\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 3,
+            "rawScore": 0.4150943396226415,
+            "normalizedScore": 0.12,
+            "query": "(max(rate(container_cpu_cfs_throttled_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]) / rate(container_cpu_cfs_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 4,
+            "rawScore": 0,
+            "normalizedScore": 0.15,
+            "query": "(sum(kube_node_status_condition{condition=~\"MemoryPressure|DiskPressure|PIDPressure\", status=\"true\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 5,
+            "rawScore": 0,
+            "normalizedScore": 0.18,
+            "query": "(sum(rate(apiserver_request_total{code=~\"5..\"}[$range$])) / sum(rate(apiserver_request_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 6,
+            "rawScore": 0.024378614886840136,
+            "normalizedScore": 0.21,
+            "query": "(histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\"}[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 7,
+            "rawScore": 0,
+            "normalizedScore": 0.24,
+            "query": "(sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"} == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 8,
+            "rawScore": 0,
+            "normalizedScore": 0.27,
+            "query": "(clamp_min(sum(kube_deployment_spec_replicas{namespace=\"robot-shop\"} - kube_deployment_status_replicas_available{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 9,
+            "rawScore": 0,
+            "normalizedScore": 0.3,
+            "query": "(clamp_min(sum(kube_statefulset_status_replicas{namespace=\"robot-shop\"} - kube_statefulset_status_replicas_ready{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 10,
+            "rawScore": 0,
+            "normalizedScore": 0.33,
+            "query": "(sum(kube_pod_container_status_waiting_reason{namespace=\"robot-shop\", reason=\"CrashLoopBackOff\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 11,
+            "rawScore": 0,
+            "normalizedScore": 0.36,
+            "query": "(clamp_min(sum(kube_poddisruptionbudget_status_desired_healthy{namespace=\"robot-shop\"} - kube_poddisruptionbudget_status_current_healthy{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 12,
+            "rawScore": 0,
+            "normalizedScore": 0.39,
+            "query": "(sum(kube_persistentvolumeclaim_status_phase{namespace=\"robot-shop\", phase=\"Pending\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 13,
+            "rawScore": 0.014764218296783118,
+            "normalizedScore": 0.42,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 14,
+            "rawScore": 0,
+            "normalizedScore": 0.45,
+            "query": "((sum(rate(etcd_request_errors_total[$range$])) / sum(rate(etcd_requests_total[$range$]))) and (sum(rate(etcd_requests_total[$range$])) > 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 15,
+            "rawScore": 65200128,
+            "normalizedScore": 0.48,
+            "query": "(max(apiserver_storage_size_bytes)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 16,
+            "rawScore": 0,
+            "normalizedScore": 0.51,
+            "query": "(sum(etcd_server_has_leader == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 17,
+            "rawScore": 0,
+            "normalizedScore": 0.54,
+            "query": "(max(increase(etcd_server_leader_changes_seen_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 18,
+            "rawScore": 0,
+            "normalizedScore": 0.57,
+            "query": "(sum(increase(etcd_server_proposals_failed_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 19,
+            "rawScore": 0.003966010362694301,
+            "normalizedScore": 0.6,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 20,
+            "rawScore": 0.007035555555555545,
+            "normalizedScore": 0.63,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 21,
+            "rawScore": 0.025301333333333335,
+            "normalizedScore": 0.66,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          }
+        ],
+        "healthCheckFailureScore": 0,
+        "healthCheckResponseTimeScore": 0.262564821410591,
+        "krknFailureScore": 0.03
+      },
+      "healthChecks": [
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:13.904430",
+          "elapsedSeconds": 0.01013,
+          "responseTimeSeconds": 0.007395,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:18.911940",
+          "elapsedSeconds": 5.01764,
+          "responseTimeSeconds": 0.006701,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:23.920711",
+          "elapsedSeconds": 10.026411,
+          "responseTimeSeconds": 0.007872,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:28.930067",
+          "elapsedSeconds": 15.035767,
+          "responseTimeSeconds": 0.008455,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:13.904873",
+          "elapsedSeconds": 0.010573,
+          "responseTimeSeconds": 0.008668,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:15.913387",
+          "elapsedSeconds": 2.019087,
+          "responseTimeSeconds": 0.007634,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:17.922282",
+          "elapsedSeconds": 4.027982,
+          "responseTimeSeconds": 0.008034,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:19.932723",
+          "elapsedSeconds": 6.038423,
+          "responseTimeSeconds": 0.009563,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:21.942366",
+          "elapsedSeconds": 8.048066,
+          "responseTimeSeconds": 0.00863,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:23.950628",
+          "elapsedSeconds": 10.056328,
+          "responseTimeSeconds": 0.007515,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:25.962000",
+          "elapsedSeconds": 12.0677,
+          "responseTimeSeconds": 0.010425,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:27.970101",
+          "elapsedSeconds": 14.075801,
+          "responseTimeSeconds": 0.007135,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        }
+      ],
+      "logPath": "logs/scenario_1.log",
+      "fitnessState": "final"
+    },
+    {
+      "generation": 1,
+      "scenarioId": "2",
+      "scenarioType": "container-scenarios",
+      "parameters": [
+        {
+          "name": "namespace",
+          "value": "robot-shop"
+        },
+        {
+          "name": "label-selector",
+          "value": "preview"
+        },
+        {
+          "name": "disruption-count",
+          "value": 1
+        },
+        {
+          "name": "container-name",
+          "value": "preview"
+        },
+        {
+          "name": "action",
+          "value": "preview"
+        },
+        {
+          "name": "expected-recovery-time",
+          "value": 60
+        }
+      ],
+      "command": "Preview: run container-scenarios",
+      "origin": "parameter_mutation",
+      "parentIds": [
+        "preview-parent-1-0",
+        "preview-parent-1-1"
+      ],
+      "durationSeconds": 70.14718948299924,
+      "returnCode": 1,
+      "fitnessResult": {
+        "fitnessScore": 68,
+        "scores": [],
+        "healthCheckFailureScore": 0,
+        "healthCheckResponseTimeScore": 0,
+        "krknFailureScore": -1
+      },
+      "healthChecks": [
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:31.577180",
+          "elapsedSeconds": 0.008427,
+          "responseTimeSeconds": 0.006675,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:36.584825",
+          "elapsedSeconds": 5.016072,
+          "responseTimeSeconds": 0.006837,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:41.594432",
+          "elapsedSeconds": 10.025679,
+          "responseTimeSeconds": 0.008424,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:46.602494",
+          "elapsedSeconds": 15.033741,
+          "responseTimeSeconds": 0.007265,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:51.613789",
+          "elapsedSeconds": 20.045036,
+          "responseTimeSeconds": 0.010503,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:28:56.625669",
+          "elapsedSeconds": 25.056916,
+          "responseTimeSeconds": 0.010993,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:01.644762",
+          "elapsedSeconds": 30.076009,
+          "responseTimeSeconds": 0.018256,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:06.653311",
+          "elapsedSeconds": 35.084558,
+          "responseTimeSeconds": 0.007692,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:11.663292",
+          "elapsedSeconds": 40.094539,
+          "responseTimeSeconds": 0.009213,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:16.672954",
+          "elapsedSeconds": 45.104201,
+          "responseTimeSeconds": 0.008819,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:21.681364",
+          "elapsedSeconds": 50.112611,
+          "responseTimeSeconds": 0.007629,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:26.690005",
+          "elapsedSeconds": 55.121252,
+          "responseTimeSeconds": 0.007849,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:31.698757",
+          "elapsedSeconds": 60.130004,
+          "responseTimeSeconds": 0.007977,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:36.706872",
+          "elapsedSeconds": 65.138119,
+          "responseTimeSeconds": 0.007329,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:41.715844",
+          "elapsedSeconds": 70.147091,
+          "responseTimeSeconds": 0.008121,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:31.579274",
+          "elapsedSeconds": 0.010521,
+          "responseTimeSeconds": 0.006833,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:33.588290",
+          "elapsedSeconds": 2.019537,
+          "responseTimeSeconds": 0.008065,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:35.597652",
+          "elapsedSeconds": 4.028899,
+          "responseTimeSeconds": 0.008586,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:37.608010",
+          "elapsedSeconds": 6.039257,
+          "responseTimeSeconds": 0.009384,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:39.616041",
+          "elapsedSeconds": 8.047288,
+          "responseTimeSeconds": 0.007214,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:41.624006",
+          "elapsedSeconds": 10.055253,
+          "responseTimeSeconds": 0.007168,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:43.634100",
+          "elapsedSeconds": 12.065347,
+          "responseTimeSeconds": 0.00925,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:45.642352",
+          "elapsedSeconds": 14.073599,
+          "responseTimeSeconds": 0.007405,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:47.651066",
+          "elapsedSeconds": 16.082313,
+          "responseTimeSeconds": 0.007781,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:49.659678",
+          "elapsedSeconds": 18.090925,
+          "responseTimeSeconds": 0.007743,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:51.668819",
+          "elapsedSeconds": 20.100066,
+          "responseTimeSeconds": 0.008307,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:53.681176",
+          "elapsedSeconds": 22.112423,
+          "responseTimeSeconds": 0.011536,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:55.690827",
+          "elapsedSeconds": 24.122074,
+          "responseTimeSeconds": 0.008827,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:57.700651",
+          "elapsedSeconds": 26.131898,
+          "responseTimeSeconds": 0.008904,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:28:59.711407",
+          "elapsedSeconds": 28.142654,
+          "responseTimeSeconds": 0.00991,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:01.731113",
+          "elapsedSeconds": 30.16236,
+          "responseTimeSeconds": 0.018784,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:03.762548",
+          "elapsedSeconds": 32.193795,
+          "responseTimeSeconds": 0.030517,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:05.774231",
+          "elapsedSeconds": 34.205478,
+          "responseTimeSeconds": 0.010802,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:07.786219",
+          "elapsedSeconds": 36.217466,
+          "responseTimeSeconds": 0.011115,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:09.797066",
+          "elapsedSeconds": 38.228313,
+          "responseTimeSeconds": 0.009935,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:11.807033",
+          "elapsedSeconds": 40.23828,
+          "responseTimeSeconds": 0.009079,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:13.818572",
+          "elapsedSeconds": 42.249819,
+          "responseTimeSeconds": 0.010655,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:15.830612",
+          "elapsedSeconds": 44.261859,
+          "responseTimeSeconds": 0.011211,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:17.840625",
+          "elapsedSeconds": 46.271872,
+          "responseTimeSeconds": 0.009084,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:19.851538",
+          "elapsedSeconds": 48.282785,
+          "responseTimeSeconds": 0.010031,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:21.861657",
+          "elapsedSeconds": 50.292904,
+          "responseTimeSeconds": 0.009231,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:23.874130",
+          "elapsedSeconds": 52.305377,
+          "responseTimeSeconds": 0.011637,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:25.885059",
+          "elapsedSeconds": 54.316306,
+          "responseTimeSeconds": 0.009961,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:27.896376",
+          "elapsedSeconds": 56.327623,
+          "responseTimeSeconds": 0.01049,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:29.907796",
+          "elapsedSeconds": 58.339043,
+          "responseTimeSeconds": 0.010578,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:31.917641",
+          "elapsedSeconds": 60.348888,
+          "responseTimeSeconds": 0.008883,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:33.927318",
+          "elapsedSeconds": 62.358565,
+          "responseTimeSeconds": 0.008777,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:35.937659",
+          "elapsedSeconds": 64.368906,
+          "responseTimeSeconds": 0.009411,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:37.947748",
+          "elapsedSeconds": 66.378995,
+          "responseTimeSeconds": 0.009249,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:39.956732",
+          "elapsedSeconds": 68.387979,
+          "responseTimeSeconds": 0.008038,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        }
+      ],
+      "logPath": "logs/scenario_2.log",
+      "fitnessState": "final"
+    },
+    {
+      "generation": 1,
+      "scenarioId": "3",
+      "scenarioType": "container-scenarios",
+      "parameters": [
+        {
+          "name": "namespace",
+          "value": "robot-shop"
+        },
+        {
+          "name": "label-selector",
+          "value": "preview"
+        },
+        {
+          "name": "disruption-count",
+          "value": 1
+        },
+        {
+          "name": "container-name",
+          "value": "preview"
+        },
+        {
+          "name": "action",
+          "value": "preview"
+        },
+        {
+          "name": "expected-recovery-time",
+          "value": 60
+        }
+      ],
+      "command": "Preview: run container-scenarios",
+      "origin": "parameter_mutation",
+      "parentIds": [
+        "preview-parent-1-0",
+        "preview-parent-1-1"
+      ],
+      "durationSeconds": 70.14467751499978,
+      "returnCode": 0,
+      "fitnessResult": {
+        "fitnessScore": 84,
+        "scores": [
+          {
+            "id": 0,
+            "rawScore": 1.0242443671919612,
+            "normalizedScore": 0.05,
+            "query": "(sum(increase(kube_pod_container_status_restarts_total{namespace=\"robot-shop\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 1,
+            "rawScore": 0,
+            "normalizedScore": 0.1,
+            "query": "(sum(kube_pod_status_phase{namespace=\"robot-shop\", phase=~\"Pending|Failed|Unknown\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 2,
+            "rawScore": 0,
+            "normalizedScore": 0.15,
+            "query": "(sum(kube_pod_container_status_last_terminated_reason{namespace=\"robot-shop\", reason=\"OOMKilled\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 3,
+            "rawScore": 0.03651685393258427,
+            "normalizedScore": 0.2,
+            "query": "(max(rate(container_cpu_cfs_throttled_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]) / rate(container_cpu_cfs_periods_total{namespace=\"robot-shop\", container!=\"\"}[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 4,
+            "rawScore": 0,
+            "normalizedScore": 0.25,
+            "query": "(sum(kube_node_status_condition{condition=~\"MemoryPressure|DiskPressure|PIDPressure\", status=\"true\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 5,
+            "rawScore": 0,
+            "normalizedScore": 0.3,
+            "query": "(sum(rate(apiserver_request_total{code=~\"5..\"}[$range$])) / sum(rate(apiserver_request_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 6,
+            "rawScore": 0.0295602481972496,
+            "normalizedScore": 0.35,
+            "query": "(histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\"}[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 7,
+            "rawScore": 0,
+            "normalizedScore": 0.4,
+            "query": "(sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"} == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 8,
+            "rawScore": 0,
+            "normalizedScore": 0.45,
+            "query": "(clamp_min(sum(kube_deployment_spec_replicas{namespace=\"robot-shop\"} - kube_deployment_status_replicas_available{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 9,
+            "rawScore": 0,
+            "normalizedScore": 0.5,
+            "query": "(clamp_min(sum(kube_statefulset_status_replicas{namespace=\"robot-shop\"} - kube_statefulset_status_replicas_ready{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 10,
+            "rawScore": 0,
+            "normalizedScore": 0.55,
+            "query": "(sum(kube_pod_container_status_waiting_reason{namespace=\"robot-shop\", reason=\"CrashLoopBackOff\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 11,
+            "rawScore": 0,
+            "normalizedScore": 0.6,
+            "query": "(clamp_min(sum(kube_poddisruptionbudget_status_desired_healthy{namespace=\"robot-shop\"} - kube_poddisruptionbudget_status_current_healthy{namespace=\"robot-shop\"}), 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 12,
+            "rawScore": 0,
+            "normalizedScore": 0.65,
+            "query": "(sum(kube_persistentvolumeclaim_status_phase{namespace=\"robot-shop\", phase=\"Pending\"})) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 13,
+            "rawScore": 0.016974805128140286,
+            "normalizedScore": 0.7,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 14,
+            "rawScore": 0,
+            "normalizedScore": 0.75,
+            "query": "((sum(rate(etcd_request_errors_total[$range$])) / sum(rate(etcd_requests_total[$range$]))) and (sum(rate(etcd_requests_total[$range$])) > 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 15,
+            "rawScore": 65200128,
+            "normalizedScore": 0.8,
+            "query": "(max(apiserver_storage_size_bytes)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 16,
+            "rawScore": 0,
+            "normalizedScore": 0.85,
+            "query": "(sum(etcd_server_has_leader == bool 0)) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 17,
+            "rawScore": 0,
+            "normalizedScore": 0.9,
+            "query": "(max(increase(etcd_server_leader_changes_seen_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 18,
+            "rawScore": 0,
+            "normalizedScore": 0.95,
+            "query": "(sum(increase(etcd_server_proposals_failed_total[$range$]))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 19,
+            "rawScore": 0.003973781512605041,
+            "normalizedScore": 0,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 20,
+            "rawScore": 0.005928571428571425,
+            "normalizedScore": 0.05,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          },
+          {
+            "id": 21,
+            "rawScore": 0.02520615384615385,
+            "normalizedScore": 0.1,
+            "query": "(histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket[$range$])) by (le))) or vector(0)",
+            "queryType": "range"
+          }
+        ],
+        "healthCheckFailureScore": 0,
+        "healthCheckResponseTimeScore": 0.2990470851210851,
+        "krknFailureScore": 0.03
+      },
+      "healthChecks": [
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:42.578748",
+          "elapsedSeconds": 0.010137,
+          "responseTimeSeconds": 0.008246,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:47.587404",
+          "elapsedSeconds": 5.018793,
+          "responseTimeSeconds": 0.007776,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:52.597025",
+          "elapsedSeconds": 10.028414,
+          "responseTimeSeconds": 0.00877,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:29:57.605583",
+          "elapsedSeconds": 15.036972,
+          "responseTimeSeconds": 0.007681,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:02.614317",
+          "elapsedSeconds": 20.045706,
+          "responseTimeSeconds": 0.007834,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:07.623058",
+          "elapsedSeconds": 25.054447,
+          "responseTimeSeconds": 0.00786,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:12.630573",
+          "elapsedSeconds": 30.061962,
+          "responseTimeSeconds": 0.006639,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:17.638874",
+          "elapsedSeconds": 35.070263,
+          "responseTimeSeconds": 0.006882,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:22.646685",
+          "elapsedSeconds": 40.078074,
+          "responseTimeSeconds": 0.006968,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:27.656156",
+          "elapsedSeconds": 45.087545,
+          "responseTimeSeconds": 0.00849,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:32.663636",
+          "elapsedSeconds": 50.095025,
+          "responseTimeSeconds": 0.006739,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:37.670973",
+          "elapsedSeconds": 55.102362,
+          "responseTimeSeconds": 0.006296,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:42.678958",
+          "elapsedSeconds": 60.110347,
+          "responseTimeSeconds": 0.007313,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:47.686837",
+          "elapsedSeconds": 65.118226,
+          "responseTimeSeconds": 0.007115,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "rs",
+          "timestamp": "2026-10-01T14:30:52.697747",
+          "elapsedSeconds": 70.129136,
+          "responseTimeSeconds": 0.010189,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:42.579096",
+          "elapsedSeconds": 0.010485,
+          "responseTimeSeconds": 0.009235,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:44.588447",
+          "elapsedSeconds": 2.019836,
+          "responseTimeSeconds": 0.008326,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:46.599047",
+          "elapsedSeconds": 4.030436,
+          "responseTimeSeconds": 0.009792,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:48.609772",
+          "elapsedSeconds": 6.041161,
+          "responseTimeSeconds": 0.009865,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:50.619693",
+          "elapsedSeconds": 8.051082,
+          "responseTimeSeconds": 0.009026,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:52.628264",
+          "elapsedSeconds": 10.059653,
+          "responseTimeSeconds": 0.007784,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:54.638728",
+          "elapsedSeconds": 12.070117,
+          "responseTimeSeconds": 0.009513,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:56.649001",
+          "elapsedSeconds": 14.08039,
+          "responseTimeSeconds": 0.009147,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:29:58.658116",
+          "elapsedSeconds": 16.089505,
+          "responseTimeSeconds": 0.008128,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:00.666824",
+          "elapsedSeconds": 18.098213,
+          "responseTimeSeconds": 0.007712,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:02.674759",
+          "elapsedSeconds": 20.106148,
+          "responseTimeSeconds": 0.007059,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:04.683748",
+          "elapsedSeconds": 22.115137,
+          "responseTimeSeconds": 0.008109,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:06.691821",
+          "elapsedSeconds": 24.12321,
+          "responseTimeSeconds": 0.007222,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:08.700450",
+          "elapsedSeconds": 26.131839,
+          "responseTimeSeconds": 0.00766,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:10.709953",
+          "elapsedSeconds": 28.141342,
+          "responseTimeSeconds": 0.008665,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:12.719476",
+          "elapsedSeconds": 30.150865,
+          "responseTimeSeconds": 0.008685,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:14.728496",
+          "elapsedSeconds": 32.159885,
+          "responseTimeSeconds": 0.008128,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:16.739085",
+          "elapsedSeconds": 34.170474,
+          "responseTimeSeconds": 0.009768,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:18.752567",
+          "elapsedSeconds": 36.183956,
+          "responseTimeSeconds": 0.012566,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:20.761081",
+          "elapsedSeconds": 38.19247,
+          "responseTimeSeconds": 0.007682,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:22.768928",
+          "elapsedSeconds": 40.200317,
+          "responseTimeSeconds": 0.006901,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:24.778830",
+          "elapsedSeconds": 42.210219,
+          "responseTimeSeconds": 0.009017,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:26.787586",
+          "elapsedSeconds": 44.218975,
+          "responseTimeSeconds": 0.007778,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:28.796110",
+          "elapsedSeconds": 46.227499,
+          "responseTimeSeconds": 0.007596,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:30.805315",
+          "elapsedSeconds": 48.236704,
+          "responseTimeSeconds": 0.008359,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:32.815423",
+          "elapsedSeconds": 50.246812,
+          "responseTimeSeconds": 0.009104,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:34.823861",
+          "elapsedSeconds": 52.25525,
+          "responseTimeSeconds": 0.007571,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:36.833181",
+          "elapsedSeconds": 54.26457,
+          "responseTimeSeconds": 0.008384,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:38.843151",
+          "elapsedSeconds": 56.27454,
+          "responseTimeSeconds": 0.009012,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:40.850895",
+          "elapsedSeconds": 58.282284,
+          "responseTimeSeconds": 0.006877,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:42.860530",
+          "elapsedSeconds": 60.291919,
+          "responseTimeSeconds": 0.008793,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:44.869824",
+          "elapsedSeconds": 62.301213,
+          "responseTimeSeconds": 0.008468,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:46.878732",
+          "elapsedSeconds": 64.310121,
+          "responseTimeSeconds": 0.007918,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:48.887382",
+          "elapsedSeconds": 66.318771,
+          "responseTimeSeconds": 0.007679,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        },
+        {
+          "application": "payment",
+          "timestamp": "2026-10-01T14:30:50.897622",
+          "elapsedSeconds": 68.329011,
+          "responseTimeSeconds": 0.009296,
+          "statusCode": 200,
+          "success": true,
+          "error": null
+        }
+      ],
+      "logPath": "logs/scenario_3.log",
+      "fitnessState": "final"
+    }
+  ]
+}
