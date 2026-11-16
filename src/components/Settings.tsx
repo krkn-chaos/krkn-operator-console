@@ -35,6 +35,7 @@ import { ProviderConfigTab } from './ProviderConfigTab';
 import { UserManagement } from './UserManagement';
 import { RegistriesCard } from './RegistriesCard';
 import { ElasticsearchConfigsCard } from './ElasticsearchConfigsCard';
+import { RobotsCard } from './RobotManagement';
 import { CloudCredentialsCard } from './CloudCredentialsCard';
 import { WorkspacesCard } from './WorkspacesCard';
 import { BackupRestoreCard } from './BackupRestoreCard';
@@ -344,12 +345,20 @@ export function Settings() {
               </div>
               </Tab>
             )}
-
             {/* Backup & Restore Tab - Admin Only */}
             {isAdmin && (
               <Tab eventKey={7} title={<TabTitleText>Backup & Restore</TabTitleText>}>
                 <div style={{ marginTop: '1.5rem' }}>
                   <BackupRestoreCard />
+                </div>
+              </Tab>
+            )}
+
+            {/* MCP Robots Tab - Admin Only */}
+            {isAdmin && (
+              <Tab eventKey={7} title={<TabTitleText>MCP Robots</TabTitleText>}>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <RobotsCard onNavigateToGroups={() => setActiveTabKey(1)} />
                 </div>
               </Tab>
             )}

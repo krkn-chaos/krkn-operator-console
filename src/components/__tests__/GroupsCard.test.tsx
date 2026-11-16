@@ -3,11 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GroupsCard } from '../GroupsCard';
 import { groupsApi } from '../../services/groupsApi';
+import { robotsApi } from '../../services/robotsApi';
 import { useNotifications } from '../../hooks/useNotifications';
-import type { GroupDetails } from '../../types/api';
+import type { GroupDetails, ListRobotsResponse } from '../../types/api';
 
 // Mock dependencies
 vi.mock('../../services/groupsApi');
+vi.mock('../../services/robotsApi');
 vi.mock('../../hooks/useNotifications');
 vi.mock('../ViewGroupMembersModal', () => ({
   ViewGroupMembersModal: () => <div data-testid="view-group-members-modal">View Members Modal</div>,
@@ -56,6 +58,12 @@ describe('GroupsCard', () => {
     });
 
     vi.mocked(groupsApi.listGroups).mockResolvedValue(mockGroups);
+    // Default: no robots anywhere
+    vi.mocked(robotsApi.listRobots).mockResolvedValue({
+      robots: [],
+      total: 0,
+      mcpEnabled: true,
+    } as ListRobotsResponse);
   });
 
   it('should render groups list', async () => {
@@ -199,5 +207,66 @@ describe('GroupsCard', () => {
     await waitFor(() => {
       expect(screen.getByText(/no groups yet/i)).toBeInTheDocument();
     });
+  });
+
+  it('should warn about robot accounts losing membership in the delete confirmation', async () => {
+    vi.mocked(robotsApi.listRobots).mockResolvedValue({
+      robots: [
+        {
+          name: 'ci-runner',
+          description: 'CI robot',
+          disabled: false,
+          groups: ['group1'],
+          tokenId: 'token-1',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+        {
+          name: 'other-robot',
+          description: 'Robot in another group',
+          disabled: false,
+          groups: ['group2'],
+          tokenId: 'token-2',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+      total: 2,
+      mcpEnabled: true,
+    } as ListRobotsResponse);
+
+    const user = userEvent.setup();
+    render(<GroupsCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('group1')).toBeInTheDocument();
+    });
+
+    // Open the actions dropdown for group1 and click Delete
+    const toggle = screen.getAllByRole('button', { name: 'Group actions' })[0];
+    await user.click(toggle);
+    await user.click(screen.getByRole('menuitem', { name: /Delete/i }));
+
+    // Confirmation modal appears with the robot membership warning (1 robot in group1)
+    await waitFor(() => {
+      expect(screen.getByText(/robot account will lose membership/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should not show the robot warning when no robot accounts are members of the group', async () => {
+    const user = userEvent.setup();
+    render(<GroupsCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('group1')).toBeInTheDocument();
+    });
+
+    const toggle = screen.getAllByRole('button', { name: 'Group actions' })[0];
+    await user.click(toggle);
+    await user.click(screen.getByRole('menuitem', { name: /Delete/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Are you sure you want to delete group/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/robot account/i)).not.toBeInTheDocument();
   });
 });

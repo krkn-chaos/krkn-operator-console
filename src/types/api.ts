@@ -774,6 +774,48 @@ export interface GroupMemberOperationResponse {
   message?: string;
 }
 
+// MCP Robot Types (admin-managed service accounts for MCP access)
+
+export interface RobotDetails {
+  name: string;
+  description: string;
+  disabled: boolean;
+  groups: string[];
+  /** Empty string ("") when the robot has no token */
+  tokenId: string;
+  tokenIssuedAt?: string;
+  tokenExpiresAt?: string;
+  lastUsedAt?: string;
+  createdAt: string;
+}
+
+export interface ListRobotsResponse {
+  robots: RobotDetails[];
+  total: number;
+  mcpEnabled: boolean;
+}
+
+export interface CreateRobotRequest {
+  name: string;
+  description?: string;
+  groups?: string[];
+}
+
+export interface UpdateRobotRequest {
+  description?: string;
+  disabled?: boolean;
+  /** REPLACES all group labels; [] clears group membership */
+  groups?: string[];
+}
+
+export interface IssueRobotTokenResponse {
+  /** Shown ONCE — never persisted or logged */
+  token: string;
+  tokenId: string;
+  expiresAt: string;
+  message: string;
+}
+
 // Registry Management Types
 
 export type AuthType = 'token' | 'password';

@@ -126,6 +126,31 @@ export class BaseApiClient {
   }
 
   /**
+   * Fetch with authentication for endpoints that return no body (e.g. 204 No Content)
+   *
+   * Uses the same error parsing as fetchJson (reads `error.message` from a JSON
+   * error body) but never attempts to parse the response body on success, so it
+   * is safe for 204 responses where fetchJson would throw on response.json().
+   *
+   * @param url - URL relative to baseUrl
+   * @param options - Fetch options
+   * @returns Promise that resolves when the request succeeds (void)
+   */
+  protected async fetchNoContent(url: string, options: RequestInit = {}): Promise<void> {
+    const fullUrl = `${this.baseUrl}${url}`;
+    const response = await authenticatedFetch(fullUrl, options);
+
+    if (!response.ok) {
+      let message = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const error = await response.json();
+        if (error.message) message = error.message;
+      } catch { /* use default message */ }
+      throw createApiError(message, response.status, response.statusText);
+    }
+  }
+
+  /**
    * Fetch with authentication (returns Response for custom handling)
    * @param url - URL relative to baseUrl
    * @param options - Fetch options
