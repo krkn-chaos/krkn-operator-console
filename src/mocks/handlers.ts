@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { config } from '../config';
-import type { AvailableRegistry, CategoryResponse, CreateGraphRunRequest, RegistryDetails } from '../types/api';
+import type { AvailableRegistry, CategoryResponse, CreateGraphRunRequest, GraphRunDetail, RegistryDetails } from '../types/api';
 import { krknAiHandlers } from './krknAiHandlers';
 import { krknAiDownloadHandlers } from './krknAiDownloadHandlers';
 import { listPreviewAiChildren } from './krknAiState';
@@ -201,7 +201,7 @@ const mockGraphRuns = [
 
 // ─── GRAPH RUNS (detail view — GraphRunDetail with spec/status) ───
 
-const mockGraphRunDetails: Record<string, object> = {
+const mockGraphRunDetails: Record<string, GraphRunDetail> = {
   'chaos-workflow-daily': {
     name: 'chaos-workflow-daily',
     namespace: 'krkn-operator-system',
@@ -1065,18 +1065,25 @@ export const handlers = [
   }),
 
   // ─── GRAPH RUN CONFIG ───
+  // Like the operator, rebuild the creation payload from the run's spec so
+  // replay gets the same shape it gets from the real API.
   http.get(`${BASE}/graphruns/:graphRunName/config`, ({ params }) => {
-    const name = params.graphRunName as string;
-    const detail = mockGraphRunDetails[name] as { spec: CreateGraphRunRequest } | undefined;
+    const graphRunName = params.graphRunName as string;
+    const detail = Object.prototype.hasOwnProperty.call(mockGraphRunDetails, graphRunName)
+      ? mockGraphRunDetails[graphRunName]
+      : undefined;
     if (!detail) {
-      return HttpResponse.json({ message: 'Graph run not found' }, { status: 404 });
+      return HttpResponse.json({ error: 'not_found', message: `GraphRun '${graphRunName}' not found` }, { status: 404 });
     }
+    const { graph, targetRequestId, targetClusters, maxRetries } = detail.spec;
     return HttpResponse.json({
-      graph: detail.spec.graph,
-      targetRequestId: detail.spec.targetRequestId,
-      targetClusters: detail.spec.targetClusters,
-      categories: mockGraphRuns.find((run) => run.name === name)?.categories ?? [],
-    });
+      graph,
+      targetRequestId,
+      targetClusters,
+      // The operator's CRD defaults maxRetries to 3.
+      maxRetries: maxRetries ?? 3,
+      categories: mockGraphRuns.find((run) => run.name === graphRunName)?.categories ?? [],
+    } satisfies CreateGraphRunRequest);
   }),
 
   // ─── ELASTICSEARCH ───

@@ -168,9 +168,9 @@ class GraphRunsApiClient extends BaseApiClient {
 
   /**
    * GET /api/v1/graphruns/{graphRunName}/config
-   * Get the configuration used to create a graph run
+   * Get the configuration used to create a graph run, ready to replay
    * @param graphRunName - Graph run name
-   * @returns Promise with the graph run's environment configuration
+   * @returns Promise with the graph run's creation payload (graph, targets, retries and categories)
    */
   async getGraphRunConfig(graphRunName: string): Promise<CreateGraphRunRequest> {
     return this.fetchJson<CreateGraphRunRequest>(`/graphruns/${encodeURIComponent(graphRunName)}/config`);
