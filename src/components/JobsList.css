@@ -10,6 +10,14 @@
   gap: var(--pf-v5-global--spacer--xs);
 }
 
+.jobs-list-status-badges .pf-v5-c-label {
+  max-width: 100%;
+}
+
+.jobs-list-status-badges .pf-v5-c-label__content {
+  white-space: normal;
+}
+
 .jobs-list-rollback-children {
   margin: 0 var(--pf-v5-global--spacer--md) var(--pf-v5-global--spacer--md) var(--pf-v5-global--spacer--xl);
 }
@@ -107,7 +115,8 @@
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
-  flex: 0 0 clamp(11rem, 12%, 13rem);
+  flex: 0 1 clamp(11rem, 12%, 13rem);
+  min-width: 0;
 }
 
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--primary {
@@ -304,7 +313,7 @@
 
 @container jobs-list-runs (max-width: 560px) {
   .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
-    flex: 0 0 11rem;
+    flex: 0 1 11rem;
     min-width: 0;
   }
 

@@ -101,8 +101,8 @@ export type UnifiedRunItem =
     }
   | { type: 'scenario'; run: ScenarioRunState; categories: string[]; rollbackRuns: RollbackRunSummary[] };
 
-// Use the latest rollback for each attempt, but count every source target in the indicator.
-function rollbackProgress(runs: RollbackRunSummary[], totalTargets: number) {
+// Count each source cluster once, even when it has multiple job attempts.
+function rollbackProgress(runs: RollbackRunSummary[], totalTargets: number, clusterJobs: ClusterJob[]) {
   if (runs.length === 0) return null;
   const latest = new Map<string, RollbackRunSummary>();
   for (const run of runs) {
@@ -113,9 +113,30 @@ function rollbackProgress(runs: RollbackRunSummary[], totalTargets: number) {
   }
   const phases = [...latest.values()].map((run) => run.phase);
   if (phases.some((phase) => !phase || phase === 'Pending' || phase === 'Running')) return { label: 'Rolling back', color: 'blue' as const };
-  const succeeded = phases.filter((phase) => phase === 'Succeeded').length;
-  if (succeeded === Math.max(totalTargets, phases.length)) return { label: 'Rolled back', color: 'green' as const };
-  if (succeeded > 0) return { label: 'Partially rolled back', color: 'orange' as const };
+
+  const targetByJobId = new Map<string, string>();
+  for (const job of clusterJobs) {
+    const target = JSON.stringify([job.providerName, job.clusterName]);
+    targetByJobId.set(job.jobId, target);
+    for (const attempt of job.attemptHistory ?? []) targetByJobId.set(attempt.jobId, target);
+  }
+
+  const latestByTarget = new Map<string, RollbackRunSummary>();
+  let hasUnmappedSuccess = false;
+  for (const [sourceJobId, rollback] of latest) {
+    // A single-target run needs no job details to identify its target.
+    const target = totalTargets === 1 ? 'single-target' : targetByJobId.get(sourceJobId);
+    if (!target) {
+      hasUnmappedSuccess ||= rollback.phase === 'Succeeded';
+      continue;
+    }
+    const previous = latestByTarget.get(target);
+    if (!previous || rollback.createdAt > previous.createdAt) latestByTarget.set(target, rollback);
+  }
+
+  const succeededTargets = [...latestByTarget.values()].filter((run) => run.phase === 'Succeeded').length;
+  if (totalTargets > 0 && succeededTargets === totalTargets) return { label: 'Rolled back', color: 'green' as const };
+  if (succeededTargets > 0 || hasUnmappedSuccess) return { label: 'Partially rolled back', color: 'orange' as const };
   return { label: 'Rollback failed', color: 'red' as const };
 }
 
@@ -1121,7 +1142,7 @@ export function JobsList({
               const scenarioRunName = run.scenarioRunName.trim();
               const isRunExpanded = expandedRunIds.has(run.scenarioRunName);
               const runPhaseDisplay = getRunPhaseDisplay(run.phase);
-              const rollbackState = rollbackProgress(item.rollbackRuns, run.totalTargets);
+              const rollbackState = rollbackProgress(item.rollbackRuns, run.totalTargets, run.clusterJobs);
               const isRollback = run.isRollback ?? (run.scenarioName === 'workload-rollback' && GENERATED_ROLLBACK_RUN_NAME.test(run.scenarioRunName));
               const scenarioCategoryKey = runCategoryKey('scenario-runs', run.scenarioRunName);
               const scenarioCategoryNames = categoryOverrides[scenarioCategoryKey] ?? item.categories;
