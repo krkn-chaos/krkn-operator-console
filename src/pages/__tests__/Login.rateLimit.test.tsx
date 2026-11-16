@@ -1,7 +1,7 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { Login } from '../Login';
 import { RateLimitError } from '../../types/auth';
 
@@ -16,6 +16,16 @@ function renderLogin() {
     <MemoryRouter initialEntries={['/login']}>
       <Login />
     </MemoryRouter>,
+  );
+}
+
+function LoginLocationProbe() {
+  const location = useLocation();
+  return (
+    <>
+      <span data-testid="login-route-path">{location.pathname}</span>
+      <span data-testid="login-route-search">{location.search}</span>
+    </>
   );
 }
 
@@ -39,6 +49,7 @@ describe('Login - rate limit handling', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   it('should show rate-limit message and disabled button on login 429', async () => {
@@ -97,4 +108,39 @@ describe('Login - rate limit handling', () => {
       expect(screen.getByText('Too many attempts. Please wait and try again.')).toBeInTheDocument();
     });
   });
+
+  it.each(['/app?view=recent', '/console/app?view=recent'])(
+    'navigates to router-relative return URL under deployment basename: %s',
+    async (returnUrl) => {
+      vi.stubEnv('BASE_URL', '/console/');
+      vi.mocked(useAuth).mockReturnValue({
+        state: {
+          isAuthenticated: true,
+          user: { userId: 'admin@example.com', name: 'Admin', surname: 'User', role: 'admin' },
+          loading: false,
+        },
+        login: mockLogin,
+        logout: vi.fn(),
+        register: vi.fn(),
+        isAdmin: vi.fn(() => true),
+      });
+
+      render(
+        <MemoryRouter
+          basename="/console"
+          initialEntries={[`/console/login?expired=true&returnUrl=${encodeURIComponent(returnUrl)}`]}
+        >
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/app" element={<LoginLocationProbe />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('login-route-path').textContent).toBe('/app');
+        expect(screen.getByTestId('login-route-search').textContent).toBe('?view=recent');
+      });
+    },
+  );
 });
