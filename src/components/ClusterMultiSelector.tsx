@@ -19,12 +19,12 @@ import {
   FlexItem,
   ActionGroup,
   Spinner,
-  Tooltip,
   Alert,
 } from '@patternfly/react-core';
-import { DisconnectedIcon, TopologyIcon } from '@patternfly/react-icons';
+import { TopologyIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
 import { ClusterHealthIndicator } from './ClusterHealthIndicator';
+import { ClusterOfflineIndicator } from './ClusterOfflineIndicator';
 import { isClusterUnavailable } from '../utils/clusterAvailability';
 
 interface ClusterMultiSelectorProps {
@@ -45,17 +45,6 @@ export function ClusterMultiSelector({
   showActions = true,
 }: ClusterMultiSelectorProps) {
   const [removedUnavailableClusterNames, setRemovedUnavailableClusterNames] = useState<string[]>([]);
-  const formatCheckedAt = (checkedAt?: string): string => {
-    if (!checkedAt) return 'unknown';
-
-    const date = new Date(checkedAt);
-    if (Number.isNaN(date.getTime())) return checkedAt;
-
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(date);
-  };
 
   // Helper to check if a cluster is selected
   const isSelected = (operatorName: string, clusterName: string): boolean => {
@@ -194,7 +183,6 @@ export function ClusterMultiSelector({
                     const checked = isSelected(operatorName, cluster['cluster-name']);
                     const isOffline = cluster.online === false;
                     const isUnavailable = isClusterUnavailable(cluster.online, cluster['cluster-status']);
-                    const offlineMessage = `Cluster is offline. Last checked: ${formatCheckedAt(cluster['checked-at'])}.`;
 
                     return (
                       <DataListItem
@@ -222,16 +210,7 @@ export function ClusterMultiSelector({
                                       <div style={{ fontWeight: 'bold' }}>
                                         {cluster['cluster-name']}
                                         <ClusterHealthIndicator status={cluster['cluster-status']} />
-                                        {isOffline && (
-                                          <Tooltip content={offlineMessage} position="top">
-                                            <span
-                                              aria-label={offlineMessage}
-                                              style={{ marginLeft: '0.5rem', color: 'var(--pf-v5-global--danger-color--100)' }}
-                                            >
-                                              <DisconnectedIcon />
-                                            </span>
-                                          </Tooltip>
-                                        )}
+                                        {isOffline && <ClusterOfflineIndicator checkedAt={cluster['checked-at']} />}
                                       </div>
                                       <div
                                         style={{
