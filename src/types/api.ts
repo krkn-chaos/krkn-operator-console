@@ -522,6 +522,7 @@ export type AppPhase =
   | 'elasticsearch_data' // Elasticsearch telemetry data table page
   | 'krkn_ai' // Mock Krkn AI console
   | 'resiliency_history' // Resiliency history analytics page
+  | 'visualize' // Embedded Grafana dashboards (krkn-visualize) page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -694,6 +695,7 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
   | { type: 'NAVIGATE_TO_KRKN_AI' }
   | { type: 'NAVIGATE_TO_RESILIENCY_HISTORY' }
+  | { type: 'NAVIGATE_TO_VISUALIZE' }
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
@@ -1875,4 +1877,111 @@ export interface ListCloudCredentialsResponse {
 export interface CloudCredentialOperationResponse {
   message: string;
   name?: string;
+}
+
+// krkn-visualize Installation Types
+
+/**
+ * VisualizeConfig - Configuration for a krkn-visualize (Grafana) installation
+ */
+export interface VisualizeConfig {
+  /** Unique name for this visualize instance */
+  name: string;
+  /** Target cluster name where krkn-visualize will be deployed */
+  targetCluster: string;
+  /** Kubernetes namespace for deployment (default: krkn-visualize) */
+  namespace: string;
+  /** Name of the Elasticsearch config to use (optional) */
+  elasticsearchConfigName?: string;
+  /** Grafana admin password */
+  grafanaPassword?: string;
+  /** Prometheus URL (auto-detected for OpenShift if not provided) */
+  prometheusUrl?: string;
+  /** Prometheus bearer token (auto-generated for OpenShift if not provided) */
+  prometheusBearerToken?: string;
+  /** Current deployment status */
+  status?: 'Pending' | 'Installing' | 'Ready' | 'Failed' | 'Deleting';
+  /** Grafana dashboard URL (available after deployment) */
+  grafanaUrl?: string;
+  /** Error message if deployment failed */
+  errorMessage?: string;
+  /** When this instance was created */
+  createdAt?: string;
+  /** Who created this instance */
+  createdBy?: string;
+  /** Last update timestamp */
+  updatedAt?: string;
+}
+
+/**
+ * CreateVisualizeRequest - Request to create/install krkn-visualize
+ */
+export interface CreateVisualizeRequest {
+  /** Unique name for this visualize instance */
+  name: string;
+  /** Target cluster name(s) - can be single or multiple */
+  targetClusters: string[];
+  /** Kubernetes namespace (defaults to krkn-visualize) */
+  namespace?: string;
+  /** Name of existing Elasticsearch config to use */
+  elasticsearchConfigName?: string;
+  /** Grafana admin password */
+  grafanaPassword: string;
+  /** Auto-detect Prometheus config for OpenShift (default: true) */
+  autoDetectPrometheus?: boolean;
+  /** Manual Prometheus URL (if autoDetect is false) */
+  prometheusUrl?: string;
+  /** Manual Prometheus bearer token (if autoDetect is false) */
+  prometheusBearerToken?: string;
+}
+
+/**
+ * ListVisualizeResponse - Response containing list of visualize instances
+ */
+export interface ListVisualizeResponse {
+  instances: VisualizeConfig[];
+  total: number;
+}
+
+/**
+ * VisualizeOperationResponse - Response after create/update/delete operations
+ */
+export interface VisualizeOperationResponse {
+  message: string;
+  name?: string;
+  grafanaUrl?: string;
+}
+
+/**
+ * VisualizeLogsResponse - Response containing installation logs for a visualize instance
+ */
+export interface VisualizeLogsResponse {
+  logs: string;
+  status: string;
+  podName?: string;
+  jobName?: string;
+}
+
+/**
+ * GrafanaDashboard - A dashboard installed in a krkn-visualize Grafana instance
+ */
+export interface GrafanaDashboard {
+  /** Grafana's stable dashboard identifier */
+  uid: string;
+  /** Human-readable dashboard title */
+  title: string;
+  /** Grafana-relative dashboard path (e.g. /d/<uid>/<slug>) used for embedding */
+  url: string;
+  /** Grafana folder containing the dashboard (Chaos, General, k8s) */
+  folderTitle?: string;
+  /** Grafana search hit type; dashboards are "dash-db" */
+  type?: string;
+}
+
+/**
+ * VisualizeDashboardsResponse - Dashboards available in a visualize instance
+ */
+export interface VisualizeDashboardsResponse {
+  dashboards: GrafanaDashboard[];
+  total: number;
 }
