@@ -356,6 +356,12 @@ const mockClusters = {
       { 'cluster-name': 'staging-us-east-1', 'cluster-api-url': 'https://api.staging-east.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
       { 'cluster-name': 'staging-eu-west-1', 'cluster-api-url': 'https://api.staging-west.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
       { 'cluster-name': 'prod-us-central1', 'cluster-api-url': 'https://api.prod.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
+      // Unavailable clusters, so the preview shows that Run can still be granted
+      // on them in group permissions while the run picker leaves them out.
+      // The liveness check failed; only ACM sets a cluster-status.
+      { 'cluster-name': 'offline-us-west-2', 'cluster-api-url': 'https://api.offline-west.example.com:6443', online: false, 'checked-at': '2026-09-09T08:00:00Z' },
+      // Reachable, but ACM reports a failed prerequisite.
+      { 'cluster-name': 'unhealthy-ap-south-1', 'cluster-api-url': 'https://api.unhealthy-south.example.com:6443', online: true, 'cluster-status': 'unhealthy', 'checked-at': '2026-09-09T08:00:00Z' },
     ],
   },
   status: 'ready',
