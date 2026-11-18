@@ -27,3 +27,4 @@ export { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 export { ElasticsearchDataView } from './ElasticsearchDataView';
 export { ElasticsearchAlertsTab } from './ElasticsearchAlertsTab';
 export { VisualizeInstallCard } from './VisualizeInstallCard';
+export { VisualizePage } from './VisualizePage';

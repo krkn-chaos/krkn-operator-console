@@ -34,6 +34,7 @@ type AppSidebarProps = Omit<SidebarNavProps, 'expanded'> & {
  * @param onOpenFiles - Called when Files menu item is clicked
  * @param onNavigateTerminal - Called when Terminal menu item is clicked
  * @param onNavigateElasticsearchData - Called when Elasticsearch Data menu item is clicked
+ * @param onNavigateVisualize - Called when Visualize (embedded Grafana dashboards) menu item is clicked
  * @param onNavigateSettings - Called when Settings menu item is clicked
  * @param onEditProfile - Called when Edit Profile menu item is clicked
  * @param onChangePassword - Called when Change Password menu item is clicked

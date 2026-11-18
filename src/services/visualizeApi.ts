@@ -5,6 +5,8 @@ import type {
   ListVisualizeResponse,
   VisualizeOperationResponse,
   VisualizeLogsResponse,
+  VisualizeDashboardsResponse,
+  GrafanaDashboard,
 } from '../types/api';
 
 const API_BASE = '/api/v1';
@@ -69,6 +71,24 @@ class VisualizeApi extends BaseApiClient {
    */
   async getLogs(name: string): Promise<VisualizeLogsResponse> {
     return this.fetchJson<VisualizeLogsResponse>(`/visualize/${encodeURIComponent(name)}/logs`);
+  }
+
+  /**
+   * List the Grafana dashboards installed in a krkn-visualize instance.
+   * The operator proxies Grafana's search API server-side, so no credentials
+   * or CORS handling are needed here.
+   *
+   * @param name - Instance name (must be in Ready status)
+   *
+   * @example
+   * const res = await visualizeApi.listDashboards('my-visualize');
+   * console.log(res.total, res.dashboards[0].uid, res.dashboards[0].url);
+   */
+  async listDashboards(name: string): Promise<GrafanaDashboard[]> {
+    const data = await this.fetchJson<VisualizeDashboardsResponse>(
+      `/visualize/${encodeURIComponent(name)}/dashboards`
+    );
+    return data.dashboards || [];
   }
 }
 

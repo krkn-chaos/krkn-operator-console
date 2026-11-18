@@ -821,6 +821,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         phase: 'resiliency_history',
       };
 
+    case 'NAVIGATE_TO_VISUALIZE':
+      return {
+        ...state,
+        phase: 'visualize',
+      };
+
     // Notifications
     case 'SHOW_NOTIFICATION':
       return {

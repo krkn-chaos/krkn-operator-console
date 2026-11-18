@@ -20,6 +20,10 @@ import {
   Alert,
   FormSelect,
   FormSelectOption,
+  Select,
+  SelectList,
+  SelectOption,
+  MenuToggle,
   Switch,
   TextArea,
   Badge,
@@ -55,7 +59,8 @@ interface VisualizeInstallFormProps {
  */
 function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, targets }: VisualizeInstallFormProps) {
   const [name, setName] = useState('');
-  const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
+  const [selectedTarget, setSelectedTarget] = useState<string>('');
+  const [isTargetSelectOpen, setIsTargetSelectOpen] = useState(false);
   const [namespace, setNamespace] = useState('krkn-visualize');
   const [esConfigName, setEsConfigName] = useState('');
   const [grafanaPassword, setGrafanaPassword] = useState('');
@@ -70,8 +75,8 @@ function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, target
       setError('Name is required');
       return;
     }
-    if (selectedTargets.length === 0) {
-      setError('At least one target cluster is required');
+    if (!selectedTarget) {
+      setError('A target cluster is required');
       return;
     }
     if (!grafanaPassword) {
@@ -88,7 +93,7 @@ function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, target
     try {
       const req: CreateVisualizeRequest = {
         name: name.trim(),
-        targetClusters: selectedTargets,
+        targetClusters: [selectedTarget],
         namespace: namespace.trim() || 'krkn-visualize',
         elasticsearchConfigName: esConfigName || undefined,
         grafanaPassword,
@@ -129,24 +134,46 @@ function VisualizeInstallForm({ onSubmit, onCancel, elasticsearchConfigs, target
       </FormGroup>
 
       <FormGroup label="Target Clusters" isRequired fieldId="visualize-targets">
-        <FormSelect
+        <Select
           id="visualize-targets"
-          multiple
-          value={selectedTargets}
-          onChange={(event) => {
-            const select = event.currentTarget;
-            setSelectedTargets(Array.from(select.selectedOptions, (option) => option.value));
+          isOpen={isTargetSelectOpen}
+          onOpenChange={setIsTargetSelectOpen}
+          selected={selectedTarget}
+          onSelect={(_event, value) => {
+            setSelectedTarget(value as string);
+            setIsTargetSelectOpen(false);
           }}
-          isRequired
+          toggle={(toggleRef) => (
+            <MenuToggle
+              ref={toggleRef}
+              id="visualize-targets"
+              aria-label="Select target clusters"
+              onClick={() => setIsTargetSelectOpen((open) => !open)}
+              isExpanded={isTargetSelectOpen}
+              isFullWidth
+            >
+              {!selectedTarget
+                ? 'Select target clusters'
+                : selectedTarget}
+            </MenuToggle>
+          )}
         >
-          {availableTargets.map((target) => (
-            <FormSelectOption
-              key={target.uuid}
-              value={target.clusterName}
-              label={`${target.clusterName} (${target.clusterAPIURL})`}
-            />
-          ))}
-        </FormSelect>
+          <SelectList>
+            {availableTargets.map((target) => (
+              <SelectOption
+                key={target.uuid}
+                value={target.clusterName}
+              >
+                <div>
+                  <strong>{target.clusterName}</strong>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                    {target.clusterAPIURL}
+                  </div>
+                </div>
+              </SelectOption>
+            ))}
+          </SelectList>
+        </Select>
         {targets.length === 0 && (
           <Alert variant="warning" title="No target clusters" isInline style={{ marginTop: '0.5rem' }}>
             No target clusters found. Please add a target cluster in the{' '}
@@ -294,6 +321,9 @@ export function VisualizeInstallCard() {
   const [loading, setLoading] = useState(true);
   const [showInstallModal, setShowInstallModal] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
+  // True while a delete request is in flight; disables the confirm button so
+  // repeated clicks cannot issue concurrent deletes of the same instance.
+  const [isDeleting, setIsDeleting] = useState(false);
   const [logsModalInstance, setLogsModalInstance] = useState<string | null>(null);
   const [logs, setLogs] = useState<string>('');
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -364,6 +394,13 @@ export function VisualizeInstallCard() {
   };
 
   const handleDelete = async (name: string) => {
+    // Guard against a second confirmation while the first delete is still in
+    // flight: a concurrent delete of the same instance would fail after the
+    // first one already removed it.
+    if (isDeleting) {
+      return;
+    }
+    setIsDeleting(true);
     try {
       await visualizeApi.deleteInstance(name);
       showSuccess('Instance deleted', `krkn-visualize "${name}" was deleted`);
@@ -371,6 +408,8 @@ export function VisualizeInstallCard() {
       fetchData();
     } catch (err) {
       showError('Failed to delete instance', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -527,12 +566,20 @@ export function VisualizeInstallCard() {
         variant={ModalVariant.small}
         title="Delete krkn-visualize Instance"
         isOpen={!!deletingName}
-        onClose={() => setDeletingName(null)}
+        onClose={() => {
+          if (!isDeleting) setDeletingName(null);
+        }}
         actions={[
-          <Button key="confirm" variant="danger" onClick={() => deletingName && handleDelete(deletingName)}>
+          <Button
+            key="confirm"
+            variant="danger"
+            isDisabled={isDeleting}
+            onClick={() => deletingName && handleDelete(deletingName)}
+          >
+            {isDeleting && <Spinner size="sm" />}
             Delete
           </Button>,
-          <Button key="cancel" variant="link" onClick={() => setDeletingName(null)}>
+          <Button key="cancel" variant="link" isDisabled={isDeleting} onClick={() => setDeletingName(null)}>
             Cancel
           </Button>,
         ]}

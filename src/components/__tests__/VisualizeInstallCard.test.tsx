@@ -16,13 +16,16 @@ vi.mock('../../services/visualizeApi');
 vi.mock('../../services/elasticsearchApi');
 vi.mock('../../services/targetsApi');
 
-// Mock the notification hook
-vi.mock('../../hooks/useNotifications', () => ({
-  useNotifications: () => ({
-    showSuccess: vi.fn(),
-    showError: vi.fn(),
-  }),
-}));
+// Mock the notification hook. Notification callbacks must keep a stable
+// identity across renders (like the real hook), otherwise fetchData's
+// useCallback dep changes every render and the load effect re-fires.
+vi.mock('../../hooks/useNotifications', () => {
+  const showSuccess = vi.fn();
+  const showError = vi.fn();
+  return {
+    useNotifications: () => ({ showSuccess, showError }),
+  };
+});
 
 describe('VisualizeInstallCard', () => {
   const mockInstances: VisualizeConfig[] = [
@@ -100,8 +103,9 @@ describe('VisualizeInstallCard', () => {
       expect(screen.getByText('No krkn-visualize Instances')).toBeInTheDocument();
     });
 
-    const installButton = screen.getByRole('button', { name: /Install krkn-visualize/i });
-    fireEvent.click(installButton);
+    // The card header and the empty state both render an install button.
+    const installButtons = screen.getAllByRole('button', { name: /Install krkn-visualize/i });
+    fireEvent.click(installButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();

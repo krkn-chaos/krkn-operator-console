@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ScenariosList } from './ScenariosList';
@@ -12,6 +12,16 @@ vi.mock('../hooks', () => ({
   }),
 }));
 
+// Signature verification is mocked as enabled with all test scenarios signed,
+// so Configure buttons are active and clicks dispatch directly.
+vi.mock('../hooks/useSignatureVerification', () => ({
+  useSignatureVerification: () => ({
+    enabled: true,
+    error: undefined,
+    isLoading: false,
+  }),
+}));
+
 describe('ScenariosList', () => {
   const mockDispatch = vi.fn();
 
@@ -21,12 +31,14 @@ describe('ScenariosList', () => {
       digest: 'sha256:abc123',
       size: 1024 * 512,
       lastModified: '2024-01-15T10:30:00Z',
+      signature_status: 'signed',
     },
     {
       name: 'node-scenarios',
       digest: 'sha256:def456',
       size: 1024 * 768,
       lastModified: '2024-01-20T14:45:00Z',
+      signature_status: 'signed',
     },
   ];
 
@@ -98,10 +110,10 @@ describe('ScenariosList', () => {
       // Modal should be visible
       expect(screen.getByText(/Are you sure you want to cancel/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /yes, cancel/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /no, go back/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /no, continue browsing/i })).toBeInTheDocument();
     });
 
-    it('should close modal when "No, go back" is clicked', async () => {
+    it('should close modal when "No, continue browsing" is clicked', async () => {
       const user = userEvent.setup();
       renderWithContext();
 
@@ -112,7 +124,7 @@ describe('ScenariosList', () => {
       expect(screen.getByText(/Are you sure you want to cancel/i)).toBeInTheDocument();
 
       // Dismiss modal
-      const dismissButton = screen.getByRole('button', { name: /no, go back/i });
+      const dismissButton = screen.getByRole('button', { name: /no, continue browsing/i });
       await user.click(dismissButton);
 
       // Modal should be closed (text no longer in document)
@@ -178,8 +190,12 @@ describe('ScenariosList', () => {
       const user = userEvent.setup();
       renderWithContext();
 
-      const configureButtons = screen.getAllByRole('button', { name: /configure/i });
-      await user.click(configureButtons[0]);
+      // The list is sorted by last-modified, so target the DataList item
+      // belonging to the scenario instead of relying on button order.
+      const podRow = screen.getByText('pod-scenarios').closest('li');
+      expect(podRow).not.toBeNull();
+      const configureButton = within(podRow!).getByRole('button', { name: /configure/i });
+      await user.click(configureButton);
 
       expect(mockDispatch).toHaveBeenCalledWith({
         type: 'SELECT_SCENARIO_FOR_DETAIL',

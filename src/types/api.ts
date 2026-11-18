@@ -522,6 +522,7 @@ export type AppPhase =
   | 'elasticsearch_data' // Elasticsearch telemetry data table page
   | 'krkn_ai' // Mock Krkn AI console
   | 'resiliency_history' // Resiliency history analytics page
+  | 'visualize' // Embedded Grafana dashboards (krkn-visualize) page
   | 'selecting_clusters' // Multi-cluster selection
   | 'configuring_registry'
   | 'loading_scenarios'
@@ -694,6 +695,7 @@ export type AppAction =
   | { type: 'NAVIGATE_TO_ELASTICSEARCH_DATA' }
   | { type: 'NAVIGATE_TO_KRKN_AI' }
   | { type: 'NAVIGATE_TO_RESILIENCY_HISTORY' }
+  | { type: 'NAVIGATE_TO_VISUALIZE' }
 
   // Notifications
   | { type: 'SHOW_NOTIFICATION'; payload: { notification: Notification } }
@@ -1958,4 +1960,28 @@ export interface VisualizeLogsResponse {
   status: string;
   podName?: string;
   jobName?: string;
+}
+
+/**
+ * GrafanaDashboard - A dashboard installed in a krkn-visualize Grafana instance
+ */
+export interface GrafanaDashboard {
+  /** Grafana's stable dashboard identifier */
+  uid: string;
+  /** Human-readable dashboard title */
+  title: string;
+  /** Grafana-relative dashboard path (e.g. /d/<uid>/<slug>) used for embedding */
+  url: string;
+  /** Grafana folder containing the dashboard (Chaos, General, k8s) */
+  folderTitle?: string;
+  /** Grafana search hit type; dashboards are "dash-db" */
+  type?: string;
+}
+
+/**
+ * VisualizeDashboardsResponse - Dashboards available in a visualize instance
+ */
+export interface VisualizeDashboardsResponse {
+  dashboards: GrafanaDashboard[];
+  total: number;
 }

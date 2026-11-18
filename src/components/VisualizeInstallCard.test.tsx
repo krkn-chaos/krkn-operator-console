@@ -1,5 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { VisualizeInstallCard } from './VisualizeInstallCard';
 import { visualizeApi } from '../services/visualizeApi';
@@ -10,12 +10,16 @@ import type { VisualizeConfig, ElasticsearchConfig, TargetResponse } from '../ty
 vi.mock('../services/visualizeApi');
 vi.mock('../services/elasticsearchApi');
 vi.mock('../services/targetsApi');
-vi.mock('../hooks', () => ({
-  useNotifications: () => ({
-    showSuccess: vi.fn(),
-    showError: vi.fn(),
-  }),
-}));
+// Notification callbacks must keep a stable identity across renders (like the
+// real hook), otherwise fetchData's useCallback dep changes every render and
+// the load effect re-fires.
+vi.mock('../hooks', () => {
+  const showSuccess = vi.fn();
+  const showError = vi.fn();
+  return {
+    useNotifications: () => ({ showSuccess, showError }),
+  };
+});
 
 describe('VisualizeInstallCard', () => {
   const mockInstances: VisualizeConfig[] = [
@@ -118,10 +122,10 @@ describe('VisualizeInstallCard', () => {
       const installButton = (await screen.findAllByRole('button', { name: /Install krkn-visualize/i }))[0];
       await user.click(installButton);
       const dialog = await screen.findByRole('dialog');
-      const clusterSelect = dialog.querySelector<HTMLSelectElement>('#visualize-targets')!;
+      await user.click(within(dialog).getByRole('button', { name: /select target clusters/i }));
 
-      expect(clusterSelect?.querySelector('option[value="cluster1"]')).toBeInTheDocument();
-      expect(clusterSelect?.querySelector('option[value="cluster3"]')).not.toBeInTheDocument();
+      expect(within(dialog).getByRole('option', { name: /cluster1/ })).toBeInTheDocument();
+      expect(within(dialog).queryByRole('option', { name: /cluster3/ })).not.toBeInTheDocument();
       expect(within(dialog).getByText(/Waiting for validation: cluster3/)).toBeInTheDocument();
     });
   });
@@ -135,9 +139,9 @@ describe('VisualizeInstallCard', () => {
       await user.click(installButton);
 
       // Form should open
-      expect(screen.getByText('Install krkn-visualize')).toBeInTheDocument();
-      expect(screen.getByLabelText('Instance Name')).toBeInTheDocument();
-      expect(screen.getByLabelText('Target Clusters')).toBeInTheDocument();
+      expect(within(await screen.findByRole('dialog')).getByRole('heading', { name: 'Install krkn-visualize' })).toBeInTheDocument();
+      expect(within(screen.getByRole('dialog')).getByRole('textbox', { name: /instance name/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /select target clusters/i })).toBeInTheDocument();
     });
 
     it('should call createInstance with form data when submitting', async () => {
@@ -155,9 +159,10 @@ describe('VisualizeInstallCard', () => {
       const nameInput = dialog.querySelector<HTMLInputElement>('#visualize-name')!;
       await user.type(nameInput, 'my-visualize');
 
-      // Select multiple target clusters
-      const clusterSelect = dialog.querySelector<HTMLSelectElement>('#visualize-targets')!;
-      await user.selectOptions(clusterSelect, ['cluster1', 'cluster2']);
+      // Select one target cluster
+      await user.click(within(dialog).getByRole('button', { name: /select target clusters/i }));
+      await user.click(within(dialog).getByRole('option', { name: /cluster1/ }));
+      expect(within(dialog).getByRole('button', { name: /select target clusters/i })).toHaveTextContent('cluster1');
 
       // Select ES config
       const esSelect = dialog.querySelector<HTMLSelectElement>('#visualize-es-config')!;
@@ -176,7 +181,7 @@ describe('VisualizeInstallCard', () => {
         expect(visualizeApi.createInstance).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'my-visualize',
-            targetClusters: ['cluster1', 'cluster2'],
+            targetClusters: ['cluster1'],
             elasticsearchConfigName: 'prod-es',
             grafanaPassword: 'securePassword123',
           })
@@ -224,7 +229,6 @@ describe('VisualizeInstallCard', () => {
     it('should call deleteInstance when deletion is confirmed', async () => {
       const user = userEvent.setup();
       vi.mocked(visualizeApi.deleteInstance).mockResolvedValue({ message: 'Instance deleted' });
-      vi.mocked(visualizeApi.listInstances).mockResolvedValue([]); // Return empty after delete
 
       render(<VisualizeInstallCard />);
 
@@ -245,6 +249,38 @@ describe('VisualizeInstallCard', () => {
       await waitFor(() => {
         expect(visualizeApi.deleteInstance).toHaveBeenCalledWith('test-visualize');
       });
+    });
+
+    it('should not issue a second delete while the first is in flight', async () => {
+      const user = userEvent.setup();
+      let resolveDelete!: (value: { message: string }) => void;
+      vi.mocked(visualizeApi.deleteInstance).mockImplementation(
+        () => new Promise((resolve) => (resolveDelete = resolve))
+      );
+
+      render(<VisualizeInstallCard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('test-visualize')).toBeInTheDocument();
+      });
+
+      // Open the confirmation modal
+      await user.click(screen.getByRole('button', { name: /Delete/i }));
+
+      // Confirm once; the request stays pending until we resolve it
+      await user.click(screen.getByRole('button', { name: /Delete/i }));
+
+      // The confirm button is disabled while the delete is in flight, so a
+      // second click cannot issue a concurrent delete of the same instance.
+      const confirmButton = screen.getByRole('button', { name: /Delete/i });
+      expect(confirmButton).toBeDisabled();
+      await user.click(confirmButton);
+
+      resolveDelete({ message: 'Instance deleted' });
+      await waitFor(() => {
+        expect(screen.queryByText(/Are you sure you want to delete/i)).not.toBeInTheDocument();
+      });
+      expect(visualizeApi.deleteInstance).toHaveBeenCalledTimes(1);
     });
 
     it('should close modal when cancelling deletion', async () => {
@@ -356,6 +392,12 @@ describe('VisualizeInstallCard', () => {
   });
 
   describe('Auto-refresh polling', () => {
+    // Real timers must be restored even when an assertion fails mid-test,
+    // otherwise every subsequent test in this file deadlocks.
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should auto-refresh every 5 seconds when status is Installing', async () => {
       const installingInstance: VisualizeConfig[] = [
         {
@@ -382,26 +424,22 @@ describe('VisualizeInstallCard', () => {
       render(<VisualizeInstallCard />);
 
       // Initial load
-      await waitFor(() => {
-        expect(visualizeApi.listInstances).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
       });
+      expect(visualizeApi.listInstances).toHaveBeenCalledTimes(1);
 
       // Advance time past first auto-refresh interval (5 seconds)
-      vi.advanceTimersByTime(5000);
-
-      await waitFor(() => {
-        expect(visualizeApi.listInstances).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
       });
+      expect(visualizeApi.listInstances).toHaveBeenCalledTimes(2);
 
       // Advance time past second interval
-      vi.advanceTimersByTime(5000);
-
-      await waitFor(() => {
-        expect(visualizeApi.listInstances).toHaveBeenCalledTimes(3);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
       });
-
-      // Cleanup
-      vi.useRealTimers();
+      expect(visualizeApi.listInstances).toHaveBeenCalledTimes(3);
     });
 
     it('should auto-refresh when status is Deleting', async () => {
@@ -423,18 +461,16 @@ describe('VisualizeInstallCard', () => {
 
       render(<VisualizeInstallCard />);
 
-      await waitFor(() => {
-        expect(visualizeApi.listInstances).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
       });
+      expect(visualizeApi.listInstances).toHaveBeenCalledTimes(1);
 
       // Advance time
-      vi.advanceTimersByTime(5000);
-
-      await waitFor(() => {
-        expect(visualizeApi.listInstances).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
       });
-
-      vi.useRealTimers();
+      expect(visualizeApi.listInstances).toHaveBeenCalledTimes(2);
     });
 
     it('should NOT auto-refresh when all instances are Ready', async () => {
@@ -451,17 +487,18 @@ describe('VisualizeInstallCard', () => {
 
       render(<VisualizeInstallCard />);
 
-      await waitFor(() => {
-        expect(visualizeApi.listInstances).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
       });
+      expect(visualizeApi.listInstances).toHaveBeenCalledTimes(1);
 
       // Advance time
-      vi.advanceTimersByTime(10000);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000);
+      });
 
       // Should still only be called once (no auto-refresh)
       expect(visualizeApi.listInstances).toHaveBeenCalledTimes(1);
-
-      vi.useRealTimers();
     });
   });
 
