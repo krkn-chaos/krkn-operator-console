@@ -37,6 +37,7 @@ import { StudioToolbar } from './StudioToolbar';
 import { StudioCanvas } from './StudioCanvas';
 import { StudioRecoveryModal } from './StudioRecoveryModal';
 import { StudioNodeEditorModal } from './StudioNodeEditorModal';
+import { TriggerNodeEditorModal } from './TriggerNodeEditorModal';
 import { RunWorkflowModal } from './RunWorkflowModal';
 import { LoadWorkflowSelect } from './LoadWorkflowSelect';
 import { WorkflowDetailsPanel } from './WorkflowDetailsPanel';
@@ -74,6 +75,7 @@ function StudioContent() {
   const [leaveReason, setLeaveReason] = useState<'dirty' | 'unsaved' | 'editing'>('dirty');
   const pendingLeaveAction = useRef<(() => void) | null>(null);
   const targetFetch = useStudioTargetFetch();
+  const selectedNodeIsTrigger = selectedNode?.nodeType === 'trigger' || selectedNode?.config?.nodeType === 'trigger';
 
   useEffect(() => {
     setCategoryCatalog(categoriesQuery.categories, categoriesQuery.status);
@@ -158,7 +160,7 @@ function StudioContent() {
   }, [savedWorkflow, clearSavedWorkflow, clearWorkflow, showSuccess, showError]);
 
   const handleNodeClick = useCallback((node: StudioNode) => {
-    setSelectedNode(node);
+    setSelectedNode({ ...node, nodeType: node.nodeType ?? node.config?.nodeType });
     setIsEditorOpen(true);
   }, []);
 
@@ -351,12 +353,21 @@ function StudioContent() {
       </Card>
 
       {/* Node Editor Modal */}
-      <StudioNodeEditorModal
-        isOpen={isEditorOpen}
-        node={selectedNode}
-        onClose={handleEditorClose}
-        onSave={handleEditorSave}
-      />
+      {selectedNodeIsTrigger ? (
+        <TriggerNodeEditorModal
+          isOpen={isEditorOpen}
+          node={selectedNode}
+          onClose={handleEditorClose}
+          onSave={handleEditorSave}
+        />
+      ) : (
+        <StudioNodeEditorModal
+          isOpen={isEditorOpen}
+          node={selectedNode}
+          onClose={handleEditorClose}
+          onSave={handleEditorSave}
+        />
+      )}
 
       {/* Run Workflow Modal */}
       <RunWorkflowModal

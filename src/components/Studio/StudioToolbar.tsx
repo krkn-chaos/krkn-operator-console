@@ -40,7 +40,7 @@ interface StudioToolbarProps {
  * ```
  */
 export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
-  const { addNode, exportWorkflow, clearWorkflow, importWorkflow, workflow, savedWorkflow, saveWorkflowToCluster, isDirty, isEditingDetails } = useStudioContext();
+  const { addNode, addTriggerNode, exportWorkflow, clearWorkflow, importWorkflow, workflow, savedWorkflow, saveWorkflowToCluster, isDirty, isEditingDetails } = useStudioContext();
   const { showError, showSuccess, showWarning } = useNotifications();
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -171,6 +171,11 @@ export function StudioToolbar({ onRunWorkflow }: StudioToolbarProps) {
               onClick={addNode}
             >
               Add Scenario
+            </Button>
+          </ToolbarItem>
+          <ToolbarItem>
+            <Button variant="secondary" icon={<PlusCircleIcon />} onClick={addTriggerNode}>
+              Add Trigger
             </Button>
           </ToolbarItem>
 

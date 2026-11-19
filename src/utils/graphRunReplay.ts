@@ -1,6 +1,8 @@
 import { cloudCredentialsApi, graphRunsApi, operatorApi } from '../services';
 import type { StudioWorkflow } from '../types/api';
 
+const TRIGGER_IMAGE = 'quay.io/krkn-chaos/krkn-hub:trigger';
+
 export interface GraphRunReplayPayload {
   workflow: StudioWorkflow;
   categories: string[];
@@ -38,15 +40,18 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
   const workflow: StudioWorkflow = {
     nodes: replayNodes.map(([nodeId, node], index) => {
       const scenarioName = node.scenario?.name ?? node.name ?? '';
+      const isTrigger = node.nodeType === 'trigger';
       return {
         nodeId,
+        ...(isTrigger ? { nodeType: 'trigger' as const } : {}),
         status: 'configured',
         position: { x: (index % 3) * 280, y: Math.floor(index / 3) * 180 },
         config: {
+          ...(isTrigger ? { nodeType: 'trigger' as const } : {}),
           registryType: node.scenario?.private ? 'private' : 'public',
           registryConfig: node.scenario?.registryName ? { registryName: node.scenario.registryName } : {},
           scenarioName,
-          scenarioImage: node.image ?? `krkn-hub:${scenarioName}`,
+          scenarioImage: isTrigger ? TRIGGER_IMAGE : node.image ?? `krkn-hub:${scenarioName}`,
           signature_status: signatureStatuses[index] ?? node.scenario?.signature_status,
           scenarioFormValues: node.env ?? {},
           volumes: node.volumes,
