@@ -24,8 +24,7 @@ import {
 import { TopologyIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
 import { ClusterHealthIndicator } from './ClusterHealthIndicator';
-import { ClusterOfflineIndicator } from './ClusterOfflineIndicator';
-import { isClusterUnavailable } from '../utils/clusterAvailability';
+import { formatClusterCheckedAt, isClusterUnavailable } from '../utils/clusterAvailability';
 
 interface ClusterMultiSelectorProps {
   clusters: { [operatorName: string]: Cluster[] } | null;
@@ -183,6 +182,7 @@ export function ClusterMultiSelector({
                     const checked = isSelected(operatorName, cluster['cluster-name']);
                     const isOffline = cluster.online === false;
                     const isUnavailable = isClusterUnavailable(cluster.online, cluster['cluster-status']);
+                    const offlineMessage = `Cluster is offline. Last checked: ${formatClusterCheckedAt(cluster['checked-at'])}.`;
 
                     return (
                       <DataListItem
@@ -261,9 +261,8 @@ export function ClusterMultiSelector({
                   size="lg"
                 >
                   {selectedClusters.length > 0
-                    ? `Proceed with ${selectedClusters.length} cluster${
-                        selectedClusters.length === 1 ? '' : 's'
-                      }`
+                    ? `Proceed with ${selectedClusters.length} cluster${selectedClusters.length === 1 ? '' : 's'
+                    }`
                     : 'Select clusters to proceed'}
                 </Button>
               </FlexItem>
