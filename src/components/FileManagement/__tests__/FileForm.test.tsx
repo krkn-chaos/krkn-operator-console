@@ -13,6 +13,7 @@ vi.mock('../../../services/operatorApi', () => ({
     updateFile: vi.fn(),
     getFile: vi.fn(),
     getGroups: vi.fn().mockResolvedValue({ groups: [] }),
+    getCategories: vi.fn().mockResolvedValue({ categories: [], total: 0 }),
   },
 }));
 
@@ -41,6 +42,7 @@ describe('FileForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (operatorApi.getGroups as ReturnType<typeof vi.fn>).mockResolvedValue({ groups: [] });
+    (operatorApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({ categories: [], total: 0 });
   });
 
   /**
@@ -158,5 +160,140 @@ describe('FileForm', () => {
     expect(fileFormStyles).toMatch(
       /\.file-form-group-select-toggle\s+\.pf-v5-c-menu-toggle__text\s*\{\s*width:\s*100%;?\s*\}/,
     );
+  });
+
+  it('sends the selected categories when creating a file', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({
+      categories: [{ name: 'network-chaos', availableToAll: true }],
+      total: 1,
+    });
+    (operatorApi.createFile as ReturnType<typeof vi.fn>).mockResolvedValue({ message: 'ok', fileId: 'f1' });
+
+    render(<FileForm {...defaultProps} />);
+
+    const categoryToggle = await screen.findByRole('button', { name: 'Categories' });
+    await user.click(categoryToggle);
+    await user.click(screen.getByRole('checkbox', { name: 'network-chaos' }));
+    await fillAndSubmit(user);
+
+    await waitFor(() => {
+      expect(operatorApi.createFile).toHaveBeenCalledWith(
+        expect.objectContaining({ categories: ['network-chaos'] }),
+      );
+    });
+  });
+
+  it('sends existing categories when editing, including ones the user cannot see', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({
+      categories: [{ name: 'network-chaos', availableToAll: true }],
+      total: 1,
+    });
+    (operatorApi.getFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      fileId: 'categorized-file',
+      fileName: 'rules.yaml',
+      content: 'key: value',
+      availableToAll: true,
+      categories: ['network-chaos', 'admin-only-category'],
+    });
+    (operatorApi.updateFile as ReturnType<typeof vi.fn>).mockResolvedValue({ fileId: 'categorized-file' });
+
+    render(
+      <FileForm
+        mode="edit"
+        initialData={{ fileId: 'categorized-file', fileName: 'rules.yaml', availableToAll: true }}
+        onSuccess={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('rules.yaml');
+    await screen.findByRole('button', { name: 'Categories' });
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(operatorApi.updateFile).toHaveBeenCalledWith(
+        'categorized-file',
+        expect.objectContaining({ categories: ['network-chaos', 'admin-only-category'] }),
+      );
+    });
+  });
+
+  it('omits categories when the category list fails to load so existing ones are preserved', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getCategories as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('forbidden'));
+    (operatorApi.getFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      fileId: 'categorized-file',
+      fileName: 'rules.yaml',
+      content: 'key: value',
+      availableToAll: true,
+      categories: ['network-chaos'],
+    });
+    (operatorApi.updateFile as ReturnType<typeof vi.fn>).mockResolvedValue({ fileId: 'categorized-file' });
+
+    render(
+      <FileForm
+        mode="edit"
+        initialData={{ fileId: 'categorized-file', fileName: 'rules.yaml', availableToAll: true }}
+        onSuccess={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('rules.yaml');
+    await screen.findByText('Categories could not be loaded');
+    // Edit mode omits the field, so the message must not claim removal.
+    expect(screen.getByText(/The existing categories will be kept unchanged/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => expect(operatorApi.updateFile).toHaveBeenCalled());
+    const payload = (operatorApi.updateFile as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(payload).not.toHaveProperty('categories');
+  });
+
+  it('omits categories when the edit response does not include them', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({
+      categories: [{ name: 'network-chaos', availableToAll: true }],
+      total: 1,
+    });
+    // An operator that predates file categories omits the field entirely.
+    (operatorApi.getFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      fileId: 'legacy-file',
+      fileName: 'legacy.yaml',
+      content: 'key: value',
+      availableToAll: true,
+    });
+    (operatorApi.updateFile as ReturnType<typeof vi.fn>).mockResolvedValue({ fileId: 'legacy-file' });
+
+    render(
+      <FileForm
+        mode="edit"
+        initialData={{ fileId: 'legacy-file', fileName: 'legacy.yaml', availableToAll: true }}
+        onSuccess={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('legacy.yaml');
+    await screen.findByRole('button', { name: 'Categories' });
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => expect(operatorApi.updateFile).toHaveBeenCalled());
+    const payload = (operatorApi.updateFile as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(payload).not.toHaveProperty('categories');
+  });
+
+  it('hides the category control when the operator does not support categories', async () => {
+    (operatorApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({
+      categories: [{ name: 'network-chaos', availableToAll: true }],
+      total: 1,
+    });
+
+    render(<FileForm {...defaultProps} categoriesSupported={false} />);
+
+    await screen.findByRole('textbox', { name: /file name/i });
+    expect(screen.queryByRole('button', { name: 'Categories' })).not.toBeInTheDocument();
   });
 });

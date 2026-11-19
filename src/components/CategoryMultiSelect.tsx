@@ -20,6 +20,12 @@ interface CategoryMultiSelectProps {
   selectedCategories: string[];
   onSelectionChange: (categories: string[]) => void;
   onRetry: () => void;
+  /**
+   * What happens to stored associations when the category list cannot load.
+   * A create flow assigns nothing; an edit flow that omits the field keeps the
+   * existing associations. The error message must describe the real outcome.
+   */
+  preserveExistingOnError?: boolean;
 }
 
 /**
@@ -46,8 +52,18 @@ export function CategoryMultiSelect({
   selectedCategories,
   onSelectionChange,
   onRetry,
+  preserveExistingOnError = false,
 }: CategoryMultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Selections can outlive the options: a stored association may not be in the
+  // visible list (stale list, or an operator that does not filter private
+  // categories). Count only what the user can actually see and toggle, so the
+  // label never claims selections that have no checkbox. Unlisted names stay in
+  // the selection so they are preserved on save.
+  const selectableNames = new Set(categories.map((category) => category.name));
+  const selectableSelectionCount = selectedCategories.filter((name) =>
+    selectableNames.has(name)).length;
 
   const toggleCategory = (name: string) => {
     onSelectionChange(
@@ -67,7 +83,10 @@ export function CategoryMultiSelect({
 
       {status === 'error' && (
         <Alert variant="warning" isInline isPlain title="Categories could not be loaded">
-          No categories will be assigned. Retry to load the categories visible to you.{' '}
+          {preserveExistingOnError
+            ? 'The existing categories will be kept unchanged.'
+            : 'No categories will be assigned.'}{' '}
+          Retry to load the categories visible to you.{' '}
           <Button variant="link" onClick={onRetry}>
             Retry
           </Button>
@@ -94,9 +113,9 @@ export function CategoryMultiSelect({
               aria-label={label}
               style={{ minWidth: '240px' }}
             >
-              {selectedCategories.length === 0
+              {selectableSelectionCount === 0
                 ? 'No categories selected'
-                : `${selectedCategories.length} ${selectedCategories.length === 1 ? 'category' : 'categories'} selected`}
+                : `${selectableSelectionCount} ${selectableSelectionCount === 1 ? 'category' : 'categories'} selected`}
             </MenuToggle>
           )}
         >

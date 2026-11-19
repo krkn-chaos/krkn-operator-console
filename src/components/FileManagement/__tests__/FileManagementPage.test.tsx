@@ -11,8 +11,11 @@ vi.mock('../../../hooks/useRole', () => ({
 vi.mock('../../../services/operatorApi');
 
 vi.mock('../FilesTable', () => ({
-  FilesTable: ({ onCreateClick }: { onCreateClick: () => void }) => (
-    <div data-testid="files-table">
+  FilesTable: ({ onCreateClick, categoriesSupported }: {
+    onCreateClick: () => void;
+    categoriesSupported?: boolean;
+  }) => (
+    <div data-testid="files-table" data-categories-supported={String(categoriesSupported)}>
       <button onClick={onCreateClick}>Create file</button>
     </div>
   ),
@@ -31,6 +34,7 @@ describe('FileManagementPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue(filesResponse);
+    vi.mocked(operatorApi.getCategories).mockResolvedValue({ categories: [], total: 0 });
   });
 
   it('loads files when the page mounts', async () => {
@@ -60,5 +64,27 @@ describe('FileManagementPage', () => {
     await user.click(screen.getByRole('button', { name: 'Create file' }));
 
     expect(screen.getByRole('dialog')).toHaveTextContent('Create/edit file form');
+  });
+
+  it('hides category support when the operator omits the categories field', async () => {
+    vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+      files: [{ fileId: 'file-1', fileName: 'config.yaml', availableToAll: true }],
+    });
+
+    render(<FileManagementPage />);
+
+    await waitFor(() => expect(screen.getByTestId('files-table')).toBeInTheDocument());
+    expect(screen.getByTestId('files-table')).toHaveAttribute('data-categories-supported', 'false');
+  });
+
+  it('keeps category support when files expose an empty categories array', async () => {
+    vi.mocked(operatorApi.getAvailableFiles).mockResolvedValue({
+      files: [{ fileId: 'file-1', fileName: 'config.yaml', availableToAll: true, categories: [] }],
+    });
+
+    render(<FileManagementPage />);
+
+    await waitFor(() => expect(screen.getByTestId('files-table')).toBeInTheDocument());
+    expect(screen.getByTestId('files-table')).toHaveAttribute('data-categories-supported', 'true');
   });
 });

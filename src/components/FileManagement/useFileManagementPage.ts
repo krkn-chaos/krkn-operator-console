@@ -1,22 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
+import { useVisibleCategories } from '../../hooks/useVisibleCategories';
 import { isApiError } from '../../utils/apiClient';
 import type { FileInfo } from '../../types/api';
 
 export function useFileManagementPage() {
   const { isAdmin, userGroups } = useRole();
+  // Category definitions carry the colors used by the row marker; files only
+  // reference categories by name.
+  const { categories } = useVisibleCategories();
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [fileFormOpen, setFileFormOpen] = useState(false);
   const [fileFormMode, setFileFormMode] = useState<'create' | 'edit'>('create');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Operators that support file categories always return the field, even when
+  // a file has none. When every listed file omits it, the deployed operator is
+  // older and the category controls would silently drop input. An empty list
+  // carries no signal, so the controls stay available.
+  const [categoriesSupported, setCategoriesSupported] = useState(true);
 
   const loadFiles = useCallback(async () => {
     try {
       const response = await operatorApi.getAvailableFiles();
-      setFiles(response.files || []);
+      const loadedFiles = response.files || [];
+      setFiles(loadedFiles);
+      setCategoriesSupported(
+        loadedFiles.length === 0 || loadedFiles.some((file) => file.categories !== undefined),
+      );
     } catch (err) {
       console.error('[FileManagementPage] Error loading files:', err);
       setError(err instanceof Error ? err.message : 'Failed to load files');
@@ -64,6 +77,8 @@ export function useFileManagementPage() {
     fileFormMode,
     fileFormOpen,
     files,
+    categories,
+    categoriesSupported,
     isAdmin,
     loading,
     selectedFile,
