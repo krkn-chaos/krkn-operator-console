@@ -49,7 +49,12 @@ describe('ClusterMultiSelector cluster health', () => {
   it('shows an accessible offline indicator with the last check time', () => {
     renderSelector();
 
-    expect(screen.getByLabelText(/Cluster is offline\. Last checked:/)).toBeInTheDocument();
+    const indicator = screen.getByLabelText(/Cluster is offline\. Last checked:/);
+    expect(indicator).toBeInTheDocument();
+    // The discovered record carries a checked-at timestamp, so the message must
+    // render a formatted date rather than the "unknown" fallback.
+    expect(indicator.getAttribute('aria-label')).toMatch(/Last checked: .+\.$/);
+    expect(indicator.getAttribute('aria-label')).not.toContain('Last checked: unknown');
   });
 
   it('does not toggle unhealthy or offline clusters and Select All excludes both', () => {

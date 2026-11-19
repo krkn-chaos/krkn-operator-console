@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
+  Alert,
+  AlertActionLink,
   Button,
   EmptyState,
   EmptyStateIcon,
@@ -16,12 +18,42 @@ import {
   Modal,
   ModalVariant,
   Spinner,
+  Tooltip,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, TopologyIcon, TrashIcon, EditIcon } from '@patternfly/react-icons';
+import {
+  PlusCircleIcon,
+  SyncIcon,
+  TopologyIcon,
+  TrashIcon,
+  EditIcon,
+} from '@patternfly/react-icons';
 import { targetsApi } from '../services/targetsApi';
+import { operatorApi } from '../services/operatorApi';
+import { useClusterDiscovery } from '../hooks/useClusterDiscovery';
 import { useNotifications } from '../hooks';
 import { TargetForm } from './TargetForm';
-import type { TargetResponse, CreateTargetRequest, UpdateTargetRequest } from '../types/api';
+import { ClusterHealthIndicator } from './ClusterHealthIndicator';
+import {
+  describeTargetAvailability,
+  type TargetAvailability,
+  type TargetAvailabilityState,
+} from '../utils/targetAvailability';
+import type {
+  TargetResponse,
+  CreateTargetRequest,
+  UpdateTargetRequest,
+} from '../types/api';
+
+const availabilityLabels: Record<
+  TargetAvailabilityState,
+  { text: string; color: 'grey' | 'green' | 'red' | 'orange' }
+> = {
+  checking: { text: 'Checking…', color: 'grey' },
+  available: { text: 'Available', color: 'green' },
+  unavailable: { text: 'Unavailable', color: 'red' },
+  'not-discovered': { text: 'Not available', color: 'orange' },
+  unknown: { text: 'Unknown', color: 'grey' },
+};
 
 export function TargetsList() {
   const [targets, setTargets] = useState<TargetResponse[]>([]);
@@ -33,11 +65,25 @@ export function TargetsList() {
   const [apiAvailable, setApiAvailable] = useState(true);
   const { showSuccess, showError } = useNotifications();
 
-  useEffect(() => {
-    loadTargets();
-  }, []);
+  // Live reachability/health, from the same discovery flow the cluster picker
+  // uses. Kept separate from `targets` because discovery covers every operator,
+  // while this tab only lists the targets configured in this operator.
+  const {
+    clusters: discoveredClusters,
+    discoveryUuid,
+    isLoading: isCheckingAvailability,
+    error: discoveryError,
+    startDiscovery,
+  } = useClusterDiscovery();
 
-  const loadTargets = async () => {
+  // Discovery creates a short-lived target request CR; track its UUID so the
+  // previous request can be cleaned up on refresh and unmount.
+  const discoveryUuidRef = useRef<string | null>(null);
+  useEffect(() => {
+    discoveryUuidRef.current = discoveryUuid;
+  }, [discoveryUuid]);
+
+  const loadTargets = useCallback(async () => {
     setLoading(true);
     try {
       const data = await targetsApi.listTargets();
@@ -50,6 +96,37 @@ export function TargetsList() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const refreshAvailability = useCallback(() => {
+    const previousUuid = discoveryUuidRef.current;
+    if (previousUuid) {
+      discoveryUuidRef.current = null;
+      // Best effort: a stale discovery request must not fail the refresh.
+      operatorApi.deleteTargetRequest(previousUuid).catch(() => {});
+    }
+    void startDiscovery();
+  }, [startDiscovery]);
+
+  // Release this discovery request if the user leaves Settings before it is used.
+  useEffect(() => {
+    return () => {
+      const uuid = discoveryUuidRef.current;
+      if (uuid) {
+        discoveryUuidRef.current = null;
+        operatorApi.deleteTargetRequest(uuid).catch(() => {});
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    void loadTargets();
+    refreshAvailability();
+  }, [loadTargets, refreshAvailability]);
+
+  const handleRefresh = () => {
+    void loadTargets();
+    refreshAvailability();
   };
 
   const handleCreate = () => {
@@ -76,6 +153,7 @@ export function TargetsList() {
       await targetsApi.deleteTarget(confirmDeleteTarget.uuid);
       showSuccess('Target deleted', `Target "${confirmDeleteTarget.clusterName}" has been deleted successfully`);
       await loadTargets();
+      refreshAvailability();
     } catch (error) {
       showError('Failed to delete target', error instanceof Error ? error.message : 'Unknown error');
     } finally {
@@ -93,12 +171,29 @@ export function TargetsList() {
     }
     setIsFormOpen(false);
     await loadTargets();
+    refreshAvailability();
   };
 
   const handleFormCancel = () => {
     setIsFormOpen(false);
     setEditingTarget(null);
   };
+
+  const availabilityByTarget = useMemo(() => {
+    const resolved = new Map<string, TargetAvailability>();
+    targets.forEach((target) => {
+      resolved.set(
+        target.uuid,
+        describeTargetAvailability(
+          target,
+          discoveredClusters,
+          discoveryError,
+          isCheckingAvailability
+        )
+      );
+    });
+    return resolved;
+  }, [targets, discoveredClusters, discoveryError, isCheckingAvailability]);
 
   if (loading) {
     return (
@@ -117,11 +212,39 @@ export function TargetsList() {
           </Title>
         </FlexItem>
         <FlexItem>
-          <Button variant="primary" icon={<PlusCircleIcon />} onClick={handleCreate}>
-            Add Target
-          </Button>
+          <Flex spaceItems={{ default: 'spaceItemsSm' }}>
+            <FlexItem>
+              <Button
+                variant="secondary"
+                icon={<SyncIcon />}
+                onClick={handleRefresh}
+                isDisabled={loading || isCheckingAvailability}
+              >
+                Refresh
+              </Button>
+            </FlexItem>
+            <FlexItem>
+              <Button variant="primary" icon={<PlusCircleIcon />} onClick={handleCreate}>
+                Add Target
+              </Button>
+            </FlexItem>
+          </Flex>
         </FlexItem>
       </Flex>
+
+      {discoveryError && targets.length > 0 && (
+        <Alert
+          variant="warning"
+          isInline
+          title="Live cluster status unavailable"
+          style={{ marginBottom: '1rem' }}
+          actionLinks={
+            <AlertActionLink onClick={handleRefresh}>Retry status check</AlertActionLink>
+          }
+        >
+          {discoveryError}. Cluster statuses below are unknown until the check succeeds.
+        </Alert>
+      )}
 
       {targets.length === 0 ? (
         <EmptyState>
@@ -137,91 +260,100 @@ export function TargetsList() {
         </EmptyState>
       ) : (
         <DataList aria-label="Targets list" isCompact>
-          {targets.map((target) => (
-            <DataListItem key={target.uuid}>
-              <DataListItemRow>
-                <DataListItemCells
-                  dataListCells={[
-                    <DataListCell key="name" width={2}>
-                      <div>
-                        <div style={{ marginBottom: '0.25rem' }}>
-                          <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
-                            {target.clusterName}
-                          </strong>
-                        </div>
-                        <div
-                          title={target.clusterAPIURL}
-                          style={{
-                            fontSize: 'var(--pf-v5-global--FontSize--sm)',
-                            color: 'var(--pf-v5-global--Color--200)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {target.clusterAPIURL}
-                        </div>
-                      </div>
-                    </DataListCell>,
-                    <DataListCell key="type" width={1}>
-                      <div>
-                        <div style={{ marginBottom: '0.25rem' }}>
-                          <strong>Type:</strong>
-                        </div>
-                        <Label color="blue">{target.secretType}</Label>
-                      </div>
-                    </DataListCell>,
-                    <DataListCell key="status" width={1}>
-                      <div>
-                        <div style={{ marginBottom: '0.25rem' }}>
-                          <strong>Status:</strong>
-                        </div>
-                        <Label color={target.ready ? 'green' : 'orange'}>
-                          {target.ready ? 'Ready' : 'Not Ready'}
-                        </Label>
-                      </div>
-                    </DataListCell>,
-                    <DataListCell key="created" width={1}>
-                      <div>
-                        <div style={{ marginBottom: '0.25rem' }}>
-                          <strong>Created:</strong>
-                        </div>
-                        <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
-                          {target.createdAt ? new Date(target.createdAt).toLocaleString() : 'N/A'}
-                        </div>
-                      </div>
-                    </DataListCell>,
-                    <DataListCell key="actions" width={1}>
-                      <Flex spaceItems={{ default: 'spaceItemsSm' }}>
-                        <FlexItem>
-                          <Button
-                            variant="secondary"
-                            icon={<EditIcon />}
-                            onClick={() => handleEdit(target)}
-                            size="sm"
+          {targets.map((target) => {
+            const availability = availabilityByTarget.get(target.uuid);
+            const state = availability?.state ?? 'unknown';
+            const label = availabilityLabels[state];
+
+            return (
+              <DataListItem key={target.uuid}>
+                <DataListItemRow>
+                  <DataListItemCells
+                    dataListCells={[
+                      <DataListCell key="name" width={2}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
+                              {target.clusterName}
+                            </strong>
+                            <ClusterHealthIndicator status={availability?.cluster?.clusterStatus} />
+                          </div>
+                          <div
+                            title={target.clusterAPIURL}
+                            style={{
+                              fontSize: 'var(--pf-v5-global--FontSize--sm)',
+                              color: 'var(--pf-v5-global--Color--200)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
                           >
-                            Edit
-                          </Button>
-                        </FlexItem>
-                        <FlexItem>
-                          <Button
-                            variant="danger"
-                            icon={<TrashIcon />}
-                            onClick={() => handleDelete(target.uuid, target.clusterName)}
-                            isLoading={deletingUuid === target.uuid}
-                            isDisabled={deletingUuid === target.uuid}
-                            size="sm"
-                          >
-                            Delete
-                          </Button>
-                        </FlexItem>
-                      </Flex>
-                    </DataListCell>,
-                  ]}
-                />
-              </DataListItemRow>
-            </DataListItem>
-          ))}
+                            {target.clusterAPIURL}
+                          </div>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="type" width={1}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong>Type:</strong>
+                          </div>
+                          <Label color="blue">{target.secretType}</Label>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="status" width={1}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong>Status:</strong>
+                          </div>
+                          <Tooltip content={availability?.detail ?? 'Status could not be determined.'} position="top">
+                            <span aria-label={`Target availability: ${label.text}`} tabIndex={0}>
+                              <Label color={label.color}>{label.text}</Label>
+                            </span>
+                          </Tooltip>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="created" width={1}>
+                        <div>
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <strong>Created:</strong>
+                          </div>
+                          <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
+                            {target.createdAt ? new Date(target.createdAt).toLocaleString() : 'N/A'}
+                          </div>
+                        </div>
+                      </DataListCell>,
+                      <DataListCell key="actions" width={1}>
+                        <Flex spaceItems={{ default: 'spaceItemsSm' }}>
+                          <FlexItem>
+                            <Button
+                              variant="secondary"
+                              icon={<EditIcon />}
+                              onClick={() => handleEdit(target)}
+                              size="sm"
+                            >
+                              Edit
+                            </Button>
+                          </FlexItem>
+                          <FlexItem>
+                            <Button
+                              variant="danger"
+                              icon={<TrashIcon />}
+                              onClick={() => handleDelete(target.uuid, target.clusterName)}
+                              isLoading={deletingUuid === target.uuid}
+                              isDisabled={deletingUuid === target.uuid}
+                              size="sm"
+                            >
+                              Delete
+                            </Button>
+                          </FlexItem>
+                        </Flex>
+                      </DataListCell>,
+                    ]}
+                  />
+                </DataListItemRow>
+              </DataListItem>
+            );
+          })}
         </DataList>
       )}
 

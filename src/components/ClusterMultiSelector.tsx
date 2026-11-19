@@ -25,7 +25,7 @@ import {
 import { DisconnectedIcon, TopologyIcon } from '@patternfly/react-icons';
 import type { Cluster, SelectedCluster } from '../types/api';
 import { ClusterHealthIndicator } from './ClusterHealthIndicator';
-import { isClusterUnavailable } from '../utils/clusterAvailability';
+import { formatClusterCheckedAt, isClusterUnavailable } from '../utils/clusterAvailability';
 
 interface ClusterMultiSelectorProps {
   clusters: { [operatorName: string]: Cluster[] } | null;
@@ -45,17 +45,6 @@ export function ClusterMultiSelector({
   showActions = true,
 }: ClusterMultiSelectorProps) {
   const [removedUnavailableClusterNames, setRemovedUnavailableClusterNames] = useState<string[]>([]);
-  const formatCheckedAt = (checkedAt?: string): string => {
-    if (!checkedAt) return 'unknown';
-
-    const date = new Date(checkedAt);
-    if (Number.isNaN(date.getTime())) return checkedAt;
-
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(date);
-  };
 
   // Helper to check if a cluster is selected
   const isSelected = (operatorName: string, clusterName: string): boolean => {
@@ -194,7 +183,7 @@ export function ClusterMultiSelector({
                     const checked = isSelected(operatorName, cluster['cluster-name']);
                     const isOffline = cluster.online === false;
                     const isUnavailable = isClusterUnavailable(cluster.online, cluster['cluster-status']);
-                    const offlineMessage = `Cluster is offline. Last checked: ${formatCheckedAt(cluster['checked-at'])}.`;
+                    const offlineMessage = `Cluster is offline. Last checked: ${formatClusterCheckedAt(cluster['checked-at'])}.`;
 
                     return (
                       <DataListItem
