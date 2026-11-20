@@ -83,6 +83,7 @@ export function FileManagementPage() {
         isOpen={page.fileFormOpen}
         mode={page.fileFormMode}
         initialData={page.selectedFile || undefined}
+        fileTypes={page.knownFileTypes}
         onClose={page.closeFileForm}
         onSuccess={page.handleFileFormSuccess}
       />

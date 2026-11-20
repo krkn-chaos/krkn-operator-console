@@ -159,4 +159,100 @@ describe('FileForm', () => {
       /\.file-form-group-select-toggle\s+\.pf-v5-c-menu-toggle__text\s*\{\s*width:\s*100%;?\s*\}/,
     );
   });
+  it('sends the normalized file type when creating a file', async () => {
+    const user = userEvent.setup();
+    (operatorApi.createFile as ReturnType<typeof vi.fn>).mockResolvedValue({ message: 'ok', fileId: 'f1' });
+
+    render(<FileForm {...defaultProps} />);
+
+    await user.type(screen.getByRole('textbox', { name: /file type/i }), 'Kube Config');
+    await fillAndSubmit(user);
+
+    await waitFor(() => {
+      expect(operatorApi.createFile).toHaveBeenCalledWith(
+        expect.objectContaining({ fileType: 'kube-config' }),
+      );
+    });
+  });
+
+  it('initializes and updates the file type when editing', async () => {
+    const user = userEvent.setup();
+    (operatorApi.getFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      fileId: 'typed-file',
+      fileName: 'rules.yaml',
+      content: 'key: value',
+      availableToAll: true,
+      fileType: 'metrics',
+    });
+    (operatorApi.updateFile as ReturnType<typeof vi.fn>).mockResolvedValue({ fileId: 'typed-file' });
+
+    render(
+      <FileForm
+        mode="edit"
+        initialData={{ fileId: 'typed-file', fileName: 'rules.yaml', availableToAll: true }}
+        onSuccess={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('rules.yaml');
+    const fileTypeInput = screen.getByRole('textbox', { name: /file type/i });
+    expect(fileTypeInput).toHaveValue('metrics');
+
+    await user.clear(fileTypeInput);
+    await user.type(fileTypeInput, 'alerts');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(operatorApi.updateFile).toHaveBeenCalledWith(
+        'typed-file',
+        expect.objectContaining({ fileType: 'alerts' }),
+      );
+    });
+  });
+
+  it('rejects a file type with no letters or numbers', async () => {
+    const user = userEvent.setup();
+
+    render(<FileForm {...defaultProps} />);
+
+    await user.type(screen.getByRole('textbox', { name: /file type/i }), '!!!');
+    await fillAndSubmit(user);
+
+    expect(await screen.findByText('Enter at least one letter or number')).toBeInTheDocument();
+    expect(operatorApi.createFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('FileForm file types', () => {
+  const defaultProps = {
+    mode: 'create' as const,
+    onSuccess: vi.fn(),
+    onCancel: vi.fn(),
+  };
+
+  it('offers previously used file types while typing', async () => {
+    const user = userEvent.setup();
+    render(<FileForm {...defaultProps} fileTypes={['alerts', 'metrics']} />);
+
+    const input = screen.getByRole('textbox', { name: /file type/i });
+    await user.click(input);
+
+    expect(await screen.findByRole('option', { name: 'alerts' })).toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'metrics' }));
+
+    expect(input).toHaveValue('metrics');
+  });
+
+  it('offers to create a file type that is not in use yet', async () => {
+    const user = userEvent.setup();
+    render(<FileForm {...defaultProps} fileTypes={['alerts']} />);
+
+    const input = screen.getByRole('textbox', { name: /file type/i });
+    await user.type(input, 'Kube Config');
+
+    await user.click(await screen.findByRole('option', { name: /Create "kube-config"/ }));
+
+    expect(input).toHaveValue('kube-config');
+  });
 });
