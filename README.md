@@ -35,7 +35,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Vite proxies `/api` requests to `http://localhost:8080`, allowing the console to communicate directly with the locally running operator.
+Vite proxies `/api` requests to `http://localhost:8080` by default. Set `VITE_API_PROXY_TARGET` in `.env.local` when the operator uses another address; for example, `http://[::1]:8080` if Keycloak occupies IPv4 port 8080 and the operator listens on IPv6.
 
 The question-mark icon in the top bar opens component versions for every signed-in
 user. The console includes its own version from `src/component.json` in the list,
