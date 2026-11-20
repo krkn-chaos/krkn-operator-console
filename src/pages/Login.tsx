@@ -9,7 +9,7 @@
  * - Error handling with inline validation
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   LoginPage as PFLoginPage,
@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { RateLimitError } from '../types/auth';
 import { useCooldown } from '../hooks/useCooldown';
+import { identityApi, type LoginProvider } from '../services/identityApi';
 
 function toRouterRelativeReturnUrl(returnUrl: string, baseUrl: string): string {
   const basename = baseUrl.replace(/\/+$/, '');
@@ -51,6 +52,21 @@ export function Login() {
   const [showSessionExpired, setShowSessionExpired] = useState(false);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
   const [cooldownSeconds, startCooldown] = useCooldown();
+  const [loginProviders, setLoginProviders] = useState<LoginProvider[]>([]);
+  const [providerError, setProviderError] = useState(false);
+
+  const loadLoginProviders = useCallback(async () => {
+    try {
+      setLoginProviders(await identityApi.loginProviders());
+      setProviderError(false);
+    } catch {
+      setProviderError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLoginProviders();
+  }, [loadLoginProviders]);
 
   // Apply theme from localStorage
   useEffect(() => {
@@ -179,6 +195,29 @@ export function Login() {
         loginButtonLabel={cooldownSeconds > 0 ? `Please wait (${cooldownSeconds}s)` : isLoading ? 'Logging in...' : 'Log in'}
         onLoginButtonClick={handleSubmit}
       />
+
+      {providerError && <Alert variant="warning" title="External login options are unavailable" isInline>
+        <Button variant="link" onClick={() => void loadLoginProviders()}>Retry</Button>
+      </Alert>}
+
+      {loginProviders.length > 0 && (
+        <div style={{ marginTop: 'var(--pf-v5-global--spacer--md)' }}>
+          {loginProviders.map(provider => (
+            <Button
+              key={provider.id}
+              variant="secondary"
+              isBlock
+              style={{ marginBottom: 'var(--pf-v5-global--spacer--sm)' }}
+              onClick={() => {
+                authService.startExternalLogin();
+                window.location.assign(new URL(provider.loginUrl, window.location.origin).toString());
+              }}
+            >
+              Log in with {provider.displayName}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {isRegistered === false && (
         <div style={{ marginTop: '1rem', textAlign: 'center' }}>

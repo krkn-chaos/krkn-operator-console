@@ -475,6 +475,9 @@ export interface UserDetails {
   active: boolean; // Account active status
   created?: string; // ISO 8601
   lastLogin?: string; // ISO 8601
+  authProvider?: string;
+  externalUsername?: string;
+  externalEmail?: string;
 }
 
 export interface CreateUserRequest {
@@ -734,6 +737,14 @@ export interface GroupDetails {
   clusterPermissions: ClusterPermissions;
   memberCount?: number;
   createdAt?: string;
+  externalGroups?: ExternalGroupMapping[];
+}
+
+/** The provider instance ID scopes each external group, avoiding name collisions. */
+export interface ExternalGroupMapping {
+  provider: string;
+  group: string;
+  groupId?: string;
 }
 
 export interface CreateGroupRequest {
@@ -741,12 +752,14 @@ export interface CreateGroupRequest {
   description?: string;
   clusterPermissions: ClusterPermissions;
   discoveryUuid?: string; // UUID of cluster discovery request for cleanup
+  externalGroups?: ExternalGroupMapping[];
 }
 
 export interface UpdateGroupRequest {
   description?: string;
   clusterPermissions?: ClusterPermissions;
   discoveryUuid?: string; // UUID of cluster discovery request for cleanup
+  externalGroups?: ExternalGroupMapping[];
 }
 
 export interface ListGroupsResponse {

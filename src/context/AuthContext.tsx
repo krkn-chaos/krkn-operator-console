@@ -144,6 +144,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Automatically logout user and clear session
    */
   const handleUnauthorized = useCallback((requestToken: string | null) => {
+    if (!requestToken && authService.getCookieSession()) {
+      authService.logout();
+      dispatch({ type: 'AUTH_LOGOUT' });
+      redirectToExpiredLogin();
+      return;
+    }
     if (!authService.logout(requestToken)) return;
 
     dispatch({ type: 'AUTH_LOGOUT' });
@@ -181,7 +187,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  const syncAuthFromStorage = useCallback((fromStorageEvent = false) => {
+  const syncAuthFromStorage = useCallback(async (fromStorageEvent = false) => {
     const user = authService.getUser();
     const token = authService.getToken();
     const expiresAt = authService.getTokenExpiresAt();
@@ -203,7 +209,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (user || token || expiresAt) {
       if (!fromStorageEvent) authService.logout();
     }
-    dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+    if (fromStorageEvent) {
+      dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+      return;
+    }
+    try {
+      const cookieUser = await authService.restoreCookieSession();
+      dispatch({ type: 'AUTH_INIT', payload: { user: cookieUser ?? null } });
+    } catch {
+      dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+    }
   }, [loadAndStoreGroups]);
 
   useEffect(() => {
@@ -225,6 +240,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [syncAuthFromStorage]);
 
   const expireSession = useCallback(() => {
+    if (authService.getCookieSession()) return;
     if (!authService.isTokenExpired()) return;
 
     authService.logout();
@@ -234,6 +250,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (!state.isAuthenticated) return;
+    if (authService.getCookieSession()) return;
 
     const expiresAt = authService.getTokenExpiresAt();
     const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
@@ -330,6 +347,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Logout user
    */
   const logout = useCallback(() => {
+    void authService.logoutCookieSession().catch(() => undefined);
     authService.logout();
     dispatch({ type: 'AUTH_LOGOUT' });
   }, []);

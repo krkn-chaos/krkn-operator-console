@@ -3,6 +3,8 @@ import { Grid, GridItem, Spinner } from '@patternfly/react-core';
 import { groupsApi } from '../services/groupsApi';
 import { UsersCard } from './UsersCard';
 import { GroupsCard } from './GroupsCard';
+import { IdentityManagement } from './IdentityManagement';
+import { useRole } from '../hooks/useRole';
 import type { GroupDetails } from '../types/api';
 
 /**
@@ -46,6 +48,7 @@ import type { GroupDetails } from '../types/api';
  * ```
  */
 export function UserManagement() {
+  const { isAdmin } = useRole();
   const [groups, setGroups] = useState<GroupDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,6 +84,9 @@ export function UserManagement() {
       <GridItem span={12}>
         <UsersCard groups={groups} />
       </GridItem>
+      {isAdmin && <GridItem span={12}>
+        <IdentityManagement />
+      </GridItem>}
     </Grid>
   );
 }

@@ -6,6 +6,7 @@ import { authService } from '../../services/authService';
 vi.mock('../../services/authService', () => ({
   authService: {
     getToken: vi.fn(() => 'fake-jwt-token'),
+    getCookieSession: vi.fn(() => null),
   },
 }));
 
@@ -62,6 +63,7 @@ describe('BaseApiClient.fetchJson', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.mocked(authService.getToken).mockReturnValue('fake-jwt-token');
+    vi.mocked(authService.getCookieSession).mockReturnValue(null);
     setUnauthorizedHandler(null);
     client = new TestApiClient('https://api.example.com');
   });
@@ -85,6 +87,22 @@ describe('BaseApiClient.fetchJson', () => {
 
     const result = await client.callFetchJson<{ id: number; name: string }>('/items/1');
     expect(result).toEqual(payload);
+  });
+
+  it('sends the CSRF token for a cookie-authenticated write', async () => {
+    vi.mocked(authService.getToken).mockReturnValue(null);
+    vi.mocked(authService.getCookieSession).mockReturnValue({
+      user: { userId: 'oidc-user', name: 'OIDC', surname: '', role: 'user', provider: 'keycloak' },
+      csrfToken: 'csrf-value',
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(fakeResponse(200, {}));
+
+    await authenticatedFetch('/api/v1/groups', { method: 'PATCH', body: '{}' });
+
+    const options = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(options.credentials).toBe('include');
+    expect(new Headers(options.headers).get('X-CSRF-Token')).toBe('csrf-value');
+    expect(new Headers(options.headers).has('Authorization')).toBe(false);
   });
 
   it('throws an error detected by isApiError on non-ok response', async () => {

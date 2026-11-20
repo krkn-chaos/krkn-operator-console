@@ -85,6 +85,51 @@ function emptySession(session: AuthSession): boolean {
  * Authentication service class
  */
 class AuthService {
+  private cookieSession: { user: User; csrfToken: string } | null = null;
+
+  /** Restore an HttpOnly OIDC session after the provider redirects to the console. */
+  async restoreCookieSession(): Promise<User | null> {
+    const response = await fetch(`${API_BASE}/session`, { credentials: 'include' });
+    if (!response.ok) {
+      this.cookieSession = null;
+      return null;
+    }
+    const session = await response.json() as {
+      userId: string; role: User['role']; provider?: string;
+      mappedGroups?: string[]; csrfToken?: string;
+    };
+    const user: User = {
+      userId: session.userId,
+      name: session.userId,
+      surname: '',
+      role: session.role,
+      provider: session.provider,
+      groups: session.mappedGroups ?? [],
+    };
+    this.cookieSession = { user, csrfToken: session.csrfToken ?? '' };
+    return user;
+  }
+
+  getCookieSession(): { user: User; csrfToken: string } | null {
+    return this.cookieSession;
+  }
+
+  /** Clear a local Bearer session before starting an external login redirect. */
+  startExternalLogin(): void {
+    if (this.getToken() || this.getUser()) this.logout();
+    this.cookieSession = null;
+  }
+
+  async logoutCookieSession(): Promise<void> {
+    const csrfToken = this.cookieSession?.csrfToken;
+    const token = this.getToken();
+    this.cookieSession = null;
+    await fetch(`${API_BASE}/logout`, {
+      method: 'POST', credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
   private readSessionRecord(): AuthSessionRecord {
     const storedRecord = localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
     if (storedRecord !== null) {
@@ -308,6 +353,7 @@ class AuthService {
     });
     clearAuthStorage(localStorage);
     clearAuthStorage(sessionStorage);
+    this.cookieSession = null;
     return true;
   }
 
