@@ -313,8 +313,57 @@ describe('FilesTable permission-based edit/delete buttons', () => {
       );
 
       expect(screen.getAllByRole('navigation').length).toBeGreaterThan(0);
+      // Page one follows the default name ordering (lexicographic), so
+      // file-9.yaml is the only file pushed to the second page.
       expect(screen.getByText('file-1.yaml')).toBeInTheDocument();
-      expect(screen.queryByText('file-26.yaml')).not.toBeInTheDocument();
+      expect(screen.queryByText('file-9.yaml')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('FilesTable file types', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const files: FileInfo[] = [
+    makeFile({ fileId: 'beta', fileName: 'beta.yaml', availableToAll: true, fileType: 'metrics' }),
+    makeFile({ fileId: 'alpha', fileName: 'alpha.yaml', availableToAll: true, fileType: 'alerts' }),
+    makeFile({ fileId: 'untyped', fileName: 'untyped.yaml', availableToAll: true }),
+  ];
+
+  function renderTable() {
+    render(<FilesTable {...defaultProps} files={files} isAdmin={true} userGroups={[]} />);
+  }
+
+  function renderedFileNames(): string[] {
+    return screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelector('code')?.textContent ?? '');
+  }
+
+  it('shows the file type of each file', () => {
+    renderTable();
+
+    expect(screen.getByText('metrics')).toBeInTheDocument();
+    expect(screen.getByText('alerts')).toBeInTheDocument();
+  });
+
+  it('sorts by file type and keeps untyped files last', async () => {
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.click(screen.getByRole('button', { name: /File Type/i }));
+    expect(renderedFileNames()).toEqual(['alpha.yaml', 'beta.yaml', 'untyped.yaml']);
+
+    await user.click(screen.getByRole('button', { name: /File Type/i }));
+    expect(renderedFileNames()).toEqual(['beta.yaml', 'alpha.yaml', 'untyped.yaml']);
+  });
+
+  it('sorts by file name by default', () => {
+    renderTable();
+
+    expect(renderedFileNames()).toEqual(['alpha.yaml', 'beta.yaml', 'untyped.yaml']);
   });
 });

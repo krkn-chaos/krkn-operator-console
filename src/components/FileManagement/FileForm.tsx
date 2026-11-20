@@ -36,6 +36,7 @@ import './FileForm.css';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
+import { isValidFileType, normalizeFileType } from '../../utils/fileType';
 import type { FileInfo, CreateFileRequest, UpdateFileRequest, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
@@ -57,7 +58,7 @@ export function FileForm({
   const [fileName, setFileName] = useState('');
   const [content, setContent] = useState('');
   const [description, setDescription] = useState('');
-  const [legacyFileType, setLegacyFileType] = useState(initialData?.fileType);
+  const [fileType, setFileType] = useState(initialData?.fileType ?? '');
   const [accessType, setAccessType] = useState<'public' | 'group'>('public');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
@@ -89,7 +90,7 @@ export function FileForm({
         setFileName(file.fileName);
         setContent(file.content);
         setDescription(file.description || '');
-        setLegacyFileType(file.fileType || initialData?.fileType);
+        setFileType(file.fileType ?? initialData?.fileType ?? '');
         setAccessType(file.availableToAll ? 'public' : 'group');
         setSelectedGroup(file.groups?.[0] || '');
       } catch (err) {
@@ -155,6 +156,10 @@ export function FileForm({
       errors.group = 'Group selection is required for group-based access';
     }
 
+    if (!isValidFileType(fileType)) {
+      errors.fileType = 'Enter at least one letter or number';
+    }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -180,6 +185,7 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
+          fileType: normalizeFileType(fileType) || undefined,
         };
 
         await operatorApi.createFile(request);
@@ -190,7 +196,7 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
-          fileType: legacyFileType,
+          fileType: normalizeFileType(fileType),
         };
 
         await operatorApi.updateFile(initialData!.fileId, request);
@@ -285,6 +291,32 @@ export function FileForm({
         />
       </FormGroup>
 
+
+      <FormGroup label="File Type" fieldId="file-type-input">
+        <TextInput
+          id="file-type-input"
+          value={fileType}
+          onChange={(_event, value) => setFileType(value)}
+          validated={validationErrors.fileType ? 'error' : 'default'}
+          placeholder="e.g. alerts, metrics, kubeconfig"
+        />
+        {validationErrors.fileType && (
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem variant="error">{validationErrors.fileType}</HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+        )}
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem>
+              {normalizeFileType(fileType) && normalizeFileType(fileType) !== fileType.trim()
+                ? `Saved as "${normalizeFileType(fileType)}".`
+                : 'Optional. Groups files by what they are used for.'}
+            </HelperTextItem>
+          </HelperText>
+        </FormHelperText>
+      </FormGroup>
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
         {/* Admin: can choose public or group */}
