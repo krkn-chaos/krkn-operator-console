@@ -1,0 +1,50 @@
+.identity-management__intro {
+  margin: 0 0 var(--pf-v5-global--spacer--lg);
+  color: var(--pf-v5-global--Color--200);
+}
+
+.identity-management__panel {
+  padding-top: var(--pf-v5-global--spacer--lg);
+}
+
+.identity-management__lead {
+  margin: 0 0 var(--pf-v5-global--spacer--lg);
+  color: var(--pf-v5-global--Color--200);
+}
+
+.identity-management__filters {
+  margin-bottom: var(--pf-v5-global--spacer--lg);
+}
+
+.identity-management__card {
+  height: 100%;
+}
+
+.identity-management__card .pf-v5-c-card__title {
+  min-height: var(--pf-v5-global--spacer--2xl);
+}
+
+.identity-management__search,
+.identity-management__table,
+.identity-management__pagination {
+  margin-top: var(--pf-v5-global--spacer--md);
+}
+
+.identity-management__meta {
+  color: var(--pf-v5-global--Color--200);
+  font-size: var(--pf-v5-global--FontSize--sm);
+}
+
+.identity-management__issuer {
+  overflow-wrap: anywhere;
+}
+
+.identity-management__form-section {
+  margin-top: var(--pf-v5-global--spacer--lg);
+}
+
+.identity-management__form-actions {
+  display: flex;
+  gap: var(--pf-v5-global--spacer--sm);
+  margin-top: var(--pf-v5-global--spacer--md);
+}

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IdentityManagement } from '../IdentityManagement';
 
@@ -31,9 +31,23 @@ describe('IdentityManagement', () => {
     await waitFor(() => expect(mocks.providers).toHaveBeenCalled());
     await waitFor(() => expect(mocks.listGroups).toHaveBeenCalled());
     await waitFor(() => expect(mocks.groups).toHaveBeenCalled());
-    await userEvent.click(await screen.findByRole('button', { name: 'Map to local group' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Group mapping' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Map' }));
     await waitFor(() => expect(mocks.updateGroup).toHaveBeenCalledWith('operators', {
       externalGroups: [{ provider: 'corp-keycloak', group: '/Ops', groupId: 'remote-1' }],
     }));
+  });
+
+  it('shows Add provider at the top right and asks for provider type first', async () => {
+    render(<IdentityManagement />);
+    const addButton = screen.getByRole('button', { name: 'Add provider' });
+    expect(addButton).toHaveTextContent('Add provider');
+
+    await userEvent.click(addButton);
+    expect(screen.getByRole('dialog', { name: 'Add provider' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Issuer URL' })).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(within(screen.getByRole('dialog', { name: 'Add provider' })).getByRole('combobox'), 'keycloak');
+    expect(screen.getByRole('textbox', { name: 'Issuer URL' })).toBeInTheDocument();
   });
 });
