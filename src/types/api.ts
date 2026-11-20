@@ -1296,6 +1296,8 @@ export interface FileResponse {
   availableToAll: boolean;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /** Category names assigned to this file. */
+  categories?: string[];
   /** Legacy metadata retained when updating files against older operators. */
   fileType?: string;
 }
@@ -1317,6 +1319,8 @@ export interface CreateFileRequest {
   availableToAll: boolean;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /** Category names to associate with the file (optional) */
+  categories?: string[];
 }
 
 /**
@@ -1345,6 +1349,11 @@ export interface UpdateFileRequest {
   availableToAll: boolean;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /**
+   * Replaces the file's categories. Omit the field to preserve the current
+   * associations; send an empty array to clear them.
+   */
+  categories?: string[];
   /** Preserved when editing legacy files until older operators stop requiring it. */
   fileType?: string;
 }
@@ -1377,6 +1386,8 @@ export interface FileInfo {
   groups?: string[];
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /** Category names assigned to this file. */
+  categories?: string[];
   /** Legacy operator metadata preserved during updates; it is not editable in the console. */
   fileType?: string;
 }

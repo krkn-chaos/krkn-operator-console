@@ -68,6 +68,8 @@ export function FileManagementPage() {
             <div style={{ marginTop: '1.5rem' }}>
               <FilesTable
                 files={page.files}
+                categories={page.categories}
+                categoriesSupported={page.categoriesSupported}
                 isAdmin={page.isAdmin}
                 userGroups={page.userGroups}
                 onCreateClick={page.openCreateFile}
@@ -83,6 +85,7 @@ export function FileManagementPage() {
         isOpen={page.fileFormOpen}
         mode={page.fileFormMode}
         initialData={page.selectedFile || undefined}
+        categoriesSupported={page.categoriesSupported}
         onClose={page.closeFileForm}
         onSuccess={page.handleFileFormSuccess}
       />

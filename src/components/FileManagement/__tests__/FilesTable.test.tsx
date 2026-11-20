@@ -318,3 +318,141 @@ describe('FilesTable permission-based edit/delete buttons', () => {
     });
   });
 });
+
+describe('FilesTable categories', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const files: FileInfo[] = [
+    makeFile({ fileId: 'alerts-1', fileName: 'alerts.yaml', description: 'Custom alert rules', availableToAll: true, categories: ['alerts'] }),
+    makeFile({ fileId: 'metrics-1', fileName: 'metrics.yaml', availableToAll: true, categories: ['cluster-reliability'] }),
+    makeFile({ fileId: 'plain-1', fileName: 'plain.yaml', availableToAll: true }),
+  ];
+
+  const categoryDefinitions = [
+    { name: 'alerts', color: '#d40078', availableToAll: true },
+    { name: 'cluster-reliability', color: '#ff9900', availableToAll: true },
+  ];
+
+  function renderTable() {
+    render(
+      <FilesTable {...defaultProps} files={files} categories={categoryDefinitions} isAdmin={true} userGroups={[]} />,
+    );
+  }
+
+  it('marks rows with the category color stripe', () => {
+    renderTable();
+
+    expect(screen.getByRole('group', { name: 'Categories: alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Categories: cluster-reliability' })).toBeInTheDocument();
+    // The file without categories gets no marker.
+    const stripes = screen.getAllByTestId('category-stripe-visual');
+    expect(stripes).toHaveLength(2);
+    // jsdom normalizes the configured hex color to rgb().
+    expect(stripes[0].style.backgroundImage).toContain('rgb(212, 0, 120)');
+  });
+
+  it('renders the file description as its own column', () => {
+    renderTable();
+
+    expect(screen.getByRole('columnheader', { name: 'Description' })).toBeInTheDocument();
+    expect(screen.getByText('Custom alert rules')).toBeInTheDocument();
+  });
+
+  it('does not render a separate category column; the stripe carries the categories', () => {
+    renderTable();
+
+    expect(screen.queryByRole('columnheader', { name: 'Categories' })).not.toBeInTheDocument();
+  });
+
+  it('filters files by category', async () => {
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.click(screen.getByRole('button', { name: 'Filter by category' }));
+    await user.click(screen.getByRole('checkbox', { name: 'alerts' }));
+
+    expect(screen.getByText('alerts.yaml')).toBeInTheDocument();
+    expect(screen.queryByText('metrics.yaml')).not.toBeInTheDocument();
+    expect(screen.queryByText('plain.yaml')).not.toBeInTheDocument();
+  });
+
+  it('matches category names in the search box', async () => {
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.type(screen.getByPlaceholderText('Search files...'), 'cluster-reliability');
+
+    expect(screen.getByText('metrics.yaml')).toBeInTheDocument();
+    expect(screen.queryByText('alerts.yaml')).not.toBeInTheDocument();
+  });
+
+  it('hides the category filter when the operator does not support categories', () => {
+    render(
+      <FilesTable
+        {...defaultProps}
+        files={files}
+        categories={categoryDefinitions}
+        categoriesSupported={false}
+        isAdmin={true}
+        userGroups={[]}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Filter by category' })).not.toBeInTheDocument();
+  });
+
+  it('drops category names that have no visible definition', async () => {
+    const user = userEvent.setup();
+    render(
+      <FilesTable
+        {...defaultProps}
+        files={[
+          makeFile({
+            fileId: 'mixed-1',
+            fileName: 'mixed.yaml',
+            availableToAll: true,
+            categories: ['alerts', 'group-only'],
+          }),
+        ]}
+        categories={[{ name: 'alerts', color: '#d40078', availableToAll: true }]}
+        isAdmin={true}
+        userGroups={[]}
+      />,
+    );
+
+    expect(screen.getByRole('group', { name: 'Categories: alerts' })).toBeInTheDocument();
+    expect(screen.queryByText('group-only')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /group-only/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter by category' }));
+    expect(screen.queryByRole('checkbox', { name: 'group-only' })).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'alerts' })).toBeInTheDocument();
+  });
+
+  it('does not match hidden category names in search', async () => {
+    const user = userEvent.setup();
+    render(
+      <FilesTable
+        {...defaultProps}
+        files={[
+          makeFile({
+            fileId: 'mixed-1',
+            fileName: 'mixed.yaml',
+            availableToAll: true,
+            categories: ['alerts', 'group-only'],
+          }),
+        ]}
+        categories={[{ name: 'alerts', color: '#d40078', availableToAll: true }]}
+        isAdmin={true}
+        userGroups={[]}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText('Search files...'), 'group-only');
+
+    expect(screen.queryByText('mixed.yaml')).not.toBeInTheDocument();
+    expect(screen.getByText('No results found')).toBeInTheDocument();
+  });
+});
