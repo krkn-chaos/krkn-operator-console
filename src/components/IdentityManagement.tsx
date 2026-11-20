@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert, Button, Card, CardBody, CardTitle, EmptyState, EmptyStateBody,
   EmptyStateIcon, Form, FormGroup, FormSelect, FormSelectOption, Modal,
@@ -6,7 +6,7 @@ import {
   Tabs, Tab, TabTitleText, Grid, GridItem, Flex, FlexItem, Label,
   Dropdown, DropdownItem, DropdownList, MenuToggle,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, KeyIcon, EllipsisVIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, KeyIcon, EllipsisVIcon, ArrowRightIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FormModal } from './FormModal';
 import { identityApi, type IdentityBlock, type IdentityProvider, type IdentityProviderInput, type RemoteGroup } from '../services/identityApi';
@@ -27,6 +27,11 @@ function failure(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
 
+function hasMapping(localGroup: GroupDetails, remoteGroup: RemoteGroup): boolean {
+  return (localGroup.externalGroups ?? []).some(mapping =>
+    mapping.provider === remoteGroup.provider && mapping.group === remoteGroup.claimValue);
+}
+
 /** Admin UI for provider configuration, scoped group mapping and OIDC accounts. */
 export function IdentityManagement() {
   const { showError, showSuccess } = useNotifications();
@@ -41,7 +46,8 @@ export function IdentityManagement() {
   const [providerForm, setProviderForm] = useState<ProviderForm | null>(null);
   const [savingProvider, setSavingProvider] = useState(false);
   const [groups, setGroups] = useState<GroupDetails[]>([]);
-  const [selectedLocalGroup, setSelectedLocalGroup] = useState('');
+  const [mappingRemote, setMappingRemote] = useState<RemoteGroup | null>(null);
+  const [mappingLocalGroupId, setMappingLocalGroupId] = useState('');
   const [remoteGroups, setRemoteGroups] = useState<RemoteGroup[]>([]);
   const [groupSearch, setGroupSearch] = useState('');
   const [directoryError, setDirectoryError] = useState('');
@@ -74,7 +80,6 @@ export function IdentityManagement() {
     try {
       const loaded = await groupsApi.listGroups();
       setGroups(loaded);
-      setSelectedLocalGroup(current => loaded.some(group => group.name === current) ? current : loaded[0]?.name ?? '');
     } catch (error) { showError('Could not load local groups', failure(error)); }
   }, [showError]);
 
@@ -137,22 +142,42 @@ export function IdentityManagement() {
     return () => { accountsRevision.current += 1; };
   }, [loadAccounts]);
 
-  const selectedGroup = groups.find(group => group.name === selectedLocalGroup);
-  const mappings = selectedGroup?.externalGroups ?? [];
-  const selectedMappings = mappings.filter(mapping => mapping.provider === selectedProvider);
-  const mappedRemote = useMemo(() => new Set(selectedMappings.map(mapping => mapping.group)), [selectedMappings]);
+  const selectedMappings = groups.flatMap(localGroup => (localGroup.externalGroups ?? [])
+    .filter(mapping => mapping.provider === selectedProvider)
+    .map(mapping => ({ localGroup, mapping })));
+  const availableLocalGroups = mappingRemote ? groups.filter(localGroup => !hasMapping(localGroup, mappingRemote)) : [];
   const userPage = usePagination(users, { initialPerPage: 10 });
   const blockPage = usePagination(blocks, { initialPerPage: 10 });
 
-  async function saveMapping(next: ExternalGroupMapping[]) {
-    if (!selectedGroup || savingMapping) return;
+  async function saveMapping(localGroup: GroupDetails, next: ExternalGroupMapping[]): Promise<boolean> {
+    if (savingMapping) return false;
     setSavingMapping(true);
     try {
-      await groupsApi.updateGroup(selectedGroup.name, { externalGroups: next });
+      await groupsApi.updateGroup(localGroup.id ?? localGroup.name, { externalGroups: next });
       await loadGroups();
       showSuccess('Group mapping saved');
-    } catch (error) { showError('Could not save group mapping', failure(error)); }
+      return true;
+    } catch (error) { showError('Could not save group mapping', failure(error)); return false; }
     finally { setSavingMapping(false); }
+  }
+
+  function openMapping(remoteGroup: RemoteGroup) {
+    setMappingLocalGroupId('');
+    setMappingRemote(remoteGroup);
+  }
+
+  async function confirmMapping() {
+    if (!mappingRemote) return;
+    const localGroup = groups.find(group => (group.id ?? group.name) === mappingLocalGroupId);
+    if (!localGroup) return;
+    if (hasMapping(localGroup, mappingRemote)) return;
+    const next = [...(localGroup.externalGroups ?? []), {
+      provider: mappingRemote.provider, group: mappingRemote.claimValue, groupId: mappingRemote.id,
+    }];
+    if (await saveMapping(localGroup, next)) {
+      setMappingRemote(null);
+      setMappingLocalGroupId('');
+    }
   }
 
   function openCreate() {
@@ -280,15 +305,8 @@ export function IdentityManagement() {
                 <Grid hasGutter className="identity-management__filters">
                   <GridItem span={12} md={6}>
                     <FormGroup label="Authentication provider" fieldId="identity-provider-select">
-                      <FormSelect id="identity-provider-select" value={selectedProvider} onChange={(_, value) => setSelectedProvider(value)}>
+                      <FormSelect id="identity-provider-select" value={selectedProvider} onChange={(_, value) => { setSelectedProvider(value); setMappingRemote(null); }}>
                         {providers.map(provider => <FormSelectOption key={provider.id} value={provider.id} label={`${provider.displayName} (${provider.id})`} />)}
-                      </FormSelect>
-                    </FormGroup>
-                  </GridItem>
-                  <GridItem span={12} md={6}>
-                    <FormGroup label="Local group" fieldId="identity-local-group-select">
-                      <FormSelect id="identity-local-group-select" value={selectedLocalGroup} onChange={(_, value) => setSelectedLocalGroup(value)}>
-                        {groups.map(group => <FormSelectOption key={group.name} value={group.name} label={group.name} />)}
                       </FormSelect>
                     </FormGroup>
                   </GridItem>
@@ -301,32 +319,7 @@ export function IdentityManagement() {
                   </EmptyState>
                 ) : (
                   <Grid hasGutter>
-                    <GridItem span={12} lg={5}>
-                      <Card className="identity-management__card" isFlat>
-                        <CardTitle>Mapped to {selectedLocalGroup}</CardTitle>
-                        <CardBody>
-                          <p className="identity-management__meta">Groups from {selectedProvider} that grant this local group's permissions.</p>
-                          {selectedMappings.length === 0 ? (
-                            <EmptyState>
-                              <EmptyStateIcon icon={UsersIcon} />
-                              <Title headingLevel="h4" size="md">No mappings yet</Title>
-                              <EmptyStateBody>Browse remote groups and choose one to map.</EmptyStateBody>
-                            </EmptyState>
-                          ) : (
-                            <Table aria-label="Mapped remote groups" variant="compact" className="identity-management__table">
-                              <Thead><Tr><Th>Remote path</Th><Th>Remote ID</Th><Th>Action</Th></Tr></Thead>
-                              <Tbody>{selectedMappings.map(mapping => (
-                                <Tr key={`${mapping.provider}:${mapping.group}`}>
-                                  <Td>{mapping.group}</Td><Td>{mapping.groupId ?? '—'}</Td>
-                                  <Td><Button variant="plain" aria-label={`Remove mapping ${mapping.group}`} isDisabled={savingMapping} onClick={() => void saveMapping(mappings.filter(item => item !== mapping))}><TrashIcon /></Button></Td>
-                                </Tr>
-                              ))}</Tbody>
-                            </Table>
-                          )}
-                        </CardBody>
-                      </Card>
-                    </GridItem>
-                    <GridItem span={12} lg={7}>
+                    <GridItem span={12} lg={6}>
                       <Card className="identity-management__card" isFlat>
                         <CardTitle>Browse remote groups</CardTitle>
                         <CardBody>
@@ -347,14 +340,43 @@ export function IdentityManagement() {
                               <Tbody>{remoteGroups.map(group => (
                                 <Tr key={group.id}>
                                   <Td>{group.path}</Td><Td>{group.id}</Td>
-                                  <Td><Button variant="secondary" isDisabled={savingMapping || group.provider !== selectedProvider || mappedRemote.has(group.claimValue)} onClick={() => void saveMapping([...mappings, { provider: group.provider, group: group.claimValue, groupId: group.id }])}>
-                                    {mappedRemote.has(group.claimValue) ? 'Mapped' : 'Map'}
+                                  <Td><Button variant="secondary" isDisabled={savingMapping || group.provider !== selectedProvider || groups.every(localGroup => hasMapping(localGroup, group))} onClick={() => openMapping(group)}>
+                                    Map
                                   </Button></Td>
                                 </Tr>
                               ))}</Tbody>
                             </Table>
                           )}
                           {directoryHasMore && !loadingDirectory && <Button variant="link" onClick={() => void loadMoreRemoteGroups()}>Load more groups</Button>}
+                        </CardBody>
+                      </Card>
+                    </GridItem>
+                    <GridItem span={12} lg={1} className="identity-management__mapping-direction">
+                      <span role="img" aria-label="Maps remote groups to local groups"><ArrowRightIcon /></span>
+                    </GridItem>
+                    <GridItem span={12} lg={5}>
+                      <Card className="identity-management__card" isFlat>
+                        <CardTitle>Existing mappings</CardTitle>
+                        <CardBody>
+                          <p className="identity-management__meta">Remote groups from {selectedProvider} and the local groups whose permissions they grant.</p>
+                          {selectedMappings.length === 0 ? (
+                            <EmptyState>
+                              <EmptyStateIcon icon={UsersIcon} />
+                              <Title headingLevel="h4" size="md">No mappings yet</Title>
+                              <EmptyStateBody>Choose Map beside a remote group, then select a local group.</EmptyStateBody>
+                            </EmptyState>
+                          ) : (
+                            <Table aria-label="Existing group mappings" variant="compact" className="identity-management__table">
+                              <Thead><Tr><Th>Remote group</Th><Th>Local group</Th><Th>Action</Th></Tr></Thead>
+                              <Tbody>{selectedMappings.map(({ localGroup, mapping }) => (
+                                <Tr key={`${localGroup.id ?? localGroup.name}:${mapping.provider}:${mapping.group}`}>
+                                  <Td><strong>{mapping.group}</strong><div className="identity-management__meta">{mapping.groupId ?? '—'}</div></Td>
+                                  <Td>{localGroup.name}</Td>
+                                  <Td><Button variant="plain" aria-label={`Remove mapping ${mapping.group} from ${localGroup.name}`} isDisabled={savingMapping} onClick={() => void saveMapping(localGroup, (localGroup.externalGroups ?? []).filter(item => item !== mapping))}><TrashIcon /></Button></Td>
+                                </Tr>
+                              ))}</Tbody>
+                            </Table>
+                          )}
                         </CardBody>
                       </Card>
                     </GridItem>
@@ -504,6 +526,21 @@ export function IdentityManagement() {
           <div className="identity-management__form-actions">
             <Button type="submit" variant="primary" isDisabled={savingProvider || !providerForm.type}>{savingProvider ? 'Saving…' : 'Save provider'}</Button>
             <Button variant="link" onClick={() => setProviderForm(null)}>Cancel</Button>
+          </div>
+        </Form>}
+      </FormModal>
+
+      <FormModal isOpen={mappingRemote !== null} title="Map remote group" description={mappingRemote ? `Choose the local group whose permissions should be granted to members of ${mappingRemote.path}.` : undefined} onClose={() => setMappingRemote(null)}>
+        {mappingRemote && <Form onSubmit={event => { event.preventDefault(); void confirmMapping(); }}>
+          <FormGroup label="Local group" isRequired fieldId="identity-mapping-local-group">
+            <FormSelect id="identity-mapping-local-group" aria-label="Local group" value={mappingLocalGroupId} isRequired onChange={(_, value) => setMappingLocalGroupId(value)}>
+              <FormSelectOption value="" label="Select local group" isDisabled />
+              {availableLocalGroups.map(group => <FormSelectOption key={group.id ?? group.name} value={group.id ?? group.name} label={group.name} />)}
+            </FormSelect>
+          </FormGroup>
+          <div className="identity-management__form-actions">
+            <Button type="submit" variant="primary" isDisabled={savingMapping || !mappingLocalGroupId}>{savingMapping ? 'Saving…' : 'Map group'}</Button>
+            <Button variant="link" onClick={() => setMappingRemote(null)}>Cancel</Button>
           </div>
         </Form>}
       </FormModal>

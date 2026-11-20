@@ -24,6 +24,24 @@
   min-height: var(--pf-v5-global--spacer--2xl);
 }
 
+.identity-management__mapping-direction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pf-v5-global--primary-color--100);
+  font-size: var(--pf-v5-global--FontSize--2xl);
+}
+
+.identity-management__mapping-direction svg {
+  transform: rotate(90deg);
+}
+
+@media (min-width: 1200px) {
+  .identity-management__mapping-direction svg {
+    transform: none;
+  }
+}
+
 .identity-management__search,
 .identity-management__table,
 .identity-management__pagination {
