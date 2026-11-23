@@ -11,7 +11,9 @@ export default defineConfig(({ mode }) => ({
     proxy: {
       '/api': {
         target: loadEnv(mode, process.cwd(), '').VITE_API_PROXY_TARGET || 'http://localhost:8080',
-        changeOrigin: true,
+        // Keep the browser Host so cookie-authenticated WebSockets pass the
+        // operator's strict Origin check during local development.
+        changeOrigin: false,
         ws: true, // Enable WebSocket proxying
         // Pass full path including /api/v1 to backend (no rewrite)
       },
