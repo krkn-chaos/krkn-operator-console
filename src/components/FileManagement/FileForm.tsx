@@ -318,6 +318,7 @@ export function FileForm({
               ref={toggleRef}
               onClick={() => setIsFileTypeOpen(!isFileTypeOpen)}
               isExpanded={isFileTypeOpen}
+              className="file-form-select-toggle"
               style={{ width: '100%' }}
             >
               <TextInputGroup>
@@ -494,7 +495,7 @@ export function FileForm({
                     onClick={() => setIsGroupSelectOpen(!isGroupSelectOpen)}
                     isExpanded={isGroupSelectOpen}
                     style={{ width: '100%' }}
-                    className="file-form-group-select-toggle"
+                    className="file-form-select-toggle"
                   >
                     <TextInputGroup>
                       <TextInputGroupMain

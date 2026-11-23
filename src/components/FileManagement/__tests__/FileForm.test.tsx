@@ -143,20 +143,23 @@ describe('FileForm', () => {
     });
   });
 
-  it('renders the group-select toggle with full-width text', async () => {
+  it('lets both typeahead inputs fill the full width of their toggles', async () => {
     const user = userEvent.setup();
-    render(<FileForm {...defaultProps} />);
+    const { container } = render(<FileForm {...defaultProps} />);
+
+    const fileTypeToggle = container.querySelector('#file-type-input')?.closest('.file-form-select-toggle');
+    expect(fileTypeToggle).toBeInTheDocument();
 
     await user.click(screen.getByRole('radio', { name: 'Assign to group' }));
 
-    const toggle = document.querySelector('.file-form-group-select-toggle');
-    expect(toggle).toBeInTheDocument();
-    expect(toggle).toHaveClass('file-form-group-select-toggle');
+    const toggles = container.querySelectorAll('.file-form-select-toggle');
+    expect(toggles).toHaveLength(2);
+    toggles.forEach((toggle) => {
+      expect(toggle.querySelector('.pf-v5-c-menu-toggle__text')).toBeInTheDocument();
+    });
 
-    const toggleText = toggle?.querySelector('.pf-v5-c-menu-toggle__text');
-    expect(toggleText).toBeInTheDocument();
     expect(fileFormStyles).toMatch(
-      /\.file-form-group-select-toggle\s+\.pf-v5-c-menu-toggle__text\s*\{\s*width:\s*100%;?\s*\}/,
+      /\.file-form-select-toggle\s+\.pf-v5-c-menu-toggle__text\s*\{[^}]*flex:\s*1;/,
     );
   });
   it('sends the normalized file type when creating a file', async () => {
