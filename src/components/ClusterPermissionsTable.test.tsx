@@ -6,6 +6,7 @@
  * - Cluster list rendering
  * - Checkbox functionality
  * - Orphaned cluster handling
+ * - Offline cluster handling
  */
 
 import { render, screen } from '@testing-library/react';
@@ -140,5 +141,92 @@ describe('ClusterPermissionsTable', () => {
 
     expect(screen.getByText('Removed')).toBeInTheDocument();
     expect(screen.getByText('https://api.removed-cluster.example.com')).toBeInTheDocument();
+  });
+
+  describe('offline clusters', () => {
+    // One offline cluster in each render path: grouped by operator, and without a source.
+    const offlineTargets: TargetResponse[] = [
+      {
+        uuid: 'offline-1',
+        clusterName: 'offline-acm',
+        clusterAPIURL: 'https://api.offline-acm.example.com',
+        operatorSource: 'krkn-operator-acm',
+        secretType: 'token',
+        ready: true,
+        online: false,
+        checkedAt: '2026-11-04T13:00:00Z',
+      },
+      {
+        uuid: 'offline-2',
+        clusterName: 'offline-legacy',
+        clusterAPIURL: 'https://api.offline-legacy.example.com',
+        secretType: 'token',
+        ready: true,
+        online: false,
+      },
+    ];
+
+    it('should allow granting Run on an offline cluster', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      render(
+        <ClusterPermissionsTable targets={offlineTargets} clusterPermissions={{}} onChange={onChange} />
+      );
+
+      for (const target of offlineTargets) {
+        const run = screen.getByLabelText(`Run permission for ${target.clusterName}`);
+        expect(run).toBeEnabled();
+        await user.click(run);
+        expect(onChange).toHaveBeenLastCalledWith({ [target.clusterAPIURL]: { actions: ['run'] } });
+      }
+    });
+
+    it('should include offline clusters when selecting Run for all clusters', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const targets = [...mockTargets, ...offlineTargets];
+      const runOn = (list: TargetResponse[]): ClusterPermissions =>
+        Object.fromEntries(list.map((target) => [target.clusterAPIURL, { actions: ['run'] }]));
+
+      // Only the online clusters have Run so far, so Run "All" still has work to do.
+      const { rerender } = render(
+        <ClusterPermissionsTable targets={targets} clusterPermissions={runOn(mockTargets)} onChange={onChange} showBulkActions />
+      );
+
+      // Bulk action buttons are ordered View, Run, Cancel.
+      const runAll = screen.getAllByRole('button', { name: 'All' })[1];
+      expect(runAll).toBeEnabled();
+      await user.click(runAll);
+      expect(onChange).toHaveBeenCalledWith(runOn(targets));
+
+      rerender(
+        <ClusterPermissionsTable targets={targets} clusterPermissions={runOn(targets)} onChange={onChange} showBulkActions />
+      );
+      expect(screen.getAllByRole('button', { name: 'All' })[1]).toBeDisabled();
+    });
+
+    it('should mark offline clusters with the last check time', () => {
+      render(
+        <ClusterPermissionsTable targets={[...mockTargets, ...offlineTargets]} clusterPermissions={{}} onChange={vi.fn()} />
+      );
+
+      expect(screen.getAllByLabelText(/^Cluster is offline\. Last checked:/)).toHaveLength(2);
+    });
+
+    it('should show the offline tooltip when the marker gets keyboard focus', async () => {
+      const user = userEvent.setup();
+      render(
+        <ClusterPermissionsTable targets={[offlineTargets[1]]} clusterPermissions={{}} onChange={vi.fn()} />
+      );
+
+      // Tab through the table the way a keyboard user would.
+      const marker = screen.getByRole('img', { name: /^Cluster is offline\. Last checked: unknown\.$/ });
+      for (let i = 0; i < 10 && document.activeElement !== marker; i += 1) {
+        await user.tab();
+      }
+      expect(marker).toHaveFocus();
+      expect(await screen.findByText('Cluster is offline. Last checked: unknown.')).toBeInTheDocument();
+    });
   });
 });

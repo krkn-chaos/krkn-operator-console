@@ -10,6 +10,8 @@
  * - Detects orphaned clusters (in permissions but not in targets)
  * - Optional warning badges for orphaned clusters
  * - Select All / Deselect All functionality per action column
+ * - Offline clusters are marked but stay editable; runs on them are
+ *   blocked where scenarios are started
  *
  * @component
  */
@@ -30,6 +32,7 @@ import {
 } from '@patternfly/react-core';
 import type { ClusterPermissions, TargetResponse } from '../types/api';
 import { ClusterHealthIndicator } from './ClusterHealthIndicator';
+import { ClusterOfflineIndicator } from './ClusterOfflineIndicator';
 
 interface ClusterPermissionsTableProps {
   /** Available target clusters */
@@ -139,7 +142,6 @@ export function ClusterPermissionsTable({
     const updated = { ...clusterPermissions };
 
     targets.forEach((target) => {
-      if (action === 'run' && target.online === false) return;
       const url = target.clusterAPIURL;
       const current = updated[url] || { actions: [] };
       if (!current.actions.includes(action)) {
@@ -172,8 +174,7 @@ export function ClusterPermissionsTable({
 
   // Check if all targets have a specific action
   const allHaveAction = (action: Action): boolean => {
-    const eligibleTargets = action === 'run' ? targets.filter((target) => target.online !== false) : targets;
-    return eligibleTargets.length > 0 && eligibleTargets.every((target) => hasAction(target.clusterAPIURL, action));
+    return targets.every((target) => hasAction(target.clusterAPIURL, action));
   };
 
   if (targets.length === 0 && orphanedUrls.length === 0) {
@@ -287,6 +288,7 @@ export function ClusterPermissionsTable({
                               {target.clusterName}
                             </strong>
                             <ClusterHealthIndicator status={target.clusterStatus} />
+                            {target.online === false && <ClusterOfflineIndicator checkedAt={target.checkedAt} />}
                           </div>
                           <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
                             {target.clusterAPIURL}
@@ -315,7 +317,6 @@ export function ClusterPermissionsTable({
                             id={`${target.uuid}-run`}
                             isChecked={hasAction(target.clusterAPIURL, 'run')}
                             onChange={() => toggleAction(target.clusterAPIURL, 'run')}
-                            isDisabled={target.online === false}
                             aria-label={`Run permission for ${target.clusterName}`}
                           />
                         </div>
@@ -356,6 +357,7 @@ export function ClusterPermissionsTable({
                           <strong style={{ fontSize: 'var(--pf-v5-global--FontSize--md)' }}>
                             {target.clusterName}
                           </strong>
+                          {target.online === false && <ClusterOfflineIndicator checkedAt={target.checkedAt} />}
                         </div>
                         <div style={{ fontSize: 'var(--pf-v5-global--FontSize--sm)', color: 'var(--pf-v5-global--Color--200)' }}>
                           {target.clusterAPIURL}
@@ -384,7 +386,6 @@ export function ClusterPermissionsTable({
                           id={`${target.uuid}-run`}
                           isChecked={hasAction(target.clusterAPIURL, 'run')}
                           onChange={() => toggleAction(target.clusterAPIURL, 'run')}
-                          isDisabled={target.online === false}
                           aria-label={`Run permission for ${target.clusterName}`}
                         />
                       </div>

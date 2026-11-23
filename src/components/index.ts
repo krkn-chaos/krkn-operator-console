@@ -2,6 +2,7 @@ export { LoadingScreen } from './LoadingScreen';
 export { ErrorDisplay } from './ErrorDisplay';
 export { ClusterMultiSelector } from './ClusterMultiSelector';
 export { ClusterHealthIndicator } from './ClusterHealthIndicator';
+export { ClusterOfflineIndicator } from './ClusterOfflineIndicator';
 export { RegistrySelector } from './RegistrySelector';
 export { ScenariosList } from './ScenariosList';
 export { DynamicFormBuilderWithTracking } from './DynamicFormBuilderWithTracking';
