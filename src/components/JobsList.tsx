@@ -601,6 +601,7 @@ export function JobsList({
     isReplayJobsLoading,
     onOpenReplayJobs,
     onReplayScenario,
+    onCheckScenarioReplay,
     onReplayWorkflow,
     isWorkflowReplayDisabled,
   }: {
@@ -617,6 +618,7 @@ export function JobsList({
     isReplayJobsLoading?: boolean;
     onOpenReplayJobs?: () => void;
     onReplayScenario?: () => void;
+    onCheckScenarioReplay?: () => Promise<boolean>;
     onReplayWorkflow?: () => Promise<void>;
     isWorkflowReplayDisabled?: boolean;
   }) => (
@@ -645,6 +647,7 @@ export function JobsList({
         isReplayJobsLoading={isReplayJobsLoading}
         onOpenReplayJobs={onOpenReplayJobs}
         onReplayScenario={onReplayScenario}
+        onCheckScenarioReplay={onCheckScenarioReplay}
         onReplayWorkflow={onReplayWorkflow}
         isWorkflowReplayDisabled={isWorkflowReplayDisabled}
       />
@@ -1410,6 +1413,14 @@ export function JobsList({
                       runId: run.scenarioRunName,
                       runPhase: run.phase,
                       onReplayScenario: () => onRerunScenario(run),
+                      onCheckScenarioReplay: async () => {
+                        try {
+                          await operatorApi.getScenarioRunReplayConfig(run.scenarioRunName);
+                          return true;
+                        } catch {
+                          return false;
+                        }
+                      },
                       replayJobs: run.clusterJobs,
                       rollbackEnabled: run.rollbackEnabled,
                       isReplayJobsLoading: loadingRunDetails.has(run.scenarioRunName),

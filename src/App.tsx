@@ -239,11 +239,16 @@ function App() {
     run: Pick<ScenarioRunState, 'scenarioName' | 'registryName'>,
     loadConfig: () => Promise<JobConfigResponse>,
   ) => {
-    dispatch({ type: 'INIT_START' });
-
+    let config: JobConfigResponse;
     try {
-      const config = await loadConfig();
+      config = await loadConfig();
+    } catch (error) {
+      showError('Replay unavailable', error instanceof Error ? error.message : 'Unable to authorize replay');
+      return;
+    }
 
+    dispatch({ type: 'INIT_START' });
+    try {
       dispatch({ type: 'RERUN_SCENARIO', payload: buildRerunIntent(config, run) });
 
       const response = await operatorApi.createTargetRequest();
@@ -291,7 +296,7 @@ function App() {
               }
               onDeleteScenarioRun={handleDeleteScenarioRun}
               onDeleteJob={handleDeleteJob}
-              onRerunScenario={(run) => startScenarioReplay(run, () => operatorApi.getScenarioRunConfig(run.scenarioRunName))}
+              onRerunScenario={(run) => startScenarioReplay(run, () => operatorApi.getScenarioRunReplayConfig(run.scenarioRunName))}
               onLoadRunDetails={(run) => fetchRunDetails(run.scenarioRunName, run)}
               scenarioRunDetails={state.scenarioRuns}
               expandedGraphRunIds={state.expandedGraphRunIds}

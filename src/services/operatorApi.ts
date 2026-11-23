@@ -291,6 +291,11 @@ class OperatorApiClient extends BaseApiClient {
     return this.fetchJson<JobConfigResponse>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/config`);
   }
 
+  /** Authorize replay of every original target before opening the replay wizard. */
+  async getScenarioRunReplayConfig(scenarioRunName: string): Promise<JobConfigResponse> {
+    return this.fetchJson<JobConfigResponse>(`/scenarios/run/${encodeURIComponent(scenarioRunName)}/config?intent=replay`);
+  }
+
   /**
    * DELETE /api/v1/scenarios/run/{scenarioRunName}
    * Delete an entire scenario run and all its jobs

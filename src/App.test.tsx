@@ -55,7 +55,7 @@ vi.mock('react-router-dom', () => ({
 
 // handleCreateJob calls operatorApi.createTargetRequest via its proceed callback.
 vi.mock('./services/operatorApi', () => ({
-  operatorApi: { createTargetRequest: vi.fn(), getScenarioRunConfig: vi.fn() },
+  operatorApi: { createTargetRequest: vi.fn(), getScenarioRunReplayConfig: vi.fn() },
 }));
 vi.mock('./services/krknAiApi', () => ({ krknAiApi: appMocks.krknAI }));
 
@@ -196,32 +196,33 @@ describe('App scenario re-run and Krkn AI navigation', () => {
 
   it('fetches run config, dispatches the replay intent, and starts target creation', async () => {
     const user = userEvent.setup();
-    vi.mocked(operatorApi.getScenarioRunConfig).mockResolvedValue(config);
+    vi.mocked(operatorApi.getScenarioRunReplayConfig).mockResolvedValue(config);
     vi.mocked(operatorApi.createTargetRequest).mockResolvedValue({ uuid: 'uuid-1' });
     renderApp();
 
     await user.click(screen.getByText('rerun-run-1'));
 
-    // getScenarioRunConfig receives the scenario run name, then target creation
+    // Replay authorization receives the scenario run name, then target creation
     // starts. Reaching createTargetRequest proves the RERUN_SCENARIO dispatch
     // (buildRerunIntent) between the two calls did not throw.
     await waitFor(() => {
-      expect(operatorApi.getScenarioRunConfig).toHaveBeenCalledWith('run-1');
+      expect(operatorApi.getScenarioRunReplayConfig).toHaveBeenCalledWith('run-1');
       expect(operatorApi.createTargetRequest).toHaveBeenCalled();
     });
     // INIT_SUCCESS advances to the polling phase, which renders LoadingScreen.
     await waitFor(() => expect(screen.getByText('LoadingScreen')).toBeInTheDocument());
   });
 
-  it('dispatches the initialization error state when the config request fails', async () => {
+  it('keeps the jobs list open and does not create targets when replay authorization fails', async () => {
     const user = userEvent.setup();
-    vi.mocked(operatorApi.getScenarioRunConfig).mockRejectedValue(new Error('boom'));
+    vi.mocked(operatorApi.getScenarioRunReplayConfig).mockRejectedValue(new Error('Replay requires run permission on every cluster in the original run'));
     renderApp();
 
     await user.click(screen.getByText('rerun-run-1'));
 
-    // INIT_ERROR moves the phase to error, which renders ErrorDisplay.
-    await waitFor(() => expect(screen.getByText('ErrorDisplay')).toBeInTheDocument());
+    await waitFor(() => expect(operatorApi.getScenarioRunReplayConfig).toHaveBeenCalledWith('run-1'));
+    expect(screen.getByText('rerun-run-1')).toBeInTheDocument();
+    expect(screen.queryByText('ErrorDisplay')).not.toBeInTheDocument();
     expect(operatorApi.createTargetRequest).not.toHaveBeenCalled();
   });
 });
