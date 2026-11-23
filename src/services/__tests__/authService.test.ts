@@ -26,7 +26,7 @@ describe('authService - user groups', () => {
     });
     expect(authService.getCookieSession()?.csrfToken).toBe('csrf-123');
     expect(authService.getToken()).toBeNull();
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/auth/session', { credentials: 'include' });
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/auth/session', expect.objectContaining({ credentials: 'include' }));
     authService.logout();
     fetchSpy.mockRestore();
   });
@@ -47,6 +47,21 @@ describe('authService - user groups', () => {
       });
     } finally {
       authService.logout();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('bounds a stalled cookie session check', async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}));
+    try {
+      const restoration = authService.restoreCookieSession();
+      const rejected = expect(restoration).rejects.toThrow('Session check timed out');
+      await vi.advanceTimersByTimeAsync(10_000);
+      await rejected;
+      expect((fetchSpy.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
       fetchSpy.mockRestore();
     }
   });

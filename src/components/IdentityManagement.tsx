@@ -32,12 +32,34 @@ function hasMapping(localGroup: GroupDetails, remoteGroup: RemoteGroup): boolean
     mapping.provider === remoteGroup.provider && mapping.group === remoteGroup.claimValue);
 }
 
+function NoProviderState({ body, onView }: { body: string; onView: () => void }) {
+  return <EmptyState>
+    <EmptyStateIcon icon={KeyIcon} />
+    <Title headingLevel="h3" size="md">Add a provider first</Title>
+    <EmptyStateBody>{body}</EmptyStateBody>
+    <Button variant="link" onClick={onView}>View providers</Button>
+  </EmptyState>;
+}
+
+function AccountLoadState({ loading, error, title, onRetry }: { loading: boolean; error: string; title: string; onRetry: () => void }) {
+  if (loading) return <Spinner />;
+  return <EmptyState>
+    <EmptyStateIcon icon={UsersIcon} />
+    <Title headingLevel="h4" size="md">{title}</Title>
+    <EmptyStateBody>{error}</EmptyStateBody>
+    <Button variant="primary" onClick={onRetry}>Retry</Button>
+  </EmptyState>;
+}
+
 /** Admin UI for provider configuration, scoped group mapping and OIDC accounts. */
 export function IdentityManagement() {
   const { showError, showSuccess } = useNotifications();
   const [providers, setProviders] = useState<IdentityProvider[]>([]);
   const [providerError, setProviderError] = useState('');
   const [loadingProviders, setLoadingProviders] = useState(true);
+  const providersRevision = useRef(0);
+  const pendingProviderIds = useRef(new Set<string>());
+  const [updatingProviders, setUpdatingProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState('');
   const [activeSection, setActiveSection] = useState(0);
   const [activeAccountsView, setActiveAccountsView] = useState(0);
@@ -53,9 +75,13 @@ export function IdentityManagement() {
   const [directoryError, setDirectoryError] = useState('');
   const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [directoryHasMore, setDirectoryHasMore] = useState(false);
+  const [directoryNextFirst, setDirectoryNextFirst] = useState(0);
   const directoryRevision = useRef(0);
   const [savingMapping, setSavingMapping] = useState(false);
   const [users, setUsers] = useState<UserDetails[]>([]);
+  const [userTotal, setUserTotal] = useState(0);
+  const [userPage, setUserPage] = useState(1);
+  const [userPerPage, setUserPerPage] = useState(10);
   const [blocks, setBlocks] = useState<IdentityBlock[]>([]);
   const [accountsError, setAccountsError] = useState('');
   const [loadingAccounts, setLoadingAccounts] = useState(false);
@@ -64,14 +90,16 @@ export function IdentityManagement() {
   const [busy, setBusy] = useState(false);
 
   const loadProviders = useCallback(async () => {
+    const revision = ++providersRevision.current;
     setLoadingProviders(true);
     try {
       const loaded = await identityApi.providers();
+      if (revision !== providersRevision.current) return;
       setProviders(loaded);
       setSelectedProvider(current => loaded.some(provider => provider.id === current) ? current : loaded[0]?.id ?? '');
       setProviderError('');
-    } catch (error) { setProviderError(failure(error)); }
-    finally { setLoadingProviders(false); }
+    } catch (error) { if (revision === providersRevision.current) setProviderError(failure(error)); }
+    finally { if (revision === providersRevision.current) setLoadingProviders(false); }
   }, []);
 
   useEffect(() => { void loadProviders(); }, [loadProviders]);
@@ -87,13 +115,14 @@ export function IdentityManagement() {
 
   const loadDirectory = useCallback(async () => {
     const revision = ++directoryRevision.current;
-    if (!selectedProvider) { setRemoteGroups([]); setDirectoryHasMore(false); return; }
+    if (!selectedProvider) { setRemoteGroups([]); setDirectoryHasMore(false); setDirectoryNextFirst(0); return; }
     setLoadingDirectory(true);
     try {
       const page = await identityApi.groups(selectedProvider, groupSearch);
       if (revision !== directoryRevision.current) return;
-      setRemoteGroups(page);
-      setDirectoryHasMore(page.length === 50);
+      setRemoteGroups(page.groups);
+      setDirectoryHasMore(page.hasMore);
+      setDirectoryNextFirst(page.nextFirst);
       setDirectoryError('');
     } catch (error) {
       if (revision === directoryRevision.current) {
@@ -111,31 +140,39 @@ export function IdentityManagement() {
     const revision = directoryRevision.current;
     setLoadingDirectory(true);
     try {
-      const page = await identityApi.groups(selectedProvider, groupSearch, remoteGroups.length);
+      const page = await identityApi.groups(selectedProvider, groupSearch, directoryNextFirst);
       if (revision !== directoryRevision.current) return;
-      setRemoteGroups(current => [...current, ...page]);
-      setDirectoryHasMore(page.length === 50);
+      setRemoteGroups(current => [...current, ...page.groups]);
+      setDirectoryHasMore(page.hasMore);
+      setDirectoryNextFirst(page.nextFirst);
     } catch (error) { if (revision === directoryRevision.current) showError('Could not load more remote groups', failure(error)); }
     finally { if (revision === directoryRevision.current) setLoadingDirectory(false); }
   }
 
   const loadAccounts = useCallback(async () => {
     const revision = ++accountsRevision.current;
-    if (!selectedProvider) { setUsers([]); setBlocks([]); return; }
+    if (!selectedProvider) { setUsers([]); setUserTotal(0); setBlocks([]); return; }
     setUsers([]);
+    setUserTotal(0);
     setBlocks([]);
     setLoadingAccounts(true);
     try {
       const [loadedUsers, loadedBlocks] = await Promise.all([
-        identityApi.users(selectedProvider), identityApi.blocks(selectedProvider),
+        identityApi.users(selectedProvider, userPage, userPerPage), identityApi.blocks(selectedProvider),
       ]);
       if (revision !== accountsRevision.current) return;
-      setUsers(loadedUsers);
+      if (userPage > 1 && loadedUsers.users.length === 0 && loadedUsers.total > 0 &&
+          Math.ceil(loadedUsers.total / userPerPage) < userPage) {
+        setUserPage(Math.ceil(loadedUsers.total / userPerPage));
+        return;
+      }
+      setUsers(loadedUsers.users);
+      setUserTotal(loadedUsers.total);
       setBlocks(loadedBlocks);
       setAccountsError('');
     } catch (error) { if (revision === accountsRevision.current) setAccountsError(failure(error)); }
     finally { if (revision === accountsRevision.current) setLoadingAccounts(false); }
-  }, [selectedProvider]);
+  }, [selectedProvider, userPage, userPerPage]);
 
   useEffect(() => {
     void loadAccounts();
@@ -146,7 +183,6 @@ export function IdentityManagement() {
     .filter(mapping => mapping.provider === selectedProvider)
     .map(mapping => ({ localGroup, mapping })));
   const availableLocalGroups = mappingRemote ? groups.filter(localGroup => !hasMapping(localGroup, mappingRemote)) : [];
-  const userPage = usePagination(users, { initialPerPage: 10 });
   const blockPage = usePagination(blocks, { initialPerPage: 10 });
 
   async function saveMapping(localGroup: GroupDetails, next: ExternalGroupMapping[]): Promise<boolean> {
@@ -201,6 +237,9 @@ export function IdentityManagement() {
     try {
       if (editingProvider) {
         const { displayName, clientId, clientSecret, redirectUrl, adminClientId, adminClientSecret, enabled } = providerForm;
+        if (!adminClientId && editingProvider.hasAdminClientSecret) {
+          throw new Error('Use Remove group directory credentials to clear the existing service client.');
+        }
         await identityApi.updateProvider(editingProvider.id, {
           displayName, clientId, redirectUrl, adminClientId, enabled,
           ...(clientSecret ? { clientSecret } : {}),
@@ -217,11 +256,18 @@ export function IdentityManagement() {
   }
 
   async function toggleProvider(provider: IdentityProvider, enabled: boolean) {
+    if (pendingProviderIds.current.has(provider.id)) return;
+    pendingProviderIds.current.add(provider.id);
+    setUpdatingProviders(current => [...current, provider.id]);
     try {
       await identityApi.updateProvider(provider.id, { enabled });
       await loadProviders();
       showSuccess(enabled ? 'Provider enabled' : 'Provider disabled');
     } catch (error) { showError('Could not update provider', failure(error)); }
+    finally {
+      pendingProviderIds.current.delete(provider.id);
+      setUpdatingProviders(current => current.filter(id => id !== provider.id));
+    }
   }
 
   async function confirmAction() {
@@ -280,7 +326,7 @@ export function IdentityManagement() {
                       <Td><strong>{provider.displayName}</strong><div className="identity-management__meta">{provider.id}</div></Td>
                       <Td>{provider.type === 'keycloak' ? 'Keycloak' : provider.type}</Td>
                       <Td className="identity-management__issuer">{provider.issuer}</Td>
-                      <Td><Switch id={`provider-${provider.id}`} label="Enabled" labelOff="Disabled" isChecked={provider.enabled} isDisabled={provider.source === 'environment'} onChange={(_, value) => void toggleProvider(provider, value)} /></Td>
+                      <Td><Switch id={`provider-${provider.id}`} label="Enabled" labelOff="Disabled" isChecked={provider.enabled} isDisabled={provider.source === 'environment' || updatingProviders.includes(provider.id)} onChange={(_, value) => void toggleProvider(provider, value)} /></Td>
                       <Td><Button variant="plain" aria-label={`Edit ${provider.displayName}`} isDisabled={provider.source === 'environment'} onClick={() => openEdit(provider)}><EditIcon /></Button></Td>
                     </Tr>
                   ))}</Tbody>
@@ -292,12 +338,7 @@ export function IdentityManagement() {
           <Tab eventKey={1} title={<TabTitleText>Group mapping</TabTitleText>}>
             <div className="identity-management__panel">
               {providers.length === 0 ? (
-                <EmptyState>
-                  <EmptyStateIcon icon={KeyIcon} />
-                  <Title headingLevel="h3" size="md">Add a provider first</Title>
-                  <EmptyStateBody>Group mapping becomes available after you configure an identity provider.</EmptyStateBody>
-                  <Button variant="link" onClick={() => setActiveSection(0)}>View providers</Button>
-                </EmptyState>
+                <NoProviderState body="Group mapping becomes available after you configure an identity provider." onView={() => setActiveSection(0)} />
               ) : <>
                 <p className="identity-management__lead">
                   Map full remote group paths to local groups. The provider ID keeps identically named groups separate.
@@ -389,30 +430,20 @@ export function IdentityManagement() {
           <Tab eventKey={2} title={<TabTitleText>Accounts</TabTitleText>}>
             <div className="identity-management__panel">
               {providers.length === 0 ? (
-                <EmptyState>
-                  <EmptyStateIcon icon={KeyIcon} />
-                  <Title headingLevel="h3" size="md">Add a provider first</Title>
-                  <EmptyStateBody>OIDC accounts appear here after users sign in through a configured provider.</EmptyStateBody>
-                  <Button variant="link" onClick={() => setActiveSection(0)}>View providers</Button>
-                </EmptyState>
+                <NoProviderState body="OIDC accounts appear here after users sign in through a configured provider." onView={() => setActiveSection(0)} />
               ) : <>
                 <div className="identity-management__filters">
                   <FormGroup label="Authentication provider" fieldId="identity-accounts-provider">
-                    <FormSelect id="identity-accounts-provider" value={selectedProvider} onChange={(_, value) => setSelectedProvider(value)}>
+                    <FormSelect id="identity-accounts-provider" value={selectedProvider} onChange={(_, value) => { setSelectedProvider(value); setUserPage(1); }}>
                       {providers.map(provider => <FormSelectOption key={provider.id} value={provider.id} label={`${provider.displayName} (${provider.id})`} />)}
                     </FormSelect>
                   </FormGroup>
                 </div>
                 <Tabs activeKey={activeAccountsView} onSelect={(_, key) => setActiveAccountsView(Number(key))} aria-label="OIDC account views">
-                  <Tab eventKey={0} title={<TabTitleText>Users ({users.length})</TabTitleText>}>
+                  <Tab eventKey={0} title={<TabTitleText>Users ({userTotal})</TabTitleText>}>
                     <div className="identity-management__panel">
-                      {loadingAccounts ? <Spinner /> : accountsError ? (
-                        <EmptyState>
-                          <EmptyStateIcon icon={UsersIcon} />
-                          <Title headingLevel="h4" size="md">Could not load OIDC identities</Title>
-                          <EmptyStateBody>{accountsError}</EmptyStateBody>
-                          <Button variant="primary" onClick={() => void loadAccounts()}>Retry</Button>
-                        </EmptyState>
+                      {loadingAccounts || accountsError ? (
+                        <AccountLoadState loading={loadingAccounts} error={accountsError} title="Could not load OIDC identities" onRetry={() => void loadAccounts()} />
                       ) : users.length === 0 ? (
                         <EmptyState>
                           <EmptyStateIcon icon={UsersIcon} />
@@ -422,7 +453,7 @@ export function IdentityManagement() {
                       ) : <>
                         <Table aria-label="OIDC users" variant="compact">
                           <Thead><Tr><Th>Identity</Th><Th>Status</Th><Th>Last login</Th><Th>Actions</Th></Tr></Thead>
-                          <Tbody>{userPage.paginatedData.map(user => (
+                          <Tbody>{users.map(user => (
                             <Tr key={user.userId}>
                               <Td><strong>{user.externalUsername || user.name || user.userId}</strong><div className="identity-management__meta">{user.externalEmail || user.userId}</div></Td>
                               <Td><Label color={user.active ? 'green' : 'red'}>{user.active ? 'Active' : 'Disabled'}</Label></Td>
@@ -453,19 +484,14 @@ export function IdentityManagement() {
                             </Tr>
                           ))}</Tbody>
                         </Table>
-                        {userPage.totalPages > 1 && <Pagination className="identity-management__pagination" itemCount={userPage.totalItems} page={userPage.page} perPage={userPage.perPage} onSetPage={userPage.handleSetPage} onPerPageSelect={userPage.handlePerPageSelect} />}
+                        {userTotal > userPerPage && <Pagination className="identity-management__pagination" itemCount={userTotal} page={userPage} perPage={userPerPage} onSetPage={(_, page) => setUserPage(page)} onPerPageSelect={(_, perPage) => { setUserPerPage(perPage); setUserPage(1); }} />}
                       </>}
                     </div>
                   </Tab>
                   <Tab eventKey={1} title={<TabTitleText>Blacklist ({blocks.length})</TabTitleText>}>
                     <div className="identity-management__panel">
-                      {loadingAccounts ? <Spinner /> : accountsError ? (
-                        <EmptyState>
-                          <EmptyStateIcon icon={UsersIcon} />
-                          <Title headingLevel="h4" size="md">Could not load the blacklist</Title>
-                          <EmptyStateBody>{accountsError}</EmptyStateBody>
-                          <Button variant="primary" onClick={() => void loadAccounts()}>Retry</Button>
-                        </EmptyState>
+                      {loadingAccounts || accountsError ? (
+                        <AccountLoadState loading={loadingAccounts} error={accountsError} title="Could not load the blacklist" onRetry={() => void loadAccounts()} />
                       ) : blocks.length === 0 ? (
                         <EmptyState>
                           <EmptyStateIcon icon={UsersIcon} />
@@ -521,6 +547,19 @@ export function IdentityManagement() {
             <p className="identity-management__meta">Use a separate Keycloak service account with permission to read realm groups.</p>
             <FormGroup label="Admin client ID" fieldId="identity-admin-client"><TextInput id="identity-admin-client" value={providerForm.adminClientId ?? ''} onChange={(_, value) => setField('adminClientId', value)} /></FormGroup>
             <FormGroup label="Admin client secret (leave blank to keep)" fieldId="identity-admin-secret"><TextInput id="identity-admin-secret" type="password" value={providerForm.adminClientSecret ?? ''} onChange={(_, value) => setField('adminClientSecret', value)} /></FormGroup>
+            {editingProvider?.hasAdminClientSecret && <Button variant="secondary" onClick={() => {
+              setProviderForm(null);
+              setPending({
+                title: 'Remove group directory credentials?',
+                detail: 'Remote group browsing will be unavailable until new service credentials are configured.',
+                destructive: true,
+                action: async () => {
+                  await identityApi.updateProvider(editingProvider.id, { adminClientId: '', adminClientSecret: '' });
+                  await loadProviders();
+                  setProviderForm(null);
+                },
+              });
+            }}>Remove group directory credentials</Button>}
             <Switch id="identity-enabled" label="Enabled" labelOff="Disabled" isChecked={providerForm.enabled} onChange={(_, value) => setField('enabled', value)} />
           </>}
           <div className="identity-management__form-actions">

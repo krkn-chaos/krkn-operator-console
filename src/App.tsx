@@ -502,7 +502,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    void logout().then(() => navigate('/login')).catch(() => {
+    void logout().then(didLogout => { if (didLogout) navigate('/login'); }).catch(() => {
       showError('Logout failed', 'Your session is still active. Please try again.');
     });
   };

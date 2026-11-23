@@ -22,6 +22,8 @@ import { config } from '../config';
 const API_BASE = `${config.apiBaseUrl}/auth`;
 const AUTH_STORAGE_KEY_LIST = Object.values(AUTH_STORAGE_KEYS);
 const LEGACY_SESSION_MIGRATED_KEY = 'legacy_session_migrated';
+export const OIDC_SESSION_SIGNAL_KEY = 'oidc_session_changed';
+const SESSION_RESTORE_TIMEOUT_MS = 10_000;
 
 interface AuthSession {
   token: string | null;
@@ -88,8 +90,24 @@ class AuthService {
   private cookieSession: { user: User; csrfToken: string } | null = null;
 
   /** Restore an HttpOnly OIDC session after the provider redirects to the console. */
-  async restoreCookieSession(): Promise<User | null> {
-    const response = await fetch(`${API_BASE}/session`, { credentials: 'include' });
+  async restoreCookieSession(options: { shouldApply?: () => boolean; announce?: boolean } = {}): Promise<User | null> {
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error('Session check timed out'));
+      }, SESSION_RESTORE_TIMEOUT_MS);
+    });
+    let response: Response;
+    try {
+      response = await Promise.race([
+        fetch(`${API_BASE}/session`, { credentials: 'include', signal: controller.signal }), timeout,
+      ]);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+    if (options.shouldApply && !options.shouldApply()) return null;
     if (!response.ok) {
       this.cookieSession = null;
       return null;
@@ -106,12 +124,18 @@ class AuthService {
       provider: session.provider,
       groups: session.mappedGroups ?? [],
     };
+    if (options.shouldApply && !options.shouldApply()) return null;
     this.cookieSession = { user, csrfToken: session.csrfToken ?? '' };
+    if (options.announce) localStorage.setItem(OIDC_SESSION_SIGNAL_KEY, `${Date.now()}:${Math.random()}`);
     return user;
   }
 
   getCookieSession(): { user: User; csrfToken: string } | null {
     return this.cookieSession;
+  }
+
+  clearCookieSession(): void {
+    this.cookieSession = null;
   }
 
   /** Clear a local Bearer session before starting an external login redirect. */
@@ -325,6 +349,7 @@ class AuthService {
           },
         },
       });
+      this.cookieSession = null;
 
       return data;
     } catch (error) {

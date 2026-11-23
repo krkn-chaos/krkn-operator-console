@@ -45,6 +45,19 @@ export interface RemoteGroup extends ExternalGroupMapping {
   claimValue: string;
 }
 
+export interface RemoteGroupPage {
+  groups: RemoteGroup[];
+  nextFirst: number;
+  hasMore: boolean;
+}
+
+export interface IdentityUserPage {
+  users: UserDetails[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface IdentityBlock {
   id: string;
   provider: string;
@@ -59,6 +72,7 @@ class IdentityApi extends BaseApiClient {
 
   async loginProviders(): Promise<LoginProvider[]> {
     const response = await fetch(`${config.apiBaseUrl}/auth/providers`, { credentials: 'include' });
+    if (response.status === 404) return [];
     if (!response.ok) throw new Error('Could not load login providers');
     return ((await response.json()) as { providers: LoginProvider[] }).providers ?? [];
   }
@@ -75,13 +89,14 @@ class IdentityApi extends BaseApiClient {
     return this.fetchJson(`/identity-providers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) });
   }
 
-  async groups(providerId: string, search = '', first = 0, max = 50): Promise<RemoteGroup[]> {
+  async groups(providerId: string, search = '', first = 0, max = 50): Promise<RemoteGroupPage> {
     const query = new URLSearchParams({ search, first: String(first), max: String(max) });
-    return (await this.fetchJson<{ groups: RemoteGroup[] }>(`/identity-providers/${encodeURIComponent(providerId)}/groups?${query}`)).groups ?? [];
+    return this.fetchJson<RemoteGroupPage>(`/identity-providers/${encodeURIComponent(providerId)}/groups?${query}`);
   }
 
-  async users(providerId: string): Promise<UserDetails[]> {
-    return (await this.fetchJson<{ users: UserDetails[] }>(`/users?authProvider=${encodeURIComponent(providerId)}`)).users ?? [];
+  async users(providerId: string, page = 1, limit = 10): Promise<IdentityUserPage> {
+    const query = new URLSearchParams({ authProvider: providerId, page: String(page), limit: String(limit) });
+    return this.fetchJson<IdentityUserPage>(`/users?${query}`);
   }
 
   async setUserActive(userId: string, active: boolean): Promise<void> {
