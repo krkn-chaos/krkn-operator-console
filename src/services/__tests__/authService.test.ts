@@ -31,6 +31,26 @@ describe('authService - user groups', () => {
     fetchSpy.mockRestore();
   });
 
+  it('keeps an OIDC session when server logout fails and sends its CSRF token', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', csrfToken: 'csrf-123',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      await authService.restoreCookieSession();
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
+
+      await expect(authService.logoutCookieSession()).rejects.toThrow('Could not end the server session');
+      expect(authService.getCookieSession()?.user.userId).toBe('oidc-123');
+      expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/auth/logout', {
+        method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': 'csrf-123' },
+      });
+    } finally {
+      authService.logout();
+      fetchSpy.mockRestore();
+    }
+  });
+
   describe('setUser', () => {
     it('stores groups in versioned session record', () => {
       const user: User = { ...baseUser, groups: ['group-a', 'group-b'] };

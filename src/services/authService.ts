@@ -123,11 +123,11 @@ class AuthService {
   async logoutCookieSession(): Promise<void> {
     const csrfToken = this.cookieSession?.csrfToken;
     const token = this.getToken();
-    this.cookieSession = null;
-    await fetch(`${API_BASE}/logout`, {
+    const response = await fetch(`${API_BASE}/logout`, {
       method: 'POST', credentials: 'include',
       headers: token ? { Authorization: `Bearer ${token}` } : csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
     });
+    if (!response.ok) throw new Error('Could not end the server session');
   }
 
   private readSessionRecord(): AuthSessionRecord {

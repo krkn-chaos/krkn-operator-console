@@ -5,9 +5,9 @@
  * Redirects to login if user is not authenticated.
  */
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { Bullseye, Button, EmptyState, EmptyStateBody, EmptyStateIcon, Spinner, Title } from '@patternfly/react-core';
+import { Alert, Bullseye, Button, EmptyState, EmptyStateBody, EmptyStateIcon, Spinner, Title } from '@patternfly/react-core';
 import { UsersIcon } from '@patternfly/react-icons';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,6 +18,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { state, logout } = useAuth();
   const location = useLocation();
+  const [logoutError, setLogoutError] = useState(false);
 
   // Show loading spinner while checking authentication
   if (state.loading) {
@@ -43,8 +44,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       <EmptyStateIcon icon={UsersIcon} />
       <Title headingLevel="h2" size="lg">No groups assigned</Title>
       <EmptyStateBody>Your identity is valid, but no external group is mapped to a local group with permissions. Contact an administrator to request access.</EmptyStateBody>
+      {logoutError && <Alert variant="danger" title="Logout failed. Your session is still active; please try again." isInline />}
       <Button variant="primary" onClick={() => window.location.reload()}>Refresh access</Button>{' '}
-      <Button variant="link" onClick={logout}>Log out</Button>
+      <Button variant="link" onClick={() => {
+        setLogoutError(false);
+        void logout().catch(() => setLogoutError(true));
+      }}>Log out</Button>
     </EmptyState></Bullseye>;
   }
 

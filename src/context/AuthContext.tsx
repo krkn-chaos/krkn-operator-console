@@ -37,7 +37,7 @@ type AuthAction =
 interface AuthContextValue {
   state: AuthState;
   login: (request: LoginRequest) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   register: (request: RegisterRequest) => Promise<void>;
   isAdmin: () => boolean;
 }
@@ -346,8 +346,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Logout user
    */
-  const logout = useCallback(() => {
-    void authService.logoutCookieSession().catch(() => undefined);
+  const logout = useCallback(async () => {
+    await authService.logoutCookieSession();
     authService.logout();
     dispatch({ type: 'AUTH_LOGOUT' });
   }, []);

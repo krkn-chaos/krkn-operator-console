@@ -502,8 +502,9 @@ function App() {
   };
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    void logout().then(() => navigate('/login')).catch(() => {
+      showError('Logout failed', 'Your session is still active. Please try again.');
+    });
   };
 
   const handleEditProfile = () => {

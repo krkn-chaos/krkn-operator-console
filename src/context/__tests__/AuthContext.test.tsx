@@ -1,7 +1,7 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AuthProvider, useAuth } from '../AuthContext';
 import { AppProvider, useAppContext } from '../AppContext';
 import { authService } from '../../services/authService';
@@ -31,6 +31,12 @@ function TestConsumer() {
       <span data-testid="role">{state.user?.role ?? 'none'}</span>
     </div>
   );
+}
+
+function LogoutConsumer() {
+  const { logout } = useAuth();
+  const [error, setError] = useState('');
+  return <><TestConsumer /><button onClick={() => void logout().catch(() => setError('Logout failed'))}>Log out</button><span>{error}</span></>;
 }
 
 function ProtectedRouteConsumer() {
@@ -88,10 +94,31 @@ describe('AuthProvider - loadAndStoreGroups', () => {
     vi.mocked(authService.getUser).mockReturnValue(null);
     vi.mocked(authService.getToken).mockReturnValue(null);
     vi.mocked(authService.getTokenExpiresAt).mockReturnValue(null);
+    vi.mocked(authService.getCookieSession).mockReturnValue(null);
     vi.mocked(authService.getSessionVersion).mockReturnValue({ generation: 0, logoutGeneration: 0 });
     vi.mocked(authService.isTokenExpired).mockReturnValue(false);
     vi.mocked(authService.logout).mockImplementation(() => true);
     vi.mocked(operatorApi.getGroups).mockResolvedValue({ groups: [] });
+  });
+
+  it('retains local auth until the server confirms logout', async () => {
+    const user: User = { userId: 'alice', name: 'Alice', surname: 'Example', role: 'user' };
+    vi.mocked(authService.getUser).mockReturnValue(user);
+    vi.mocked(authService.getToken).mockReturnValue('local-token');
+    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(new Date(Date.now() + 60_000).toISOString());
+    vi.mocked(authService.logoutCookieSession).mockRejectedValueOnce(new Error('server unavailable'));
+
+    renderAuthProvider(<LogoutConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    expect(await screen.findByText('Logout failed')).toBeInTheDocument();
+    expect(screen.getByTestId('authenticated').textContent).toBe('true');
+    expect(authService.logout).not.toHaveBeenCalled();
+
+    vi.mocked(authService.logoutCookieSession).mockResolvedValueOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('false'));
+    expect(authService.logout).toHaveBeenCalledOnce();
   });
 
   it('fetches and stores groups for admin users on init', async () => {
@@ -447,6 +474,7 @@ describe('AuthProvider - loadAndStoreGroups', () => {
     expect(screen.getByTestId('authenticated').textContent).toBe('true');
 
     await vi.advanceTimersByTimeAsync(1_000);
+    await act(async () => { await Promise.resolve(); });
     expect(authService.logout).toHaveBeenCalledOnce();
     expect(screen.getByTestId('authenticated').textContent).toBe('false');
     expect(screen.getByTestId('route-path').textContent).toBe('/login');
