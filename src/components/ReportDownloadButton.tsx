@@ -34,6 +34,7 @@ export const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ runI
   const [isErrorExpanded, setIsErrorExpanded] = React.useState(false);
 
   const {
+    reportStatus,
     isLoading,
     error,
     hasHtml,
@@ -87,7 +88,7 @@ export const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ runI
   if (!hasReports) {
     return (
       <span style={{ color: 'var(--pf-v5-global--Color--200)', fontStyle: 'italic' }}>
-        No reports available
+        {reportStatus?.supported === false ? reportStatus.message || 'Reports are not supported for this run' : 'No reports available'}
       </span>
     );
   }

@@ -401,6 +401,7 @@ export interface ReportStatus {
   generated: boolean;
   htmlAvailable: boolean;
   pdfAvailable: boolean;
+  supported?: boolean;
   generatedAt?: string;
   location?: string;
   fileSize?: number;

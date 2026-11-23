@@ -69,6 +69,25 @@ describe('useReportActions', () => {
     expect(mockGetReportStatus).toHaveBeenCalledTimes(1);
   });
 
+  it('stops polling when reports are unsupported for a multi-cluster run', async () => {
+    mockGetReportStatus.mockResolvedValue({
+      generated: false,
+      htmlAvailable: false,
+      pdfAvailable: false,
+      supported: false,
+      message: 'Reports are not supported for multi-cluster scenario runs',
+    });
+
+    const { result } = renderHook(() =>
+      useReportActions({ runId: 'multi-run', runName: 'multi-run' }),
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.reportStatus?.supported).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(mockGetReportStatus).toHaveBeenCalledTimes(1);
+  });
+
   it('stops polling for PartiallyFailed and Failed phases', async () => {
     mockGetReportStatus.mockResolvedValue({
       generated: false,
