@@ -148,14 +148,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!requestToken) {
       const cookieSession = authService.getCookieSession();
       if (!cookieSession || authService.getToken()) return;
-      void authService.logoutCookieSession().then(() => {
-        if (authService.getCookieSession() !== cookieSession || authService.getToken()) return;
+      const finishExpiredSession = () => {
+        const currentCookie = authService.getCookieSession();
+        if (authService.getToken() || (currentCookie && currentCookie !== cookieSession)) return;
         syncRevision.current += 1;
         if (!authService.logout(null)) return;
         dispatch({ type: 'AUTH_LOGOUT' });
         redirectToExpiredLogin();
-      }).catch(() => {
-        // Keep the current session visible when the server cannot clear its cookie.
+      };
+      void authService.logoutCookieSession().then(finishExpiredSession).catch(() => {
+        // A stale cookie can make logout fail too. Confirm whether the server
+        // still accepts it before keeping this user in the authenticated UI.
+        void authService.restoreCookieSession({
+          shouldApply: () => authService.getCookieSession() === cookieSession && !authService.getToken(),
+        }).then(user => {
+          if (!user && !authService.getCookieSession()) finishExpiredSession();
+        }).catch(() => {
+          // A transport failure is not proof that the session has expired.
+        });
       });
       return;
     }
@@ -231,14 +241,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         currentVersion.generation === sessionVersion.generation &&
         currentVersion.logoutGeneration === sessionVersion.logoutGeneration;
     };
+    const existingCookie = authService.getCookieSession();
     try {
       const cookieUser = await authService.restoreCookieSession({ shouldApply: isCurrent, announce: !fromStorageEvent });
       if (!isCurrent()) return;
       dispatch({ type: 'AUTH_INIT', payload: { user: cookieUser ?? null } });
     } catch {
       if (isCurrent()) {
-        authService.clearCookieSession();
-        dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+        const currentCookie = authService.getCookieSession();
+        if (existingCookie && currentCookie === existingCookie) {
+          dispatch({ type: 'AUTH_INIT', payload: { user: existingCookie.user } });
+        } else if (!currentCookie) {
+          dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+        }
       }
     }
   }, [loadAndStoreGroups]);
@@ -378,8 +393,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     syncRevision.current += 1;
     const requestToken = authService.getToken();
     const cookieSession = authService.getCookieSession();
-    await authService.logoutCookieSession();
-    if (authService.getToken() !== requestToken || authService.getCookieSession() !== cookieSession) return false;
+    // A local Bearer session can always be cleared in the browser. Only an
+    // OIDC cookie needs a successful server response before local logout.
+    if (cookieSession) await authService.logoutCookieSession();
+    const currentCookie = authService.getCookieSession();
+    if (authService.getToken() !== requestToken || (currentCookie && currentCookie !== cookieSession)) return false;
     if (!authService.logout(requestToken)) return false;
     dispatch({ type: 'AUTH_LOGOUT' });
     return true;

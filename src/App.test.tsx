@@ -82,7 +82,12 @@ vi.mock('./components', () => ({
   ElasticsearchDataView: () => <div data-testid="elasticsearch-data-view">ElasticsearchDataView</div>,
 }));
 vi.mock('./components/KrknAI/KrknAIPage', () => ({
-  KrknAIPage: () => <div data-testid="krkn-ai-page">KrknAIPage</div>,
+  KrknAIPage: ({ onReplayScenario }: { onReplayScenario: (scenario: { childRunName: string; scenarioType: string }) => void }) => (
+    <div data-testid="krkn-ai-page">
+      KrknAIPage
+      <button onClick={() => onReplayScenario({ childRunName: 'ai-child-run', scenarioType: 'pod-scenarios' })}>Replay AI child</button>
+    </div>
+  ),
 }));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
 vi.mock('./components/ResiliencyHistory', () => ({
@@ -192,6 +197,18 @@ describe('App scenario re-run and Krkn AI navigation', () => {
     await waitFor(() => expect(appMocks.krknAI.getStatus).toHaveBeenCalledTimes(1));
     expect(screen.queryByText('Krkn AI')).not.toBeInTheDocument();
     expect(screen.queryByTestId('krkn-ai-page')).not.toBeInTheDocument();
+  });
+
+  it('authorizes a Krkn AI child replay before creating a target', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getScenarioRunReplayConfig).mockRejectedValue(new Error('Forbidden'));
+    renderApp();
+
+    await user.click(await screen.findByText('Krkn AI'));
+    await user.click(screen.getByRole('button', { name: 'Replay AI child' }));
+
+    await waitFor(() => expect(operatorApi.getScenarioRunReplayConfig).toHaveBeenCalledWith('ai-child-run'));
+    expect(operatorApi.createTargetRequest).not.toHaveBeenCalled();
   });
 
   it('fetches run config, dispatches the replay intent, and starts target creation', async () => {

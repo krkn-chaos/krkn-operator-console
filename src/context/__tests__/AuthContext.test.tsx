@@ -104,40 +104,53 @@ describe('AuthProvider - loadAndStoreGroups', () => {
     vi.mocked(operatorApi.getGroups).mockResolvedValue({ groups: [] });
   });
 
-  it('retains local auth until the server confirms logout', async () => {
+  it('ends a Bearer session locally even when the server is unavailable', async () => {
     const user: User = { userId: 'alice', name: 'Alice', surname: 'Example', role: 'user' };
     vi.mocked(authService.getUser).mockReturnValue(user);
     vi.mocked(authService.getToken).mockReturnValue('local-token');
     vi.mocked(authService.getTokenExpiresAt).mockReturnValue(new Date(Date.now() + 60_000).toISOString());
-    vi.mocked(authService.logoutCookieSession).mockRejectedValueOnce(new Error('server unavailable'));
 
     renderAuthProvider(<LogoutConsumer />);
     await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('false'));
+    expect(authService.logout).toHaveBeenCalledOnce();
+    expect(authService.logoutCookieSession).not.toHaveBeenCalled();
+    expect(screen.queryByText('Logout failed')).not.toBeInTheDocument();
+  });
+
+  it('retains an OIDC session when server logout fails', async () => {
+    const user: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    vi.mocked(authService.getCookieSession).mockReturnValue({ user, csrfToken: 'csrf' });
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(user);
+    vi.mocked(authService.logoutCookieSession).mockRejectedValue(new Error('server unavailable'));
+
+    renderAuthProvider(<LogoutConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
     expect(await screen.findByText('Logout failed')).toBeInTheDocument();
     expect(screen.getByTestId('authenticated').textContent).toBe('true');
     expect(authService.logout).not.toHaveBeenCalled();
-
-    vi.mocked(authService.logoutCookieSession).mockResolvedValueOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
-    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('false'));
-    expect(authService.logout).toHaveBeenCalledOnce();
   });
 
-  it('does not clear a newer local session when an older logout finishes', async () => {
+  it('does not clear a newer local session when an older OIDC logout finishes', async () => {
     const firstUser: User = { userId: 'first', name: 'First', surname: 'User', role: 'user' };
     const secondUser: User = { userId: 'second', name: 'Second', surname: 'User', role: 'user' };
     vi.mocked(authService.getUser).mockReturnValue(firstUser);
-    vi.mocked(authService.getToken).mockReturnValue('first-token');
-    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(new Date(Date.now() + 60_000).toISOString());
+    vi.mocked(authService.getCookieSession).mockReturnValue({ user: firstUser, csrfToken: 'first-csrf' });
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(firstUser);
     let completeLogout!: () => void;
     vi.mocked(authService.logoutCookieSession).mockImplementation(() => new Promise(resolve => { completeLogout = resolve; }));
     renderAuthProvider(<LogoutConsumer />);
     await waitFor(() => expect(screen.getByTestId('user-id').textContent).toBe('first'));
+    vi.mocked(authService.logout).mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
     vi.mocked(authService.getUser).mockReturnValue(secondUser);
     vi.mocked(authService.getToken).mockReturnValue('second-token');
+    vi.mocked(authService.getCookieSession).mockReturnValue(null);
+    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(new Date(Date.now() + 60_000).toISOString());
     act(() => dispatchAuthStorageEvent());
     await waitFor(() => expect(screen.getByTestId('user-id').textContent).toBe('second'));
     await act(async () => completeLogout());

@@ -72,13 +72,21 @@ describe('RunCategoryActions', () => {
 
   it('disables atomic replay when the user cannot run every original cluster', async () => {
     const onReplayScenario = vi.fn();
-    const onCheckScenarioReplay = vi.fn().mockResolvedValue(false);
+    const onCheckScenarioReplay = vi.fn().mockResolvedValue('forbidden');
     render(<RunCategoryActions {...defaultProps} onReplayScenario={onReplayScenario} onCheckScenarioReplay={onCheckScenarioReplay} />);
 
     fireEvent.click(screen.getByLabelText('Actions for run run-123'));
     await waitFor(() => expect(screen.getByRole('menuitem', { name: /Replay unavailable/ })).toBeDisabled());
     expect(onCheckScenarioReplay).toHaveBeenCalledOnce();
     expect(onReplayScenario).not.toHaveBeenCalled();
+  });
+
+  it('shows a retryable check error when replay authorization cannot be checked', async () => {
+    const onCheckScenarioReplay = vi.fn().mockResolvedValue('error');
+    render(<RunCategoryActions {...defaultProps} onReplayScenario={vi.fn()} onCheckScenarioReplay={onCheckScenarioReplay} />);
+
+    fireEvent.click(screen.getByLabelText('Actions for run run-123'));
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: /Could not check replay/ })).toBeDisabled());
   });
 
   it('opens category actions and supports adding and removing a category', async () => {

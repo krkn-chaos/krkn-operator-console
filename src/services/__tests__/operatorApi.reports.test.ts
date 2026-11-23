@@ -27,6 +27,20 @@ describe('OperatorApi - report endpoints', () => {
     );
   });
 
+  it('uses replay intent and preserves a denied replay response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: 'forbidden', message: 'Replay requires access to every cluster' }),
+    });
+
+    await expect(operatorApi.getScenarioRunReplayConfig('run/with spaces')).rejects.toMatchObject({ status: 403 });
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/scenarios/run/run%2Fwith%20spaces/config?intent=replay',
+      expect.objectContaining({ headers: expect.anything() }),
+    );
+  });
+
   it.each([
     ['html', 'downloadReportHTML', '/api/v1/scenarios/run/run-1/reports/summary.html'],
     ['pdf', 'downloadReportPDF', '/api/v1/scenarios/run/run-1/reports/summary.pdf'],

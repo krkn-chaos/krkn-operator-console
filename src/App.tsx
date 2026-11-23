@@ -328,7 +328,7 @@ function App() {
                   if (!childRunName) return;
                   void startScenarioReplay(
                     { scenarioName: scenario.scenarioType ?? '', registryName: scenario.registryName },
-                    () => operatorApi.getScenarioRunConfig(childRunName),
+                    () => operatorApi.getScenarioRunReplayConfig(childRunName),
                   );
                 }}
               />

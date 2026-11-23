@@ -39,7 +39,7 @@ interface RunCategoryActionsProps {
   onOpenReplayJobs?: () => void;
   onReplayScenario?: () => void;
   /** Checked whenever the menu opens; replay is atomic across all original targets. */
-  onCheckScenarioReplay?: () => Promise<boolean>;
+  onCheckScenarioReplay?: () => Promise<'allowed' | 'forbidden' | 'error'>;
   onReplayWorkflow?: () => Promise<void>;
   isWorkflowReplayDisabled?: boolean;
 }
@@ -84,7 +84,7 @@ export function RunCategoryActions({
   isWorkflowReplayDisabled = false,
 }: RunCategoryActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [replayAllowed, setReplayAllowed] = useState<boolean | null>(null);
+  const [replayAccess, setReplayAccess] = useState<'allowed' | 'forbidden' | 'error' | null>(null);
   const [confirmRollback, setConfirmRollback] = useState<RollbackAttempt | null>(null);
   const replayCheckVersion = useRef(0);
   useEffect(() => () => { replayCheckVersion.current += 1; }, []);
@@ -98,10 +98,10 @@ export function RunCategoryActions({
     replayCheckVersion.current += 1;
     if (open && onReplayScenario && onCheckScenarioReplay) {
       const version = replayCheckVersion.current;
-      setReplayAllowed(null);
+      setReplayAccess(null);
       void onCheckScenarioReplay()
-        .then((allowed) => { if (replayCheckVersion.current === version) setReplayAllowed(allowed); })
-        .catch(() => { if (replayCheckVersion.current === version) setReplayAllowed(false); });
+        .then((access) => { if (replayCheckVersion.current === version) setReplayAccess(access); })
+        .catch(() => { if (replayCheckVersion.current === version) setReplayAccess('error'); });
     }
     if (open && runId && rollbackEnabled && replayJobs.length === 0 && !hasLoadedReplayJobsForOpenMenu.current) {
       hasLoadedReplayJobsForOpenMenu.current = true;
@@ -157,11 +157,12 @@ export function RunCategoryActions({
             <DropdownItem
               key="replay-scenario"
               icon={<RedoIcon />}
-              isDisabled={Boolean(onCheckScenarioReplay) && replayAllowed !== true}
+              isDisabled={Boolean(onCheckScenarioReplay) && replayAccess !== 'allowed'}
               onClick={handleScenarioReplay}
             >
-              {onCheckScenarioReplay && replayAllowed === null ? 'Checking replay access…' :
-                onCheckScenarioReplay && replayAllowed === false ? 'Replay unavailable: requires access to every cluster' : 'Replay'}
+              {onCheckScenarioReplay && replayAccess === null ? 'Checking replay access…' :
+                onCheckScenarioReplay && replayAccess === 'forbidden' ? 'Replay unavailable: requires access to every cluster' :
+                  onCheckScenarioReplay && replayAccess === 'error' ? 'Could not check replay access' : 'Replay'}
             </DropdownItem>
           )}
           {runId && (

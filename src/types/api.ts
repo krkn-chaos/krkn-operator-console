@@ -142,6 +142,8 @@ export interface RerunIntent {
 }
 
 export interface JobConfigResponse {
+  /** The response hides sensitive values and targets outside the caller's view. */
+  partialView?: boolean;
   workspace?: WorkspaceSelection;
   rollbackEnabled?: boolean;
   targetRequestId: string;

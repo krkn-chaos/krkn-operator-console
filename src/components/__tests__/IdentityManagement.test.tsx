@@ -117,6 +117,17 @@ describe('IdentityManagement', () => {
     await waitFor(() => expect(mocks.updateProvider).toHaveBeenCalledWith('corp-keycloak', { adminClientId: '', adminClientSecret: '' }));
   });
 
+  it('requires the explicit remove action to clear stored group directory credentials', async () => {
+    render(<IdentityManagement />);
+    await waitFor(() => expect(mocks.providers).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Corporate Keycloak' }));
+    await userEvent.clear(screen.getByLabelText('Admin client ID'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save provider' }));
+
+    await waitFor(() => expect(mocks.showError).toHaveBeenCalled());
+    expect(mocks.updateProvider).not.toHaveBeenCalled();
+  });
+
   it('disables a provider switch while its update is pending', async () => {
     let completeUpdate!: () => void;
     mocks.updateProvider.mockImplementation(() => new Promise<void>(resolve => { completeUpdate = resolve; }));

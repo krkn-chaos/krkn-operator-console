@@ -99,35 +99,38 @@ class AuthService {
         reject(new Error('Session check timed out'));
       }, SESSION_RESTORE_TIMEOUT_MS);
     });
-    let response: Response;
     try {
-      response = await Promise.race([
-        fetch(`${API_BASE}/session`, { credentials: 'include', signal: controller.signal }), timeout,
+      return await Promise.race([
+        (async () => {
+          const response = await fetch(`${API_BASE}/session`, { credentials: 'include', signal: controller.signal });
+          if (controller.signal.aborted || (options.shouldApply && !options.shouldApply())) return null;
+          if (response.status === 401 || response.status === 403) {
+            this.cookieSession = null;
+            return null;
+          }
+          if (!response.ok) throw new Error(`Session check failed: HTTP ${response.status}`);
+          const session = await response.json() as {
+            userId: string; role: User['role']; provider?: string;
+            mappedGroups?: string[]; csrfToken?: string;
+          };
+          if (controller.signal.aborted || (options.shouldApply && !options.shouldApply())) return null;
+          const user: User = {
+            userId: session.userId,
+            name: session.userId,
+            surname: '',
+            role: session.role,
+            provider: session.provider,
+            groups: session.mappedGroups ?? [],
+          };
+          this.cookieSession = { user, csrfToken: session.csrfToken ?? '' };
+          if (options.announce) localStorage.setItem(OIDC_SESSION_SIGNAL_KEY, `${Date.now()}:${Math.random()}`);
+          return user;
+        })(),
+        timeout,
       ]);
     } finally {
       if (timeoutId !== undefined) clearTimeout(timeoutId);
     }
-    if (options.shouldApply && !options.shouldApply()) return null;
-    if (!response.ok) {
-      this.cookieSession = null;
-      return null;
-    }
-    const session = await response.json() as {
-      userId: string; role: User['role']; provider?: string;
-      mappedGroups?: string[]; csrfToken?: string;
-    };
-    const user: User = {
-      userId: session.userId,
-      name: session.userId,
-      surname: '',
-      role: session.role,
-      provider: session.provider,
-      groups: session.mappedGroups ?? [],
-    };
-    if (options.shouldApply && !options.shouldApply()) return null;
-    this.cookieSession = { user, csrfToken: session.csrfToken ?? '' };
-    if (options.announce) localStorage.setItem(OIDC_SESSION_SIGNAL_KEY, `${Date.now()}:${Math.random()}`);
-    return user;
   }
 
   getCookieSession(): { user: User; csrfToken: string } | null {

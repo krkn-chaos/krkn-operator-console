@@ -66,6 +66,41 @@ describe('authService - user groups', () => {
     }
   });
 
+  it('bounds a stalled session response body as well as the request', async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => new Promise(() => {}),
+    } as unknown as Response);
+    try {
+      const restoration = authService.restoreCookieSession();
+      const rejected = expect(restoration).rejects.toThrow('Session check timed out');
+      await vi.advanceTimersByTimeAsync(10_000);
+      await rejected;
+      expect(authService.getCookieSession()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('keeps an existing cookie identity when the session endpoint is unavailable', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', csrfToken: 'csrf-123',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      await authService.restoreCookieSession();
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
+
+      await expect(authService.restoreCookieSession()).rejects.toThrow('Session check failed');
+      expect(authService.getCookieSession()?.user.userId).toBe('oidc-123');
+    } finally {
+      authService.logout();
+      fetchSpy.mockRestore();
+    }
+  });
+
   describe('setUser', () => {
     it('stores groups in versioned session record', () => {
       const user: User = { ...baseUser, groups: ['group-a', 'group-b'] };
