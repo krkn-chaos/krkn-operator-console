@@ -167,7 +167,7 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
       </div>
 
       {/* Scenario Variables */}
-      <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+      {!config.partialView && <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
         <p style={labelStyle}>Scenario Variables</p>
         {envEntries.length > 0 ? (
           <dl style={dlStyle}>
@@ -180,12 +180,12 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
               </div>
             ))}
           </dl>
-        ) : !config.partialView ? (
+        ) : (
           <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--pf-v5-global--Color--200)', fontSize: 'var(--pf-v5-global--FontSize--sm)' }}>
             No configuration parameters set
           </p>
-        ) : null}
-      </div>
+        )}
+      </div>}
     </div>
   );
 }

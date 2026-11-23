@@ -72,6 +72,7 @@ describe('ScenarioConfigDisplay', () => {
 
     expect(await screen.findByText('Partial configuration')).toBeInTheDocument();
     expect(screen.getByText(/visible-cluster/)).toBeInTheDocument();
+    expect(screen.queryByText('Scenario Variables')).not.toBeInTheDocument();
     expect(screen.queryByText('NAMESPACE:')).not.toBeInTheDocument();
   });
 
