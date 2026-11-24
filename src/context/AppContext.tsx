@@ -50,6 +50,8 @@ const initialState: AppState = {
   rerunCloudCredentialRef: null,
   rerunWorkspace: null,
   rerunRollbackEnabled: false,
+  rerunResiliencyScoreEnabled: undefined,
+  rerunResiliencyScoreBaseline: undefined,
 
   // Error handling
   error: null,
@@ -163,6 +165,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         rerunCloudCredentialRef: null,
         rerunWorkspace: null,
         rerunRollbackEnabled: false,
+        rerunResiliencyScoreEnabled: undefined,
+        rerunResiliencyScoreBaseline: undefined,
         error: null,
       };
 
@@ -559,6 +563,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         rerunCloudCredentialRef: state.rerunIntent?.cloudCredentialRef ?? null,
         rerunWorkspace: state.rerunIntent?.workspace ?? null,
         rerunRollbackEnabled: state.rerunIntent?.rollbackEnabled ?? false,
+        rerunResiliencyScoreEnabled: state.rerunIntent?.resiliencyScoreEnabled,
+        rerunResiliencyScoreBaseline: state.rerunIntent?.resiliencyScoreBaseline,
         rerunIntent: null,
         error: null,
       };
@@ -627,6 +633,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         rerunCloudCredentialRef: null,
         rerunWorkspace: null,
         rerunRollbackEnabled: false,
+        rerunResiliencyScoreEnabled: undefined,
+        rerunResiliencyScoreBaseline: undefined,
         error: null,
       };
 
@@ -743,6 +751,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
               rerunCloudCredentialRef: null,
               rerunWorkspace: null,
               rerunRollbackEnabled: false,
+              rerunResiliencyScoreEnabled: undefined,
+              rerunResiliencyScoreBaseline: undefined,
             };
           }
           // Normal flow — back to scenarios list
@@ -762,6 +772,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             rerunCloudCredentialRef: null,
             rerunWorkspace: null,
             rerunRollbackEnabled: false,
+            rerunResiliencyScoreEnabled: undefined,
+            rerunResiliencyScoreBaseline: undefined,
           };
 
         default:

@@ -81,6 +81,7 @@ describe('useScenarioRunsPoller initial fetch', () => {
           runningJobs: 1,
           clusterJobs: [],
           creationTimestamp: '2025-07-01T12:00:00Z',
+          resiliencyScoreBaseline: 80.5,
         },
       ],
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
@@ -101,6 +102,7 @@ describe('useScenarioRunsPoller initial fetch', () => {
     expect(runs).toHaveLength(1);
     expect(runs[0].scenarioRunName).toBe('sr-init-001');
     expect(runs[0].createdAt).toBe('2025-07-01T12:00:00Z');
+    expect(runs[0].resiliencyScoreBaseline).toBe(80.5);
   });
 
   it('handles empty ScenarioRunListResponse gracefully', async () => {
@@ -269,13 +271,13 @@ describe('useScenarioRunsPoller handleMessage integration', () => {
       resource: 'run',
       id: 'new-run-001',
       event: 'created',
-      data: { scenarioRunName: 'new-run-001', phase: 'Pending', totalTargets: 1, successfulJobs: 0, failedJobs: 0, runningJobs: 0, clusterJobs: [] },
+      data: { scenarioRunName: 'new-run-001', phase: 'Pending', totalTargets: 1, successfulJobs: 0, failedJobs: 0, runningJobs: 0, clusterJobs: [], resiliencyScoreBaseline: 0 },
     });
 
     expect(mockDispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'ADD_SCENARIO_RUN',
-        payload: expect.objectContaining({ run: expect.objectContaining({ scenarioRunName: 'new-run-001' }) }),
+        payload: expect.objectContaining({ run: expect.objectContaining({ scenarioRunName: 'new-run-001', resiliencyScoreBaseline: 0 }) }),
       }),
     );
   });

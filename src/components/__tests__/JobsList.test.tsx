@@ -122,6 +122,52 @@ describe('JobsList', () => {
     vi.mocked(operatorApi.updateCategoryAssociation).mockResolvedValue({} as never);
   });
 
+  it('shows red when any calculated cluster score misses scenario baseline', () => {
+    const job = makeScenarioJobItem('scored-run');
+    job.scenarioRun = {
+      ...job.scenarioRun!,
+      resiliencyScoreEnabled: true,
+      resiliencyScoreBaseline: 80,
+      resiliencyScores: [
+        { clusterName: 'passing', score: 100, status: 'calculated' },
+        { clusterName: 'failing', score: 70, status: 'calculated' },
+      ],
+    };
+    setMockJobs([job]);
+
+    render(<JobsList {...defaultProps()} />);
+    expect(screen.getByText('85.0 (avg)').closest('.pf-v5-c-label')).toHaveClass('pf-m-red');
+  });
+
+  it('shows green when scenario score meets zero baseline', () => {
+    const job = makeScenarioJobItem('zero-baseline-run');
+    job.scenarioRun = {
+      ...job.scenarioRun!,
+      resiliencyScoreEnabled: true,
+      resiliencyScoreBaseline: 0,
+      resiliencyScores: [{ clusterName: 'cluster-a', score: 0, status: 'calculated' }],
+    };
+    setMockJobs([job]);
+
+    render(<JobsList {...defaultProps()} />);
+    expect(screen.getByText('0.0').closest('.pf-v5-c-label')).toHaveClass('pf-m-green');
+  });
+
+  it('shows unavailable when score extraction fails', () => {
+    const job = makeScenarioJobItem('failed-score-run');
+    job.scenarioRun = {
+      ...job.scenarioRun!,
+      resiliencyScoreEnabled: true,
+      resiliencyScoreBaseline: 80,
+      resiliencyScores: [{ clusterName: 'cluster-a', score: 0, status: 'error' }],
+    };
+    setMockJobs([job]);
+
+    render(<JobsList {...defaultProps()} />);
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('0.0')).not.toBeInTheDocument();
+  });
+
   describe('Empty State', () => {
     it('should show empty state when no runs', () => {
       const props = defaultProps();
@@ -222,6 +268,7 @@ describe('JobsList', () => {
           clusterJobs: [],
           ownerUserId: 'admin@test.com',
           resiliencyScoreEnabled: true,
+          resiliencyScores: [],
         },
       })]);
       render(<JobsList {...defaultProps()} />);

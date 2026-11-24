@@ -129,6 +129,10 @@ describe('TERMINAL_PHASES', () => {
 });
 
 describe('hasChanges', () => {
+  it('detects a baseline added by the server', () => {
+    expect(hasChanges(makeRunState(), makeRunState({ resiliencyScoreBaseline: 0 }))).toBe(true);
+  });
+
   it('returns false for identical states', () => {
     const run = makeRunState();
     expect(hasChanges(run, { ...run })).toBe(false);

@@ -49,6 +49,7 @@ export function useScenarioRunsPoller() {
                 rollbackEnabled: details.rollbackEnabled ?? base.rollbackEnabled,
                 isRollback: details.isRollback ?? base.isRollback,
                 resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled,
+                resiliencyScoreBaseline: details.resiliencyScoreBaseline ?? base.resiliencyScoreBaseline,
                 resiliencyScores: details.resiliencyScores,
               }
             : {
@@ -68,6 +69,7 @@ export function useScenarioRunsPoller() {
                 graphNodeId: details.graphNodeId || base.graphNodeId,
                 customRunName: details.customRunName || base.customRunName,
                 resiliencyScoreEnabled: details.resiliencyScoreEnabled ?? base.resiliencyScoreEnabled,
+                resiliencyScoreBaseline: details.resiliencyScoreBaseline ?? base.resiliencyScoreBaseline,
                 resiliencyScores: details.resiliencyScores,
               },
         },
@@ -110,6 +112,7 @@ export function useScenarioRunsPoller() {
           graphNodeId: run.graphNodeId,
           customRunName: run.customRunName,
           resiliencyScoreEnabled: run.resiliencyScoreEnabled,
+          resiliencyScoreBaseline: run.resiliencyScoreBaseline,
           resiliencyScores: run.resiliencyScores,
         };
       });
@@ -153,6 +156,7 @@ export function useScenarioRunsPoller() {
         graphNodeId: data.graphNodeId || existing?.graphNodeId,
         customRunName: data.customRunName || existing?.customRunName,
         resiliencyScoreEnabled: data.resiliencyScoreEnabled ?? existing?.resiliencyScoreEnabled,
+        resiliencyScoreBaseline: data.resiliencyScoreBaseline ?? existing?.resiliencyScoreBaseline,
         resiliencyScores: data.resiliencyScores || existing?.resiliencyScores,
       };
 
@@ -237,6 +241,7 @@ export function useScenarioRunsPoller() {
 export function hasChanges(prev: ScenarioRunState, next: ScenarioRunState): boolean {
   if (prev.rollbackEnabled !== next.rollbackEnabled) return true;
   if (prev.isRollback !== next.isRollback) return true;
+  if (prev.resiliencyScoreBaseline !== next.resiliencyScoreBaseline) return true;
   if (prev.phase !== next.phase) return true;
   if (prev.totalTargets !== next.totalTargets) return true;
   if (prev.runningJobs !== next.runningJobs) return true;

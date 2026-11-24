@@ -152,6 +152,19 @@ describe('SCORE_CALCULATING', () => {
 });
 
 describe('toGraphClusterScores', () => {
+  it('compares calculated cluster scores and skips extraction errors', () => {
+    const scores: ClusterResiliencyScore[] = [
+      { clusterName: 'passing', score: 100, status: 'calculated' },
+      { clusterName: 'failing', score: 70, status: 'calculated' },
+      { clusterName: 'unavailable', score: 0, status: 'error' },
+    ];
+
+    expect(toGraphClusterScores(scores, 80)).toEqual([
+      { clusterName: 'passing', calculated: 100, baseline: 80, status: 'pass' },
+      { clusterName: 'failing', calculated: 70, baseline: 80, status: 'fail' },
+    ]);
+  });
+
   it('converts ClusterResiliencyScore[] to GraphClusterScore[]', () => {
     const scores: ClusterResiliencyScore[] = [
       { clusterName: 'cluster-a', score: 92.3 },

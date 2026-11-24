@@ -36,6 +36,10 @@ export interface ResiliencyScoreTooltipProps {
   isCompact?: boolean;
   /** Optional class for styling the rendered label */
   labelClassName?: string;
+  /** Use binary pass/fail colors for standalone scenario runs. */
+  strictPassFail?: boolean;
+  /** Distinguish an enabled run with no usable score from a run without scoring. */
+  scoreEnabled?: boolean;
 }
 
 /** Info color used for no-baseline states */
@@ -62,10 +66,12 @@ function PerClusterBreakdown({
   scores,
   effectiveBaseline,
   useInfoColor,
+  strictPassFail,
 }: {
   scores: GraphClusterScore[];
   effectiveBaseline: number;
   useInfoColor: boolean;
+  strictPassFail: boolean;
 }) {
   return (
     <div>
@@ -73,7 +79,9 @@ function PerClusterBreakdown({
       {scores.map(cs => {
         const clusterColor = useInfoColor
           ? INFO_COLOR
-          : getScoreColor(cs.calculated, cs.baseline ?? effectiveBaseline);
+          : strictPassFail
+            ? cs.status === 'fail' ? 'var(--pf-v5-global--danger-color--100)' : 'var(--pf-v5-global--success-color--100)'
+            : getScoreColor(cs.calculated, cs.baseline ?? effectiveBaseline);
         return (
           <div key={cs.clusterName} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
             <span style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
@@ -148,12 +156,14 @@ export function ResiliencyScoreTooltip({
   baseline: explicitBaseline,
   isCompact = false,
   labelClassName,
+  strictPassFail = false,
+  scoreEnabled = false,
 }: ResiliencyScoreTooltipProps) {
   // No scores available
   if (!scores || scores.length === 0) {
     return (
-      <Tooltip content="Resiliency score not enabled for this run">
-        <Label className={labelClassName} isCompact={isCompact} color="grey">N/A</Label>
+      <Tooltip content={scoreEnabled ? 'Resiliency score unavailable for this run' : 'Resiliency score not enabled for this run'}>
+        <Label className={labelClassName} isCompact={isCompact} color="grey">{scoreEnabled ? 'Unavailable' : 'N/A'}</Label>
       </Tooltip>
     );
   }
@@ -176,7 +186,7 @@ export function ResiliencyScoreTooltip({
   const baseline = explicitBaseline ?? scores[0]?.baseline;
   const hasNoBaseline =
     baseline == null ||
-    baseline <= 0 ||
+    (strictPassFail ? baseline < 0 : baseline <= 0) ||
     scores.some(cs => cs.status === 'no-baseline');
 
   // No valid baseline - show neutral info display
@@ -198,6 +208,7 @@ export function ResiliencyScoreTooltip({
                 scores={scores}
                 effectiveBaseline={0}
                 useInfoColor
+                strictPassFail={strictPassFail}
               />
             )}
           </div>
@@ -211,8 +222,15 @@ export function ResiliencyScoreTooltip({
   }
 
   // Normal display with valid baseline
-  const scoreColor = getScoreColor(avgScore, baseline);
-  const labelDisplay = getLabelDisplay(avgScore, baseline);
+  const failed = scores.some(cs => cs.status === 'fail');
+  const scoreColor = strictPassFail
+    ? failed ? 'var(--pf-v5-global--danger-color--100)' : 'var(--pf-v5-global--success-color--100)'
+    : getScoreColor(avgScore, baseline);
+  const labelDisplay = strictPassFail
+    ? failed
+      ? { color: 'red' as const, icon: <ExclamationCircleIcon /> }
+      : { color: 'green' as const, icon: <CheckCircleIcon /> }
+    : getLabelDisplay(avgScore, baseline);
 
   return (
     <Tooltip
@@ -231,6 +249,7 @@ export function ResiliencyScoreTooltip({
               scores={scores}
               effectiveBaseline={baseline}
               useInfoColor={false}
+              strictPassFail={strictPassFail}
             />
           )}
         </div>

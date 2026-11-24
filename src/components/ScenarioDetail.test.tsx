@@ -1350,7 +1350,7 @@ describe('ScenarioDetail', () => {
     });
 
 
-    it('should include resiliencyScoreEnabled when the resiliency score switch is enabled', async () => {
+    it('requires a baseline and submits score settings when scoring is enabled', async () => {
       const user = userEvent.setup();
       vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
       vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
@@ -1369,13 +1369,118 @@ describe('ScenarioDetail', () => {
       await user.click(resiliencySwitch);
       expect(resiliencySwitch).toBeChecked();
 
+      const baselineInput = screen.getByRole('spinbutton', { name: /baseline score/i });
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      expect(screen.getByText('Baseline score is required')).toBeInTheDocument();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+      await user.type(baselineInput, '80.5');
+
       await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
 
       await waitFor(() => {
         expect(operatorApi.runScenario).toHaveBeenCalledWith(
-          expect.objectContaining({ resiliencyScoreEnabled: true })
+          expect.objectContaining({ resiliencyScoreEnabled: true, resiliencyScoreBaseline: 80.5 })
         );
       });
+      expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'ADD_SCENARIO_RUN',
+        payload: expect.objectContaining({ run: expect.objectContaining({ resiliencyScoreBaseline: 80.5 }) }),
+      }));
+    });
+
+    it('restores score switch and baseline when rerunning a scored scenario', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+
+      renderWithContext({
+        startInPreview: true,
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' }],
+        rerunScenario: { name: 'pod-scenarios', private: false },
+        rerunResiliencyScoreEnabled: true,
+        rerunResiliencyScoreBaseline: 75,
+      } as Partial<AppState>);
+
+      await waitForSignatureVerification();
+      expect(screen.getByRole('checkbox')).toBeChecked();
+      expect(screen.getByRole('spinbutton', { name: /baseline score/i })).toHaveValue(75);
+
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ resiliencyScoreEnabled: true, resiliencyScoreBaseline: 75 }),
+      ));
+    });
+
+    it('restores score settings after replay configuration loads into mounted form', async () => {
+      const initialState = {
+        ...baseState,
+        startInPreview: true,
+        scenarios: [{ name: 'pod-scenarios', signature_status: 'signed' as const }],
+      };
+      const { rerender } = renderWithContext(initialState);
+      expect(screen.getByRole('checkbox')).not.toBeChecked();
+
+      rerender(
+        <AppContext.Provider value={{
+          state: {
+            ...initialState,
+            rerunScenario: { name: 'pod-scenarios', private: false },
+            rerunResiliencyScoreEnabled: true,
+            rerunResiliencyScoreBaseline: 75,
+          },
+          dispatch: mockDispatch,
+        }}>
+          <ScenarioDetail scenarioName="pod-scenarios" registryConfig={null} />
+        </AppContext.Provider>,
+      );
+
+      await waitFor(() => expect(screen.getByRole('checkbox')).toBeChecked());
+      expect(screen.getByRole('spinbutton', { name: /baseline score/i })).toHaveValue(75);
+    });
+
+    it('rejects a negative baseline before submitting', async () => {
+      const user = userEvent.setup();
+      renderWithContext();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('checkbox'));
+      await user.type(screen.getByRole('spinbutton', { name: /baseline score/i }), '-1');
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+
+      expect(screen.getByText('Baseline score must be a non-negative number')).toBeInTheDocument();
+      expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    });
+
+    it('submits zero baseline', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+      renderWithContext();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      await user.click(screen.getByRole('checkbox'));
+      await user.type(screen.getByRole('spinbutton', { name: /baseline score/i }), '0');
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ resiliencyScoreBaseline: 0 }),
+      ));
+    });
+
+    it('omits baseline after scoring is disabled', async () => {
+      const user = userEvent.setup();
+      vi.mocked(operatorApi.runScenario).mockResolvedValueOnce(mockCreateResponse);
+      vi.mocked(operatorApi.getScenarioRunStatus).mockResolvedValueOnce(mockStatusResponse);
+      vi.mocked(operatorApi.getActiveRuns).mockResolvedValueOnce(mockActiveRuns);
+      renderWithContext();
+      await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+      const scoreSwitch = screen.getByRole('checkbox');
+      await user.click(scoreSwitch);
+      await user.type(screen.getByRole('spinbutton', { name: /baseline score/i }), '80');
+      await user.click(scoreSwitch);
+      expect(screen.queryByRole('spinbutton', { name: /baseline score/i })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+      await waitFor(() => expect(operatorApi.runScenario).toHaveBeenCalled());
+      expect(JSON.stringify(vi.mocked(operatorApi.runScenario).mock.calls[0][0])).not.toContain('resiliencyScoreBaseline');
     });
 
     it('should build correct scenario image for private registry', async () => {

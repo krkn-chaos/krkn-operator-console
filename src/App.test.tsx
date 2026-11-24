@@ -130,6 +130,27 @@ describe('App Elasticsearch navigation', () => {
 });
 
 describe('scenario replay handoff', () => {
+  it('carries score settings into the scenario intent', () => {
+    const config: JobConfigResponse = {
+      targetRequestId: 'target-1',
+      targetClusters: { operator: ['cluster-1'] },
+      scenario: { name: 'pod-scenarios', private: false },
+      kubeconfigPath: '/tmp/kubeconfig',
+      environment: {},
+    };
+    const run = {
+      scenarioRunName: 'run-1',
+      scenarioName: 'pod-scenarios',
+      resiliencyScoreEnabled: true,
+      resiliencyScoreBaseline: 75,
+    } as ScenarioRunState;
+
+    expect(buildRerunIntent(config, run)).toMatchObject({
+      resiliencyScoreEnabled: true,
+      resiliencyScoreBaseline: 75,
+    });
+  });
+
   it('carries categories from the replay response into the scenario intent', () => {
     const config: JobConfigResponse = {
       targetRequestId: 'target-1',

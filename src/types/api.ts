@@ -139,6 +139,8 @@ export interface RerunIntent {
   cloudCredentialRef?: string;
   /** Visible category assignments restored from the run configuration. */
   categories?: string[];
+  resiliencyScoreEnabled?: boolean;
+  resiliencyScoreBaseline?: number;
 }
 
 export interface JobConfigResponse {
@@ -330,6 +332,8 @@ export interface ScenarioRunRequest {
   maxRetries?: number;
   /** Enable resiliency score calculation for this run */
   resiliencyScoreEnabled?: boolean;
+  /** Baseline used to compare calculated resiliency scores */
+  resiliencyScoreBaseline?: number;
   /** Visible category names to assign to the newly created run. */
   categories?: string[];
 }
@@ -426,6 +430,7 @@ export interface ScenarioRunStatusResponse {
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
   customRunName?: string;
   resiliencyScoreEnabled?: boolean;
+  resiliencyScoreBaseline?: number;
   resiliencyScores?: ClusterResiliencyScore[];
   reportStatus?: ReportStatus;
 }
@@ -461,6 +466,7 @@ export interface ScenarioRunState {
   graphNodeId?: string; // Node ID within the graph (if this ScenarioRun is part of a graph)
   customRunName?: string; // User-provided label for the run
   resiliencyScoreEnabled?: boolean;
+  resiliencyScoreBaseline?: number;
   resiliencyScores?: ClusterResiliencyScore[];
 }
 
@@ -603,6 +609,8 @@ export interface AppState {
   rerunCloudCredentialRef: string | null;
   rerunWorkspace: WorkspaceSelection | null;
   rerunRollbackEnabled: boolean;
+  rerunResiliencyScoreEnabled?: boolean;
+  rerunResiliencyScoreBaseline?: number;
 
   // Error handling
   error: AppError | null;
@@ -981,6 +989,8 @@ export interface ClusterResiliencyScore {
   clusterName: string;
   /** Resiliency score value (0-100) */
   score: number;
+  status?: 'calculated' | 'error';
+  message?: string;
 }
 
 /**
