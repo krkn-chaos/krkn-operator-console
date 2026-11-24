@@ -23,6 +23,7 @@ const makeHandlers = (): Handlers => ({
   onNavigateTerminal: vi.fn(),
   onNavigateElasticsearchData: vi.fn(),
   onNavigateResiliencyHistory: vi.fn(),
+  onNavigateVisualize: vi.fn(),
   onNavigateSettings: vi.fn(),
   onEditProfile: vi.fn(),
   onChangePassword: vi.fn(),
@@ -60,6 +61,7 @@ describe('AppSidebar', () => {
     expect(screen.getByText('Terminal')).toBeInTheDocument();
     expect(screen.getByText('ES Data')).toBeInTheDocument();
     expect(screen.getByText('Resiliency History')).toBeInTheDocument();
+    expect(screen.getByText('Visualize')).toBeInTheDocument();
   });
   it('hides Krkn AI navigation when the operator feature is disabled', () => {
     renderSidebar({ showKrknAI: false });

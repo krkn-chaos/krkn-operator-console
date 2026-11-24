@@ -7,7 +7,7 @@ import { useAuth } from './context/AuthContext';
 import { useTargetPoller } from './hooks';
 import { useScenarioRunsPoller } from './hooks/useScenarioRunsPoller';
 import { useGraphRunsPoller } from './hooks/useGraphRunsPoller';
-import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio, ElasticsearchDataView } from './components';
+import { LoadingScreen, ErrorDisplay, ClusterMultiSelector, RegistrySelector, ScenariosList, JobsList, Settings, TerminalContent, Studio, ElasticsearchDataView, VisualizePage } from './components';
 import { FileManagementPage } from './components/FileManagement';
 import { CategoryManagementPage } from './components/CategoryManagement';
 import { ResiliencyHistoryPage } from './components/ResiliencyHistory';
@@ -354,6 +354,13 @@ function App() {
           </PageSection>
         );
 
+      case 'visualize':
+        return (
+          <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: '100%' }}>
+            <VisualizePage />
+          </PageSection>
+        );
+
       case 'terminal':
         return (
           <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: '100%' }}>
@@ -495,6 +502,12 @@ function App() {
     proceed();
   };
 
+  const handleNavigateToVisualize = () => {
+    const proceed = () => dispatch({ type: 'NAVIGATE_TO_VISUALIZE' });
+    if (!checkStudioGuard(proceed)) return;
+    proceed();
+  };
+
   const handleNavigateToHome = () => {
     const proceed = () => dispatch({ type: 'JOBS_LIST_READY' });
     if (!checkStudioGuard(proceed)) return;
@@ -561,6 +574,7 @@ function App() {
       onNavigateTerminal={handleNavigateToTerminal}
       onNavigateElasticsearchData={handleNavigateToElasticsearchData}
       onNavigateResiliencyHistory={handleNavigateToResiliencyHistory}
+      onNavigateVisualize={handleNavigateToVisualize}
       onNavigateSettings={handleNavigateToSettings}
       onEditProfile={handleEditProfile}
       onChangePassword={handleChangePassword}

@@ -1,5 +1,5 @@
 import { Nav, NavItem, NavList, NavExpandable } from '@patternfly/react-core';
-import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon, TagsIcon } from '@patternfly/react-icons';
+import { CogIcon, TerminalIcon, PlayIcon, FolderIcon, EditIcon, KeyIcon, MoonIcon, SunIcon, PowerOffIcon, UserIcon, TopologyIcon, DatabaseIcon, TagsIcon, ChartLineIcon } from '@patternfly/react-icons';
 import { MdAutoAwesome, MdWork } from 'react-icons/md';
 import { FiBarChart2 } from 'react-icons/fi';
 import type { ReactNode } from 'react';
@@ -31,6 +31,7 @@ import './SidebarPFNav.css';
  * @param onNavigateTerminal - Called when Terminal menu item is clicked
  * @param onNavigateElasticsearchData - Called when Elasticsearch Data menu item is clicked
  * @param onNavigateResiliencyHistory - Called when Resiliency History is selected
+ * @param onNavigateVisualize - Called when Visualize (embedded Grafana dashboards) is selected
  * @param onNavigateSettings - Called when Settings menu item is clicked
  * @param onEditProfile - Called when Edit Profile menu item is clicked
  * @param onChangePassword - Called when Change Password menu item is clicked
@@ -75,6 +76,7 @@ export function SidebarPFNav({
   onNavigateTerminal,
   onNavigateElasticsearchData,
   onNavigateResiliencyHistory,
+  onNavigateVisualize,
   onNavigateSettings,
   onEditProfile,
   onChangePassword,
@@ -116,6 +118,9 @@ export function SidebarPFNav({
           </NavItem>
           <NavItem isActive={activePhase === 'resiliency_history'} onClick={onNavigateResiliencyHistory} aria-label="Resiliency History">
             {item(<FiBarChart2 />, 'Resiliency History')}
+          </NavItem>
+          <NavItem isActive={activePhase === 'visualize'} onClick={onNavigateVisualize} aria-label="Visualize">
+            {item(<ChartLineIcon />, 'Visualize')}
           </NavItem>
           {isAdmin && (
             <NavItem isActive={activePhase === 'settings'} onClick={onNavigateSettings} aria-label="Settings">

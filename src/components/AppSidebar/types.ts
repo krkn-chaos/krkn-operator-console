@@ -31,6 +31,8 @@ export interface SidebarNavProps {
   onNavigateTerminal: () => void;
   onNavigateElasticsearchData: () => void;
   onNavigateResiliencyHistory: () => void;
+  /** Called when Visualize (embedded Grafana dashboards) is selected */
+  onNavigateVisualize: () => void;
   onNavigateSettings: () => void;
   onEditProfile: () => void;
   onChangePassword: () => void;
