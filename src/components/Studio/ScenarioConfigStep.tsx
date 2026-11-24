@@ -81,10 +81,14 @@ interface ScenarioConfigStepProps {
   registryName: string; // PRIMITIVE instead of object
   formValues: ScenarioFormValues;
   globalFormValues: ScenarioFormValues;
+  configuredSecrets?: Record<string, boolean>;
+  secretsToClear?: string[];
+  onClearSavedSecret?: (variable: string) => void;
   globalTouchedFields: TouchedFields;
   onFormChange: (values: ScenarioFormValues) => void;
   onGlobalFormChange: (values: ScenarioFormValues, touchedFields: TouchedFields) => void;
   onDefaultValuesLoad?: (defaults: ScenarioFormValues) => void;
+  onSecretVariablesLoad?: (variables: string[]) => void;
   onLoadStatusChange?: (status: 'loading' | 'loaded' | 'error') => void;
   cloudCredentialRef?: string;
   onCloudCredentialRefChange?: (name: string) => void;
@@ -99,10 +103,14 @@ export function ScenarioConfigStep({
   registryName,
   formValues,
   globalFormValues,
+  configuredSecrets,
+  secretsToClear,
+  onClearSavedSecret,
   globalTouchedFields,
   onFormChange,
   onGlobalFormChange,
   onDefaultValuesLoad,
+  onSecretVariablesLoad,
   onLoadStatusChange,
   cloudCredentialRef: cloudCredentialRefProp = '',
   onCloudCredentialRefChange,
@@ -111,6 +119,13 @@ export function ScenarioConfigStep({
 }: ScenarioConfigStepProps) {
   const [scenarioDetail, setScenarioDetail] = useState<ScenarioDetail | null>(null);
   const [scenarioGlobals, setScenarioGlobals] = useState<ScenarioGlobals | null>(null);
+  useEffect(() => {
+    if (!scenarioDetail) return;
+    const variables = [...scenarioDetail.fields, ...(scenarioGlobals?.fields ?? [])]
+      .filter(field => field.secret)
+      .map(field => field.variable);
+    onSecretVariablesLoad?.(variables);
+  }, [scenarioDetail, scenarioGlobals, onSecretVariablesLoad]);
   const [loading, setLoading] = useState(false);
   const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -402,6 +417,9 @@ export function ScenarioConfigStep({
         <CardBody>
           <DynamicFormBuilder
             fields={mainFormFields}
+            configuredSecrets={configuredSecrets}
+            secretsToClear={secretsToClear}
+            onClearSavedSecret={onClearSavedSecret}
             values={formValues}
             onChange={handleFormChange}
             disabledFields={cloudDisabledFields}
@@ -410,6 +428,9 @@ export function ScenarioConfigStep({
       </Card>
 
       <ScenarioParameterSections
+        configuredSecrets={configuredSecrets}
+        secretsToClear={secretsToClear}
+        onClearSavedSecret={onClearSavedSecret}
         optionalFields={optionalFields}
         formValues={formValues}
         onFormChange={handleFormChange}

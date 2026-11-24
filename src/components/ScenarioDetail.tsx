@@ -37,6 +37,7 @@ import { CategoryMultiSelect } from './CategoryMultiSelect';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus, ClustersResponse } from '../types/api';
 import { createScenarioReference } from '../utils/scenarioReference';
+import { secretInvalidationWarning, willClearScenarioSecrets } from '../utils/secretInputPolicy';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -104,6 +105,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     existingRuns: string[];
   } | null>(null);
   const [pendingRunRequest, setPendingRunRequest] = useState<ScenarioRunRequest | null>(null);
+  const [showSecretInvalidationConfirmation, setShowSecretInvalidationConfirmation] = useState(false);
+  const [secretsToClear, setSecretsToClear] = useState<string[]>([]);
   const [workspace, setWorkspace] = useState(rerunWorkspace ?? undefined);
   const [rollbackEnabled, setRollbackEnabled] = useState(rerunRollbackEnabled);
   const [showRollbackPreviewConfirmation, setShowRollbackPreviewConfirmation] = useState(false);
@@ -601,7 +604,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     }
   };
 
-  const handleRunScenario = async () => {
+  const handleRunScenario = async (secretChangeConfirmed = false) => {
     if (isSubmitting || submissionLock.current) return;
 
     if (!state.uuid) {
@@ -701,7 +704,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         } else {
           if (value !== undefined && value !== null && value !== '') {
             environment[field.variable] = String(value);
-          } else if (field.default) {
+          } else if (field.default && !state.rerunIntent?.secretFields?.[field.variable]) {
             environment[field.variable] = field.default;
           }
         }
@@ -763,6 +766,11 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           }
         }
       }
+      for (const variable of secretsToClear) {
+        if (state.rerunIntent?.secretFields?.[variable] && !(variable in environment)) {
+          environment[variable] = '';
+        }
+      }
 
       // Build the run request (batch execution)
       const runRequest: ScenarioRunRequest = {
@@ -771,6 +779,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         scenario,
         kubeconfigPath: rerunKubeconfigPath ?? '/home/krkn/.kube/config',
         environment,
+        sourceScenarioRunName: state.rerunIntent?.sourceScenarioRunName,
         files: files.length > 0 ? files : undefined,
         fileReferences: fileReferences.length > 0 ? fileReferences : undefined,
         workspace,
@@ -786,6 +795,42 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             : selectedRunCategories)
           : undefined,
       };
+
+      const previousConfig = state.rerunIntent?.originalConfiguration;
+      const secretFields = state.rerunIntent?.secretFields ?? {};
+      if (previousConfig && !secretChangeConfirmed && willClearScenarioSecrets(
+        previousConfig.environment,
+        environment,
+        secretFields,
+        JSON.stringify({
+          scenario: previousConfig.scenario,
+          targetClusters: previousConfig.targetClusters,
+          workspace: previousConfig.workspace,
+          rollbackEnabled: previousConfig.rollbackEnabled ?? false,
+          cloudCredentialRef: previousConfig.cloudCredentialRef,
+          kubeconfigPath: previousConfig.kubeconfigPath,
+          files: previousConfig.files,
+          fileReferences: previousConfig.fileReferences,
+          elasticsearchConfigName: previousConfig.elasticsearchConfigName,
+          maxRetries: previousConfig.maxRetries,
+          resiliencyScoreEnabled: previousConfig.resiliencyScoreEnabled,
+        }) !== JSON.stringify({
+          scenario: runRequest.scenario,
+          targetClusters: runRequest.targetClusters,
+          workspace: runRequest.workspace,
+          rollbackEnabled: runRequest.rollbackEnabled ?? false,
+          cloudCredentialRef: runRequest.cloudCredentialRef,
+          kubeconfigPath: runRequest.kubeconfigPath,
+          files: runRequest.files,
+          fileReferences: runRequest.fileReferences,
+          elasticsearchConfigName: runRequest.elasticsearchConfigName,
+          maxRetries: runRequest.maxRetries,
+          resiliencyScoreEnabled: runRequest.resiliencyScoreEnabled,
+        }),
+      )) {
+        setShowSecretInvalidationConfirmation(true);
+        return;
+      }
 
       const activeRuns = await operatorApi.getActiveRuns();
       for (const cluster of state.selectedClusters) {
@@ -1040,6 +1085,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
               {hasConfigurableMainFields ? (
                 <DynamicFormBuilder
                   fields={mainFormFields}
+                  configuredSecrets={state.rerunIntent?.secretFields}
+                  secretsToClear={secretsToClear}
+                  onClearSavedSecret={(variable) => setSecretsToClear(previous => [...new Set([...previous, variable])])}
                   values={scenarioFormValues || {}}
                   onChange={handleFormChange}
                   disabledFields={cloudDisabledFields}
@@ -1099,6 +1147,9 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           </Card>
 
           <ScenarioParameterSections
+            configuredSecrets={state.rerunIntent?.secretFields}
+            secretsToClear={secretsToClear}
+            onClearSavedSecret={(variable) => setSecretsToClear(previous => [...new Set([...previous, variable])])}
             optionalFields={optionalFields}
             formValues={scenarioFormValues || {}}
             onFormChange={handleFormChange}
@@ -1312,7 +1363,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
             <Button
               variant="primary"
               size="lg"
-              onClick={handleRunScenario}
+              onClick={() => { void handleRunScenario(); }}
               isDisabled={isSubmitting || replaySignatureCheckLoading}
               isLoading={isSubmitting}
             >
@@ -1321,6 +1372,23 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           </div>
         </>
       )}
+
+      <Modal
+        variant={ModalVariant.small}
+        title={secretInvalidationWarning('scenario').title}
+        titleIconVariant={ExclamationTriangleIcon}
+        isOpen={showSecretInvalidationConfirmation}
+        onClose={() => setShowSecretInvalidationConfirmation(false)}
+        actions={[
+          <Button key="continue" variant="danger" onClick={() => {
+            setShowSecretInvalidationConfirmation(false);
+            void handleRunScenario(true);
+          }}>Continue</Button>,
+          <Button key="cancel" variant="link" onClick={() => setShowSecretInvalidationConfirmation(false)}>Cancel</Button>,
+        ]}
+      >
+        <p>{secretInvalidationWarning('scenario').explanation}</p>
+      </Modal>
 
       <Modal
         variant={ModalVariant.small}

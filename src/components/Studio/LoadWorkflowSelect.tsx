@@ -92,7 +92,16 @@ export function LoadWorkflowSelect({ id = 'studio-load-workflow' }: { id?: strin
         ? savedCategories.filter((name) => visibleCategories.some((category) => category.name === name))
         : savedCategories;
 
-      loadWorkflow(canvas, {
+      const workflowWithSecretState = {
+        ...canvas,
+        nodes: canvas.nodes.map((node) => ({
+          ...node,
+          config: node.config
+            ? { ...node.config, secretFields: wfResponse.secretFields?.[node.nodeId] }
+            : undefined,
+        })),
+      };
+      loadWorkflow(workflowWithSecretState, {
         workflowId: wfResponse.workflowId,
         workflowName: wfResponse.workflowName,
         description: wfResponse.description,

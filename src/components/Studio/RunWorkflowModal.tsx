@@ -65,6 +65,7 @@ export function RunWorkflowModal({
   const {
     exportWorkflow,
     workflow,
+    savedWorkflow,
     selectedCategories = [],
     visibleCategories = [],
     categoryLoadStatus = 'error',
@@ -225,6 +226,8 @@ export function RunWorkflowModal({
 
     const request: CreateGraphRunRequest = {
       graph,
+      sourceWorkflowId: savedWorkflow?.workflowId,
+      sourceGraphRunName: savedWorkflow ? undefined : workflow.sourceGraphRunName,
       targetRequestId: targetFetchState.uuid,
       targetClusters,
       cloudCredentialRef: workflow.cloudCredentialRef,

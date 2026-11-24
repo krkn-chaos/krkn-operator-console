@@ -134,6 +134,10 @@ export interface RerunIntent {
   scenario: ScenarioReference;
   clusters: { operatorName: string; clusterName: string }[];
   environment: { [key: string]: string };
+  secretFields?: { [key: string]: boolean };
+  sourceScenarioRunName?: string;
+  /** Original server configuration used to detect edits before replay. */
+  originalConfiguration?: JobConfigResponse;
   kubeconfigPath: string;
   /** Saved cloud credential restored for the replayed scenario run. */
   cloudCredentialRef?: string;
@@ -153,6 +157,13 @@ export interface JobConfigResponse {
   scenarioName?: string;
   kubeconfigPath: string;
   environment: { [key: string]: string };
+  secretFields?: { [key: string]: boolean };
+  sourceScenarioRunName?: string;
+  files?: ScenarioFileMount[];
+  fileReferences?: FileReference[];
+  elasticsearchConfigName?: string;
+  maxRetries?: number;
+  resiliencyScoreEnabled?: boolean;
   /** Saved cloud credential used by the original scenario run. */
   cloudCredentialRef?: string;
   /** Categories visible to the current user and restored for replay. */
@@ -317,6 +328,7 @@ export interface ScenarioRunRequest {
   scenario: ScenarioReference;
   kubeconfigPath?: string;
   environment?: { [key: string]: string };
+  sourceScenarioRunName?: string;
   files?: ScenarioFileMount[];
   /** References to centrally-managed files (optional) */
   fileReferences?: FileReference[];
@@ -941,6 +953,7 @@ export interface GraphRunSummary {
 export interface GraphRunSpec {
   /** Dependency graph of scenarios to execute (maps node ID to scenario node) */
   graph: { [nodeId: string]: GraphScenarioNode };
+  secretFields?: { [nodeId: string]: { [variable: string]: boolean } };
   /** Reference to the KrknTargetRequest CR UUID */
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
@@ -1060,6 +1073,9 @@ export interface GraphRunDetail {
 export interface CreateGraphRunRequest {
   /** Dependency graph of scenarios to execute */
   graph: { [nodeId: string]: GraphScenarioNode };
+  secretFields?: { [nodeId: string]: { [variable: string]: boolean } };
+  sourceWorkflowId?: string;
+  sourceGraphRunName?: string;
   /** Reference to the KrknTargetRequest CR UUID */
   targetRequestId: string;
   /** Map of provider name to list of cluster names */
@@ -1212,6 +1228,10 @@ export interface StudioNode {
     signature_status?: SignatureStatus;
     /** Scenario form values (environment variables) */
     scenarioFormValues: ScenarioFormValues;
+    /** Read-only configured state for saved secret inputs. */
+    secretFields?: { [variable: string]: boolean };
+    /** Explicit secret removals pending save; never contains credential values. */
+    clearSecretFields?: string[];
     /** Global form values (optional) */
     globalFormValues?: ScenarioFormValues;
     /** Global touched fields (tracks which global fields were modified) */
@@ -1258,6 +1278,8 @@ export interface StudioWorkflow {
   resiliencyScoreConfig?: ResiliencyScoreConfig;
   /** Default cloud credential restored for workflow replay. */
   cloudCredentialRef?: string;
+  /** Original run used to safely reuse unchanged node secrets during replay. */
+  sourceGraphRunName?: string;
 }
 
 /**
@@ -1426,6 +1448,7 @@ export interface WorkflowResponse {
   workflowName: string;
   graph: { [nodeId: string]: GraphScenarioNode };
   studioLayout?: StudioWorkflow;
+  secretFields?: { [nodeId: string]: { [variable: string]: boolean } };
   description?: string;
   availableToAll: boolean;
   groups?: string[];

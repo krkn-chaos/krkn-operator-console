@@ -12,6 +12,7 @@ import {
   HelperTextItem,
   Title,
   Switch,
+  Button,
 } from '@patternfly/react-core';
 import { ExclamationCircleIcon } from '@patternfly/react-icons';
 import type { ScenarioField, ScenarioFormValues, StringField, EnumField } from '../types/api';
@@ -23,9 +24,12 @@ interface DynamicFormBuilderProps {
   onChange: (values: ScenarioFormValues) => void;
   /** Variable names to force-disable regardless of mutually_excludes (e.g. cloud fields covered by a saved credential) */
   disabledFields?: string[];
+  configuredSecrets?: Record<string, boolean>;
+  secretsToClear?: string[];
+  onClearSavedSecret?: (variable: string) => void;
 }
 
-export function DynamicFormBuilder({ fields, values, onChange, disabledFields: externalDisabledFields = [] }: DynamicFormBuilderProps) {
+export function DynamicFormBuilder({ fields, values, onChange, disabledFields: externalDisabledFields = [], configuredSecrets = {}, secretsToClear = [], onClearSavedSecret }: DynamicFormBuilderProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const initializedFieldsKey = useRef<string | null>(null);
   const validationTimeouts = useRef<{ [key: string]: number }>({});
@@ -167,10 +171,16 @@ export function DynamicFormBuilder({ fields, values, onChange, disabledFields: e
               value={value as string}
               onChange={(_event, val) => handleChange(field.variable, val)}
               validated={validated}
-              placeholder={injectedPlaceholder ?? field.default}
+              placeholder={configuredSecrets[field.variable] && isSecretField(field) ? 'Saved value configured' : injectedPlaceholder ?? field.default}
               autoComplete={isSecretField(field) ? 'off' : undefined}
               isDisabled={isFieldDisabled}
             />
+            {configuredSecrets[field.variable] && isSecretField(field) && (
+              <FormHelperText><HelperText><HelperTextItem>{secretsToClear.includes(field.variable) && !value ? 'Saved value will be cleared.' : 'Saved value configured. Leave blank to keep it, or enter a new value to replace it.'}</HelperTextItem></HelperText></FormHelperText>
+            )}
+            {configuredSecrets[field.variable] && isSecretField(field) && onClearSavedSecret && (
+              <Button variant="link" isInline isDisabled={isFieldDisabled} onClick={() => { handleChange(field.variable, ''); onClearSavedSecret(field.variable); }}>Clear saved value</Button>
+            )}
             {field.description && (
               <FormHelperText>
                 <HelperText>

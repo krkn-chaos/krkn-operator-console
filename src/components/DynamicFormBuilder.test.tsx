@@ -38,6 +38,20 @@ function makeBooleanField(
 }
 
 describe('DynamicFormBuilder', () => {
+  it('shows configured secret state without a value and supports explicit clearing', async () => {
+    const user = userEvent.setup();
+    const field = { ...makeStringField('TOKEN', 'API token'), secret: true } as ScenarioField;
+    const onChange = vi.fn();
+    const onClearSavedSecret = vi.fn();
+    render(<DynamicFormBuilder fields={[field]} values={{}} onChange={onChange} configuredSecrets={{ TOKEN: true }} onClearSavedSecret={onClearSavedSecret} />);
+    const input = screen.getByLabelText('API token');
+    expect(input).toHaveAttribute('type', 'password');
+    expect(input).toHaveValue('');
+    expect(screen.getByText(/Saved value configured/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear saved value' }));
+    expect(onClearSavedSecret).toHaveBeenCalledWith('TOKEN');
+    expect(onChange).toHaveBeenCalledWith({ TOKEN: '' });
+  });
   describe('group rendering', () => {
     it('should render group headers with title and description', () => {
       const fields: ScenarioField[] = [

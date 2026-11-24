@@ -49,6 +49,7 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
           scenarioImage: node.image ?? `krkn-hub:${scenarioName}`,
           signature_status: signatureStatuses[index] ?? node.scenario?.signature_status,
           scenarioFormValues: node.env ?? {},
+          secretFields: config.secretFields?.[nodeId],
           volumes: node.volumes,
           workspace: node.workspace,
           rollbackEnabled: node.rollbackEnabled,
@@ -67,6 +68,7 @@ export async function loadGraphRunReplay(graphRunName: string): Promise<GraphRun
       }
       return nextNodeNumber;
     })(),
+    sourceGraphRunName: config.sourceGraphRunName ?? graphRunName,
     resiliencyScoreConfig: graphRunDetail.spec.resiliencyScoreEnabled
       ? {
           baseline: graphRunDetail.spec.resiliencyScoreBaseline ?? 0,

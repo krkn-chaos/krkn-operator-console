@@ -62,11 +62,13 @@ export function buildGraph(workflow: StudioWorkflow): { [nodeId: string]: GraphS
       const env: { [key: string]: string } = {};
       if (node.config.scenarioFormValues) {
         Object.entries(node.config.scenarioFormValues).forEach(([key, value]) => {
+          if (node.config?.secretFields?.[key] && (value === '' || value == null) && !node.config.clearSecretFields?.includes(key)) return;
           env[key] = String(value);
         });
       }
       if (node.config.globalFormValues) {
         Object.entries(node.config.globalFormValues).forEach(([key, value]) => {
+          if (node.config?.secretFields?.[key] && (value === '' || value == null) && !node.config.clearSecretFields?.includes(key)) return;
           env[key] = String(value);
         });
       }
