@@ -1,7 +1,7 @@
 /**
  * Login page for krkn-operator-console
  *
- * Provides user authentication with JWT tokens.
+ * Provides local Bearer login and external OIDC login choices.
  * Features:
  * - Email and password login form
  * - Session expired notification
@@ -205,13 +205,12 @@ export function Login() {
           {loginProviders.map(provider => (
             <Button
               key={provider.id}
+              component="a"
+              href={provider.loginUrl}
               variant="secondary"
               isBlock
               style={{ marginBottom: 'var(--pf-v5-global--spacer--sm)' }}
-              onClick={() => {
-                authService.startExternalLogin();
-                window.location.assign(new URL(provider.loginUrl, window.location.origin).toString());
-              }}
+              onClick={() => authService.startExternalLogin()}
             >
               Log in with {provider.displayName}
             </Button>

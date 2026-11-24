@@ -1,6 +1,6 @@
 # Keycloak OIDC console test
 
-Use a krkn-operator backend containing the identity provider API and serve the console through the same HTTPS origin as `/api/v1`. The `krkn_session` cookie is `Secure`, so HTTPS is the reliable setup for browser testing. In local development, the Vite proxy forwards `/api` to the address in `VITE_API_PROXY_TARGET` (default `localhost:8080`).
+Deploy the console with provider discovery and OIDC login links before enabling external login in the operator. Against an older operator, the console receives 404 from `/api/v1/auth/providers` and keeps the local login form available. Once both are deployed, create and enable the provider. Serve the console and `/api/v1` through the same HTTPS origin: the `krkn_session` cookie is `Secure`. In local development, the Vite proxy forwards `/api` to the address in `VITE_API_PROXY_TARGET` (default `localhost:8080`).
 
 1. Log in with a local admin account and open **Settings → Users & Groups → Identity management**.
 2. In **Providers**, click **Add provider** and select **Keycloak**. The provider ID is permanent and scopes user identities, blocks, and group mappings. Enter the exact realm issuer URL, the confidential login client ID and secret, and the callback URL ending in `/api/v1/auth/oidc/{provider-id}/callback`. Register that exact callback in Keycloak's valid redirect URIs.
