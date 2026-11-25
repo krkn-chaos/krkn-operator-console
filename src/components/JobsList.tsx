@@ -66,6 +66,7 @@ import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
 import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
 import { JobDiagnosticAlert } from './JobDiagnosticAlert';
 import { operatorApi } from '../services/operatorApi';
+import { isApiError } from '../utils/apiClient';
 import { toGraphClusterScores, SCORE_CALCULATING } from '../utils/resiliency';
 import { getJobPhaseDisplay } from '../utils/jobPhaseDisplay';
 import { TERMINAL_PHASES } from '../hooks/useScenarioRunsPoller';
@@ -601,6 +602,7 @@ export function JobsList({
     isReplayJobsLoading,
     onOpenReplayJobs,
     onReplayScenario,
+    onCheckScenarioReplay,
     onReplayWorkflow,
     isWorkflowReplayDisabled,
   }: {
@@ -617,6 +619,7 @@ export function JobsList({
     isReplayJobsLoading?: boolean;
     onOpenReplayJobs?: () => void;
     onReplayScenario?: () => void;
+    onCheckScenarioReplay?: () => Promise<'allowed' | 'forbidden' | 'error'>;
     onReplayWorkflow?: () => Promise<void>;
     isWorkflowReplayDisabled?: boolean;
   }) => (
@@ -645,6 +648,7 @@ export function JobsList({
         isReplayJobsLoading={isReplayJobsLoading}
         onOpenReplayJobs={onOpenReplayJobs}
         onReplayScenario={onReplayScenario}
+        onCheckScenarioReplay={onCheckScenarioReplay}
         onReplayWorkflow={onReplayWorkflow}
         isWorkflowReplayDisabled={isWorkflowReplayDisabled}
       />
@@ -1410,6 +1414,14 @@ export function JobsList({
                       runId: run.scenarioRunName,
                       runPhase: run.phase,
                       onReplayScenario: () => onRerunScenario(run),
+                      onCheckScenarioReplay: async () => {
+                        try {
+                          await operatorApi.getScenarioRunReplayConfig(run.scenarioRunName);
+                          return 'allowed';
+                        } catch (error) {
+                          return isApiError(error) && error.status === 403 ? 'forbidden' : 'error';
+                        }
+                      },
                       replayJobs: run.clusterJobs,
                       rollbackEnabled: run.rollbackEnabled,
                       isReplayJobsLoading: loadingRunDetails.has(run.scenarioRunName),

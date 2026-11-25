@@ -69,6 +69,9 @@ export async function authenticatedFetch(
   const headers = new Headers(options.headers);
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
+  } else if (authService.getCookieSession() && !['GET', 'HEAD', 'OPTIONS'].includes((options.method ?? 'GET').toUpperCase())) {
+    const csrfToken = authService.getCookieSession()?.csrfToken;
+    if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
   }
 
   // Ensure Content-Type is set for JSON requests (skip for FormData — browser sets boundary)
@@ -80,6 +83,7 @@ export async function authenticatedFetch(
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   // Handle 401 Unauthorized - token expired or invalid

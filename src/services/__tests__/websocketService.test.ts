@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../authService', () => ({
   authService: {
     getToken: vi.fn(() => 'mock-jwt-token'),
+    getCookieSession: vi.fn(() => null),
   },
 }));
 
@@ -106,6 +107,7 @@ describe('WebSocketService', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(authService.getToken).mockReturnValue('mock-jwt-token');
+    vi.mocked(authService.getCookieSession).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -151,6 +153,17 @@ describe('WebSocketService', () => {
       expect(websocketService.getState('test-noauth')).toBe('error');
 
       websocketService.disconnect('test-noauth');
+    });
+
+    it('uses the browser cookie when there is no Bearer token', () => {
+      vi.mocked(authService.getToken).mockReturnValue(null);
+      vi.mocked(authService.getCookieSession).mockReturnValue({
+        user: { userId: 'oidc-user', name: 'OIDC', surname: '', role: 'user', provider: 'keycloak' },
+        csrfToken: 'csrf',
+      });
+      websocketService.connect('test-cookie', 'ws://localhost/test');
+      expect(MockWebSocket.latest?.protocol).toBe('');
+      websocketService.disconnect('test-cookie');
     });
   });
 

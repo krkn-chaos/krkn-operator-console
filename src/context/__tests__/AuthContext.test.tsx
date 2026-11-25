@@ -1,10 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AuthProvider, useAuth } from '../AuthContext';
 import { AppProvider, useAppContext } from '../AppContext';
-import { authService } from '../../services/authService';
+import { authService, OIDC_SESSION_SIGNAL_KEY } from '../../services/authService';
 import { operatorApi } from '../../services/operatorApi';
 import { setUnauthorizedHandler } from '../../utils/apiClient';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
@@ -29,8 +29,15 @@ function TestConsumer() {
       <span data-testid="authenticated">{String(state.isAuthenticated)}</span>
       <span data-testid="groups">{JSON.stringify(state.user?.groups ?? [])}</span>
       <span data-testid="role">{state.user?.role ?? 'none'}</span>
+      <span data-testid="user-id">{state.user?.userId ?? 'none'}</span>
     </div>
   );
+}
+
+function LogoutConsumer() {
+  const { logout } = useAuth();
+  const [error, setError] = useState('');
+  return <><TestConsumer /><button onClick={() => void logout().catch(() => setError('Logout failed'))}>Log out</button><span>{error}</span></>;
 }
 
 function ProtectedRouteConsumer() {
@@ -72,10 +79,10 @@ function renderAuthProvider(
   );
 }
 
-function dispatchAuthStorageEvent(): void {
+function dispatchAuthStorageEvent(key = AUTH_SESSION_STORAGE_KEY): void {
   const event = new Event('storage') as StorageEvent;
   Object.defineProperties(event, {
-    key: { value: AUTH_SESSION_STORAGE_KEY },
+    key: { value: key },
     storageArea: { value: window.localStorage },
   });
   window.dispatchEvent(event);
@@ -88,10 +95,143 @@ describe('AuthProvider - loadAndStoreGroups', () => {
     vi.mocked(authService.getUser).mockReturnValue(null);
     vi.mocked(authService.getToken).mockReturnValue(null);
     vi.mocked(authService.getTokenExpiresAt).mockReturnValue(null);
+    vi.mocked(authService.getCookieSession).mockReturnValue(null);
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(null);
+    vi.mocked(authService.logoutCookieSession).mockResolvedValue();
     vi.mocked(authService.getSessionVersion).mockReturnValue({ generation: 0, logoutGeneration: 0 });
     vi.mocked(authService.isTokenExpired).mockReturnValue(false);
     vi.mocked(authService.logout).mockImplementation(() => true);
     vi.mocked(operatorApi.getGroups).mockResolvedValue({ groups: [] });
+  });
+
+  it('ends a Bearer session locally even when the server is unavailable', async () => {
+    const user: User = { userId: 'alice', name: 'Alice', surname: 'Example', role: 'user' };
+    vi.mocked(authService.getUser).mockReturnValue(user);
+    vi.mocked(authService.getToken).mockReturnValue('local-token');
+    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(new Date(Date.now() + 60_000).toISOString());
+
+    renderAuthProvider(<LogoutConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('false'));
+    expect(authService.logout).toHaveBeenCalledOnce();
+    expect(authService.logoutCookieSession).not.toHaveBeenCalled();
+    expect(screen.queryByText('Logout failed')).not.toBeInTheDocument();
+  });
+
+  it('retains an OIDC session when server logout fails', async () => {
+    const user: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    vi.mocked(authService.getCookieSession).mockReturnValue({ user, csrfToken: 'csrf' });
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(user);
+    vi.mocked(authService.logoutCookieSession).mockRejectedValue(new Error('server unavailable'));
+
+    renderAuthProvider(<LogoutConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
+    expect(await screen.findByText('Logout failed')).toBeInTheDocument();
+    expect(screen.getByTestId('authenticated').textContent).toBe('true');
+    expect(authService.logout).not.toHaveBeenCalled();
+  });
+
+  it('does not clear a newer local session when an older OIDC logout finishes', async () => {
+    const firstUser: User = { userId: 'first', name: 'First', surname: 'User', role: 'user' };
+    const secondUser: User = { userId: 'second', name: 'Second', surname: 'User', role: 'user' };
+    vi.mocked(authService.getUser).mockReturnValue(firstUser);
+    vi.mocked(authService.getCookieSession).mockReturnValue({ user: firstUser, csrfToken: 'first-csrf' });
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(firstUser);
+    let completeLogout!: () => void;
+    vi.mocked(authService.logoutCookieSession).mockImplementation(() => new Promise(resolve => { completeLogout = resolve; }));
+    renderAuthProvider(<LogoutConsumer />);
+    await waitFor(() => expect(screen.getByTestId('user-id').textContent).toBe('first'));
+    vi.mocked(authService.logout).mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
+    vi.mocked(authService.getUser).mockReturnValue(secondUser);
+    vi.mocked(authService.getToken).mockReturnValue('second-token');
+    vi.mocked(authService.getCookieSession).mockReturnValue(null);
+    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(new Date(Date.now() + 60_000).toISOString());
+    act(() => dispatchAuthStorageEvent());
+    await waitFor(() => expect(screen.getByTestId('user-id').textContent).toBe('second'));
+    await act(async () => completeLogout());
+    expect(authService.logout).not.toHaveBeenCalled();
+    expect(screen.getByTestId('user-id').textContent).toBe('second');
+  });
+
+  it('ignores a late cookie restore after another tab installs a Bearer session', async () => {
+    let finishRestore!: (user: User | null) => void;
+    vi.mocked(authService.restoreCookieSession).mockImplementation(() => new Promise(resolve => { finishRestore = resolve; }));
+    renderAuthProvider(<TestConsumer />);
+    await waitFor(() => expect(authService.restoreCookieSession).toHaveBeenCalled());
+
+    const localUser: User = { userId: 'local', name: 'Local', surname: 'User', role: 'user' };
+    vi.mocked(authService.getUser).mockReturnValue(localUser);
+    vi.mocked(authService.getToken).mockReturnValue('local-token');
+    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(new Date(Date.now() + 60_000).toISOString());
+    act(() => dispatchAuthStorageEvent());
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+    await act(async () => finishRestore({ userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' }));
+    expect(screen.getByTestId('user-id').textContent).toBe('local');
+    expect(authService.clearCookieSession).toHaveBeenCalled();
+  });
+
+  it('keeps a cookie identity after another tab clears local storage', async () => {
+    const cookieUser: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(cookieUser);
+    vi.mocked(authService.getCookieSession).mockReturnValue({ user: cookieUser, csrfToken: 'csrf' });
+    renderAuthProvider(<TestConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+    act(() => dispatchAuthStorageEvent());
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+  });
+
+  it('drops an OIDC identity when another tab clears its cookie', async () => {
+    const cookieUser: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    vi.mocked(authService.restoreCookieSession).mockResolvedValueOnce(cookieUser).mockResolvedValueOnce(null);
+    vi.mocked(authService.getCookieSession).mockReturnValue({ user: cookieUser, csrfToken: 'csrf' });
+    renderAuthProvider(<TestConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+    act(() => dispatchAuthStorageEvent());
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('false'));
+  });
+
+  it('restores a cookie identity when another tab announces OIDC sign-in', async () => {
+    const cookieUser: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    vi.mocked(authService.restoreCookieSession).mockResolvedValueOnce(null).mockResolvedValueOnce(cookieUser);
+    renderAuthProvider(<TestConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('false'));
+    act(() => dispatchAuthStorageEvent(OIDC_SESSION_SIGNAL_KEY));
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+  });
+
+  it('does not let a stale cookie 401 clear a newer Bearer login', async () => {
+    const cookieUser: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(cookieUser);
+    vi.mocked(authService.getCookieSession).mockReturnValue({ user: cookieUser, csrfToken: 'csrf' });
+    renderAuthProvider(<TestConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+
+    vi.mocked(authService.getToken).mockReturnValue('new-local-token');
+    const calls = vi.mocked(setUnauthorizedHandler).mock.calls;
+    act(() => calls[calls.length - 1]?.[0]?.(null));
+    expect(authService.logoutCookieSession).not.toHaveBeenCalled();
+    expect(authService.logout).not.toHaveBeenCalled();
+  });
+
+  it('clears the server cookie after a 401 from the current OIDC session', async () => {
+    const cookieUser: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    const cookieSession = { user: cookieUser, csrfToken: 'csrf' };
+    vi.mocked(authService.restoreCookieSession).mockResolvedValue(cookieUser);
+    vi.mocked(authService.getCookieSession).mockReturnValue(cookieSession);
+    vi.mocked(authService.logoutCookieSession).mockResolvedValue();
+    renderAuthProvider(<TestConsumer />);
+    await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'));
+
+    const calls = vi.mocked(setUnauthorizedHandler).mock.calls;
+    act(() => calls[calls.length - 1]?.[0]?.(null));
+    await waitFor(() => expect(authService.logoutCookieSession).toHaveBeenCalledOnce());
+    await waitFor(() => expect(authService.logout).toHaveBeenCalledWith(null));
+    expect(screen.getByTestId('authenticated').textContent).toBe('false');
   });
 
   it('fetches and stores groups for admin users on init', async () => {
@@ -447,6 +587,7 @@ describe('AuthProvider - loadAndStoreGroups', () => {
     expect(screen.getByTestId('authenticated').textContent).toBe('true');
 
     await vi.advanceTimersByTimeAsync(1_000);
+    await act(async () => { await Promise.resolve(); });
     expect(authService.logout).toHaveBeenCalledOnce();
     expect(screen.getByTestId('authenticated').textContent).toBe('false');
     expect(screen.getByTestId('route-path').textContent).toBe('/login');
@@ -454,5 +595,27 @@ describe('AuthProvider - loadAndStoreGroups', () => {
 
     vi.useRealTimers();
     window.history.replaceState({}, '', '/');
+  });
+
+  it('starts Bearer expiry after replacing an OIDC cookie identity', async () => {
+    vi.useFakeTimers();
+    const cookieUser: User = { userId: 'oidc', name: 'OIDC', surname: '', role: 'user', provider: 'corp' };
+    const localUser: User = { userId: 'local', name: 'Local', surname: 'User', role: 'user' };
+    let cookieSession: { user: User; csrfToken: string } | null = { user: cookieUser, csrfToken: 'csrf' };
+    const expiresAt = new Date(Date.now() + 1_000).toISOString();
+    vi.mocked(authService.getCookieSession).mockImplementation(() => cookieSession);
+    vi.mocked(authService.clearCookieSession).mockImplementation(() => { cookieSession = null; });
+    vi.mocked(authService.getUser).mockReturnValue(localUser);
+    vi.mocked(authService.getToken).mockReturnValue('local-token');
+    vi.mocked(authService.getTokenExpiresAt).mockReturnValue(expiresAt);
+    vi.mocked(authService.isTokenExpired).mockImplementation(() => Date.now() >= Date.parse(expiresAt));
+
+    renderAuthProvider(<TestConsumer />);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.getByTestId('user-id').textContent).toBe('local');
+    expect(authService.clearCookieSession).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(screen.getByTestId('authenticated').textContent).toBe('false');
+    vi.useRealTimers();
   });
 });

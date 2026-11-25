@@ -1,7 +1,7 @@
 /**
  * Login page for krkn-operator-console
  *
- * Provides user authentication with JWT tokens.
+ * Provides local Bearer login and external OIDC login choices.
  * Features:
  * - Email and password login form
  * - Session expired notification
@@ -9,7 +9,7 @@
  * - Error handling with inline validation
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   LoginPage as PFLoginPage,
@@ -22,8 +22,18 @@ import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { RateLimitError } from '../types/auth';
 import { useCooldown } from '../hooks/useCooldown';
+import { identityApi, type LoginProvider } from '../services/identityApi';
 
 function toRouterRelativeReturnUrl(returnUrl: string, baseUrl: string): string {
+  // returnUrl comes from the query string. Keep navigation inside this router,
+  // including when stripping a deployment basename would expose a leading //.
+  const isLocalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
+    && !path.includes('\\') && !Array.from(path).some(char => {
+      const code = char.charCodeAt(0);
+      return code < 32 || code === 127;
+    });
+  if (!isLocalPath(returnUrl)) return '/app';
+
   const basename = baseUrl.replace(/\/+$/, '');
   if (!basename) return returnUrl;
 
@@ -33,7 +43,8 @@ function toRouterRelativeReturnUrl(returnUrl: string, baseUrl: string): string {
 
   if (pathname === basename) return `/${suffix}`;
   if (pathname.startsWith(`${basename}/`)) {
-    return `${pathname.slice(basename.length)}${suffix}`;
+    const relative = `${pathname.slice(basename.length)}${suffix}`;
+    return isLocalPath(relative) ? relative : '/app';
   }
 
   return returnUrl;
@@ -51,6 +62,21 @@ export function Login() {
   const [showSessionExpired, setShowSessionExpired] = useState(false);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
   const [cooldownSeconds, startCooldown] = useCooldown();
+  const [loginProviders, setLoginProviders] = useState<LoginProvider[]>([]);
+  const [providerError, setProviderError] = useState(false);
+
+  const loadLoginProviders = useCallback(async () => {
+    try {
+      setLoginProviders(await identityApi.loginProviders());
+      setProviderError(false);
+    } catch {
+      setProviderError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLoginProviders();
+  }, [loadLoginProviders]);
 
   // Apply theme from localStorage
   useEffect(() => {
@@ -179,6 +205,28 @@ export function Login() {
         loginButtonLabel={cooldownSeconds > 0 ? `Please wait (${cooldownSeconds}s)` : isLoading ? 'Logging in...' : 'Log in'}
         onLoginButtonClick={handleSubmit}
       />
+
+      {providerError && <Alert variant="warning" title="External login options are unavailable" isInline>
+        <Button variant="link" onClick={() => void loadLoginProviders()}>Retry</Button>
+      </Alert>}
+
+      {loginProviders.length > 0 && (
+        <div style={{ marginTop: 'var(--pf-v5-global--spacer--md)' }}>
+          {loginProviders.map(provider => (
+            <Button
+              key={provider.id}
+              component="a"
+              href={provider.loginUrl}
+              variant="secondary"
+              isBlock
+              style={{ marginBottom: 'var(--pf-v5-global--spacer--sm)' }}
+              onClick={() => authService.startExternalLogin()}
+            >
+              Log in with {provider.displayName}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {isRegistered === false && (
         <div style={{ marginTop: '1rem', textAlign: 'center' }}>

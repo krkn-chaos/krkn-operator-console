@@ -19,6 +19,8 @@ export interface User {
   role: UserRole;
   organization?: string;
   groups?: string[];
+  /** Set for users authenticated through an external OIDC provider. */
+  provider?: string;
 }
 
 /**

@@ -275,7 +275,7 @@ class WebSocketService {
     if (conn.isCleanedUp) return;
 
     const token = authService.getToken();
-    if (!token) {
+    if (!token && !authService.getCookieSession()) {
       this.setState(conn, 'error');
       return;
     }
@@ -283,8 +283,9 @@ class WebSocketService {
     this.setState(conn, conn.reconnectAttempts > 0 ? 'reconnecting' : 'connecting');
 
     try {
-      const wsProtocol = `access_token.${token}`;
-      const ws = new WebSocket(conn.url, wsProtocol);
+      const ws = token
+        ? new WebSocket(conn.url, `access_token.${token}`)
+        : new WebSocket(conn.url);
       conn.ws = ws;
 
       ws.onopen = () => {

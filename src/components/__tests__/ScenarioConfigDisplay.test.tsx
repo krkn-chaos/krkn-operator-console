@@ -62,6 +62,20 @@ describe('ScenarioConfigDisplay', () => {
     expect(mockGetScenarioRunConfig).toHaveBeenCalledWith('fetch-run');
   });
 
+  it('labels partial configuration and only renders the visible cluster', async () => {
+    mockGetScenarioRunConfig.mockResolvedValue({ ...makeConfig(),
+      partialView: true,
+      targetClusters: { 'krkn-operator': ['visible-cluster'] },
+      environment: {},
+    });
+    render(<ScenarioConfigDisplay scenarioRunName="partial-run" />);
+
+    expect(await screen.findByText('Partial configuration')).toBeInTheDocument();
+    expect(screen.getByText(/visible-cluster/)).toBeInTheDocument();
+    expect(screen.queryByText('Scenario Variables')).not.toBeInTheDocument();
+    expect(screen.queryByText('NAMESPACE:')).not.toBeInTheDocument();
+  });
+
   it('calls graph run API when graphRunName is provided', async () => {
     render(<ScenarioConfigDisplay graphRunName="my-graph-run" />);
 

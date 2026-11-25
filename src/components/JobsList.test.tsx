@@ -187,6 +187,7 @@ describe('JobsList', () => {
 
   it('shows Rollback beside Replay in the run menu without expanding the run', async () => {
     const user = userEvent.setup();
+    vi.spyOn(operatorApi, 'getScenarioRunReplayConfig').mockResolvedValue({} as Awaited<ReturnType<typeof operatorApi.getScenarioRunReplayConfig>>);
     setMockJobs([makeScenarioJobItem('node-cpu-hog-953e3861', 'Failed', {
       clusterJobs: [{
         providerName: 'krkn-operator-acm',
@@ -199,7 +200,7 @@ describe('JobsList', () => {
     render(<JobsList {...defaultProps} />);
 
     await user.click(screen.getByRole('button', { name: 'Actions for run node-cpu-hog-953e3861' }));
-    const replay = screen.getByText('Replay').closest('li');
+    const replay = (await screen.findByText('Replay')).closest('li');
     const rollback = screen.getByText('Rollback').closest('li');
     expect(replay).toBeInTheDocument();
     expect(rollback).toBeInTheDocument();
@@ -667,6 +668,7 @@ describe('JobsList - Replay actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setMockIsLoading(false);
+    vi.spyOn(operatorApi, 'getScenarioRunReplayConfig').mockResolvedValue({} as Awaited<ReturnType<typeof operatorApi.getScenarioRunReplayConfig>>);
   });
 
   it('starts scenario replay directly from the actions menu without opening a cluster submenu', async () => {
@@ -675,7 +677,7 @@ describe('JobsList - Replay actions', () => {
     render(<JobsList {...rerunDefaultProps} />);
 
     await user.click(screen.getByRole('button', { name: 'Actions for run run-001' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Replay' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Replay' }));
 
     expect(mockOnRerunScenario).toHaveBeenCalledTimes(1);
     expect(mockOnRerunScenario.mock.calls[0]).toHaveLength(1);

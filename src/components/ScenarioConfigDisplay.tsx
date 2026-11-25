@@ -137,6 +137,11 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {config.partialView && (
+        <Alert variant="info" isInline title="Partial configuration">
+          Only shared scenario metadata and clusters you can view are shown. Variables and saved files are hidden.
+        </Alert>
+      )}
       {/* Scenario Settings */}
       <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
         <p style={labelStyle}>Scenario Settings</p>
@@ -162,7 +167,7 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
       </div>
 
       {/* Scenario Variables */}
-      <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
+      {!config.partialView && <div style={{ padding: '1rem', backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)', borderRadius: '4px' }}>
         <p style={labelStyle}>Scenario Variables</p>
         {envEntries.length > 0 ? (
           <dl style={dlStyle}>
@@ -180,7 +185,7 @@ export function ScenarioConfigDisplay({ scenarioRunName, graphRunName }: Scenari
             No configuration parameters set
           </p>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

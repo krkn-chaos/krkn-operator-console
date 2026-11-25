@@ -55,7 +55,7 @@ vi.mock('react-router-dom', () => ({
 
 // handleCreateJob calls operatorApi.createTargetRequest via its proceed callback.
 vi.mock('./services/operatorApi', () => ({
-  operatorApi: { createTargetRequest: vi.fn(), getScenarioRunConfig: vi.fn() },
+  operatorApi: { createTargetRequest: vi.fn(), getScenarioRunReplayConfig: vi.fn() },
 }));
 vi.mock('./services/krknAiApi', () => ({ krknAiApi: appMocks.krknAI }));
 
@@ -82,7 +82,12 @@ vi.mock('./components', () => ({
   ElasticsearchDataView: () => <div data-testid="elasticsearch-data-view">ElasticsearchDataView</div>,
 }));
 vi.mock('./components/KrknAI/KrknAIPage', () => ({
-  KrknAIPage: () => <div data-testid="krkn-ai-page">KrknAIPage</div>,
+  KrknAIPage: ({ onReplayScenario }: { onReplayScenario: (scenario: { childRunName: string; scenarioType: string }) => void }) => (
+    <div data-testid="krkn-ai-page">
+      KrknAIPage
+      <button onClick={() => onReplayScenario({ childRunName: 'ai-child-run', scenarioType: 'pod-scenarios' })}>Replay AI child</button>
+    </div>
+  ),
 }));
 vi.mock('./components/FileManagement', () => ({ FileManagementPage: () => <div>FileManagementPage</div> }));
 vi.mock('./components/ResiliencyHistory', () => ({
@@ -194,34 +199,47 @@ describe('App scenario re-run and Krkn AI navigation', () => {
     expect(screen.queryByTestId('krkn-ai-page')).not.toBeInTheDocument();
   });
 
+  it('authorizes a Krkn AI child replay before creating a target', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getScenarioRunReplayConfig).mockRejectedValue(new Error('Forbidden'));
+    renderApp();
+
+    await user.click(await screen.findByText('Krkn AI'));
+    await user.click(screen.getByRole('button', { name: 'Replay AI child' }));
+
+    await waitFor(() => expect(operatorApi.getScenarioRunReplayConfig).toHaveBeenCalledWith('ai-child-run'));
+    expect(operatorApi.createTargetRequest).not.toHaveBeenCalled();
+  });
+
   it('fetches run config, dispatches the replay intent, and starts target creation', async () => {
     const user = userEvent.setup();
-    vi.mocked(operatorApi.getScenarioRunConfig).mockResolvedValue(config);
+    vi.mocked(operatorApi.getScenarioRunReplayConfig).mockResolvedValue(config);
     vi.mocked(operatorApi.createTargetRequest).mockResolvedValue({ uuid: 'uuid-1' });
     renderApp();
 
     await user.click(screen.getByText('rerun-run-1'));
 
-    // getScenarioRunConfig receives the scenario run name, then target creation
+    // Replay authorization receives the scenario run name, then target creation
     // starts. Reaching createTargetRequest proves the RERUN_SCENARIO dispatch
     // (buildRerunIntent) between the two calls did not throw.
     await waitFor(() => {
-      expect(operatorApi.getScenarioRunConfig).toHaveBeenCalledWith('run-1');
+      expect(operatorApi.getScenarioRunReplayConfig).toHaveBeenCalledWith('run-1');
       expect(operatorApi.createTargetRequest).toHaveBeenCalled();
     });
     // INIT_SUCCESS advances to the polling phase, which renders LoadingScreen.
     await waitFor(() => expect(screen.getByText('LoadingScreen')).toBeInTheDocument());
   });
 
-  it('dispatches the initialization error state when the config request fails', async () => {
+  it('keeps the jobs list open and does not create targets when replay authorization fails', async () => {
     const user = userEvent.setup();
-    vi.mocked(operatorApi.getScenarioRunConfig).mockRejectedValue(new Error('boom'));
+    vi.mocked(operatorApi.getScenarioRunReplayConfig).mockRejectedValue(new Error('Replay requires run permission on every cluster in the original run'));
     renderApp();
 
     await user.click(screen.getByText('rerun-run-1'));
 
-    // INIT_ERROR moves the phase to error, which renders ErrorDisplay.
-    await waitFor(() => expect(screen.getByText('ErrorDisplay')).toBeInTheDocument());
+    await waitFor(() => expect(operatorApi.getScenarioRunReplayConfig).toHaveBeenCalledWith('run-1'));
+    expect(screen.getByText('rerun-run-1')).toBeInTheDocument();
+    expect(screen.queryByText('ErrorDisplay')).not.toBeInTheDocument();
     expect(operatorApi.createTargetRequest).not.toHaveBeenCalled();
   });
 });

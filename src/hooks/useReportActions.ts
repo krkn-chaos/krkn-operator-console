@@ -59,7 +59,7 @@ export function useReportActions({ runId, runName, runPhase }: UseReportActionsO
         setReportStatus(status);
         setError(null);
 
-        if (status.htmlAvailable || status.pdfAvailable) { setIsLoading(false); return; }
+        if (status.supported === false || status.htmlAvailable || status.pdfAvailable) { setIsLoading(false); return; }
         if (isCompleted) { setIsLoading(false); return; }
 
         attempts += 1;

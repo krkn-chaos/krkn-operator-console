@@ -22,6 +22,8 @@ import { config } from '../config';
 const API_BASE = `${config.apiBaseUrl}/auth`;
 const AUTH_STORAGE_KEY_LIST = Object.values(AUTH_STORAGE_KEYS);
 const LEGACY_SESSION_MIGRATED_KEY = 'legacy_session_migrated';
+export const OIDC_SESSION_SIGNAL_KEY = 'oidc_session_changed';
+const SESSION_RESTORE_TIMEOUT_MS = 10_000;
 
 interface AuthSession {
   token: string | null;
@@ -81,10 +83,94 @@ function emptySession(session: AuthSession): boolean {
   return session.token === null && session.user === null && session.expiresAt === null;
 }
 
+function parseCookieSession(value: unknown): { user: User; csrfToken: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid session response');
+  const session = value as Record<string, unknown>;
+  if (typeof session.userId !== 'string' || !session.userId.trim()
+    || (session.role !== 'admin' && session.role !== 'user')
+    || typeof session.provider !== 'string' || !session.provider.trim()
+    || !Array.isArray(session.mappedGroups) || !session.mappedGroups.every(group => typeof group === 'string')
+    || typeof session.csrfToken !== 'string' || !session.csrfToken) {
+    throw new Error('Invalid session response');
+  }
+  return {
+    user: {
+      userId: session.userId,
+      name: session.userId,
+      surname: '',
+      role: session.role,
+      provider: session.provider,
+      groups: session.mappedGroups as string[],
+    },
+    csrfToken: session.csrfToken,
+  };
+}
+
 /**
  * Authentication service class
  */
 class AuthService {
+  private cookieSession: { user: User; csrfToken: string } | null = null;
+
+  /** Restore an HttpOnly OIDC session after the provider redirects to the console. */
+  async restoreCookieSession(options: { shouldApply?: () => boolean; announce?: boolean } = {}): Promise<User | null> {
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error('Session check timed out'));
+      }, SESSION_RESTORE_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([
+        (async () => {
+          const response = await fetch(`${API_BASE}/session`, { credentials: 'include', signal: controller.signal });
+          if (controller.signal.aborted || (options.shouldApply && !options.shouldApply())) return null;
+          if (response.status === 401 || response.status === 403) {
+            this.cookieSession = null;
+            return null;
+          }
+          if (!response.ok) throw new Error(`Session check failed: HTTP ${response.status}`);
+          const session = await response.json() as unknown;
+          if (controller.signal.aborted || (options.shouldApply && !options.shouldApply())) return null;
+          this.cookieSession = null;
+          const { user, csrfToken } = parseCookieSession(session);
+          this.cookieSession = { user, csrfToken };
+          if (options.announce) localStorage.setItem(OIDC_SESSION_SIGNAL_KEY, `${Date.now()}:${Math.random()}`);
+          return user;
+        })(),
+        timeout,
+      ]);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  }
+
+  getCookieSession(): { user: User; csrfToken: string } | null {
+    return this.cookieSession;
+  }
+
+  clearCookieSession(): void {
+    this.cookieSession = null;
+  }
+
+  /** Clear a local Bearer session before starting an external login redirect. */
+  startExternalLogin(): void {
+    if (this.getToken() || this.getUser()) this.logout();
+    this.cookieSession = null;
+  }
+
+  async logoutCookieSession(): Promise<void> {
+    const csrfToken = this.cookieSession?.csrfToken;
+    const token = this.getToken();
+    const response = await fetch(`${API_BASE}/logout`, {
+      method: 'POST', credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+    if (!response.ok) throw new Error('Could not end the server session');
+  }
+
   private readSessionRecord(): AuthSessionRecord {
     const storedRecord = localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
     if (storedRecord !== null) {
@@ -280,6 +366,7 @@ class AuthService {
           },
         },
       });
+      this.cookieSession = null;
 
       return data;
     } catch (error) {
@@ -308,6 +395,7 @@ class AuthService {
     });
     clearAuthStorage(localStorage);
     clearAuthStorage(sessionStorage);
+    this.cookieSession = null;
     return true;
   }
 

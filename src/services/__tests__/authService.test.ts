@@ -16,6 +16,107 @@ describe('authService - user groups', () => {
     role: 'user',
   };
 
+  it('restores an OIDC session without storing its token in browser storage', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', mappedGroups: ['ops'], csrfToken: 'csrf-123',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    expect(await authService.restoreCookieSession()).toEqual({
+      userId: 'oidc-123', name: 'oidc-123', surname: '', role: 'user', provider: 'corp-keycloak', groups: ['ops'],
+    });
+    expect(authService.getCookieSession()?.csrfToken).toBe('csrf-123');
+    expect(authService.getToken()).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/auth/session', expect.objectContaining({ credentials: 'include' }));
+    authService.logout();
+    fetchSpy.mockRestore();
+  });
+
+  it('keeps an OIDC session when server logout fails and sends its CSRF token', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', mappedGroups: [], csrfToken: 'csrf-123',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      await authService.restoreCookieSession();
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
+
+      await expect(authService.logoutCookieSession()).rejects.toThrow('Could not end the server session');
+      expect(authService.getCookieSession()?.user.userId).toBe('oidc-123');
+      expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/auth/logout', {
+        method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': 'csrf-123' },
+      });
+    } finally {
+      authService.logout();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('bounds a stalled cookie session check', async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}));
+    try {
+      const restoration = authService.restoreCookieSession();
+      const rejected = expect(restoration).rejects.toThrow('Session check timed out');
+      await vi.advanceTimersByTimeAsync(10_000);
+      await rejected;
+      expect((fetchSpy.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('bounds a stalled session response body as well as the request', async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => new Promise(() => {}),
+    } as unknown as Response);
+    try {
+      const restoration = authService.restoreCookieSession();
+      const rejected = expect(restoration).rejects.toThrow('Session check timed out');
+      await vi.advanceTimersByTimeAsync(10_000);
+      await rejected;
+      expect(authService.getCookieSession()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('keeps an existing cookie identity when the session endpoint is unavailable', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', mappedGroups: [], csrfToken: 'csrf-123',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      await authService.restoreCookieSession();
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
+
+      await expect(authService.restoreCookieSession()).rejects.toThrow('Session check failed');
+      expect(authService.getCookieSession()?.user.userId).toBe('oidc-123');
+    } finally {
+      authService.logout();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    { userId: '', role: 'user', provider: 'corp', mappedGroups: [], csrfToken: 'csrf' },
+    { userId: 'oidc-123', role: 'owner', provider: 'corp', mappedGroups: [], csrfToken: 'csrf' },
+    { userId: 'oidc-123', role: 'user', provider: 'corp', mappedGroups: [42], csrfToken: 'csrf' },
+    { userId: 'oidc-123', role: 'user', provider: 'corp', mappedGroups: [], csrfToken: null },
+  ])('rejects a malformed OIDC session response', async (session) => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(session), { status: 200 }));
+    try {
+      await expect(authService.restoreCookieSession()).rejects.toThrow('Invalid session response');
+      expect(authService.getCookieSession()).toBeNull();
+    } finally {
+      authService.clearCookieSession();
+      fetchSpy.mockRestore();
+    }
+  });
+
   describe('setUser', () => {
     it('stores groups in versioned session record', () => {
       const user: User = { ...baseUser, groups: ['group-a', 'group-b'] };

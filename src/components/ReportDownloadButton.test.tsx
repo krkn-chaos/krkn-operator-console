@@ -55,6 +55,21 @@ describe('ReportDownloadButton', () => {
     expect(screen.getByText('Download PDF')).toBeInTheDocument();
   });
 
+  it('explains when reports are unsupported without showing an error', async () => {
+    mockGetReportStatus.mockResolvedValue({
+      generated: false,
+      htmlAvailable: false,
+      pdfAvailable: false,
+      supported: false,
+      message: 'Reports are not supported for multi-cluster scenario runs',
+    });
+
+    render(<ReportDownloadButton runId="multi-run" runName="multi-run" />);
+
+    expect(await screen.findByText('Reports are not supported for multi-cluster scenario runs')).toBeInTheDocument();
+    expect(screen.queryByText('Report Error')).not.toBeInTheDocument();
+  });
+
   it('downloads HTML report when button is clicked', async () => {
     const mockBlob = new Blob(['<html>Test</html>'], { type: 'text/html' });
     mockGetReportStatus.mockResolvedValue({

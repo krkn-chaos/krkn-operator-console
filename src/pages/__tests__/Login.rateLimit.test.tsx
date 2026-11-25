@@ -143,4 +143,26 @@ describe('Login - rate limit handling', () => {
       });
     },
   );
+
+  it.each(['https://evil.test', '//evil.test', '/console//evil.test', '/console/\\evil.test'])(
+    'ignores a non-local return URL: %s',
+    async (returnUrl) => {
+      vi.stubEnv('BASE_URL', '/console/');
+      vi.mocked(useAuth).mockReturnValue({
+        state: { isAuthenticated: true, user: { userId: 'admin@example.com', name: 'Admin', surname: 'User', role: 'admin' }, loading: false },
+        login: mockLogin, logout: vi.fn(), register: vi.fn(), isAdmin: vi.fn(() => true),
+      });
+
+      render(
+        <MemoryRouter basename="/console" initialEntries={[`/console/login?returnUrl=${encodeURIComponent(returnUrl)}`]}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/app" element={<LoginLocationProbe />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => expect(screen.getByTestId('login-route-path').textContent).toBe('/app'));
+    },
+  );
 });

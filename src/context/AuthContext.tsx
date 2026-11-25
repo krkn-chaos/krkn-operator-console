@@ -4,9 +4,9 @@
  * Provides global authentication state and methods for login, logout, and session management.
  */
 
-import { createContext, useContext, useReducer, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, useState, useRef, ReactNode, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
+import { authService, OIDC_SESSION_SIGNAL_KEY } from '../services/authService';
 import { operatorApi } from '../services/operatorApi';
 import { setUnauthorizedHandler } from '../utils/apiClient';
 import { AUTH_SESSION_STORAGE_KEY } from '../types/auth';
@@ -37,7 +37,7 @@ type AuthAction =
 interface AuthContextValue {
   state: AuthState;
   login: (request: LoginRequest) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<boolean>;
   register: (request: RegisterRequest) => Promise<void>;
   isAdmin: () => boolean;
 }
@@ -127,6 +127,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const [authSessionRevision, setAuthSessionRevision] = useState(0);
+  const syncRevision = useRef(0);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -144,6 +145,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Automatically logout user and clear session
    */
   const handleUnauthorized = useCallback((requestToken: string | null) => {
+    if (!requestToken) {
+      const cookieSession = authService.getCookieSession();
+      if (!cookieSession || authService.getToken()) return;
+      const finishExpiredSession = () => {
+        const currentCookie = authService.getCookieSession();
+        if (authService.getToken() || (currentCookie && currentCookie !== cookieSession)) return;
+        syncRevision.current += 1;
+        if (!authService.logout(null)) return;
+        dispatch({ type: 'AUTH_LOGOUT' });
+        redirectToExpiredLogin();
+      };
+      void authService.logoutCookieSession().then(finishExpiredSession).catch(() => {
+        // A stale cookie can make logout fail too. Confirm whether the server
+        // still accepts it before keeping this user in the authenticated UI.
+        void authService.restoreCookieSession({
+          shouldApply: () => authService.getCookieSession() === cookieSession && !authService.getToken(),
+        }).then(user => {
+          if (!user && !authService.getCookieSession()) finishExpiredSession();
+        }).catch(() => {
+          // A transport failure is not proof that the session has expired.
+        });
+      });
+      return;
+    }
     if (!authService.logout(requestToken)) return;
 
     dispatch({ type: 'AUTH_LOGOUT' });
@@ -181,7 +206,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  const syncAuthFromStorage = useCallback((fromStorageEvent = false) => {
+  const syncAuthFromStorage = useCallback(async (fromStorageEvent = false, forceCookieRefresh = false) => {
+    const revision = ++syncRevision.current;
     const user = authService.getUser();
     const token = authService.getToken();
     const expiresAt = authService.getTokenExpiresAt();
@@ -194,6 +220,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       expiresAtMs > Date.now() &&
       !authService.isTokenExpired()
     ) {
+      authService.clearCookieSession();
       dispatch({ type: 'AUTH_INIT', payload: { user } });
       setAuthSessionRevision(revision => revision + 1);
       loadAndStoreGroups(user, token);
@@ -203,7 +230,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (user || token || expiresAt) {
       if (!fromStorageEvent) authService.logout();
     }
-    dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+    if (fromStorageEvent && !forceCookieRefresh && !authService.getCookieSession()) {
+      dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+      return;
+    }
+    const sessionVersion = authService.getSessionVersion();
+    const isCurrent = () => {
+      const currentVersion = authService.getSessionVersion();
+      return revision === syncRevision.current && !authService.getToken() &&
+        currentVersion.generation === sessionVersion.generation &&
+        currentVersion.logoutGeneration === sessionVersion.logoutGeneration;
+    };
+    const existingCookie = authService.getCookieSession();
+    try {
+      const cookieUser = await authService.restoreCookieSession({ shouldApply: isCurrent, announce: !fromStorageEvent });
+      if (!isCurrent()) return;
+      dispatch({ type: 'AUTH_INIT', payload: { user: cookieUser ?? null } });
+    } catch {
+      if (isCurrent()) {
+        const currentCookie = authService.getCookieSession();
+        if (existingCookie && currentCookie === existingCookie) {
+          dispatch({ type: 'AUTH_INIT', payload: { user: existingCookie.user } });
+        } else if (!currentCookie) {
+          dispatch({ type: 'AUTH_INIT', payload: { user: null } });
+        }
+      }
+    }
   }, [loadAndStoreGroups]);
 
   useEffect(() => {
@@ -216,8 +268,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const handleStorage = (event: StorageEvent) => {
       if (event.storageArea !== localStorage) return;
       // Auth state is committed in one storage value, so each event sees a full session.
-      if (event.key !== AUTH_SESSION_STORAGE_KEY && event.key !== null) return;
-      syncAuthFromStorage(true);
+      if (event.key === OIDC_SESSION_SIGNAL_KEY) {
+        void syncAuthFromStorage(true, true);
+      } else if (event.key === AUTH_SESSION_STORAGE_KEY || event.key === null) {
+        void syncAuthFromStorage(true);
+      }
     };
 
     window.addEventListener('storage', handleStorage);
@@ -225,6 +280,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [syncAuthFromStorage]);
 
   const expireSession = useCallback(() => {
+    if (!authService.getToken() && authService.getCookieSession()) return;
     if (!authService.isTokenExpired()) return;
 
     authService.logout();
@@ -234,6 +290,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (!state.isAuthenticated) return;
+    if (!authService.getToken() && authService.getCookieSession()) return;
 
     const expiresAt = authService.getTokenExpiresAt();
     const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
@@ -273,6 +330,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [authSessionRevision, expireSession, state.isAuthenticated]);
 
   const login = useCallback(async (request: LoginRequest) => {
+    syncRevision.current += 1;
     const sessionVersionAtLoginStart = authService.getSessionVersion();
 
     try {
@@ -319,6 +377,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (newerValidSession) {
         syncAuthFromStorage();
+      } else if (authService.getCookieSession()) {
+        dispatch({ type: 'AUTH_INIT', payload: { user: authService.getCookieSession()!.user } });
       } else {
         dispatch({ type: 'AUTH_ERROR' });
       }
@@ -329,9 +389,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Logout user
    */
-  const logout = useCallback(() => {
-    authService.logout();
+  const logout = useCallback(async () => {
+    syncRevision.current += 1;
+    const requestToken = authService.getToken();
+    const cookieSession = authService.getCookieSession();
+    // A local Bearer session can always be cleared in the browser. Only an
+    // OIDC cookie needs a successful server response before local logout.
+    if (cookieSession) await authService.logoutCookieSession();
+    const currentCookie = authService.getCookieSession();
+    if (authService.getToken() !== requestToken || (currentCookie && currentCookie !== cookieSession)) return false;
+    if (!authService.logout(requestToken)) return false;
     dispatch({ type: 'AUTH_LOGOUT' });
+    return true;
   }, []);
 
   /**
