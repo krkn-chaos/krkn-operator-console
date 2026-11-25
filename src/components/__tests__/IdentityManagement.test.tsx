@@ -53,6 +53,7 @@ describe('IdentityManagement', () => {
     await waitFor(() => expect(mocks.listGroups).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('Existing mappings')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Remove mapping /Ops from User' })).toBeInTheDocument();
+    expect(screen.getByText('Provider group ID: remote-1')).toBeInTheDocument();
   });
 
   it('shows existing mappings for every local group under the selected provider', async () => {
@@ -64,6 +65,7 @@ describe('IdentityManagement', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Group mapping' }));
     expect(await screen.findByRole('button', { name: 'Remove mapping /Ops from User' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove mapping /Engineering from Operators' })).toBeInTheDocument();
+    expect(screen.getAllByText('Provider group ID: not supplied (matched by path)')).toHaveLength(2);
     expect(screen.queryByRole('combobox', { name: 'Local group' })).not.toBeInTheDocument();
   });
 
@@ -126,6 +128,34 @@ describe('IdentityManagement', () => {
 
     await waitFor(() => expect(mocks.showError).toHaveBeenCalled());
     expect(mocks.updateProvider).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://console.test/api/v1/auth/oidc/other/callback',
+    'http://console.test/api/v1/auth/oidc/corp-keycloak/callback',
+    'https://console.test/api/v1/auth/oidc/corp-keycloak/callback?next=other',
+  ])('rejects an invalid callback URL before updating the provider: %s', async (callbackURL) => {
+    render(<IdentityManagement />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Corporate Keycloak' }));
+    const callback = screen.getByRole('textbox', { name: 'Callback URL' });
+    await userEvent.clear(callback);
+    await userEvent.type(callback, callbackURL);
+    await userEvent.click(screen.getByRole('button', { name: 'Save provider' }));
+    expect(mocks.showError).toHaveBeenCalledWith('Could not save identity provider', expect.stringContaining('Callback URL must be HTTPS'));
+    expect(mocks.updateProvider).not.toHaveBeenCalled();
+  });
+
+  it('accepts an HTTP loopback callback for a local Keycloak test', async () => {
+    render(<IdentityManagement />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Corporate Keycloak' }));
+    const callback = screen.getByRole('textbox', { name: 'Callback URL' });
+    await userEvent.clear(callback);
+    await userEvent.type(callback, 'http://127.0.0.1:8080/api/v1/auth/oidc/corp-keycloak/callback');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Admin client ID' }), 'group-reader');
+    await userEvent.click(screen.getByRole('button', { name: 'Save provider' }));
+    await waitFor(() => expect(mocks.updateProvider).toHaveBeenCalledWith('corp-keycloak', expect.objectContaining({
+      redirectUrl: 'http://127.0.0.1:8080/api/v1/auth/oidc/corp-keycloak/callback',
+    })));
   });
 
   it('disables a provider switch while its update is pending', async () => {

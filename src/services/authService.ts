@@ -83,6 +83,29 @@ function emptySession(session: AuthSession): boolean {
   return session.token === null && session.user === null && session.expiresAt === null;
 }
 
+function parseCookieSession(value: unknown): { user: User; csrfToken: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid session response');
+  const session = value as Record<string, unknown>;
+  if (typeof session.userId !== 'string' || !session.userId.trim()
+    || (session.role !== 'admin' && session.role !== 'user')
+    || typeof session.provider !== 'string' || !session.provider.trim()
+    || !Array.isArray(session.mappedGroups) || !session.mappedGroups.every(group => typeof group === 'string')
+    || typeof session.csrfToken !== 'string' || !session.csrfToken) {
+    throw new Error('Invalid session response');
+  }
+  return {
+    user: {
+      userId: session.userId,
+      name: session.userId,
+      surname: '',
+      role: session.role,
+      provider: session.provider,
+      groups: session.mappedGroups as string[],
+    },
+    csrfToken: session.csrfToken,
+  };
+}
+
 /**
  * Authentication service class
  */
@@ -109,20 +132,11 @@ class AuthService {
             return null;
           }
           if (!response.ok) throw new Error(`Session check failed: HTTP ${response.status}`);
-          const session = await response.json() as {
-            userId: string; role: User['role']; provider?: string;
-            mappedGroups?: string[]; csrfToken?: string;
-          };
+          const session = await response.json() as unknown;
           if (controller.signal.aborted || (options.shouldApply && !options.shouldApply())) return null;
-          const user: User = {
-            userId: session.userId,
-            name: session.userId,
-            surname: '',
-            role: session.role,
-            provider: session.provider,
-            groups: session.mappedGroups ?? [],
-          };
-          this.cookieSession = { user, csrfToken: session.csrfToken ?? '' };
+          this.cookieSession = null;
+          const { user, csrfToken } = parseCookieSession(session);
+          this.cookieSession = { user, csrfToken };
           if (options.announce) localStorage.setItem(OIDC_SESSION_SIGNAL_KEY, `${Date.now()}:${Math.random()}`);
           return user;
         })(),

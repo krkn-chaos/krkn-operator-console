@@ -27,6 +27,18 @@ function failure(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
 
+function validCallbackURL(raw: string, providerId: string): boolean {
+  try {
+    const url = new URL(raw);
+    const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+    return (url.protocol === 'https:' || url.protocol === 'http:' && loopback)
+      && !url.username && !url.password && !url.search && !url.hash
+      && url.pathname.endsWith(`/api/v1/auth/oidc/${providerId}/callback`);
+  } catch {
+    return false;
+  }
+}
+
 function hasMapping(localGroup: GroupDetails, remoteGroup: RemoteGroup): boolean {
   return (localGroup.externalGroups ?? []).some(mapping =>
     mapping.provider === remoteGroup.provider && mapping.group === remoteGroup.claimValue);
@@ -233,6 +245,10 @@ export function IdentityManagement() {
   async function saveProvider(event: React.FormEvent) {
     event.preventDefault();
     if (!providerForm || !providerForm.type) return;
+    if (!validCallbackURL(providerForm.redirectUrl, providerForm.id)) {
+      showError('Could not save identity provider', 'Callback URL must be HTTPS (HTTP is allowed for localhost) and end with this provider\'s /api/v1/auth/oidc/{id}/callback path.');
+      return;
+    }
     setSavingProvider(true);
     try {
       if (editingProvider) {
@@ -411,7 +427,7 @@ export function IdentityManagement() {
                               <Thead><Tr><Th>Remote group</Th><Th>Local group</Th><Th>Action</Th></Tr></Thead>
                               <Tbody>{selectedMappings.map(({ localGroup, mapping }) => (
                                 <Tr key={`${localGroup.id ?? localGroup.name}:${mapping.provider}:${mapping.group}`}>
-                                  <Td><strong>{mapping.group}</strong><div className="identity-management__meta">{mapping.groupId ?? '—'}</div></Td>
+                                  <Td><strong>{mapping.group}</strong><div className="identity-management__meta">Provider group ID: {mapping.groupId || 'not supplied (matched by path)'}</div></Td>
                                   <Td>{localGroup.name}</Td>
                                   <Td><Button variant="plain" aria-label={`Remove mapping ${mapping.group} from ${localGroup.name}`} isDisabled={savingMapping} onClick={() => void saveMapping(localGroup, (localGroup.externalGroups ?? []).filter(item => item !== mapping))}><TrashIcon /></Button></Td>
                                 </Tr>

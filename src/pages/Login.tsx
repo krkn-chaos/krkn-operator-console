@@ -25,6 +25,15 @@ import { useCooldown } from '../hooks/useCooldown';
 import { identityApi, type LoginProvider } from '../services/identityApi';
 
 function toRouterRelativeReturnUrl(returnUrl: string, baseUrl: string): string {
+  // returnUrl comes from the query string. Keep navigation inside this router,
+  // including when stripping a deployment basename would expose a leading //.
+  const isLocalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
+    && !path.includes('\\') && !Array.from(path).some(char => {
+      const code = char.charCodeAt(0);
+      return code < 32 || code === 127;
+    });
+  if (!isLocalPath(returnUrl)) return '/app';
+
   const basename = baseUrl.replace(/\/+$/, '');
   if (!basename) return returnUrl;
 
@@ -34,7 +43,8 @@ function toRouterRelativeReturnUrl(returnUrl: string, baseUrl: string): string {
 
   if (pathname === basename) return `/${suffix}`;
   if (pathname.startsWith(`${basename}/`)) {
-    return `${pathname.slice(basename.length)}${suffix}`;
+    const relative = `${pathname.slice(basename.length)}${suffix}`;
+    return isLocalPath(relative) ? relative : '/app';
   }
 
   return returnUrl;

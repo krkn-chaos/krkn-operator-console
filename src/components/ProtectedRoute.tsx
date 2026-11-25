@@ -43,7 +43,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Bullseye><EmptyState>
       <EmptyStateIcon icon={UsersIcon} />
       <Title headingLevel="h2" size="lg">No groups assigned</Title>
-      <EmptyStateBody>Your identity is valid, but no external group is mapped to a local group with permissions. Contact an administrator to request access.</EmptyStateBody>
+      <EmptyStateBody>No external group was mapped to a local group with permissions at the last session check. Contact an administrator to request access, then refresh.</EmptyStateBody>
       {logoutError && <Alert variant="danger" title="Logout failed. Your session is still active; please try again." isInline />}
       <Button variant="primary" onClick={() => window.location.reload()}>Refresh access</Button>{' '}
       <Button variant="link" onClick={() => {

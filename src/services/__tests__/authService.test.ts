@@ -35,7 +35,7 @@ describe('authService - user groups', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     try {
       fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
-        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', csrfToken: 'csrf-123',
+        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', mappedGroups: [], csrfToken: 'csrf-123',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
       await authService.restoreCookieSession();
       fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
@@ -88,7 +88,7 @@ describe('authService - user groups', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     try {
       fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
-        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', csrfToken: 'csrf-123',
+        userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', mappedGroups: [], csrfToken: 'csrf-123',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
       await authService.restoreCookieSession();
       fetchSpy.mockResolvedValueOnce(new Response(null, { status: 503 }));
@@ -97,6 +97,22 @@ describe('authService - user groups', () => {
       expect(authService.getCookieSession()?.user.userId).toBe('oidc-123');
     } finally {
       authService.logout();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    { userId: '', role: 'user', provider: 'corp', mappedGroups: [], csrfToken: 'csrf' },
+    { userId: 'oidc-123', role: 'owner', provider: 'corp', mappedGroups: [], csrfToken: 'csrf' },
+    { userId: 'oidc-123', role: 'user', provider: 'corp', mappedGroups: [42], csrfToken: 'csrf' },
+    { userId: 'oidc-123', role: 'user', provider: 'corp', mappedGroups: [], csrfToken: null },
+  ])('rejects a malformed OIDC session response', async (session) => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(session), { status: 200 }));
+    try {
+      await expect(authService.restoreCookieSession()).rejects.toThrow('Invalid session response');
+      expect(authService.getCookieSession()).toBeNull();
+    } finally {
+      authService.clearCookieSession();
       fetchSpy.mockRestore();
     }
   });
