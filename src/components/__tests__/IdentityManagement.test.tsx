@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IdentityManagement } from '../IdentityManagement';
 
@@ -138,8 +138,7 @@ describe('IdentityManagement', () => {
     render(<IdentityManagement />);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Corporate Keycloak' }));
     const callback = screen.getByRole('textbox', { name: 'Callback URL' });
-    await userEvent.clear(callback);
-    await userEvent.type(callback, callbackURL);
+    fireEvent.change(callback, { target: { value: callbackURL } });
     await userEvent.click(screen.getByRole('button', { name: 'Save provider' }));
     expect(mocks.showError).toHaveBeenCalledWith('Could not save identity provider', expect.stringContaining('Callback URL must be HTTPS'));
     expect(mocks.updateProvider).not.toHaveBeenCalled();
@@ -149,9 +148,8 @@ describe('IdentityManagement', () => {
     render(<IdentityManagement />);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Corporate Keycloak' }));
     const callback = screen.getByRole('textbox', { name: 'Callback URL' });
-    await userEvent.clear(callback);
-    await userEvent.type(callback, 'http://127.0.0.1:8080/api/v1/auth/oidc/corp-keycloak/callback');
-    await userEvent.type(screen.getByRole('textbox', { name: 'Admin client ID' }), 'group-reader');
+    fireEvent.change(callback, { target: { value: 'http://127.0.0.1:8080/api/v1/auth/oidc/corp-keycloak/callback' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Admin client ID' }), { target: { value: 'group-reader' } });
     await userEvent.click(screen.getByRole('button', { name: 'Save provider' }));
     await waitFor(() => expect(mocks.updateProvider).toHaveBeenCalledWith('corp-keycloak', expect.objectContaining({
       redirectUrl: 'http://127.0.0.1:8080/api/v1/auth/oidc/corp-keycloak/callback',
