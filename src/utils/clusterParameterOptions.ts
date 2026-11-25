@@ -1,8 +1,8 @@
-import type { ScenarioField, ScenarioFormValues, SelectedCluster } from '../types/api';
+import type { ClusterResourceName, ClusterResourcesResponse, ScenarioField, ScenarioFormValues, SelectedCluster } from '../types/api';
 
 type ClusterRef = Pick<SelectedCluster, 'operatorName' | 'clusterName'>;
 
-type Resource = 'namespaces' | 'nodes' | 'pods' | 'pvcs' | 'vmi' | 'serviceaccounts';
+type Resource = ClusterResourceName;
 type Selection = 'name' | 'label' | 'container';
 const LIST_CACHE_TTL_MS = 30_000;
 
@@ -21,21 +21,12 @@ export interface ClusterOptionSource {
   selectionMode?: 'comma' | 'list';
 }
 
-interface KubeItem {
-  metadata?: { name?: string; namespace?: string; labels?: Record<string, string> };
-  spec?: { containers?: Array<{ name?: string }> };
-}
+type KubeItem = ClusterResourcesResponse['items'][number];
+type KubeList = ClusterResourcesResponse;
 
-interface KubeList {
-  items: KubeItem[];
-}
-
-export type ClusterCommandRunner = (cluster: ClusterRef, command: string) => Promise<{
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}>;
-export type ClusterNodeReader = (uuid: string, cluster: ClusterRef) => Promise<string[]>;
+export type ClusterResourceReader = (
+  cluster: ClusterRef, resource: Resource, namespace?: string, allNamespaces?: boolean,
+) => Promise<KubeList>;
 
 const namespaced = (resource: Resource, selection: Selection = 'name'): ClusterOptionSource =>
   ({ resource, selection, namespaced: true });
@@ -143,8 +134,7 @@ function matchingNamespaces(names: string[], expression: string): string[] {
 
 /**
  * Lists matching resource names shared by every selected cluster. Namespace
- * expression can be exact name or regex. Node names use getNodeNames; other
- * resources use runCommand. Cache successful lists for 30 seconds; refresh
+ * expression can be exact name or regex. Cache successful lists for 30 seconds; refresh
  * bypasses cached results.
  * Rejects on command failure, invalid list response, or invalid namespace regex.
  *
@@ -163,11 +153,10 @@ function matchingNamespaces(names: string[], expression: string): string[] {
  * const cache = new Map();
  * const options: string[] = await discoverClusterOptions({
  *   uuid, clusters, source, namespaceExpression: 'default',
- *   runCommand: (cluster, command) => operatorApi.executeTerminalCommand({
- *     uuid, cluster_id: cluster.clusterName, provider: cluster.operatorName, command,
+ *   listResources: (cluster, resource, namespace, allNamespaces) => operatorApi.getClusterResources({
+ *     uuid, clusterName: cluster.clusterName, operatorName: cluster.operatorName,
+ *     resource, namespace, allNamespaces,
  *   }),
- *   getNodeNames: async (targetUUID, cluster) =>
- *     (await operatorApi.getNodes(targetUUID, cluster.clusterName, cluster.operatorName)).nodes,
  *   cache,
  * });
  * console.log(options); // e.g. ['web-0', 'web-1']
@@ -178,8 +167,7 @@ export async function discoverClusterOptions({
   source,
   namespaceExpression = '',
   podName = '',
-  runCommand,
-  getNodeNames,
+  listResources,
   cache,
   refresh = false,
 }: {
@@ -188,29 +176,19 @@ export async function discoverClusterOptions({
   source: ClusterOptionSource;
   namespaceExpression?: string;
   podName?: string;
-  runCommand: ClusterCommandRunner;
-  getNodeNames: ClusterNodeReader;
+  listResources: ClusterResourceReader;
   cache: Map<string, Promise<KubeList>>;
   refresh?: boolean;
 }): Promise<string[]> {
   if (!uuid || clusters.length === 0) return [];
 
-  if (source.resource === 'nodes' && source.selection === 'name') {
-    const perCluster = await Promise.all(clusters.map((cluster) => getNodeNames(uuid, cluster)));
-    return perCluster[0].filter((name) => perCluster.every((names) => names.includes(name))).sort();
-  }
-
   const getList = (cluster: ClusterRef, resource: Resource, namespace?: string, allNamespaces = false): Promise<KubeList> => {
-    const scope = allNamespaces ? ' -A' : namespace ? ` -n ${namespace}` : '';
-    const command = `kubectl get ${resource}${scope} -o json`;
-    const cacheKey = JSON.stringify([uuid, cluster.operatorName, cluster.clusterName, command]);
+    const cacheKey = JSON.stringify([uuid, cluster.operatorName, cluster.clusterName, resource, namespace ?? '', allNamespaces]);
     const cached = cache.get(cacheKey);
     if (cached && !refresh) return cached;
-    const request = runCommand(cluster, command).then(({ stdout, stderr, exitCode }) => {
-      if (exitCode !== 0) throw new Error(stderr || `Unable to list ${resource} on ${cluster.clusterName}`);
-      const parsed = JSON.parse(stdout) as Partial<KubeList>;
-      if (!Array.isArray(parsed.items)) throw new Error(`Invalid ${resource} response from ${cluster.clusterName}`);
-      return parsed as KubeList;
+    const request = listResources(cluster, resource, namespace, allNamespaces).then((list) => {
+      if (!Array.isArray(list.items)) throw new Error(`Invalid ${resource} response from ${cluster.clusterName}`);
+      return list;
     });
     cache.set(cacheKey, request);
     void request.then(

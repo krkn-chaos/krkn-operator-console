@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { operatorApi } from '../services/operatorApi';
 import type { ScenarioField, ScenarioFormValues, SelectedCluster } from '../types/api';
+import { isApiError } from '../utils/apiClient';
 import { clusterOptionQueryKey, discoverClusterOptions, getClusterOptionSource, type ClusterFieldOptionState } from '../utils/clusterParameterOptions';
 
 interface ClusterParameterOptionsArgs {
@@ -85,23 +86,22 @@ export function useClusterParameterOptions({
     const request = discoverClusterOptions({
       uuid, clusters, source: query.source, namespaceExpression, podName,
       cache: listCache.current, refresh: !automatic && Boolean(queryStates[query.key]),
-      getNodeNames: async (targetUUID, cluster) => (await operatorApi.getNodes(targetUUID, cluster.clusterName, cluster.operatorName)).nodes,
-      runCommand: async (cluster, command) => operatorApi.executeTerminalCommand({
-        cluster_id: cluster.clusterName, operator_name: cluster.operatorName, uuid, command,
+      listResources: (cluster, resource, namespace, allNamespaces) => operatorApi.getClusterResources({
+        clusterName: cluster.clusterName, operatorName: cluster.operatorName, uuid,
+        resource, namespace, allNamespaces,
       }),
     }).then((options) => {
       setQueryStates((previous) => ({ ...previous, [query.key]: { options, status: 'ready' } }));
     }).catch((error: unknown) => {
-      const terminalCode = error instanceof Error && error.message.startsWith('TERMINAL_ERROR:')
-        ? error.message.split(':')[1] : '';
+      const status = isApiError(error) ? error.status : 0;
       setQueryStates((previous) => ({ ...previous, [query.key]: {
         options: [], status: 'error',
-        error: terminalCode === '403'
+        error: status === 403
           ? 'Permission denied while loading cluster options.'
-          : terminalCode === '404'
-            ? 'Command unavailable on this cluster.'
-            : terminalCode === '500'
-              ? 'Cluster command failed while loading options.'
+          : status === 404
+            ? 'Target or provider unavailable.'
+            : status === 502 || status === 504
+              ? 'Cluster resource lookup failed while loading options.'
               : 'Unable to load cluster options.',
       } }));
     }).finally(() => pending.current.delete(query.key));

@@ -63,6 +63,24 @@ export interface NodesResponse {
   nodes: string[];
 }
 
+export type ClusterResourceName = 'namespaces' | 'nodes' | 'pods' | 'pvcs' | 'vmi' | 'serviceaccounts';
+
+export interface ClusterResourcesRequest {
+  uuid: string;
+  clusterName: string;
+  operatorName: string;
+  resource: ClusterResourceName;
+  namespace?: string;
+  allNamespaces?: boolean;
+}
+
+export interface ClusterResourcesResponse {
+  items: Array<{
+    metadata: { name: string; namespace?: string; labels?: Record<string, string> };
+    spec?: { containers?: Array<{ name: string }> };
+  }>;
+}
+
 // Target CRUD API Types
 
 export type SecretType = 'kubeconfig' | 'token' | 'credentials';
