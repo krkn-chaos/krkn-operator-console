@@ -77,9 +77,12 @@ export function RunWorkflowModal({
   const [showResiliencyModal, setShowResiliencyModal] = useState(false);
   const [resiliencyConfig, setResiliencyConfig] = useState<ResiliencyScoreConfig | null>(null);
   const [maxRetries, setMaxRetries] = useState(3);
-  const unsignedNodes = workflow.nodes.filter(
-    (node) => node.status === 'configured' && node.config && node.config.signature_status !== 'signed',
-  );
+  const unsignedNodes = workflow.nodes.filter((node) => {
+    // Trigger nodes use a fixed utility image; the operator verifies that image
+    // at execution time, so Studio has no per-node signature status to display.
+    if (node.nodeType === 'trigger' || node.config?.nodeType === 'trigger') return false;
+    return node.status === 'configured' && node.config && node.config.signature_status !== 'signed';
+  });
 
   // Reset state when modal closes
   useEffect(() => {
