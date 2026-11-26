@@ -82,6 +82,36 @@ const FILE_PURPOSE_CONFIG: Record<string, { icon: ComponentType<{ style?: React.
   'resiliency-score': { icon: FiBarChart2, color: 'var(--pf-v5-global--palette--green-400)', label: 'Resiliency' },
 };
 
+/** Name shown to users; workflow templates display their workflow name. */
+function fileDisplayName(file: FileInfo): string {
+  const purposeKey = file.filePurpose || 'file';
+  return purposeKey === 'workflow-template' && file.workflowName ? file.workflowName : file.fileName;
+}
+
+type SortColumn = 'name' | 'type';
+type SortDirection = 'asc' | 'desc';
+
+/**
+ * Sort files by name or type. Untyped files stay last in both directions so the
+ * type column reads the same whichever way it is toggled.
+ */
+function sortFiles(files: FileInfo[], column: SortColumn, direction: SortDirection): FileInfo[] {
+  const valueOf = (file: FileInfo) => (column === 'type' ? file.fileType || '' : fileDisplayName(file));
+
+  return [...files].sort((a, b) => {
+    const aValue = valueOf(a);
+    const bValue = valueOf(b);
+
+    if (!aValue || !bValue) {
+      if (aValue === bValue) return 0;
+      return aValue ? -1 : 1;
+    }
+
+    const result = aValue.localeCompare(bValue, undefined, { sensitivity: 'base' });
+    return direction === 'asc' ? result : -result;
+  });
+}
+
 function canModifyFile(file: FileInfo, userGroups: string[], isAdmin: boolean): boolean {
   if (isAdmin) return true;
   if (file.availableToAll) return true;
@@ -114,6 +144,8 @@ export function FilesTable({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAccess, setSelectedAccess] = useState<string[]>([]);
   const [isAccessFilterOpen, setIsAccessFilterOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const filesList = useMemo(() => Array.isArray(files) ? files : [], [files]);
   const accessOptions = useMemo(
@@ -133,7 +165,8 @@ export function FilesTable({
         file.fileId.toLowerCase().includes(term) ||
         file.fileName.toLowerCase().includes(term) ||
         file.workflowName?.toLowerCase().includes(term) ||
-        file.description?.toLowerCase().includes(term)
+        file.description?.toLowerCase().includes(term) ||
+        file.fileType?.toLowerCase().includes(term)
       );
       const matchesAccess = selectedAccess.length === 0 || (
         (file.availableToAll && selectedAccess.includes('public')) ||
@@ -143,6 +176,23 @@ export function FilesTable({
     }
   ), [filesList, searchTerm, selectedAccess]);
 
+  const sortedFiles = useMemo(
+    () => sortFiles(filteredFiles, sortColumn, sortDirection),
+    [filteredFiles, sortColumn, sortDirection],
+  );
+
+  const handleSort = (_event: unknown, index: number, direction: SortDirection) => {
+    setSortColumn(index === 1 ? 'type' : 'name');
+    setSortDirection(direction);
+  };
+
+  // Shared wiring for every sortable header; only the column index differs.
+  const sortPropsFor = (columnIndex: number) => ({
+    sortBy: { index: sortColumn === 'name' ? 0 : 1, direction: sortDirection },
+    columnIndex,
+    onSort: handleSort,
+  });
+
   const {
     paginatedData: paginatedFiles,
     page,
@@ -151,7 +201,7 @@ export function FilesTable({
     totalPages,
     handleSetPage,
     handlePerPageSelect,
-  } = usePagination(filteredFiles, { initialPerPage: FILES_PER_PAGE });
+  } = usePagination(sortedFiles, { initialPerPage: FILES_PER_PAGE });
 
   const toggleSelection = (value: string, setSelection: React.Dispatch<React.SetStateAction<string[]>>) => {
     setSelection((current) => current.includes(value)
@@ -224,9 +274,14 @@ export function FilesTable({
       >
         <Thead>
           <Tr>
-            <Th width={50}>File Name</Th>
+            <Th width={35} sort={sortPropsFor(0)}>
+              File Name
+            </Th>
+            <Th width={20} sort={sortPropsFor(1)}>
+              File Type
+            </Th>
             <Th width={25}>Access</Th>
-            <Th width={25}>Actions</Th>
+            <Th width={20}>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
@@ -234,7 +289,7 @@ export function FilesTable({
             const purposeKey = file.filePurpose || 'file';
             const purposeCfg = FILE_PURPOSE_CONFIG[purposeKey] || FILE_PURPOSE_CONFIG['file'];
             const PurposeIcon = purposeCfg.icon;
-            const displayName = (purposeKey === 'workflow-template' && file.workflowName) ? file.workflowName : file.fileName;
+            const displayName = fileDisplayName(file);
             const canModify = canModifyFile(file, userGroups, isAdmin);
             const disabledTooltip = `You don't have permission (file belongs to ${file.groups?.[0] || 'another group'})`;
 
@@ -260,6 +315,13 @@ export function FilesTable({
                       )}
                     </div>
                   </Tooltip>
+                </Td>
+                <Td dataLabel="File Type">
+                  {file.fileType ? (
+                    <Label isCompact color="cyan">{file.fileType}</Label>
+                  ) : (
+                    <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>—</span>
+                  )}
                 </Td>
                 <Td dataLabel="Access">
                   {file.availableToAll ? (

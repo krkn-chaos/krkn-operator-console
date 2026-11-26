@@ -1,3 +1,14 @@
-.file-form-group-select-toggle .pf-v5-c-menu-toggle__text {
-  width: 100%;
+/*
+ * Typeahead selects (File Type, Group).
+ *
+ * MenuToggle renders its children inside a `.pf-v5-c-menu-toggle__text` flex
+ * item that is content-sized by default. The TextInputGroup inside it is
+ * `width: 100%`, but 100% of a content-sized parent collapses to the input's
+ * 12ch min-width, so only a narrow strip of the box is typeable. Letting the
+ * text item grow makes the input span the full toggle — and the dropdown,
+ * which PatternFly sizes to the trigger width, matches it.
+ */
+.file-form-select-toggle .pf-v5-c-menu-toggle__text {
+  flex: 1;
+  min-width: 0;
 }

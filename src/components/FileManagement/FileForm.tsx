@@ -36,11 +36,14 @@ import './FileForm.css';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
+import { isValidFileType, normalizeFileType } from '../../utils/fileType';
 import type { FileInfo, CreateFileRequest, UpdateFileRequest, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
   mode: 'create' | 'edit';
   initialData?: FileInfo;
+  /** File types already in use, offered as suggestions while typing. */
+  fileTypes?: string[];
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -48,6 +51,7 @@ interface FileFormProps {
 export function FileForm({
   mode,
   initialData,
+  fileTypes = [],
   onSuccess,
   onCancel,
 }: FileFormProps) {
@@ -57,7 +61,8 @@ export function FileForm({
   const [fileName, setFileName] = useState('');
   const [content, setContent] = useState('');
   const [description, setDescription] = useState('');
-  const [legacyFileType, setLegacyFileType] = useState(initialData?.fileType);
+  const [fileType, setFileType] = useState(initialData?.fileType ?? '');
+  const [isFileTypeOpen, setIsFileTypeOpen] = useState(false);
   const [accessType, setAccessType] = useState<'public' | 'group'>('public');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [availableGroups, setAvailableGroups] = useState<GroupResponse[]>([]);
@@ -89,7 +94,7 @@ export function FileForm({
         setFileName(file.fileName);
         setContent(file.content);
         setDescription(file.description || '');
-        setLegacyFileType(file.fileType || initialData?.fileType);
+        setFileType(file.fileType ?? initialData?.fileType ?? '');
         setAccessType(file.availableToAll ? 'public' : 'group');
         setSelectedGroup(file.groups?.[0] || '');
       } catch (err) {
@@ -155,9 +160,19 @@ export function FileForm({
       errors.group = 'Group selection is required for group-based access';
     }
 
+    if (!isValidFileType(fileType)) {
+      errors.fileType = 'Enter at least one letter or number';
+    }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
+
+  const normalizedFileType = normalizeFileType(fileType);
+  const fileTypeSuggestions = fileTypes
+    .filter((type) => type.toLowerCase().includes(normalizedFileType))
+    .sort();
+  const canCreateFileType = normalizedFileType !== '' && !fileTypes.includes(normalizedFileType);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -180,6 +195,7 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
+          fileType: normalizeFileType(fileType) || undefined,
         };
 
         await operatorApi.createFile(request);
@@ -190,7 +206,7 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
-          fileType: legacyFileType,
+          fileType: normalizeFileType(fileType),
         };
 
         await operatorApi.updateFile(initialData!.fileId, request);
@@ -285,6 +301,87 @@ export function FileForm({
         />
       </FormGroup>
 
+
+      <FormGroup label="File Type" fieldId="file-type-input">
+        <Select
+          isOpen={isFileTypeOpen}
+          selected={fileType}
+          onSelect={(_event, value) => {
+            if (typeof value === 'string') {
+              setFileType(value);
+            }
+            setIsFileTypeOpen(false);
+          }}
+          onOpenChange={(isOpen) => setIsFileTypeOpen(isOpen)}
+          toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+            <MenuToggle
+              ref={toggleRef}
+              onClick={() => setIsFileTypeOpen(!isFileTypeOpen)}
+              isExpanded={isFileTypeOpen}
+              className="file-form-select-toggle"
+              style={{ width: '100%' }}
+            >
+              <TextInputGroup>
+                <TextInputGroupMain
+                  id="file-type-input"
+                  aria-label="File Type"
+                  value={fileType}
+                  placeholder="e.g. alerts, metrics, kubeconfig"
+                  onClick={() => setIsFileTypeOpen(true)}
+                  onChange={(_event, value) => {
+                    setFileType(value);
+                    setIsFileTypeOpen(true);
+                  }}
+                />
+                {fileType && (
+                  <TextInputGroupUtilities>
+                    <Button
+                      variant="plain"
+                      onClick={() => setFileType('')}
+                      aria-label="Clear file type"
+                      icon={<FiX />}
+                    />
+                  </TextInputGroupUtilities>
+                )}
+              </TextInputGroup>
+            </MenuToggle>
+          )}
+        >
+          <SelectList>
+            {fileTypeSuggestions.map((type) => (
+              <SelectOption key={type} value={type}>
+                {type}
+              </SelectOption>
+            ))}
+            {canCreateFileType && (
+              <SelectOption key="create-file-type" value={normalizedFileType}>
+                Create "{normalizedFileType}"
+              </SelectOption>
+            )}
+            {fileTypeSuggestions.length === 0 && !canCreateFileType && (
+              <SelectOption value="no-file-types" isDisabled>
+                No existing file types. Type a new one to create it.
+              </SelectOption>
+            )}
+          </SelectList>
+        </Select>
+        {validationErrors.fileType && (
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem variant="error">{validationErrors.fileType}</HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+        )}
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem>
+              {normalizeFileType(fileType) && normalizeFileType(fileType) !== fileType.trim()
+                ? `Saved as "${normalizeFileType(fileType)}".`
+                : 'Optional. Groups files by what they are used for.'}
+            </HelperTextItem>
+          </HelperText>
+        </FormHelperText>
+      </FormGroup>
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
         {/* Admin: can choose public or group */}
@@ -398,7 +495,7 @@ export function FileForm({
                     onClick={() => setIsGroupSelectOpen(!isGroupSelectOpen)}
                     isExpanded={isGroupSelectOpen}
                     style={{ width: '100%' }}
-                    className="file-form-group-select-toggle"
+                    className="file-form-select-toggle"
                   >
                     <TextInputGroup>
                       <TextInputGroupMain

@@ -1314,7 +1314,7 @@ export interface FileResponse {
   availableToAll: boolean;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
-  /** Legacy metadata retained when updating files against older operators. */
+  /** User-defined file type (e.g. 'alerts', 'metrics'); absent when untyped. */
   fileType?: string;
 }
 
@@ -1335,6 +1335,8 @@ export interface CreateFileRequest {
   availableToAll: boolean;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
+  /** User-defined file type (optional), e.g. 'alerts' or 'metrics'. */
+  fileType?: string;
 }
 
 /**
@@ -1363,7 +1365,7 @@ export interface UpdateFileRequest {
   availableToAll: boolean;
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
-  /** Preserved when editing legacy files until older operators stop requiring it. */
+  /** Replaces the file's user-defined type; omit to preserve it. */
   fileType?: string;
 }
 
@@ -1395,7 +1397,7 @@ export interface FileInfo {
   groups?: string[];
   /** Optional file purpose (e.g., 'workflow-template') */
   filePurpose?: string;
-  /** Legacy operator metadata preserved during updates; it is not editable in the console. */
+  /** User-defined file type (e.g. 'alerts', 'metrics'); absent when untyped. */
   fileType?: string;
 }
 

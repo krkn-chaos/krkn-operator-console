@@ -13,6 +13,7 @@ interface FileFormModalProps {
   isOpen: boolean;
   mode: 'create' | 'edit';
   initialData?: FileInfo;
+  fileTypes?: string[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -21,6 +22,7 @@ export function FileFormModal({
   isOpen,
   mode,
   initialData,
+  fileTypes,
   onClose,
   onSuccess,
 }: FileFormModalProps) {
@@ -34,6 +36,7 @@ export function FileFormModal({
       <FileForm
         mode={mode}
         initialData={initialData}
+        fileTypes={fileTypes}
         onSuccess={onSuccess}
         onCancel={onClose}
       />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
 import { isApiError } from '../../utils/apiClient';
@@ -28,6 +28,12 @@ export function useFileManagementPage() {
     setError(null);
     loadFiles().finally(() => setLoading(false));
   }, [loadFiles]);
+
+  // Types already in use, offered as suggestions in the form.
+  const knownFileTypes = useMemo(
+    () => Array.from(new Set(files.map((file) => file.fileType).filter((type): type is string => !!type))).sort(),
+    [files],
+  );
 
   const openFileForm = (file: FileInfo | null, mode: 'create' | 'edit') => {
     setSelectedFile(file);
@@ -64,6 +70,7 @@ export function useFileManagementPage() {
     fileFormMode,
     fileFormOpen,
     files,
+    knownFileTypes,
     isAdmin,
     loading,
     selectedFile,
