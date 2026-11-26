@@ -1631,22 +1631,29 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(mocks.ai.getScenario).toHaveBeenCalledTimes(3);
   });
 
-  it('explains pending fitness and score headers on hover', async () => {
-    const user = userEvent.setup();
+  function preparePendingFitnessRun(): void {
     const run = makeRun('pending-fitness-run', 'Running');
     const provisional = makeScenarioRow({ fitnessScore: 3, fitnessState: 'provisional', phase: 'Succeeded' });
     mocks.ai.listRuns.mockResolvedValue([run]);
     mocks.ai.getRunSummary.mockResolvedValue(makeSummary(run.metadata.name, 'Running'));
     mocks.ai.getScenarioIndex.mockResolvedValue(makeIndex([provisional]));
     mocks.ai.getScenario.mockResolvedValue(makeScenarioDetail(3, 'provisional'));
+  }
 
+  async function openPendingFitnessRun() {
     render(<KrknAIPage />);
     await flushReact();
     fireEvent.click(screen.getByRole('row', { name: /Open run pending-fitness-run/ }));
     await flushReact();
 
     const scenarioTable = screen.getByRole('table', { name: 'Scenario executions' });
-    const scenarioRow = within(scenarioTable).getByRole('row', { name: /Open generation 1 scenario 9 details/ });
+    return within(scenarioTable).getByRole('row', { name: /Open generation 1 scenario 9 details/ });
+  }
+
+  it('explains pending fitness and normalized score on hover', async () => {
+    const user = userEvent.setup();
+    preparePendingFitnessRun();
+    const scenarioRow = await openPendingFitnessRun();
     const generationExplanation = 'Calculating generation fitness; calculation waits for generation completion.';
     const generationStatus = within(scenarioRow).getByRole('status', { name: generationExplanation });
     expect(screen.queryByText(/Calculating generation fitness/)).not.toBeInTheDocument();
@@ -1666,7 +1673,16 @@ describe('Krkn-AI real run lifecycle', () => {
     expect(within(fitnessComponents).queryByText(/Normalization is pending/)).not.toBeInTheDocument();
     await user.hover(normalizationStatus.querySelector('span[tabindex="0"]') as HTMLElement);
     expect(await screen.findByText(normalizationExplanation)).toBeInTheDocument();
+  });
 
+  it('explains fitness component column headers on hover', async () => {
+    const user = userEvent.setup();
+    preparePendingFitnessRun();
+    const scenarioRow = await openPendingFitnessRun();
+    fireEvent.click(scenarioRow);
+    await flushReact();
+    fireEvent.click(screen.getByRole('tab', { name: 'Fitness' }));
+    const fitnessComponents = screen.getByRole('table', { name: 'Measured fitness components' });
     const headerTooltips = [
       ['PromQL query', 'Prometheus query used to measure this fitness component.'],
       ['Query type', 'How the query is evaluated, such as a point or range query.'],
