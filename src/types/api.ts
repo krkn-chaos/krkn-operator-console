@@ -154,7 +154,8 @@ export interface JobConfigResponse {
   /** Backend response compatibility only. */
   scenarioName?: string;
   kubeconfigPath: string;
-  environment: { [key: string]: string };
+  /** Omitted by the operator when the run has no environment variables. */
+  environment?: { [key: string]: string };
   /** Saved cloud credential used by the original scenario run. */
   cloudCredentialRef?: string;
   /** Categories visible to the current user and restored for replay. */
