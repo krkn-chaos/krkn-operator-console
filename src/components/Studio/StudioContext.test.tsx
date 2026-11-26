@@ -1272,6 +1272,21 @@ describe('StudioContext', () => {
   // 16. buildGraph helper
   // =========================================================================
   describe('buildGraph', () => {
+    it('omits a blank redacted secret while retaining cleartext inputs', () => {
+      const node = makeConfiguredNode('node-a');
+      node.config!.scenarioFormValues = { TOKEN: '', URL: 'https://service.example' };
+      node.config!.secretFields = { TOKEN: true };
+      const graph = buildGraph({ nodes: [node], edges: [], nextNodeNumber: 2 });
+      expect(graph['node-a'].env).toEqual({ URL: 'https://service.example' });
+    });
+    it('sends an explicitly cleared secret as an empty value', () => {
+      const node = makeConfiguredNode('node-a');
+      node.config!.scenarioFormValues = { TOKEN: '', URL: 'https://service.example' };
+      node.config!.secretFields = { TOKEN: false };
+      node.config!.clearSecretFields = ['TOKEN'];
+      const graph = buildGraph({ nodes: [node], edges: [], nextNodeNumber: 2 });
+      expect(graph['node-a'].env).toEqual({ TOKEN: '', URL: 'https://service.example' });
+    });
     it('builds graph from configured nodes only', () => {
       const wf: StudioWorkflow = {
         nodes: [

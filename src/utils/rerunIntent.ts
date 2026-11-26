@@ -8,6 +8,7 @@ export function buildRerunIntent(
   const clusters = Object.entries(config.targetClusters).flatMap(
     ([operatorName, clusterNames]) => clusterNames.map(clusterName => ({ operatorName, clusterName })),
   );
+  const hasSavedSecrets = Object.values(config.secretFields ?? {}).some(Boolean);
 
   return {
     scenario: config.scenario ?? {
@@ -17,10 +18,15 @@ export function buildRerunIntent(
     },
     clusters,
     environment: config.environment,
+    ...(hasSavedSecrets ? {
+      secretFields: config.secretFields,
+      sourceScenarioRunName: config.sourceScenarioRunName,
+      originalConfiguration: config,
+    } : {}),
     kubeconfigPath: config.kubeconfigPath,
     ...(config.cloudCredentialRef ? { cloudCredentialRef: config.cloudCredentialRef } : {}),
     categories: config.categories,
-    workspace: config.workspace,
-    rollbackEnabled: config.rollbackEnabled,
+    ...(config.workspace ? { workspace: config.workspace } : {}),
+    ...(config.rollbackEnabled !== undefined ? { rollbackEnabled: config.rollbackEnabled } : {}),
   };
 }

@@ -9,6 +9,8 @@
  */
 
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { Button, Modal, ModalVariant } from '@patternfly/react-core';
+import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { WizardStepper, WizardStepConfig } from './WizardStepper';
 import { RegistrySelectorStep } from './RegistrySelectorStep';
 import { ScenariosListStep } from './ScenariosListStep';
@@ -17,6 +19,7 @@ import { NodeMetadataStep } from './NodeMetadataStep';
 import { useStudioContext } from './StudioContext';
 import { useScenariosFetch } from '../../hooks';
 import type { StudioNode, ScenariosRequest, ScenarioFormValues, TouchedFields, SignatureStatus } from '../../types/api';
+import { secretInvalidationWarning, willClearScenarioSecrets } from '../../utils/secretInputPolicy';
 
 interface StudioNodeEditorModalProps {
   isOpen: boolean;
@@ -31,7 +34,7 @@ function StudioNodeEditorModalComponent({
   onClose,
   onSave,
 }: StudioNodeEditorModalProps) {
-  const { validateNodeId } = useStudioContext();
+  const { validateNodeId, savedWorkflow, workflow } = useStudioContext();
   const {
     scenarios,
     loading: loadingScenarios,
@@ -68,6 +71,9 @@ function StudioNodeEditorModalComponent({
   const [hasPendingFileInput, setHasPendingFileInput] = useState(false);
   const [pendingFileWarningShown, setPendingFileWarningShown] = useState(false);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [secretVariables, setSecretVariables] = useState<string[]>([]);
+  const [secretsToClear, setSecretsToClear] = useState<string[]>([]);
+  const [pendingSecretInvalidation, setPendingSecretInvalidation] = useState<Partial<StudioNode> | null>(null);
 
   // Track if we've initialized to prevent repeated initialization
   const hasInitialized = useRef(false);
@@ -83,6 +89,7 @@ function StudioNodeEditorModalComponent({
       // Reset initialization flag when modal closes
       hasInitialized.current = false;
       setScenarioConfigStatus('idle');
+      setSecretsToClear([]);
       return;
     }
 
@@ -272,6 +279,8 @@ function StudioNodeEditorModalComponent({
         scenarioImage,
         signature_status: selectedSignatureStatus,
         scenarioFormValues: finalFormValues,
+        secretFields: node.config?.secretFields,
+        clearSecretFields: secretsToClear,
         globalFormValues,
         globalTouchedFields,
         volumes: Object.keys(volumes).length > 0 ? volumes : undefined,
@@ -287,6 +296,50 @@ function StudioNodeEditorModalComponent({
       updates.nodeId = newNodeId;
     }
 
+    if (node.config && (savedWorkflow || workflow?.sourceGraphRunName)) {
+      const secretFields = { ...node.config.secretFields };
+      for (const variable of secretVariables) {
+        if (!(variable in secretFields)) {
+          secretFields[variable] = Boolean(node.config.scenarioFormValues[variable] ?? node.config.globalFormValues?.[variable]);
+        }
+      }
+      const previousValues = { ...node.config.scenarioFormValues, ...node.config.globalFormValues } as Record<string, string>;
+      const nextValues = { ...finalFormValues, ...globalFormValues } as Record<string, string>;
+      const nextSecretFields = { ...secretFields };
+      for (const variable of Object.keys(secretFields)) {
+        if (nextValues[variable]) nextSecretFields[variable] = true;
+        if (secretsToClear.includes(variable) && !nextValues[variable]) nextSecretFields[variable] = false;
+      }
+      if (updates.config) updates.config.secretFields = nextSecretFields;
+      const executionChanged = JSON.stringify({
+        nodeId: node.nodeId,
+        scenarioName: node.config.scenarioName,
+        registryType: node.config.registryType,
+        registryConfig: node.config.registryConfig,
+        volumes: node.config.volumes,
+        workspace: node.config.workspace,
+        rollbackEnabled: node.config.rollbackEnabled,
+        resiliencyWeight: node.config.resiliencyWeight,
+      }) !== JSON.stringify({
+        nodeId: newNodeId,
+        scenarioName: selectedScenario,
+        registryType,
+        registryConfig,
+        volumes: updates.config?.volumes,
+        workspace,
+        rollbackEnabled,
+        resiliencyWeight,
+      });
+      if (willClearScenarioSecrets(previousValues, nextValues, secretFields, executionChanged)) {
+        if (updates.config) {
+          updates.config.secretFields = Object.fromEntries(
+            Object.keys(secretFields).map(variable => [variable, Boolean(nextValues[variable])]),
+          );
+        }
+        setPendingSecretInvalidation(updates);
+        return;
+      }
+    }
     onSave(node.nodeId, updates);
     onClose();
   };
@@ -298,6 +351,10 @@ function StudioNodeEditorModalComponent({
 
   const handleDefaultValuesLoad = useCallback((defaults: ScenarioFormValues) => {
     setScenarioDefaultValues(defaults);
+  }, []);
+
+  const handleSecretVariablesLoad = useCallback((variables: string[]) => {
+    setSecretVariables(variables);
   }, []);
 
   const handleClose = () => {
@@ -358,10 +415,14 @@ function StudioNodeEditorModalComponent({
           registryName={registryType === 'private' ? registryName : ''}
           formValues={formValues}
           globalFormValues={globalFormValues}
+          configuredSecrets={node.config?.secretFields}
+          secretsToClear={secretsToClear}
+          onClearSavedSecret={(variable) => setSecretsToClear(previous => [...new Set([...previous, variable])])}
           globalTouchedFields={globalTouchedFields}
           onFormChange={setFormValues}
           onGlobalFormChange={handleGlobalFormChange}
           onDefaultValuesLoad={handleDefaultValuesLoad}
+          onSecretVariablesLoad={handleSecretVariablesLoad}
           onLoadStatusChange={handleScenarioConfigLoadStatusChange}
           cloudCredentialRef={cloudCredentialRef}
           onCloudCredentialRefChange={setCloudCredentialRef}
@@ -400,6 +461,7 @@ function StudioNodeEditorModalComponent({
   ];
 
   return (
+    <>
     <WizardStepper
       isOpen={isOpen}
       title="Configure Chaos Scenario"
@@ -409,6 +471,24 @@ function StudioNodeEditorModalComponent({
       onClose={handleClose}
       onSave={handleSave}
     />
+    <Modal
+      variant={ModalVariant.small}
+      title={secretInvalidationWarning('node').title}
+      titleIconVariant={ExclamationTriangleIcon}
+      isOpen={pendingSecretInvalidation !== null}
+      onClose={() => setPendingSecretInvalidation(null)}
+      actions={[
+        <Button key="continue" variant="danger" onClick={() => {
+          if (pendingSecretInvalidation) onSave(node.nodeId, pendingSecretInvalidation);
+          setPendingSecretInvalidation(null);
+          onClose();
+        }}>Continue</Button>,
+        <Button key="cancel" variant="link" onClick={() => setPendingSecretInvalidation(null)}>Cancel</Button>,
+      ]}
+    >
+      <p>{secretInvalidationWarning('node').explanation}</p>
+    </Modal>
+    </>
   );
 }
 

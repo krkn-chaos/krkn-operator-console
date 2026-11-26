@@ -43,6 +43,9 @@ interface ScenarioParameterSectionsProps {
   appliedCloudCredName: string;
   /** CLOUD_TYPE used to hide other providers' optional credential fields */
   activeCloudType?: string;
+  configuredSecrets?: Record<string, boolean>;
+  secretsToClear?: string[];
+  onClearSavedSecret?: (variable: string) => void;
 }
 
 export function ScenarioParameterSections({
@@ -70,6 +73,9 @@ export function ScenarioParameterSections({
   onSelectCloudCredential,
   appliedCloudCredName,
   activeCloudType,
+  configuredSecrets,
+  secretsToClear,
+  onClearSavedSecret,
 }: ScenarioParameterSectionsProps) {
   const cloudDisabledFields = getCloudDisabledFields(appliedCloudCredName);
   const esDisabledFields = appliedEsConfigName ? ['ES_PASSWORD'] : [];
@@ -146,6 +152,9 @@ export function ScenarioParameterSections({
               {visibleOptionalFields.length > 0 ? (
                 <DynamicFormBuilder
                   fields={visibleOptionalFields}
+                  configuredSecrets={configuredSecrets}
+                  secretsToClear={secretsToClear}
+                  onClearSavedSecret={onClearSavedSecret}
                   values={formValues}
                   onChange={onFormChange}
                   disabledFields={cloudDisabledFields}
@@ -216,6 +225,9 @@ export function ScenarioParameterSections({
                 <CardBody>
                   <DynamicFormBuilderWithTracking
                     fields={visibleRequiredGlobalFields}
+                    configuredSecrets={configuredSecrets}
+                    secretsToClear={secretsToClear}
+                    onClearSavedSecret={onClearSavedSecret}
                     values={globalFormValues}
                     touchedFields={globalTouchedFields}
                     onChange={onGlobalFormChange}
@@ -230,6 +242,9 @@ export function ScenarioParameterSections({
                 <CardBody>
                   <DynamicFormBuilderWithTracking
                     fields={visibleOptionalGlobalFields}
+                    configuredSecrets={configuredSecrets}
+                    secretsToClear={secretsToClear}
+                    onClearSavedSecret={onClearSavedSecret}
                     values={globalFormValues}
                     touchedFields={globalTouchedFields}
                     onChange={onGlobalFormChange}
