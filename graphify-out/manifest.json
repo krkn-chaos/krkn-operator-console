@@ -1914,9 +1914,9 @@
     "semantic_hash": ""
   },
   "src/services/__tests__/authService.test.ts": {
-    "mtime": 1795707160.887875,
-    "seen": 1795707256.391846,
-    "ast_hash": "c20c98fc2475c1c183fbc9a140a4d4dc",
+    "mtime": 1795707828.3755875,
+    "seen": 1795707836.444863,
+    "ast_hash": "efb60716411d0c477fbb962fba031562",
     "semantic_hash": ""
   },
   "src/services/__tests__/backupRestoreApi.test.ts": {
@@ -2004,9 +2004,9 @@
     "semantic_hash": ""
   },
   "src/services/authService.ts": {
-    "mtime": 1795707160.7297542,
-    "seen": 1795707256.391854,
-    "ast_hash": "b15a10321770cc6fd0de96dbbf43eef2",
+    "mtime": 1795707828.313036,
+    "seen": 1795707836.4448729,
+    "ast_hash": "e03c631ee3e72b12144f519a3a2ce6da",
     "semantic_hash": ""
   },
   "src/services/backupRestoreApi.ts": {

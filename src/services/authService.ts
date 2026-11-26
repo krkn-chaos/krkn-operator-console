@@ -93,11 +93,14 @@ function parseCookieSession(value: unknown): { user: User; csrfToken: string } {
     || typeof session.csrfToken !== 'string' || !session.csrfToken) {
     throw new Error('Invalid session response');
   }
+  const name = typeof session.name === 'string' ? session.name.trim() : '';
+  const surname = typeof session.surname === 'string' ? session.surname.trim() : '';
+  const hasDisplayName = Boolean(name || surname);
   return {
     user: {
       userId: session.userId,
-      name: typeof session.name === 'string' ? session.name.trim() : '',
-      surname: typeof session.surname === 'string' ? session.surname.trim() : '',
+      name: hasDisplayName ? name : session.userId,
+      surname: hasDisplayName ? surname : '',
       role: session.role,
       provider: session.provider,
       groups: session.mappedGroups as string[],
