@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   EmptyState,
@@ -23,9 +23,10 @@ import {
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FiFile, FiEdit, FiTrash2, FiRefreshCw, FiPlus, FiGlobe, FiLock, FiBarChart2 } from 'react-icons/fi';
 import { TopologyIcon } from '@patternfly/react-icons';
-import type { FileInfo } from '../../types/api';
+import type { CategoryResponse, FileInfo } from '../../types/api';
 import type { ComponentType } from 'react';
 import { usePagination } from '../../hooks/usePagination';
+import { CategoryStripe } from '../CategoryStripe';
 
 const FILES_PER_PAGE = 25;
 
@@ -94,6 +95,10 @@ function canModifyFile(file: FileInfo, userGroups: string[], isAdmin: boolean): 
 
 interface FilesTableProps {
   files: FileInfo[];
+  /** Category definitions for the current user; supplies colors for named categories. */
+  categories?: CategoryResponse[];
+  /** Whether the deployed operator persists category associations on files. */
+  categoriesSupported?: boolean;
   isAdmin: boolean;
   userGroups: string[];
   onCreateClick: () => void;
@@ -104,6 +109,8 @@ interface FilesTableProps {
 
 export function FilesTable({
   files,
+  categories = [],
+  categoriesSupported = true,
   isAdmin,
   userGroups,
   onCreateClick,
@@ -114,6 +121,8 @@ export function FilesTable({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAccess, setSelectedAccess] = useState<string[]>([]);
   const [isAccessFilterOpen, setIsAccessFilterOpen] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
 
   const filesList = useMemo(() => Array.isArray(files) ? files : [], [files]);
   const accessOptions = useMemo(
@@ -125,6 +134,27 @@ export function FilesTable({
     ],
     [filesList],
   );
+  // Files reference categories by name; the definitions supply the stripe colors
+  // and are the only categories the user is allowed to know about. Names without
+  // a visible definition are dropped, matching how the runs list renders
+  // categories (see JobsList.getRunCategories).
+  const categoriesByName = useMemo(
+    () => new Map(categories.map((category) => [category.name, category])),
+    [categories],
+  );
+  const categoriesForFile = useCallback(
+    (file: FileInfo): CategoryResponse[] => (file.categories || [])
+      .map((name) => categoriesByName.get(name))
+      .filter((category): category is CategoryResponse => category !== undefined),
+    [categoriesByName],
+  );
+
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(filesList.flatMap((file) => categoriesForFile(file).map((c) => c.name))))
+      .sort()
+      .map((category) => ({ value: category, label: category })),
+    [filesList, categoriesForFile],
+  );
 
   const filteredFiles = useMemo(() => filesList.filter(
     (file) => {
@@ -133,15 +163,18 @@ export function FilesTable({
         file.fileId.toLowerCase().includes(term) ||
         file.fileName.toLowerCase().includes(term) ||
         file.workflowName?.toLowerCase().includes(term) ||
-        file.description?.toLowerCase().includes(term)
+        file.description?.toLowerCase().includes(term) ||
+        categoriesForFile(file).some((category) => category.name.toLowerCase().includes(term))
       );
       const matchesAccess = selectedAccess.length === 0 || (
         (file.availableToAll && selectedAccess.includes('public')) ||
         (file.groups || []).some((group) => selectedAccess.includes(`group:${group}`))
       );
-      return matchesSearch && matchesAccess;
+      const matchesCategory = selectedCategories.length === 0 ||
+        categoriesForFile(file).some((category) => selectedCategories.includes(category.name));
+      return matchesSearch && matchesAccess && matchesCategory;
     }
-  ), [filesList, searchTerm, selectedAccess]);
+  ), [filesList, searchTerm, selectedAccess, selectedCategories, categoriesForFile]);
 
   const {
     paginatedData: paginatedFiles,
@@ -204,6 +237,19 @@ export function FilesTable({
               onSelect={(value) => toggleSelection(value, setSelectedAccess)}
             />
           </ToolbarItem>
+          {categoriesSupported && (
+            <ToolbarItem>
+              <MultiFilter
+                ariaLabel="Filter files by category"
+                label="Filter by category"
+                options={categoryOptions}
+                selected={selectedCategories}
+                isOpen={isCategoryFilterOpen}
+                onToggle={setIsCategoryFilterOpen}
+                onSelect={(value) => toggleSelection(value, setSelectedCategories)}
+              />
+            </ToolbarItem>
+          )}
           <ToolbarItem>
             <Button variant="secondary" onClick={onRefresh} icon={<FiRefreshCw />}>
               Refresh
@@ -224,9 +270,10 @@ export function FilesTable({
       >
         <Thead>
           <Tr>
-            <Th width={50}>File Name</Th>
-            <Th width={25}>Access</Th>
-            <Th width={25}>Actions</Th>
+            <Th width={25}>File Name</Th>
+            <Th width={40}>Description</Th>
+            <Th width={20}>Access</Th>
+            <Th width={15}>Actions</Th>
           </Tr>
         </Thead>
         <Tbody>
@@ -237,29 +284,47 @@ export function FilesTable({
             const displayName = (purposeKey === 'workflow-template' && file.workflowName) ? file.workflowName : file.fileName;
             const canModify = canModifyFile(file, userGroups, isAdmin);
             const disabledTooltip = `You don't have permission (file belongs to ${file.groups?.[0] || 'another group'})`;
+            const fileCategories = categoriesForFile(file);
 
             return (
               <Tr key={file.fileId}>
-                <Td dataLabel="File Name">
-                  <Tooltip content={file.description || 'No description'} position="top">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <PurposeIcon style={{ color: purposeCfg.color, flexShrink: 0 }} />
-                      <code style={{
-                        fontSize: '0.875rem',
-                        padding: '0.125rem 0.25rem',
-                        backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
-                        borderRadius: '3px',
-                        cursor: 'help',
-                      }}>
-                        {displayName}
-                      </code>
-                      {purposeKey !== 'file' && (
-                        <Label isCompact color={purposeKey === 'workflow-template' ? 'purple' : 'green'}>
-                          {purposeCfg.label}
-                        </Label>
-                      )}
-                    </div>
-                  </Tooltip>
+                <Td dataLabel="File Name" style={{ position: 'relative' }}>
+                  <CategoryStripe categories={fileCategories} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <PurposeIcon style={{ color: purposeCfg.color, flexShrink: 0 }} />
+                    <code style={{
+                      fontSize: '0.875rem',
+                      padding: '0.125rem 0.25rem',
+                      backgroundColor: 'var(--pf-v5-global--BackgroundColor--200)',
+                      borderRadius: '3px',
+                    }}>
+                      {displayName}
+                    </code>
+                    {purposeKey !== 'file' && (
+                      <Label isCompact color={purposeKey === 'workflow-template' ? 'purple' : 'green'}>
+                        {purposeCfg.label}
+                      </Label>
+                    )}
+                  </div>
+                </Td>
+                <Td dataLabel="Description">
+                  {file.description ? (
+                    <Tooltip content={file.description} position="top">
+                      <span
+                        style={{
+                          display: 'block',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: '100%',
+                        }}
+                      >
+                        {file.description}
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <span style={{ color: 'var(--pf-v5-global--Color--200)' }}>—</span>
+                  )}
                 </Td>
                 <Td dataLabel="Access">
                   {file.availableToAll ? (
@@ -318,7 +383,7 @@ export function FilesTable({
         />
       )}
 
-      {filteredFiles.length === 0 && (searchTerm || selectedAccess.length > 0) && (
+      {filteredFiles.length === 0 && (searchTerm || selectedAccess.length > 0 || selectedCategories.length > 0) && (
         <EmptyState>
           <EmptyStateHeader titleText="No results found" headingLevel="h4" />
           <EmptyStateBody>

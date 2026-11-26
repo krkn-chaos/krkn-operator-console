@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RunCategoryStripe } from './RunCategoryActions';
+import { CategoryStripe } from './CategoryStripe';
 
 const makeRect = (left: number, top: number, width: number, height: number) => ({
   left,
@@ -20,10 +20,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('RunCategoryStripe', () => {
+describe('CategoryStripe', () => {
   it('uses the sidebar marker width and visibly expands before showing its tooltip', async () => {
     render(
-      <RunCategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />,
+      <CategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />,
     );
 
     const stripe = screen.getByRole('group', { name: 'Categories: resilience' });
@@ -56,7 +56,7 @@ describe('RunCategoryStripe', () => {
 
   it('shows the tooltip from the fallback timer when the width transition event is missing', () => {
     vi.useFakeTimers();
-    render(<RunCategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
+    render(<CategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
 
     const visualStripe = screen.getByTestId('category-stripe-visual');
     fireEvent.mouseEnter(visualStripe);
@@ -69,7 +69,7 @@ describe('RunCategoryStripe', () => {
 
   it.each(['mouse leave', 'blur'] as const)('cancels the fallback reveal on %s', (event) => {
     vi.useFakeTimers();
-    render(<RunCategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
+    render(<CategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
 
     const stripe = screen.getByRole('group', { name: 'Categories: resilience' });
     const visualStripe = screen.getByTestId('category-stripe-visual');
@@ -88,7 +88,7 @@ describe('RunCategoryStripe', () => {
 
   it('keeps a visible tooltip open while the pointer crosses the gap into it', () => {
     vi.useFakeTimers();
-    render(<RunCategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
+    render(<CategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
 
     const visualStripe = screen.getByTestId('category-stripe-visual');
     fireEvent.mouseEnter(visualStripe);
@@ -109,7 +109,7 @@ describe('RunCategoryStripe', () => {
   it('keeps long category names inside the viewport and points the arrow at the stripe', () => {
     vi.stubGlobal('innerWidth', 320);
     render(
-      <RunCategoryStripe categories={[{
+      <CategoryStripe categories={[{
         name: 'a-very-long-category-name-without-natural-breaks-that-must-wrap',
         color: '#0066cc',
         availableToAll: true,
@@ -132,7 +132,7 @@ describe('RunCategoryStripe', () => {
   });
 
   it('repositions the tooltip arrow when the run row changes height during resize', () => {
-    render(<RunCategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
+    render(<CategoryStripe categories={[{ name: 'resilience', color: '#0066cc', availableToAll: true }]} />);
 
     const visualStripe = screen.getByTestId('category-stripe-visual');
     let visualRect = makeRect(10, 32, 9, 20);
@@ -149,7 +149,7 @@ describe('RunCategoryStripe', () => {
 
   it('renders category colors as contiguous equal-height gradient stops', () => {
     render(
-      <RunCategoryStripe
+      <CategoryStripe
         categories={[
           { name: 'first', color: '#cc0066', availableToAll: true },
           { name: 'second', color: '#00aa66', availableToAll: true },

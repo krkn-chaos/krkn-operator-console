@@ -63,7 +63,8 @@ import { useJobs } from '../hooks/useJobs';
 import { useKrknAIOrigins } from '../hooks/useKrknAIOrigins';
 import { ResiliencyScoreTooltip } from './ResiliencyScoreTooltip';
 import { ScenarioConfigDisplay } from './ScenarioConfigDisplay';
-import { RunCategoryActions, RunCategoryStripe } from './RunCategoryActions';
+import { RunCategoryActions } from './RunCategoryActions';
+import { CategoryStripe } from './CategoryStripe';
 import { JobDiagnosticAlert } from './JobDiagnosticAlert';
 import { operatorApi } from '../services/operatorApi';
 import { isApiError } from '../utils/apiClient';
@@ -972,7 +973,7 @@ export function JobsList({
                   <DataListItem key={item.graphRunName} isExpanded={isGraphExpanded}>
                     {/* GraphRun Summary Row */}
                     <DataListItemRow style={{ position: 'relative' }}>
-                      <RunCategoryStripe categories={graphCategories} />
+                      <CategoryStripe categories={graphCategories} />
                       <DataListToggle
                         onClick={() => onToggleGraphRunAccordion(item.graphRunName)}
                         isExpanded={isGraphExpanded}
@@ -1156,7 +1157,7 @@ export function JobsList({
                 <DataListItem key={run.scenarioRunName} isExpanded={isRunExpanded}>
                   {/* Scenario Run Summary Row */}
                   <DataListItemRow style={{ position: 'relative' }}>
-                    <RunCategoryStripe categories={scenarioCategories} />
+                    <CategoryStripe categories={scenarioCategories} />
                     <DataListToggle
                       onClick={() => onToggleRunAccordion(run.scenarioRunName)}
                       isExpanded={isRunExpanded}

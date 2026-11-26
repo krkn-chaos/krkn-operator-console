@@ -15,12 +15,16 @@ function Harness({
   status = 'ready',
   availableCategories = categories,
   onRetry = vi.fn(),
+  preserveExistingOnError = false,
+  initialSelected = [],
 }: {
   status?: CategoryLoadStatus;
   availableCategories?: CategoryResponse[];
   onRetry?: () => void;
+  preserveExistingOnError?: boolean;
+  initialSelected?: string[];
 }) {
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(initialSelected);
   return (
     <CategoryMultiSelect
       id="test-categories"
@@ -30,6 +34,7 @@ function Harness({
       selectedCategories={selected}
       onSelectionChange={setSelected}
       onRetry={onRetry}
+      preserveExistingOnError={preserveExistingOnError}
     />
   );
 }
@@ -53,6 +58,21 @@ describe('CategoryMultiSelect', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading categories');
     expect(screen.queryByRole('button', { name: 'Categories' })).not.toBeInTheDocument();
     expect(screen.queryByText('network')).not.toBeInTheDocument();
+  });
+
+  it('counts only categories that have a selectable option', () => {
+    render(<Harness initialSelected={['network', 'group-only']} />);
+
+    const toggle = screen.getByRole('button', { name: 'Categories' });
+    expect(toggle).toHaveTextContent('1 category selected');
+    expect(screen.queryByRole('checkbox', { name: 'group-only' })).not.toBeInTheDocument();
+  });
+
+  it('says existing categories are kept when the caller preserves them', () => {
+    render(<Harness status="error" preserveExistingOnError />);
+
+    expect(screen.getByText(/The existing categories will be kept unchanged/)).toBeInTheDocument();
+    expect(screen.queryByText(/No categories will be assigned/)).not.toBeInTheDocument();
   });
 
   it('offers retry after a category request fails and hides partial results', async () => {

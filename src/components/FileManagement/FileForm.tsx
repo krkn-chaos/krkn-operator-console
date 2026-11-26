@@ -35,12 +35,19 @@ import { FiX } from 'react-icons/fi';
 import './FileForm.css';
 import { operatorApi } from '../../services/operatorApi';
 import { useRole } from '../../hooks/useRole';
+import { useVisibleCategories } from '../../hooks/useVisibleCategories';
+import { CategoryMultiSelect } from '../CategoryMultiSelect';
 import { isApiError } from '../../utils/apiClient';
 import type { FileInfo, CreateFileRequest, UpdateFileRequest, GroupResponse } from '../../types/api';
 
 interface FileFormProps {
   mode: 'create' | 'edit';
   initialData?: FileInfo;
+  /**
+   * Whether the deployed operator supports file categories. When false the
+   * category field is hidden instead of accepting input that cannot persist.
+   */
+  categoriesSupported?: boolean;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -48,15 +55,25 @@ interface FileFormProps {
 export function FileForm({
   mode,
   initialData,
+  categoriesSupported = true,
   onSuccess,
   onCancel,
 }: FileFormProps) {
   const { isAdmin } = useRole();
+  const {
+    categories: visibleCategories,
+    status: categoryStatus,
+    reload: reloadCategories,
+  } = useVisibleCategories();
 
   // State - will be populated from getFile() in edit mode
   const [fileName, setFileName] = useState('');
   const [content, setContent] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  // Whether the loaded file exposed the categories field. An operator without
+  // support omits it, and sending an empty array would clear associations.
+  const [categoryFieldKnown, setCategoryFieldKnown] = useState(false);
   const [legacyFileType, setLegacyFileType] = useState(initialData?.fileType);
   const [accessType, setAccessType] = useState<'public' | 'group'>('public');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
@@ -90,6 +107,8 @@ export function FileForm({
         setContent(file.content);
         setDescription(file.description || '');
         setLegacyFileType(file.fileType || initialData?.fileType);
+        setSelectedCategories(file.categories ?? []);
+        setCategoryFieldKnown(file.categories !== undefined);
         setAccessType(file.availableToAll ? 'public' : 'group');
         setSelectedGroup(file.groups?.[0] || '');
       } catch (err) {
@@ -173,6 +192,14 @@ export function FileForm({
       // Max 1 group (or empty for public)
       const groupsArray = accessType === 'group' && selectedGroup ? [selectedGroup] : [];
 
+      // Only send categories when the operator supports them, the list loaded,
+      // and either the current associations are known or the user made a
+      // selection. Omitting the field leaves stored associations untouched.
+      const canSendCategories = categoriesSupported
+        && categoryStatus === 'ready'
+        && (mode === 'create' || categoryFieldKnown || selectedCategories.length > 0);
+      const categoriesField = canSendCategories ? { categories: selectedCategories } : {};
+
       if (mode === 'create') {
         const request: CreateFileRequest = {
           fileName,
@@ -180,6 +207,7 @@ export function FileForm({
           description: description.trim() || undefined,
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
+          ...categoriesField,
         };
 
         await operatorApi.createFile(request);
@@ -191,6 +219,7 @@ export function FileForm({
           groups: groupsArray.length > 0 ? groupsArray : undefined,
           availableToAll: accessType === 'public',
           fileType: legacyFileType,
+          ...categoriesField,
         };
 
         await operatorApi.updateFile(initialData!.fileId, request);
@@ -285,6 +314,18 @@ export function FileForm({
         />
       </FormGroup>
 
+      {categoriesSupported && (
+        <CategoryMultiSelect
+          id="file-categories"
+          label="Categories"
+          categories={visibleCategories}
+          status={categoryStatus}
+          selectedCategories={selectedCategories}
+          onSelectionChange={setSelectedCategories}
+          onRetry={reloadCategories}
+          preserveExistingOnError={mode === 'edit'}
+        />
+      )}
 
       <FormGroup label="Access Control" isRequired fieldId="access-control">
         {/* Admin: can choose public or group */}
