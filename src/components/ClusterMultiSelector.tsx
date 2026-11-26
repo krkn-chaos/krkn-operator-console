@@ -261,9 +261,8 @@ export function ClusterMultiSelector({
                   size="lg"
                 >
                   {selectedClusters.length > 0
-                    ? `Proceed with ${selectedClusters.length} cluster${
-                        selectedClusters.length === 1 ? '' : 's'
-                      }`
+                    ? `Proceed with ${selectedClusters.length} cluster${selectedClusters.length === 1 ? '' : 's'
+                    }`
                     : 'Select clusters to proceed'}
                 </Button>
               </FlexItem>

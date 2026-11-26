@@ -360,12 +360,10 @@ const mockClusters = {
       { 'cluster-name': 'staging-us-east-1', 'cluster-api-url': 'https://api.staging-east.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
       { 'cluster-name': 'staging-eu-west-1', 'cluster-api-url': 'https://api.staging-west.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
       { 'cluster-name': 'prod-us-central1', 'cluster-api-url': 'https://api.prod.example.com:6443', online: true, 'cluster-status': 'healthy', 'checked-at': '2026-09-09T08:00:00Z' },
-      // Unavailable clusters, so the preview shows that Run can still be granted
-      // on them in group permissions while the run picker leaves them out.
-      // The liveness check failed; only ACM sets a cluster-status.
-      { 'cluster-name': 'offline-us-west-2', 'cluster-api-url': 'https://api.offline-west.example.com:6443', online: false, 'checked-at': '2026-09-09T08:00:00Z' },
-      // Reachable, but ACM reports a failed prerequisite.
-      { 'cluster-name': 'unhealthy-ap-south-1', 'cluster-api-url': 'https://api.unhealthy-south.example.com:6443', online: true, 'cluster-status': 'unhealthy', 'checked-at': '2026-09-09T08:00:00Z' },
+      // Liveness failure: the API server did not answer the latest check.
+      { 'cluster-name': 'chaos-lab-unreachable', 'cluster-api-url': 'https://api.chaos-lab-unreachable.example.com:6443', online: false, 'cluster-status': 'unknown', 'checked-at': '2026-11-19T09:45:00Z' },
+      // Reachable, but ACM reports the cluster itself as unhealthy.
+      { 'cluster-name': 'prod-eu-central1', 'cluster-api-url': 'https://api.prod-eu.example.com:6443', online: true, 'cluster-status': 'unhealthy', 'checked-at': '2026-11-19T09:45:00Z' },
     ],
   },
   status: 'ready',
@@ -417,6 +415,12 @@ const mockTargets = [
   { uuid: 'target-001', clusterName: 'staging-us-east-1', clusterAPIURL: 'https://api.staging-east.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z' },
   { uuid: 'target-002', clusterName: 'staging-eu-west-1', clusterAPIURL: 'https://api.staging-west.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-07-01T12:00:00Z' },
   { uuid: 'target-003', clusterName: 'prod-us-central1', clusterAPIURL: 'https://api.prod.example.com:6443', secretType: 'token', ready: true, createdAt: '2026-06-30T08:00:00Z' },
+  // Registered and ready, but discovery reports its API server as unreachable.
+  { uuid: 'target-004', clusterName: 'chaos-lab-unreachable', clusterAPIURL: 'https://api.chaos-lab-unreachable.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-11-02T15:20:00Z' },
+  // Registered and reachable, but ACM reports the cluster as unhealthy.
+  { uuid: 'target-005', clusterName: 'prod-eu-central1', clusterAPIURL: 'https://api.prod-eu.example.com:6443', secretType: 'kubeconfig', ready: true, createdAt: '2026-11-05T09:10:00Z' },
+  // Not registered as ready, so discovery excludes it from every picker.
+  { uuid: 'target-006', clusterName: 'retired-lab-cluster', clusterAPIURL: 'https://api.retired-lab.example.com:6443', secretType: 'token', ready: false, createdAt: '2026-10-21T11:00:00Z' },
 ];
 
 // ─── SCENARIOS (ScenarioTag) ───
@@ -572,10 +576,12 @@ export const handlers = [
 
   // ─── GROUPS ───
   http.get(`${BASE}/groups`, () =>
-    HttpResponse.json({ groups: [
-      { name: 'krkn-admins', role: 'admin' },
-      { name: 'krkn-users', role: 'user' },
-    ] }),
+    HttpResponse.json({
+      groups: [
+        { name: 'krkn-admins', role: 'admin' },
+        { name: 'krkn-users', role: 'user' },
+      ]
+    }),
   ),
 
   // ─── TARGET CREATION & POLLING ───
@@ -1027,10 +1033,10 @@ export const handlers = [
     const { command } = await request.json() as { command?: string };
     const stdout = command === 'kubectl get namespaces -o json'
       ? JSON.stringify({
-          apiVersion: 'v1',
-          kind: 'NamespaceList',
-          items: ['default', 'kube-system', 'shop', 'robot-shop'].map((name) => ({ metadata: { name } })),
-        })
+        apiVersion: 'v1',
+        kind: 'NamespaceList',
+        items: ['default', 'kube-system', 'shop', 'robot-shop'].map((name) => ({ metadata: { name } })),
+      })
       : 'Preview mode: commands are simulated.\n$ oc get pods\nNAME                    READY   STATUS    RESTARTS   AGE\nkrkn-operator-0         1/1     Running   0          2d\n';
     return HttpResponse.json({
       stdout_base64: b64(stdout),
@@ -1091,7 +1097,7 @@ export const handlers = [
   http.get(`${BASE}/elasticsearch-configs`, () =>
     HttpResponse.json({
       configs: [
-         { name: 'prod-es', host: 'https://es.example.com', port: 9200, telemetryIndex: 'krkn-telemetry', alertsIndex: 'krkn-alerts' },
+        { name: 'prod-es', host: 'https://es.example.com', port: 9200, telemetryIndex: 'krkn-telemetry', alertsIndex: 'krkn-alerts' },
       ],
       total: 1,
     }),
