@@ -96,8 +96,8 @@ function parseCookieSession(value: unknown): { user: User; csrfToken: string } {
   return {
     user: {
       userId: session.userId,
-      name: session.userId,
-      surname: '',
+      name: typeof session.name === 'string' ? session.name.trim() : '',
+      surname: typeof session.surname === 'string' ? session.surname.trim() : '',
       role: session.role,
       provider: session.provider,
       groups: session.mappedGroups as string[],

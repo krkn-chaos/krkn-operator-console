@@ -18,11 +18,12 @@ describe('authService - user groups', () => {
 
   it('restores an OIDC session without storing its token in browser storage', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', mappedGroups: ['ops'], csrfToken: 'csrf-123',
+      userId: 'oidc-123', name: 'Tullio', surname: 'Sebastiani', role: 'user',
+      provider: 'corp-keycloak', mappedGroups: ['ops'], csrfToken: 'csrf-123',
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
     expect(await authService.restoreCookieSession()).toEqual({
-      userId: 'oidc-123', name: 'oidc-123', surname: '', role: 'user', provider: 'corp-keycloak', groups: ['ops'],
+      userId: 'oidc-123', name: 'Tullio', surname: 'Sebastiani', role: 'user', provider: 'corp-keycloak', groups: ['ops'],
     });
     expect(authService.getCookieSession()?.csrfToken).toBe('csrf-123');
     expect(authService.getToken()).toBeNull();

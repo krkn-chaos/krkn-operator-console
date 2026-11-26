@@ -103,6 +103,19 @@ describe('IdentityManagement', () => {
     expect(screen.getByRole('textbox', { name: 'Issuer URL' })).toBeInTheDocument();
   });
 
+  it('states whether TLS verification is skipped', async () => {
+    render(<IdentityManagement />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Corporate Keycloak' }));
+
+    const skipTLS = screen.getByLabelText('Skip TLS verification: Disabled');
+    const caCertificate = screen.getByRole('textbox', { name: 'Additional trusted CA certificate (PEM)' });
+    expect(caCertificate).not.toBeDisabled();
+    expect(screen.getByLabelText('CA certificate input instructions')).toBeInTheDocument();
+
+    await userEvent.click(skipTLS);
+    expect(screen.getByRole('textbox', { name: 'Additional trusted CA certificate (PEM)' })).toBeDisabled();
+  });
+
   it('uses Keycloak root offsets even when a page contains nested groups', async () => {
     mocks.groups.mockResolvedValueOnce({ groups: [
       { provider: 'corp-keycloak', id: 'root', name: 'Root', path: '/Root', claimValue: '/Root' },

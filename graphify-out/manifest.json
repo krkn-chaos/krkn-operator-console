@@ -522,9 +522,9 @@
     "semantic_hash": ""
   },
   "src/components/IdentityManagement.tsx": {
-    "mtime": 1795700475.7411385,
-    "seen": 1795700652.346892,
-    "ast_hash": "123665568abefcabdf4c976744c34f9a",
+    "mtime": 1795707224.3716445,
+    "seen": 1795707256.391722,
+    "ast_hash": "3b2ca4ba986eb20a0fa6d490270745f2",
     "semantic_hash": ""
   },
   "src/components/JobDiagnosticAlert.tsx": {
@@ -1362,9 +1362,9 @@
     "semantic_hash": ""
   },
   "src/components/__tests__/IdentityManagement.test.tsx": {
-    "mtime": 1795700515.5521944,
-    "seen": 1795700652.346957,
-    "ast_hash": "6c75d0c0f04710eebd4a78de697a1ce9",
+    "mtime": 1795707224.4500778,
+    "seen": 1795707256.3917959,
+    "ast_hash": "578b221de0b86beaa7be6f22a78287b1",
     "semantic_hash": ""
   },
   "src/components/__tests__/JobsList.test.tsx": {
@@ -1914,9 +1914,9 @@
     "semantic_hash": ""
   },
   "src/services/__tests__/authService.test.ts": {
-    "mtime": 1795693573.7837021,
-    "seen": 1795700652.347001,
-    "ast_hash": "ce10a5901d1244c26b8f4d8f4a767680",
+    "mtime": 1795707160.887875,
+    "seen": 1795707256.391846,
+    "ast_hash": "c20c98fc2475c1c183fbc9a140a4d4dc",
     "semantic_hash": ""
   },
   "src/services/__tests__/backupRestoreApi.test.ts": {
@@ -2004,9 +2004,9 @@
     "semantic_hash": ""
   },
   "src/services/authService.ts": {
-    "mtime": 1795693573.7855246,
-    "seen": 1795700652.347008,
-    "ast_hash": "8ba47f5b6ec974175a5a70408d70ce35",
+    "mtime": 1795707160.7297542,
+    "seen": 1795707256.391854,
+    "ast_hash": "b15a10321770cc6fd0de96dbbf43eef2",
     "semantic_hash": ""
   },
   "src/services/backupRestoreApi.ts": {
