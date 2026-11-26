@@ -33,10 +33,13 @@ import { getFieldPreviewDisplayValue } from '../utils/fieldUtils';
 import { runOnEnterFromFormControl } from '../utils/keyboard';
 import { useSignatureVerification } from '../hooks/useSignatureVerification';
 import { useVisibleCategories } from '../hooks/useVisibleCategories';
+import { useClusterParameterOptions } from '../hooks/useClusterParameterOptions';
 import { CategoryMultiSelect } from './CategoryMultiSelect';
 
 import type { ScenarioFormValues, ScenariosRequest, TouchedFields, ScenarioRunRequest, ScenarioFileMount, ScenarioRunState, StringField, ElasticsearchConfig, ScenarioReference, CloudCredential, SignatureStatus, ClustersResponse } from '../types/api';
 import { createScenarioReference } from '../utils/scenarioReference';
+
+const POD_LABEL_CONFLICT_ERROR = 'Pod include and exclude labels must differ.';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -481,6 +484,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       }
     });
 
+    if (hasPodLabelConflict) errors.push(POD_LABEL_CONFLICT_ERROR);
+
     setValidationErrors(errors);
     return errors.length === 0;
   };
@@ -618,6 +623,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
     }
     if (rollbackEnabled && !workspace) {
       setValidationErrors(['Enable rollback requires a workspace. Select one or disable rollback.']);
+      return;
+    }
+    if (hasPodLabelConflict) {
+      setValidationErrors([POD_LABEL_CONFLICT_ERROR]);
       return;
     }
     if (!rollbackEnabled && (!Number.isInteger(maxRetries) || maxRetries < 0)) {
@@ -897,6 +906,23 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       : base;
   }, [scenarioDetail, hasGroupedScenarioFields, effectiveCloudType, cloudFilterOptions]);
 
+  const scenarioFields = useMemo(() => scenarioDetail?.fields ?? [], [scenarioDetail?.fields]);
+  const {
+    scenarioOptions: scenarioClusterOptions,
+    globalOptions: globalClusterOptions,
+    hasPodLabelConflict,
+    loadOptions: loadClusterOptions,
+  } = useClusterParameterOptions({
+    uuid: state.uuid,
+    clusters: state.selectedClusters,
+    scenarioName,
+    scenarioFields,
+    globalFields: allGlobalFields,
+    scenarioValues: scenarioFormValues,
+    globalValues: globalFormValues,
+    active: Boolean(scenarioDetail) && !showPreview,
+  });
+
   const hasConfigurableMainFields = mainFormFields.some((field) => field.type !== 'group');
 
   const previewScenarioFields = useMemo(
@@ -1043,6 +1069,8 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                   values={scenarioFormValues || {}}
                   onChange={handleFormChange}
                   disabledFields={cloudDisabledFields}
+                  clusterOptions={scenarioClusterOptions}
+                  onClusterOptionsOpen={(variable) => { void loadClusterOptions(variable); }}
                 />
               ) : (
                 <Alert variant="info" isInline isPlain title="No required parameters">
@@ -1099,6 +1127,10 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
           </Card>
 
           <ScenarioParameterSections
+            scenarioClusterOptions={scenarioClusterOptions}
+            globalClusterOptions={globalClusterOptions}
+            onScenarioClusterOptionsOpen={(variable) => { void loadClusterOptions(variable); }}
+            onGlobalClusterOptionsOpen={(variable) => { void loadClusterOptions(variable, true); }}
             optionalFields={optionalFields}
             formValues={scenarioFormValues || {}}
             onFormChange={handleFormChange}

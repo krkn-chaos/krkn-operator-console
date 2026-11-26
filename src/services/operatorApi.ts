@@ -6,6 +6,8 @@ import type {
   CreateTargetResponse,
   ClustersResponse,
   NodesResponse,
+  ClusterResourcesRequest,
+  ClusterResourcesResponse,
   ScenariosRequest,
   ScenariosResponse,
   ScenarioDetail,
@@ -101,7 +103,7 @@ class OperatorApiClient extends BaseApiClient {
   /**
    * POST /terminal
    * Execute a command on a remote cluster via kubectl/oc
-   * @param request - Terminal request with cluster_id, uuid, and command
+   * @param request - Terminal request with cluster_id, operator_name, uuid, and command
    * @returns Promise with decoded stdout, stderr, and exit code
    */
   async executeTerminalCommand(request: TerminalRequest): Promise<{
@@ -197,6 +199,19 @@ class OperatorApiClient extends BaseApiClient {
     const query = new URLSearchParams({ id: uuid, 'cluster-name': clusterName });
     if (operatorName) query.set('operator-name', operatorName);
     return this.fetchJson<NodesResponse>(`/nodes?${query.toString()}`);
+  }
+
+  /** List limited cluster resource metadata for scenario parameter suggestions. */
+  async getClusterResources(request: ClusterResourcesRequest): Promise<ClusterResourcesResponse> {
+    const query = new URLSearchParams({
+      id: request.uuid,
+      'cluster-name': request.clusterName,
+      'operator-name': request.operatorName,
+      resource: request.resource,
+    });
+    if (request.namespace) query.set('namespace', request.namespace);
+    if (request.allNamespaces) query.set('all-namespaces', 'true');
+    return this.fetchJson<ClusterResourcesResponse>(`/cluster-resources?${query.toString()}`);
   }
 
   /**

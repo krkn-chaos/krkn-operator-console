@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ScenarioDetail } from './ScenarioDetail';
@@ -7,7 +8,7 @@ import { operatorApi } from '../services/operatorApi';
 import { elasticsearchApi } from '../services/elasticsearchApi';
 import { cloudCredentialsApi } from '../services/cloudCredentialsApi';
 import { workspacesApi } from '../services/workspacesApi';
-import type { AppState } from '../types/api';
+import type { AppAction, AppState } from '../types/api';
 import type {
   ScenarioDetail as ScenarioDetailType,
   ScenarioGlobals,
@@ -16,6 +17,8 @@ import type {
   ScenarioRunStatusResponse,
   ActiveRunsResponse,
   StringField,
+  ClusterResourceName,
+  ClusterResourcesRequest,
 } from '../types/api';
 
 vi.mock('../services/operatorApi');
@@ -133,12 +136,17 @@ describe('ScenarioDetail', () => {
     notifications: [],
   };
 
-  const renderWithContext = (state: Partial<AppState> = {}, registryConfig: ScenariosRequest | null = null) => {
+  const resourceRequest = (resource: ClusterResourceName, overrides: Partial<ClusterResourcesRequest> = {}): ClusterResourcesRequest => ({
+    uuid: 'test-uuid-123', clusterName: 'cluster1', operatorName: 'krkn-operator',
+    resource, namespace: undefined, allNamespaces: false, ...overrides,
+  });
+
+  const renderWithContext = (state: Partial<AppState> = {}, registryConfig: ScenariosRequest | null = null, scenarioName = 'pod-scenarios') => {
     const fullState = { ...baseState, ...state };
 
     return render(
       <AppContext.Provider value={{ state: fullState, dispatch: mockDispatch }}>
-        <ScenarioDetail scenarioName="pod-scenarios" registryConfig={registryConfig} />
+        <ScenarioDetail scenarioName={scenarioName} registryConfig={registryConfig} />
       </AppContext.Provider>
     );
   };
@@ -170,6 +178,386 @@ describe('ScenarioDetail', () => {
     vi.mocked(elasticsearchApi.listConfigs).mockResolvedValue([]);
     vi.mocked(cloudCredentialsApi.listAvailable).mockResolvedValue([]);
     vi.mocked(workspacesApi.listAvailable).mockResolvedValue([]);
+    vi.mocked(operatorApi.getClusterResources).mockResolvedValue({ items: [] });
+  });
+
+  it('loads namespace suggestions from selected cluster when dropdown opens', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockResolvedValue({
+      items: [{ metadata: { name: 'default' } }, { metadata: { name: 'openshift-etcd' } }],
+    });
+
+    renderWithContext();
+    await user.click(screen.getByRole('button', { name: 'Show Target namespace options' }));
+
+    await waitFor(() => expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('namespaces')));
+    expect(await screen.findByText('openshift-etcd')).toBeInTheDocument();
+    expect(operatorApi.executeTerminalCommand).not.toHaveBeenCalled();
+    expect(operatorApi.getNodes).not.toHaveBeenCalled();
+  });
+
+  it('prefetches namespace and node suggestions before either select opens', async () => {
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource }) => ({
+      items: [{ metadata: { name: resource === 'namespaces' ? 'default' : 'worker-1' } }],
+    }));
+    const nodeName: StringField = {
+      name: 'node-name', variable: 'NODE_NAME', short_description: 'Node name',
+      description: 'Node to target', type: 'string', required: true, default: '',
+    };
+    renderWithContext({ scenarioDetail: { ...mockScenarioDetail, fields: [mockScenarioDetail.fields[0], nodeName] } });
+
+    await waitFor(() => expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('namespaces')));
+    await waitFor(() => expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('nodes')));
+  });
+
+  it('waits until open to list namespaced options for a namespace expression', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource }) => ({
+      items: resource === 'namespaces'
+        ? [{ metadata: { name: 'team-a' } }]
+        : [{ metadata: { name: 'pod-a', namespace: 'team-a' } }],
+    }));
+    const podName: StringField = {
+      name: 'pod-name', variable: 'POD_NAME', short_description: 'Pod name',
+      description: 'Pod to target', type: 'string', required: true, default: '',
+    };
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, fields: [mockScenarioDetail.fields[0], podName] },
+      scenarioFormValues: { NAMESPACE: 'team-.*', POD_NAME: '' },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('namespaces'));
+    expect(operatorApi.getClusterResources).not.toHaveBeenCalledWith(resourceRequest('pods', { allNamespaces: true }));
+
+    await user.click(screen.getByRole('button', { name: 'Show Pod name options' }));
+    expect(await screen.findByText('pod-a')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Refresh Pod name options' }));
+    await waitFor(() => expect(vi.mocked(operatorApi.getClusterResources).mock.calls.filter(
+      ([request]) => request.resource === 'pods' && request.allNamespaces,
+    )).toHaveLength(2));
+  });
+
+  it('opens prefetched node options without another request and retains them during refresh', async () => {
+    const user = userEvent.setup();
+    const getResources = vi.mocked(operatorApi.getClusterResources);
+    let resolvePrefetch!: (result: { items: Array<{ metadata: { name: string } }> }) => void;
+    getResources.mockImplementationOnce(() => new Promise((resolve) => { resolvePrefetch = resolve; }));
+    const nodeName: StringField = {
+      name: 'node-name', variable: 'NODE_NAME', short_description: 'Node name',
+      description: 'Node to target', type: 'string', required: true, default: '',
+    };
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, name: 'node-scenarios', fields: [nodeName] },
+      scenarioFormValues: { NODE_NAME: '' },
+    }, null, 'node-scenarios');
+
+    await waitFor(() => expect(getResources).toHaveBeenCalledTimes(1));
+    await act(async () => resolvePrefetch({ items: [{ metadata: { name: 'worker-1' } }] }));
+    await user.click(screen.getByRole('button', { name: 'Show Node name options' }));
+    expect(screen.getByText('worker-1')).toBeInTheDocument();
+    expect(getResources).toHaveBeenCalledTimes(1);
+
+    let resolveRefresh!: (result: { items: Array<{ metadata: { name: string } }> }) => void;
+    getResources.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+    await user.click(screen.getByRole('button', { name: 'Refresh Node name options' }));
+    await waitFor(() => expect(getResources).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('worker-1')).toBeInTheDocument();
+    expect(screen.getByText('Refreshing cluster options…')).toBeInTheDocument();
+    await act(async () => resolveRefresh({ items: [{ metadata: { name: 'worker-2' } }] }));
+    expect(await screen.findByText('worker-2')).toBeInTheDocument();
+  });
+
+  it('routes discovery to each selected provider when cluster names match', async () => {
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource }) => ({
+      items: [{ metadata: { name: resource === 'nodes' ? 'worker-1' : 'shared' } }],
+    }));
+    const nodeName: StringField = {
+      name: 'node-name', variable: 'NODE_NAME', short_description: 'Node name',
+      description: 'Node to target', type: 'string', required: true, default: '',
+    };
+    renderWithContext({
+      selectedClusters: [
+        { operatorName: 'provider-a', clusterName: 'shared', clusterApiUrl: 'https://a' },
+        { operatorName: 'provider-b', clusterName: 'shared', clusterApiUrl: 'https://b' },
+      ],
+      scenarioDetail: { ...mockScenarioDetail, fields: [mockScenarioDetail.fields[0], nodeName] },
+    });
+
+    for (const operatorName of ['provider-a', 'provider-b']) {
+      await waitFor(() => expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('nodes', { clusterName: 'shared', operatorName })));
+      await waitFor(() => expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('namespaces', { clusterName: 'shared', operatorName })));
+    }
+  });
+
+  it('refreshes pod suggestions when selected namespace changes', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource, namespace }) => ({
+      items: resource === 'namespaces'
+        ? [{ metadata: { name: 'team-a' } }, { metadata: { name: 'team-b' } }]
+        : [{ metadata: { name: namespace === 'team-a' ? 'pod-a' : 'pod-b' } }],
+    }));
+    const podName: StringField = {
+      name: 'pod-name', variable: 'POD_NAME', short_description: 'Pod name',
+      description: 'Pod to target', type: 'string', required: true, default: '',
+    };
+    const detail = { ...mockScenarioDetail, fields: [mockScenarioDetail.fields[0], podName] };
+    const state = { ...baseState, scenarioDetail: detail, scenarioFormValues: { NAMESPACE: 'team-a' } };
+    const { rerender } = render(
+      <AppContext.Provider value={{ state, dispatch: mockDispatch }}>
+        <ScenarioDetail scenarioName="pod-scenarios" registryConfig={null} />
+      </AppContext.Provider>,
+    );
+
+    const podNameToggle = screen.getByRole('button', { name: 'Show Pod name options' });
+    await user.click(podNameToggle);
+    await waitFor(() => expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('pods', { namespace: 'team-a' })));
+    await user.click(podNameToggle);
+
+    rerender(
+      <AppContext.Provider value={{ state: { ...state, scenarioFormValues: { NAMESPACE: 'team-b' } }, dispatch: mockDispatch }}>
+        <ScenarioDetail scenarioName="pod-scenarios" registryConfig={null} />
+      </AppContext.Provider>,
+    );
+    await user.click(podNameToggle);
+    await waitFor(() => expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('pods', { namespace: 'team-b' })));
+
+    expect(await screen.findByText('pod-b')).toBeInTheDocument();
+    expect(screen.queryByText('pod-a')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['POD_LABEL', 'POD_LABEL', 'Exclude label'],
+    ['LABEL_SELECTOR', 'LABEL_SELECTOR', 'Exclude label'],
+    ['POD_LABEL', 'EXCLUDE_LABEL', 'Pod label'],
+  ])('filters conflicting pod labels for %s with %s selected', async (includeVariable, selectedVariable, targetLabel) => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource }) => ({
+      items: resource === 'namespaces'
+        ? [{ metadata: { name: 'default' } }]
+        : [{ metadata: { name: 'pod-1', labels: { app: 'demo', protected: 'true' } } }],
+    }));
+    const podLabel: StringField = {
+      name: 'pod-label', variable: includeVariable, short_description: 'Pod label',
+      description: '', type: 'string', required: true,
+    };
+    const excludeLabel: StringField = {
+      name: 'exclude-label', variable: 'EXCLUDE_LABEL', short_description: 'Exclude label',
+      description: '', type: 'string', required: true,
+    };
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, fields: [mockScenarioDetail.fields[0], podLabel, excludeLabel] },
+      scenarioFormValues: { NAMESPACE: 'default', [selectedVariable]: 'app=demo' },
+    });
+
+    await user.click(screen.getByRole('button', { name: `Show ${targetLabel} options` }));
+    expect(await screen.findByText('protected=true')).toBeInTheDocument();
+    expect(screen.queryByText('app=demo')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: selectedVariable === 'EXCLUDE_LABEL' ? 'Exclude label' : 'Pod label' })).toHaveValue('app=demo');
+  });
+
+  it('blocks equal pod include and exclude labels entered as custom values', async () => {
+    const user = userEvent.setup();
+    const podLabel: StringField = {
+      name: 'pod-label', variable: 'POD_LABEL', short_description: 'Pod label',
+      description: '', type: 'string', required: true,
+    };
+    const excludeLabel: StringField = {
+      name: 'exclude-label', variable: 'EXCLUDE_LABEL', short_description: 'Exclude label',
+      description: '', type: 'string', required: false,
+    };
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, fields: [mockScenarioDetail.fields[0], podLabel, excludeLabel] },
+      scenarioFormValues: { NAMESPACE: 'default', POD_LABEL: 'app=demo', EXCLUDE_LABEL: 'app=demo' },
+    });
+
+    await user.click(screen.getByRole('button', { name: /Preview Configuration/i }));
+    expect(screen.getByText('Pod include and exclude labels must differ.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preview Configuration/i })).toBeInTheDocument();
+  });
+
+  it('blocks equal pod labels when opening directly in preview', async () => {
+    const user = userEvent.setup();
+    renderWithContext({
+      startInPreview: true,
+      scenarioDetail: { ...mockScenarioDetail, fields: [
+        mockScenarioDetail.fields[0],
+        { name: 'pod-label', variable: 'POD_LABEL', short_description: 'Pod label', description: '', type: 'string', required: true },
+        { name: 'exclude-label', variable: 'EXCLUDE_LABEL', short_description: 'Exclude label', description: '', type: 'string', required: false },
+      ] },
+      scenarioFormValues: { NAMESPACE: 'default', POD_LABEL: 'app=demo', EXCLUDE_LABEL: 'app=demo' },
+    });
+
+    await user.click(screen.getByRole('button', { name: /Run Scenarios/i }));
+    expect(operatorApi.runScenario).not.toHaveBeenCalled();
+    expect(screen.getByText('Pod include and exclude labels must differ.')).toBeInTheDocument();
+  });
+
+  it('lets users clear and exchange pod include and exclude labels', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource }) => ({
+      items: resource === 'namespaces'
+        ? [{ metadata: { name: 'default' } }]
+        : [{ metadata: { name: 'pod-1', labels: { app: 'demo', protected: 'true' } } }],
+    }));
+    const detail: ScenarioDetailType = { ...mockScenarioDetail, fields: [
+      mockScenarioDetail.fields[0],
+      { name: 'pod-label', variable: 'POD_LABEL', short_description: 'Pod label', description: '', type: 'string', required: true },
+      { name: 'exclude-label', variable: 'EXCLUDE_LABEL', short_description: 'Exclude label', description: '', type: 'string', required: false },
+    ] };
+    function Form() {
+      const [state, setState] = useState<AppState>({
+        ...baseState,
+        scenarioDetail: detail,
+        scenarioFormValues: { NAMESPACE: 'default', POD_LABEL: 'app=demo', EXCLUDE_LABEL: 'protected=true' },
+      });
+      const dispatch = (action: AppAction) => {
+        if (action.type === 'UPDATE_SCENARIO_FORM') {
+          setState((previous) => ({ ...previous, scenarioFormValues: action.payload.formValues }));
+        }
+      };
+      return <AppContext.Provider value={{ state, dispatch }}>
+        <ScenarioDetail scenarioName="pod-scenarios" registryConfig={null} />
+      </AppContext.Provider>;
+    }
+    render(<Form />);
+    await user.click(screen.getByRole('button', { name: /Optional Parameters/i }));
+    await user.click(screen.getByRole('button', { name: 'Clear Pod label' }));
+    expect(screen.getByRole('combobox', { name: 'Pod label' })).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Show Exclude label options' }));
+    await user.click(await screen.findByText('app=demo'));
+    expect(screen.getByRole('combobox', { name: 'Exclude label' })).toHaveValue('app=demo');
+
+    await user.click(screen.getByRole('button', { name: 'Show Pod label options' }));
+    expect(screen.queryByText('app=demo')).not.toBeInTheDocument();
+    await user.click(await screen.findByText('protected=true'));
+    expect(screen.getByRole('combobox', { name: 'Pod label' })).toHaveValue('protected=true');
+  });
+
+  it('offers pod labels from every namespace matching current regex without replacing it', async () => {
+    const user = userEvent.setup();
+    const calls: ClusterResourcesRequest[] = [];
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async (request) => {
+      calls.push(request);
+      const items = request.resource === 'namespaces'
+        ? [
+            { metadata: { name: 'openshift-etcd' } },
+            { metadata: { name: 'openshift-monitoring' } },
+            { metadata: { name: 'default' } },
+          ]
+        : request.resource === 'pods' && request.allNamespaces
+          ? [
+            { metadata: { name: 'etcd-0', namespace: 'openshift-etcd', labels: { app: 'etcd' } } },
+            { metadata: { name: 'prometheus-0', namespace: 'openshift-monitoring', labels: { app: 'prometheus' } } },
+            { metadata: { name: 'other', namespace: 'default', labels: { app: 'other' } } },
+          ] : [];
+      return { items };
+    });
+    const podLabel: StringField = {
+      name: 'pod-label', variable: 'POD_LABEL', short_description: 'Pod label',
+      description: 'Label of pods to target', type: 'string', required: true, default: '',
+    };
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, fields: [mockScenarioDetail.fields[0], podLabel] },
+      scenarioFormValues: { NAMESPACE: 'openshift-.*', POD_LABEL: '' },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Show Pod label options' }));
+    expect(await screen.findByText('app=etcd')).toBeInTheDocument();
+    expect(screen.getByText('app=prometheus')).toBeInTheDocument();
+    expect(screen.queryByText('app=other')).not.toBeInTheDocument();
+    expect(calls).not.toContainEqual(resourceRequest('pods', { namespace: 'default' }));
+    expect(screen.getByRole('combobox', { name: 'Target namespace' })).toHaveValue('openshift-.*');
+  });
+
+  it('loads node names through cluster resource endpoint', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockResolvedValue({ items: [{ metadata: { name: 'worker-1' } }] });
+    const nodeName: StringField = {
+      name: 'node-name', variable: 'NODE_NAME', short_description: 'Node name',
+      description: 'Node to target', type: 'string', required: true, default: '',
+    };
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, name: 'node-scenarios', fields: [nodeName] },
+      scenarioFormValues: { NODE_NAME: '' },
+    }, null, 'node-scenarios');
+
+    await user.click(screen.getByRole('button', { name: 'Show Node name options' }));
+    expect(await screen.findByText('worker-1')).toBeInTheDocument();
+    expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('nodes'));
+    expect(operatorApi.getNodes).not.toHaveBeenCalled();
+    expect(operatorApi.executeTerminalCommand).not.toHaveBeenCalled();
+  });
+
+  it('offers cluster options in optional and global parameter sections', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource }) => ({
+      items: [{ metadata: { name: resource === 'namespaces' ? 'default' : resource === 'nodes' ? 'worker-1' : 'api-0' } }],
+    }));
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, fields: [
+        mockScenarioDetail.fields[0],
+        { name: 'pod-name', variable: 'POD_NAME', short_description: 'Pod name', description: '', type: 'string', required: false },
+      ] },
+      scenarioGlobals: { ...mockScenarioGlobals, fields: [
+        { name: 'virt-node', variable: 'KUBE_VIRT_NODE_NAME', short_description: 'Virtualization node', description: '', type: 'string', required: false },
+      ] },
+    });
+
+    await user.click(screen.getByText('Optional Parameters'));
+    await user.click(screen.getByRole('button', { name: 'Show Pod name options' }));
+    expect(await screen.findByText('api-0')).toBeInTheDocument();
+    await user.click(screen.getByText('Global Parameters'));
+    await user.click(screen.getByRole('button', { name: 'Show Virtualization node options' }));
+    expect(await screen.findByText('worker-1')).toBeInTheDocument();
+  });
+
+  it('uses scenario namespace for pods when global virtualization namespace also has a value', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockImplementation(async ({ resource }) => ({
+      items: resource === 'namespaces'
+        ? [{ metadata: { name: 'workloads' } }, { metadata: { name: 'virtualization' } }]
+        : [{ metadata: { name: 'api-0' } }],
+    }));
+    renderWithContext({
+      scenarioDetail: { ...mockScenarioDetail, fields: [
+        mockScenarioDetail.fields[0],
+        { name: 'pod-name', variable: 'POD_NAME', short_description: 'Pod name', description: '', type: 'string', required: true },
+      ] },
+      scenarioFormValues: { NAMESPACE: 'workloads', KUBE_VIRT_NAMESPACE: 'virtualization' },
+      globalFormValues: { KUBE_VIRT_NAMESPACE: 'virtualization' },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Show Pod name options' }));
+    await screen.findByText('api-0');
+    expect(operatorApi.getClusterResources).toHaveBeenCalledWith(resourceRequest('pods', { namespace: 'workloads' }));
+  });
+
+  it('explains discovery permission failures and allows retry', async () => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources)
+      .mockRejectedValueOnce(Object.assign(new Error('Denied'), { status: 403, statusText: 'Forbidden' }))
+      .mockResolvedValueOnce({ items: [{ metadata: { name: 'default' } }] });
+    renderWithContext();
+    await user.click(screen.getByRole('button', { name: 'Show Target namespace options' }));
+    expect(await screen.findByText('Permission denied while loading cluster options.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('default')).toBeInTheDocument();
+  });
+
+  it.each([
+    [404, 'Target or provider unavailable.'],
+    [502, 'Cluster resource lookup failed while loading options.'],
+    [504, 'Cluster resource lookup failed while loading options.'],
+    [429, 'Unable to load cluster options.'],
+  ])('shows safe cluster option error for HTTP %s', async (status, expected) => {
+    const user = userEvent.setup();
+    vi.mocked(operatorApi.getClusterResources).mockRejectedValueOnce(Object.assign(new Error('private provider detail'), { status, statusText: 'Failure' }));
+    renderWithContext();
+
+    await user.click(screen.getByRole('button', { name: 'Show Target namespace options' }));
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText('private provider detail')).not.toBeInTheDocument();
   });
 
   describe('Signature verification loading', () => {
@@ -433,6 +821,26 @@ describe('ScenarioDetail', () => {
   });
 
   describe('Global Parameters Section', () => {
+    it('shows required and optional global cards with their fields', async () => {
+      const user = userEvent.setup();
+      renderWithContext({ scenarioGlobals: {
+        ...mockScenarioGlobals,
+        fields: [
+          { ...mockScenarioGlobals.fields[0], required: true },
+          {
+            name: 'optional-global', variable: 'OPTIONAL_GLOBAL', short_description: 'Optional global',
+            description: 'Optional global', type: 'string', required: false,
+          },
+        ],
+      } });
+
+      await user.click(screen.getByRole('button', { name: /Global Parameters/i }));
+      expect(screen.getByText('Required Global Parameters')).toBeInTheDocument();
+      expect(screen.getByText('Optional Global Parameters')).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Prometheus URL' })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Optional global' })).toBeInTheDocument();
+    });
+
     it('should render global parameters toggle', () => {
       renderWithContext();
 
@@ -1135,8 +1543,9 @@ describe('ScenarioDetail', () => {
         },
       });
 
-      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
-      await user.click(namespaceInput);
+      await user.click(screen.getByRole('button', { name: /Optional Parameters/i }));
+      const killCountInput = screen.getByRole('spinbutton', { name: /Number of pods to kill/i });
+      await user.click(killCountInput);
       await user.keyboard('{Enter}');
 
       await waitFor(() => {
@@ -1155,8 +1564,9 @@ describe('ScenarioDetail', () => {
 
       renderWithContext({ scenarioFormValues: { NAMESPACE: 'default' } });
 
-      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
-      await user.click(namespaceInput);
+      await user.click(screen.getByRole('button', { name: /Optional Parameters/i }));
+      const killCountInput = screen.getByRole('spinbutton', { name: /Number of pods to kill/i });
+      await user.click(killCountInput);
       await user.keyboard('{Enter}');
       await waitFor(() => expect(operatorApi.getActiveRuns).toHaveBeenCalledTimes(1));
 
@@ -1176,7 +1586,7 @@ describe('ScenarioDetail', () => {
         },
       });
 
-      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      const namespaceInput = screen.getByRole('combobox', { name: /Target namespace/i });
       await user.click(namespaceInput);
       await user.keyboard('{Shift>}{Enter}{/Shift}');
 
@@ -1192,7 +1602,7 @@ describe('ScenarioDetail', () => {
         },
       });
 
-      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
+      const namespaceInput = screen.getByRole('combobox', { name: /Target namespace/i });
       await user.click(namespaceInput);
       await user.keyboard('a');
 
@@ -1257,8 +1667,9 @@ describe('ScenarioDetail', () => {
 
       renderWithContext({ scenarioFormValues: {} });
 
-      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
-      await user.click(namespaceInput);
+      await user.click(screen.getByRole('button', { name: /Optional Parameters/i }));
+      const killCountInput = screen.getByRole('spinbutton', { name: /Number of pods to kill/i });
+      await user.click(killCountInput);
       await user.keyboard('{Enter}');
 
       expect(operatorApi.runScenario).not.toHaveBeenCalled();
@@ -1275,6 +1686,7 @@ describe('ScenarioDetail', () => {
             validator: '^[a-z]+$',
             validation_message: 'Use lowercase letters only',
           },
+          mockScenarioDetail.fields[1],
         ],
       };
 
@@ -1283,8 +1695,9 @@ describe('ScenarioDetail', () => {
         scenarioFormValues: { NAMESPACE: 'INVALID_VALUE' },
       });
 
-      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
-      await user.click(namespaceInput);
+      await user.click(screen.getByRole('button', { name: /Optional Parameters/i }));
+      const killCountInput = screen.getByRole('spinbutton', { name: /Number of pods to kill/i });
+      await user.click(killCountInput);
       await user.keyboard('{Enter}');
 
       expect(operatorApi.runScenario).not.toHaveBeenCalled();
@@ -1305,8 +1718,9 @@ describe('ScenarioDetail', () => {
       await user.click(await screen.findByText('Select a file'));
       await user.click(await screen.findByText('metrics.yaml'));
 
-      const namespaceInput = screen.getByRole('textbox', { name: /Target namespace/i });
-      await user.click(namespaceInput);
+      await user.click(screen.getByRole('button', { name: /Optional Parameters/i }));
+      const killCountInput = screen.getByRole('spinbutton', { name: /Number of pods to kill/i });
+      await user.click(killCountInput);
       await user.keyboard('{Enter}');
 
       expect(operatorApi.runScenario).not.toHaveBeenCalled();

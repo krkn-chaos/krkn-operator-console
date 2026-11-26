@@ -594,6 +594,21 @@ export const handlers = [
   http.get(`${BASE}/nodes`, () =>
     HttpResponse.json({ nodes: ['ip-10-0-1-100.ec2.internal', 'ip-10-0-1-101.ec2.internal'] }),
   ),
+  http.get(`${BASE}/cluster-resources`, ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    const namespace = query.get('namespace');
+    const itemsByResource = {
+      namespaces: ['default', 'kube-system', 'shop', 'robot-shop'].map((name) => ({ metadata: { name } })),
+      nodes: ['ip-10-0-1-100.ec2.internal', 'ip-10-0-1-101.ec2.internal'].map((name) => ({ metadata: { name, labels: { 'node-role.kubernetes.io/worker': '' } } })),
+      pods: [{ metadata: { name: 'web-0', namespace: 'shop', labels: { app: 'web' } }, spec: { containers: [{ name: 'web' }] } }],
+      pvcs: [{ metadata: { name: 'shop-data', namespace: 'shop' } }],
+      vmi: [{ metadata: { name: 'demo-vm', namespace: 'default', labels: { app: 'demo' } } }],
+      serviceaccounts: [{ metadata: { name: 'default', namespace: 'shop' } }],
+    };
+    const resource = query.get('resource') as keyof typeof itemsByResource;
+    const items = itemsByResource[resource] ?? [];
+    return HttpResponse.json({ items: namespace ? items.filter((item) => 'namespace' in item.metadata && item.metadata.namespace === namespace) : items });
+  }),
 
   // ─── SCENARIOS ───
   http.post(`${BASE}/scenarios`, () =>
