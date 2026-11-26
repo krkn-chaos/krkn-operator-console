@@ -185,7 +185,16 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       mounted = false;
     };
   }, [registryConfig, rerunScenario, state.scenarios]);
-  const [enableResiliencyScore, setEnableResiliencyScore] = useState(false);
+  const [enableResiliencyScore, setEnableResiliencyScore] = useState(state.rerunResiliencyScoreEnabled ?? false);
+  const [resiliencyScoreBaseline, setResiliencyScoreBaseline] = useState(state.rerunResiliencyScoreBaseline?.toString() ?? '');
+  const [baselineError, setBaselineError] = useState('');
+
+  useEffect(() => {
+    if (!state.rerunScenario) return;
+    setEnableResiliencyScore(state.rerunResiliencyScoreEnabled ?? false);
+    setResiliencyScoreBaseline(state.rerunResiliencyScoreBaseline?.toString() ?? '');
+    setBaselineError('');
+  }, [state.rerunScenario, state.rerunResiliencyScoreEnabled, state.rerunResiliencyScoreBaseline]);
 
   // Load available files for file reference mapping
   useEffect(() => {
@@ -548,6 +557,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         registryName: statusResponse.registryName,
         customRunName: statusResponse.customRunName || runRequest.customRunName,
         resiliencyScoreEnabled: statusResponse.resiliencyScoreEnabled ?? enableResiliencyScore,
+        resiliencyScoreBaseline: statusResponse.resiliencyScoreBaseline ?? runRequest.resiliencyScoreBaseline,
         resiliencyScores: statusResponse.resiliencyScores,
       };
 
@@ -624,6 +634,14 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
       setValidationErrors(['Maximum retries must be a non-negative whole number.']);
       return;
     }
+    if (enableResiliencyScore) {
+      const baseline = Number(resiliencyScoreBaseline);
+      if (!resiliencyScoreBaseline.trim() || !Number.isFinite(baseline) || baseline < 0) {
+        setBaselineError(resiliencyScoreBaseline.trim() ? 'Baseline score must be a non-negative number' : 'Baseline score is required');
+        return;
+      }
+    }
+    setBaselineError('');
     if (rerunScenario && (signatureVerificationLoading || rerunSignatureLoading)) {
       setValidationErrors(['Image signature verification is still loading — please try again.']);
       return;
@@ -780,6 +798,7 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
         cloudCredentialRef: appliedCloudCredName || undefined,
         maxRetries: rollbackEnabled ? 0 : maxRetries,
         resiliencyScoreEnabled: enableResiliencyScore || undefined,
+        resiliencyScoreBaseline: enableResiliencyScore ? Number(resiliencyScoreBaseline) : undefined,
         categories: selectedRunCategories.length > 0
           ? (visibleCategories.status === 'ready'
             ? selectedRunCategories.filter((name) => visibleCategories.categories.some((category) => category.name === name))
@@ -1297,7 +1316,13 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 label="Enabled"
                 labelOff="Disabled"
                 isChecked={enableResiliencyScore}
-                onChange={(_event, checked) => setEnableResiliencyScore(checked)}
+                onChange={(_event, checked) => {
+                  setEnableResiliencyScore(checked);
+                  if (!checked) {
+                    setResiliencyScoreBaseline('');
+                    setBaselineError('');
+                  }
+                }}
               />
               <FormHelperText>
                 <HelperText>
@@ -1305,6 +1330,32 @@ export function ScenarioDetail({ scenarioName, registryConfig }: ScenarioDetailP
                 </HelperText>
               </FormHelperText>
             </FormGroup>
+            {enableResiliencyScore && (
+              <FormGroup label="Baseline Score" fieldId="resiliency-score-baseline" isRequired>
+                <TextInput
+                  id="resiliency-score-baseline"
+                  aria-label="Baseline score"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={resiliencyScoreBaseline}
+                  onChange={(_event, value) => {
+                    setResiliencyScoreBaseline(value);
+                    setBaselineError('');
+                  }}
+                  validated={baselineError ? 'error' : 'default'}
+                  isDisabled={isSubmitting}
+                  placeholder="e.g., 100.0"
+                />
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem variant={baselineError ? 'error' : 'default'}>
+                      {baselineError || 'Reference score for comparison (must be >= 0)'}
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              </FormGroup>
+            )}
           </div>
 
           {/* Run Button */}

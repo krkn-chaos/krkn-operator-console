@@ -203,6 +203,7 @@ function toUnifiedRunItem(item: UnifiedJobItem): UnifiedRunItem {
         graphRunName: sr.graphRunName,
         customRunName: sr.customRunName,
         resiliencyScoreEnabled: sr.resiliencyScoreEnabled,
+        resiliencyScoreBaseline: sr.resiliencyScoreBaseline,
         resiliencyScores: sr.resiliencyScores,
       },
     };
@@ -1369,13 +1370,16 @@ export function JobsList({
                             <ResiliencyScoreTooltip
                               isCompact
                               labelClassName="jobs-list-compact-label"
+                              strictPassFail
+                              scoreEnabled={run.resiliencyScoreEnabled}
                               scores={
-                                run.resiliencyScores
-                                  ? toGraphClusterScores(run.resiliencyScores)
+                                run.resiliencyScores?.length
+                                  ? toGraphClusterScores(run.resiliencyScores, run.resiliencyScoreBaseline)
                                   : run.resiliencyScoreEnabled && !TERMINAL_PHASES.includes(run.phase)
                                     ? [{ clusterName: '', calculated: SCORE_CALCULATING, status: 'no-baseline' as const }]
                                     : undefined
                               }
+                              baseline={run.resiliencyScoreBaseline}
                             />
                           </div>
                         </DataListCell>,

@@ -3,7 +3,7 @@ import type { JobConfigResponse, RerunIntent, ScenarioRunState } from '../types/
 /** Build the state handoff used when a scenario run is replayed from its saved configuration. */
 export function buildRerunIntent(
   config: JobConfigResponse,
-  run: Pick<ScenarioRunState, 'scenarioName' | 'registryName'>,
+  run: Pick<ScenarioRunState, 'scenarioName' | 'registryName' | 'resiliencyScoreEnabled' | 'resiliencyScoreBaseline'>,
 ): RerunIntent {
   const clusters = Object.entries(config.targetClusters).flatMap(
     ([operatorName, clusterNames]) => clusterNames.map(clusterName => ({ operatorName, clusterName })),
@@ -22,5 +22,9 @@ export function buildRerunIntent(
     categories: config.categories,
     workspace: config.workspace,
     rollbackEnabled: config.rollbackEnabled,
+    ...(run.resiliencyScoreEnabled ? {
+      resiliencyScoreEnabled: true,
+      ...(run.resiliencyScoreBaseline !== undefined ? { resiliencyScoreBaseline: run.resiliencyScoreBaseline } : {}),
+    } : {}),
   };
 }
