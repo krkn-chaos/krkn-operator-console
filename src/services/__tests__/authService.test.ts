@@ -18,17 +18,38 @@ describe('authService - user groups', () => {
 
   it('restores an OIDC session without storing its token in browser storage', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      userId: 'oidc-123', role: 'user', provider: 'corp-keycloak', mappedGroups: ['ops'], csrfToken: 'csrf-123',
+      userId: 'oidc-123', name: 'Tullio', surname: 'Sebastiani', role: 'user',
+      provider: 'corp-keycloak', mappedGroups: ['ops'], csrfToken: 'csrf-123',
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
     expect(await authService.restoreCookieSession()).toEqual({
-      userId: 'oidc-123', name: 'oidc-123', surname: '', role: 'user', provider: 'corp-keycloak', groups: ['ops'],
+      userId: 'oidc-123', name: 'Tullio', surname: 'Sebastiani', role: 'user', provider: 'corp-keycloak', groups: ['ops'],
     });
     expect(authService.getCookieSession()?.csrfToken).toBe('csrf-123');
     expect(authService.getToken()).toBeNull();
     expect(fetchSpy).toHaveBeenCalledWith('/api/v1/auth/session', expect.objectContaining({ credentials: 'include' }));
     authService.logout();
     fetchSpy.mockRestore();
+  });
+
+  it.each([
+    { name: '', surname: '' },
+    {},
+  ])('falls back to the OIDC user ID when profile names are empty or absent', async (profile) => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      userId: 'oidc-456', ...profile, role: 'user', provider: 'corp-keycloak',
+      mappedGroups: [], csrfToken: 'csrf-456',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    try {
+      expect(await authService.restoreCookieSession()).toEqual({
+        userId: 'oidc-456', name: 'oidc-456', surname: '', role: 'user',
+        provider: 'corp-keycloak', groups: [],
+      });
+    } finally {
+      authService.logout();
+      fetchSpy.mockRestore();
+    }
   });
 
   it('keeps an OIDC session when server logout fails and sends its CSRF token', async () => {

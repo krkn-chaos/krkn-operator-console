@@ -5,8 +5,9 @@ import {
   ModalVariant, Pagination, SearchInput, Spinner, Switch, TextArea, TextInput, Title,
   Tabs, Tab, TabTitleText, Grid, GridItem, Flex, FlexItem, Label,
   Dropdown, DropdownItem, DropdownList, MenuToggle,
+  Tooltip,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, KeyIcon, EllipsisVIcon, ArrowRightIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, UsersIcon, TrashIcon, EditIcon, KeyIcon, EllipsisVIcon, ArrowRightIcon, QuestionCircleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { FormModal } from './FormModal';
 import { identityApi, type IdentityBlock, type IdentityProvider, type IdentityProviderInput, type RemoteGroup } from '../services/identityApi';
@@ -657,12 +658,21 @@ export function IdentityManagement() {
               });
             }}>Remove group directory credentials</Button>}
             <Title headingLevel="h4" size="md" className="identity-management__form-section">Connection security</Title>
-            <FormGroup label={editingProvider?.hasCACert ? 'Additional trusted CA (leave blank to keep current)' : 'Additional trusted CA certificate (PEM)'} fieldId="identity-ca-cert">
+            <FormGroup
+              label={editingProvider?.hasCACert ? 'Additional trusted CA (leave blank to keep current)' : 'Additional trusted CA certificate (PEM)'}
+              fieldId="identity-ca-cert"
+              labelIcon={
+                <Tooltip content="Paste the PEM-encoded CA certificate that issued the certificate served by the OIDC provider. Include the full BEGIN CERTIFICATE and END CERTIFICATE lines; include intermediate CA certificates if the chain requires them. Do not paste the server certificate or a private key.">
+                  <span tabIndex={0} aria-label="CA certificate input instructions"><QuestionCircleIcon /></span>
+                </Tooltip>
+              }
+            >
               <TextArea
                 id="identity-ca-cert"
                 value={providerForm.caCert ?? ''}
                 resizeOrientation="vertical"
                 rows={6}
+                isDisabled={providerForm.skipTLSVerify ?? false}
                 onChange={(_, value) => {
                   setField('caCert', value);
                   if (value.trim()) setField('clearCACert', false);
@@ -674,8 +684,8 @@ export function IdentityManagement() {
             </Button>}
             <Switch
               id="identity-skip-tls-verify"
-              label="Skip TLS certificate verification"
-              labelOff="Verify TLS certificates"
+              label="Skip TLS verification: Enabled"
+              labelOff="Skip TLS verification: Disabled"
               isChecked={providerForm.skipTLSVerify ?? false}
               onChange={(_, value) => setField('skipTLSVerify', value)}
             />
