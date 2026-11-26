@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert, Button, Card, CardBody, CardTitle, EmptyState, EmptyStateBody,
   EmptyStateIcon, Form, FormGroup, FormSelect, FormSelectOption, Modal,
-  ModalVariant, Pagination, SearchInput, Spinner, Switch, TextInput, Title,
+  ModalVariant, Pagination, SearchInput, Spinner, Switch, TextArea, TextInput, Title,
   Tabs, Tab, TabTitleText, Grid, GridItem, Flex, FlexItem, Label,
   Dropdown, DropdownItem, DropdownList, MenuToggle,
 } from '@patternfly/react-core';
@@ -16,11 +16,15 @@ import { usePagination } from '../hooks/usePagination';
 import type { ExternalGroupMapping, GroupDetails, UserDetails } from '../types/api';
 import './IdentityManagement.css';
 
-type ProviderForm = Omit<IdentityProviderInput, 'type'> & { type: '' | IdentityProviderInput['type'] };
+type ProviderForm = Omit<IdentityProviderInput, 'type'> & {
+  type: '' | IdentityProviderInput['type'];
+  clearCACert?: boolean;
+};
 
 const emptyProvider: ProviderForm = {
   id: '', type: '', displayName: '', issuer: '', clientId: '',
-  clientSecret: '', redirectUrl: '', adminClientId: '', adminClientSecret: '', enabled: false,
+  clientSecret: '', redirectUrl: '', adminClientId: '', adminClientSecret: '',
+  caCert: '', skipTLSVerify: false, clearCACert: false, enabled: false,
 };
 
 function failure(error: unknown): string {
@@ -98,7 +102,16 @@ export function IdentityManagement() {
   const [accountsError, setAccountsError] = useState('');
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const accountsRevision = useRef(0);
-  const [pending, setPending] = useState<{ title: string; detail: string; action: () => Promise<void>; destructive?: boolean } | null>(null);
+  const [pending, setPending] = useState<{
+    title: string;
+    detail: string;
+    action: () => Promise<void>;
+    destructive?: boolean;
+    refreshProviders?: boolean;
+    refreshGroups?: boolean;
+    refreshAccounts?: boolean;
+    successMessage?: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const loadProviders = useCallback(async () => {
@@ -238,7 +251,8 @@ export function IdentityManagement() {
     setProviderForm({
       id: provider.id, type: 'keycloak', displayName: provider.displayName,
       issuer: provider.issuer, clientId: provider.clientId, redirectUrl: provider.redirectUrl,
-      adminClientId: provider.adminClientId ?? '', clientSecret: '', adminClientSecret: '', enabled: provider.enabled,
+      adminClientId: provider.adminClientId ?? '', clientSecret: '', adminClientSecret: '',
+      caCert: '', clearCACert: false, skipTLSVerify: provider.skipTLSVerify ?? false, enabled: provider.enabled,
     });
   }
 
@@ -252,17 +266,20 @@ export function IdentityManagement() {
     setSavingProvider(true);
     try {
       if (editingProvider) {
-        const { displayName, clientId, clientSecret, redirectUrl, adminClientId, adminClientSecret, enabled } = providerForm;
+        const { displayName, clientId, clientSecret, redirectUrl, adminClientId, adminClientSecret, enabled, caCert, clearCACert, skipTLSVerify } = providerForm;
         if (!adminClientId && editingProvider.hasAdminClientSecret) {
           throw new Error('Use Remove group directory credentials to clear the existing service client.');
         }
         await identityApi.updateProvider(editingProvider.id, {
           displayName, clientId, redirectUrl, adminClientId, enabled,
+          skipTLSVerify,
+          ...(clearCACert ? { caCert: '' } : caCert?.trim() ? { caCert: caCert.trim() } : {}),
           ...(clientSecret ? { clientSecret } : {}),
           ...(adminClientSecret ? { adminClientSecret } : {}),
         });
       } else {
-        await identityApi.createProvider({ ...providerForm, type: providerForm.type });
+        const { clearCACert: _clearCACert, ...providerInput } = providerForm;
+        await identityApi.createProvider({ ...providerInput, type: providerForm.type });
       }
       setProviderForm(null);
       await loadProviders();
@@ -288,11 +305,14 @@ export function IdentityManagement() {
 
   async function confirmAction() {
     if (!pending) return;
+    const action = pending;
     setBusy(true);
     try {
-      await pending.action();
-      await loadAccounts();
-      showSuccess('Identity updated');
+      await action.action();
+      if (action.refreshProviders) await loadProviders();
+      if (action.refreshGroups) await loadGroups();
+      if (action.refreshAccounts !== false) await loadAccounts();
+      showSuccess(action.successMessage ?? 'Identity updated');
       setPending(null);
     } catch (error) { showError('Could not update identity', failure(error)); }
     finally { setBusy(false); }
@@ -343,7 +363,24 @@ export function IdentityManagement() {
                       <Td>{provider.type === 'keycloak' ? 'Keycloak' : provider.type}</Td>
                       <Td className="identity-management__issuer">{provider.issuer}</Td>
                       <Td><Switch id={`provider-${provider.id}`} label="Enabled" labelOff="Disabled" isChecked={provider.enabled} isDisabled={provider.source === 'environment' || updatingProviders.includes(provider.id)} onChange={(_, value) => void toggleProvider(provider, value)} /></Td>
-                      <Td><Button variant="plain" aria-label={`Edit ${provider.displayName}`} isDisabled={provider.source === 'environment'} onClick={() => openEdit(provider)}><EditIcon /></Button></Td>
+                      <Td>
+                        <Button variant="plain" aria-label={`Edit ${provider.displayName}`} isDisabled={provider.source === 'environment'} onClick={() => openEdit(provider)}><EditIcon /></Button>
+                        <Button
+                          variant="plain"
+                          aria-label={`Delete ${provider.displayName}`}
+                          isDisabled={provider.source === 'environment'}
+                          onClick={() => setPending({
+                            title: 'Delete identity provider?',
+                            detail: `This removes ${provider.displayName}, its remote group mappings, and active sessions. OIDC user records and blacklist entries are retained.`,
+                            destructive: true,
+                            action: () => identityApi.deleteProvider(provider.id),
+                            refreshProviders: true,
+                            refreshGroups: true,
+                            refreshAccounts: false,
+                            successMessage: 'Identity provider deleted',
+                          })}
+                        ><TrashIcon /></Button>
+                      </Td>
                     </Tr>
                   ))}</Tbody>
                 </Table>
@@ -576,6 +613,32 @@ export function IdentityManagement() {
                 },
               });
             }}>Remove group directory credentials</Button>}
+            <Title headingLevel="h4" size="md" className="identity-management__form-section">Connection security</Title>
+            <FormGroup label={editingProvider?.hasCACert ? 'Additional trusted CA (leave blank to keep current)' : 'Additional trusted CA certificate (PEM)'} fieldId="identity-ca-cert">
+              <TextArea
+                id="identity-ca-cert"
+                value={providerForm.caCert ?? ''}
+                resizeOrientation="vertical"
+                rows={6}
+                onChange={(_, value) => {
+                  setField('caCert', value);
+                  if (value.trim()) setField('clearCACert', false);
+                }}
+              />
+            </FormGroup>
+            {editingProvider?.hasCACert && <Button variant="secondary" onClick={() => setField('clearCACert', !providerForm.clearCACert)}>
+              {providerForm.clearCACert ? 'Keep configured CA certificate' : 'Remove configured CA certificate'}
+            </Button>}
+            <Switch
+              id="identity-skip-tls-verify"
+              label="Skip TLS certificate verification"
+              labelOff="Verify TLS certificates"
+              isChecked={providerForm.skipTLSVerify ?? false}
+              onChange={(_, value) => setField('skipTLSVerify', value)}
+            />
+            {providerForm.skipTLSVerify && <Alert variant="warning" title="TLS verification is disabled" isInline>
+              Connections to this provider will accept untrusted certificates. Use this only on a network you trust.
+            </Alert>}
             <Switch id="identity-enabled" label="Enabled" labelOff="Disabled" isChecked={providerForm.enabled} onChange={(_, value) => setField('enabled', value)} />
           </>}
           <div className="identity-management__form-actions">
