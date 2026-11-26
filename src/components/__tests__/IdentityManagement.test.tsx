@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { IdentityManagement } from '../IdentityManagement';
 
 const mocks = vi.hoisted(() => ({
-  providers: vi.fn(), groups: vi.fn(), users: vi.fn(), blocks: vi.fn(), updateProvider: vi.fn(), updateGroup: vi.fn(), listGroups: vi.fn(),
+  providers: vi.fn(), groups: vi.fn(), users: vi.fn(), blocks: vi.fn(), updateProvider: vi.fn(), deleteProvider: vi.fn(), updateGroup: vi.fn(), listGroups: vi.fn(),
   showError: vi.fn(), showSuccess: vi.fn(),
 }));
 
 vi.mock('../../services/identityApi', () => ({ identityApi: {
   providers: mocks.providers, groups: mocks.groups, users: mocks.users, blocks: mocks.blocks, updateProvider: mocks.updateProvider,
+  deleteProvider: mocks.deleteProvider,
 } }));
 vi.mock('../../services/groupsApi', () => ({ groupsApi: {
   listGroups: mocks.listGroups, updateGroup: mocks.updateGroup,
@@ -26,6 +27,7 @@ describe('IdentityManagement', () => {
     mocks.blocks.mockResolvedValue([]);
     mocks.updateGroup.mockResolvedValue({ name: 'User' });
     mocks.updateProvider.mockResolvedValue({});
+    mocks.deleteProvider.mockResolvedValue(undefined);
   });
 
   it('saves a remote mapping using the local group ID when its display name differs', async () => {
@@ -67,6 +69,25 @@ describe('IdentityManagement', () => {
     expect(screen.getByRole('button', { name: 'Remove mapping /Engineering from Operators' })).toBeInTheDocument();
     expect(screen.getAllByText('Provider group ID: not supplied (matched by path)')).toHaveLength(2);
     expect(screen.queryByRole('combobox', { name: 'Local group' })).not.toBeInTheDocument();
+  });
+
+  it('waits for an in-flight group mapping write before allowing provider deletion', async () => {
+    let finishMapping!: () => void;
+    mocks.updateGroup.mockImplementation(() => new Promise<void>(resolve => { finishMapping = resolve; }));
+    render(<IdentityManagement />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Group mapping' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Map' }));
+    const mappingDialog = screen.getByRole('dialog', { name: 'Map remote group' });
+    await userEvent.selectOptions(within(mappingDialog).getByRole('combobox', { name: 'Local group' }), 'user');
+    await userEvent.click(within(mappingDialog).getByRole('button', { name: 'Map group' }));
+    await waitFor(() => expect(mocks.updateGroup).toHaveBeenCalled());
+
+    const deleteButton = screen.getByRole('button', { name: 'Delete Corporate Keycloak', hidden: true });
+    expect(deleteButton).toBeDisabled();
+    finishMapping();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Map remote group' })).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('tab', { name: /Providers/ }));
+    await waitFor(() => expect(deleteButton).toBeEnabled());
   });
 
   it('shows Add provider at the top right and asks for provider type first', async () => {
@@ -166,5 +187,56 @@ describe('IdentityManagement', () => {
     expect(mocks.updateProvider).toHaveBeenCalledTimes(1);
     completeUpdate();
     await waitFor(() => expect(mocks.providers).toHaveBeenCalledTimes(2));
+  });
+
+  it('accepts provider deletion, refreshes provider and group lists, and reports success', async () => {
+    mocks.providers.mockResolvedValueOnce([{ id: 'corp-keycloak', type: 'keycloak', displayName: 'Corporate Keycloak', issuer: 'https://id.test/realms/corp', clientId: 'login', redirectUrl: 'https://console.test/api/v1/auth/oidc/corp-keycloak/callback', enabled: true, source: 'secret', hasClientSecret: true, hasAdminClientSecret: true }]).mockResolvedValueOnce([]);
+    render(<IdentityManagement />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Corporate Keycloak' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete identity provider?' });
+    expect(within(dialog).getByText(/OIDC user records and blacklist entries are retained/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(mocks.deleteProvider).toHaveBeenCalledWith('corp-keycloak'));
+    await waitFor(() => expect(mocks.providers).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.listGroups).toHaveBeenCalledTimes(2));
+    expect(mocks.showSuccess).toHaveBeenCalledWith('Identity provider deleted');
+  });
+
+  it('reports a failed post-delete refresh and lets the admin retry without deleting again', async () => {
+    mocks.providers.mockResolvedValueOnce([{ id: 'corp-keycloak', type: 'keycloak', displayName: 'Corporate Keycloak', issuer: 'https://id.test/realms/corp', clientId: 'login', redirectUrl: 'https://console.test/api/v1/auth/oidc/corp-keycloak/callback', enabled: true, source: 'secret', hasClientSecret: true, hasAdminClientSecret: true }]).mockResolvedValueOnce([]);
+    mocks.listGroups.mockResolvedValueOnce([{ id: 'user', name: 'User', clusterPermissions: {}, externalGroups: [] }])
+      .mockRejectedValueOnce(new Error('temporary group API error'))
+      .mockResolvedValueOnce([{ id: 'user', name: 'User', clusterPermissions: {}, externalGroups: [] }]);
+    render(<IdentityManagement />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Corporate Keycloak' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Delete identity provider?' })).getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByRole('button', { name: 'Retry group list' })).toBeInTheDocument();
+    expect(mocks.showError).toHaveBeenCalledWith(
+      'Identity action completed, but the lists could not be refreshed',
+      expect.stringContaining('The action has already completed.'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Retry group list' }));
+    await waitFor(() => expect(mocks.listGroups).toHaveBeenCalledTimes(3));
+    expect(mocks.deleteProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a confirmation open and blocks cancel while its action is in flight', async () => {
+    let finishDelete!: () => void;
+    mocks.deleteProvider.mockImplementation(() => new Promise<void>(resolve => { finishDelete = resolve; }));
+    render(<IdentityManagement />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Corporate Keycloak' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete identity provider?' });
+    const confirm = within(dialog).getByRole('button', { name: 'Confirm' });
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' });
+    await userEvent.click(confirm);
+
+    expect(confirm).toBeDisabled();
+    expect(cancel).toBeDisabled();
+    await userEvent.click(cancel);
+    expect(screen.getByRole('dialog', { name: 'Delete identity provider?' })).toBeInTheDocument();
+    finishDelete();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete identity provider?' })).not.toBeInTheDocument());
   });
 });

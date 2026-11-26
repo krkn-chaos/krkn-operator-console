@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert, Button, Card, CardBody, CardTitle, EmptyState, EmptyStateBody,
   EmptyStateIcon, Form, FormGroup, FormSelect, FormSelectOption, Modal,
-  ModalVariant, Pagination, SearchInput, Spinner, Switch, TextInput, Title,
+  ModalVariant, Pagination, SearchInput, Spinner, Switch, TextArea, TextInput, Title,
   Tabs, Tab, TabTitleText, Grid, GridItem, Flex, FlexItem, Label,
   Dropdown, DropdownItem, DropdownList, MenuToggle,
 } from '@patternfly/react-core';
@@ -16,11 +16,27 @@ import { usePagination } from '../hooks/usePagination';
 import type { ExternalGroupMapping, GroupDetails, UserDetails } from '../types/api';
 import './IdentityManagement.css';
 
-type ProviderForm = Omit<IdentityProviderInput, 'type'> & { type: '' | IdentityProviderInput['type'] };
+type ProviderForm = Omit<IdentityProviderInput, 'type'> & {
+  type: '' | IdentityProviderInput['type'];
+  clearCACert?: boolean;
+};
+
+type PendingIdentityAction = {
+  title: string;
+  detail: string;
+  action: () => Promise<void>;
+  destructive?: boolean;
+  refreshProviders?: boolean;
+  refreshGroups?: boolean;
+  refreshAccounts?: boolean;
+  successMessage?: string;
+  providerId?: string;
+};
 
 const emptyProvider: ProviderForm = {
   id: '', type: '', displayName: '', issuer: '', clientId: '',
-  clientSecret: '', redirectUrl: '', adminClientId: '', adminClientSecret: '', enabled: false,
+  clientSecret: '', redirectUrl: '', adminClientId: '', adminClientSecret: '',
+  caCert: '', skipTLSVerify: false, clearCACert: false, enabled: false,
 };
 
 function failure(error: unknown): string {
@@ -80,6 +96,7 @@ export function IdentityManagement() {
   const [providerForm, setProviderForm] = useState<ProviderForm | null>(null);
   const [savingProvider, setSavingProvider] = useState(false);
   const [groups, setGroups] = useState<GroupDetails[]>([]);
+  const [groupsLoadError, setGroupsLoadError] = useState('');
   const [mappingRemote, setMappingRemote] = useState<RemoteGroup | null>(null);
   const [mappingLocalGroupId, setMappingLocalGroupId] = useState('');
   const [remoteGroups, setRemoteGroups] = useState<RemoteGroup[]>([]);
@@ -98,30 +115,40 @@ export function IdentityManagement() {
   const [accountsError, setAccountsError] = useState('');
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const accountsRevision = useRef(0);
-  const [pending, setPending] = useState<{ title: string; detail: string; action: () => Promise<void>; destructive?: boolean } | null>(null);
+  const [pending, setPending] = useState<PendingIdentityAction | null>(null);
+  const [deletingProviderId, setDeletingProviderId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const loadProviders = useCallback(async () => {
+  const loadProviders = useCallback(async (): Promise<boolean> => {
     const revision = ++providersRevision.current;
     setLoadingProviders(true);
     try {
       const loaded = await identityApi.providers();
-      if (revision !== providersRevision.current) return;
+      if (revision !== providersRevision.current) return false;
       setProviders(loaded);
       setSelectedProvider(current => loaded.some(provider => provider.id === current) ? current : loaded[0]?.id ?? '');
       setProviderError('');
-    } catch (error) { if (revision === providersRevision.current) setProviderError(failure(error)); }
+      return true;
+    } catch (error) {
+      if (revision === providersRevision.current) setProviderError(failure(error));
+      return false;
+    }
     finally { if (revision === providersRevision.current) setLoadingProviders(false); }
   }, []);
 
   useEffect(() => { void loadProviders(); }, [loadProviders]);
 
-  const loadGroups = useCallback(async () => {
+  const loadGroups = useCallback(async (): Promise<boolean> => {
     try {
       const loaded = await groupsApi.listGroups();
       setGroups(loaded);
-    } catch (error) { showError('Could not load local groups', failure(error)); }
-  }, [showError]);
+      setGroupsLoadError('');
+      return true;
+    } catch (error) {
+      setGroupsLoadError(failure(error));
+      return false;
+    }
+  }, []);
 
   useEffect(() => { void loadGroups(); }, [loadGroups]);
 
@@ -198,11 +225,14 @@ export function IdentityManagement() {
   const blockPage = usePagination(blocks, { initialPerPage: 10 });
 
   async function saveMapping(localGroup: GroupDetails, next: ExternalGroupMapping[]): Promise<boolean> {
-    if (savingMapping) return false;
+    if (savingMapping || deletingProviderId !== null) return false;
     setSavingMapping(true);
     try {
       await groupsApi.updateGroup(localGroup.id ?? localGroup.name, { externalGroups: next });
-      await loadGroups();
+      if (!await loadGroups()) {
+        showError('Group mapping saved, but the group list could not be refreshed', 'Use Retry in the group mapping section to reload the latest mappings.');
+        return true;
+      }
       showSuccess('Group mapping saved');
       return true;
     } catch (error) { showError('Could not save group mapping', failure(error)); return false; }
@@ -210,12 +240,13 @@ export function IdentityManagement() {
   }
 
   function openMapping(remoteGroup: RemoteGroup) {
+    if (savingMapping || deletingProviderId !== null) return;
     setMappingLocalGroupId('');
     setMappingRemote(remoteGroup);
   }
 
   async function confirmMapping() {
-    if (!mappingRemote) return;
+    if (!mappingRemote || deletingProviderId !== null) return;
     const localGroup = groups.find(group => (group.id ?? group.name) === mappingLocalGroupId);
     if (!localGroup) return;
     if (hasMapping(localGroup, mappingRemote)) return;
@@ -238,7 +269,8 @@ export function IdentityManagement() {
     setProviderForm({
       id: provider.id, type: 'keycloak', displayName: provider.displayName,
       issuer: provider.issuer, clientId: provider.clientId, redirectUrl: provider.redirectUrl,
-      adminClientId: provider.adminClientId ?? '', clientSecret: '', adminClientSecret: '', enabled: provider.enabled,
+      adminClientId: provider.adminClientId ?? '', clientSecret: '', adminClientSecret: '',
+      caCert: '', clearCACert: false, skipTLSVerify: provider.skipTLSVerify ?? false, enabled: provider.enabled,
     });
   }
 
@@ -252,17 +284,20 @@ export function IdentityManagement() {
     setSavingProvider(true);
     try {
       if (editingProvider) {
-        const { displayName, clientId, clientSecret, redirectUrl, adminClientId, adminClientSecret, enabled } = providerForm;
+        const { displayName, clientId, clientSecret, redirectUrl, adminClientId, adminClientSecret, enabled, caCert, clearCACert, skipTLSVerify } = providerForm;
         if (!adminClientId && editingProvider.hasAdminClientSecret) {
           throw new Error('Use Remove group directory credentials to clear the existing service client.');
         }
         await identityApi.updateProvider(editingProvider.id, {
           displayName, clientId, redirectUrl, adminClientId, enabled,
+          skipTLSVerify,
+          ...(clearCACert ? { caCert: '' } : caCert?.trim() ? { caCert: caCert.trim() } : {}),
           ...(clientSecret ? { clientSecret } : {}),
           ...(adminClientSecret ? { adminClientSecret } : {}),
         });
       } else {
-        await identityApi.createProvider({ ...providerForm, type: providerForm.type });
+        const { clearCACert: _clearCACert, ...providerInput } = providerForm;
+        await identityApi.createProvider({ ...providerInput, type: providerForm.type });
       }
       setProviderForm(null);
       await loadProviders();
@@ -288,14 +323,35 @@ export function IdentityManagement() {
 
   async function confirmAction() {
     if (!pending) return;
+    const action = pending;
     setBusy(true);
     try {
-      await pending.action();
-      await loadAccounts();
-      showSuccess('Identity updated');
-      setPending(null);
+      await action.action();
+      let refreshFailed = false;
+      if (action.refreshProviders && !await loadProviders()) refreshFailed = true;
+      if (action.refreshGroups && !await loadGroups()) refreshFailed = true;
+      if (action.refreshAccounts !== false) await loadAccounts();
+      setPending(current => current === action ? null : current);
+      if (action.providerId) setDeletingProviderId(current => current === action.providerId ? null : current);
+      if (refreshFailed) {
+        showError('Identity action completed, but the lists could not be refreshed', 'Use Retry in the provider or group mapping section to reload the latest data. The action has already completed.');
+      } else {
+        showSuccess(action.successMessage ?? 'Identity updated');
+      }
     } catch (error) { showError('Could not update identity', failure(error)); }
     finally { setBusy(false); }
+  }
+
+  function requestConfirmation(action: PendingIdentityAction): boolean {
+    if (busy || pending !== null) return false;
+    setPending(action);
+    return true;
+  }
+
+  function closeConfirmation() {
+    if (busy) return;
+    setPending(null);
+    setDeletingProviderId(null);
   }
 
   const setField = <K extends keyof ProviderForm>(key: K, value: ProviderForm[K]) =>
@@ -317,6 +373,9 @@ export function IdentityManagement() {
         <p className="identity-management__intro">
           Configure external sign-in, connect remote groups to local permissions, and manage identities.
         </p>
+        {groupsLoadError && <Alert variant="danger" title="Could not refresh local groups" isInline actionLinks={<Button variant="link" onClick={() => void loadGroups()}>Retry group list</Button>}>
+          {groupsLoadError}
+        </Alert>}
         <Tabs activeKey={activeSection} onSelect={(_, key) => setActiveSection(Number(key))} aria-label="Identity management sections">
           <Tab eventKey={0} title={<TabTitleText>Providers ({providers.length})</TabTitleText>}>
             <div className="identity-management__panel">
@@ -343,7 +402,28 @@ export function IdentityManagement() {
                       <Td>{provider.type === 'keycloak' ? 'Keycloak' : provider.type}</Td>
                       <Td className="identity-management__issuer">{provider.issuer}</Td>
                       <Td><Switch id={`provider-${provider.id}`} label="Enabled" labelOff="Disabled" isChecked={provider.enabled} isDisabled={provider.source === 'environment' || updatingProviders.includes(provider.id)} onChange={(_, value) => void toggleProvider(provider, value)} /></Td>
-                      <Td><Button variant="plain" aria-label={`Edit ${provider.displayName}`} isDisabled={provider.source === 'environment'} onClick={() => openEdit(provider)}><EditIcon /></Button></Td>
+                      <Td>
+                        <Button variant="plain" aria-label={`Edit ${provider.displayName}`} isDisabled={provider.source === 'environment'} onClick={() => openEdit(provider)}><EditIcon /></Button>
+                        <Button
+                          variant="plain"
+                          aria-label={`Delete ${provider.displayName}`}
+                          isDisabled={provider.source === 'environment' || savingMapping || deletingProviderId !== null}
+                          onClick={() => {
+                            const opened = requestConfirmation({
+                              title: 'Delete identity provider?',
+                              detail: `This removes ${provider.displayName}, its remote group mappings, and active sessions. OIDC user records and blacklist entries are retained.`,
+                              destructive: true,
+                              providerId: provider.id,
+                              action: () => identityApi.deleteProvider(provider.id),
+                              refreshProviders: true,
+                              refreshGroups: true,
+                              refreshAccounts: false,
+                              successMessage: 'Identity provider deleted',
+                            });
+                            if (opened) setDeletingProviderId(provider.id);
+                          }}
+                        ><TrashIcon /></Button>
+                      </Td>
                     </Tr>
                   ))}</Tbody>
                 </Table>
@@ -397,7 +477,7 @@ export function IdentityManagement() {
                               <Tbody>{remoteGroups.map(group => (
                                 <Tr key={group.id}>
                                   <Td>{group.path}</Td><Td>{group.id}</Td>
-                                  <Td><Button variant="secondary" isDisabled={savingMapping || group.provider !== selectedProvider || groups.every(localGroup => hasMapping(localGroup, group))} onClick={() => openMapping(group)}>
+                                  <Td><Button variant="secondary" isDisabled={savingMapping || deletingProviderId !== null || group.provider !== selectedProvider || groups.every(localGroup => hasMapping(localGroup, group))} onClick={() => openMapping(group)}>
                                     Map
                                   </Button></Td>
                                 </Tr>
@@ -429,7 +509,7 @@ export function IdentityManagement() {
                                 <Tr key={`${localGroup.id ?? localGroup.name}:${mapping.provider}:${mapping.group}`}>
                                   <Td><strong>{mapping.group}</strong><div className="identity-management__meta">Provider group ID: {mapping.groupId || 'not supplied (matched by path)'}</div></Td>
                                   <Td>{localGroup.name}</Td>
-                                  <Td><Button variant="plain" aria-label={`Remove mapping ${mapping.group} from ${localGroup.name}`} isDisabled={savingMapping} onClick={() => void saveMapping(localGroup, (localGroup.externalGroups ?? []).filter(item => item !== mapping))}><TrashIcon /></Button></Td>
+                                  <Td><Button variant="plain" aria-label={`Remove mapping ${mapping.group} from ${localGroup.name}`} isDisabled={savingMapping || deletingProviderId !== null} onClick={() => void saveMapping(localGroup, (localGroup.externalGroups ?? []).filter(item => item !== mapping))}><TrashIcon /></Button></Td>
                                 </Tr>
                               ))}</Tbody>
                             </Table>
@@ -485,13 +565,13 @@ export function IdentityManagement() {
                                   )}
                                 >
                                   <DropdownList>
-                                    <DropdownItem onClick={() => { setPending({ title: user.active ? 'Disable user?' : 'Enable user?', detail: user.userId, destructive: user.active, action: () => identityApi.setUserActive(user.userId, !user.active) }); setOpenUserMenu(null); }}>
+                                    <DropdownItem onClick={() => { requestConfirmation({ title: user.active ? 'Disable user?' : 'Enable user?', detail: user.userId, destructive: user.active, action: () => identityApi.setUserActive(user.userId, !user.active) }); setOpenUserMenu(null); }}>
                                       {user.active ? 'Disable' : 'Enable'}
                                     </DropdownItem>
-                                    <DropdownItem icon={<TrashIcon />} onClick={() => { setPending({ title: 'Delete OIDC user?', detail: `${user.userId} can sign in again later.`, destructive: true, action: () => identityApi.deleteUser(user.userId, false) }); setOpenUserMenu(null); }}>
+                                    <DropdownItem icon={<TrashIcon />} onClick={() => { requestConfirmation({ title: 'Delete OIDC user?', detail: `${user.userId} can sign in again later.`, destructive: true, action: () => identityApi.deleteUser(user.userId, false) }); setOpenUserMenu(null); }}>
                                       Delete
                                     </DropdownItem>
-                                    <DropdownItem icon={<TrashIcon />} onClick={() => { setPending({ title: 'Delete and blacklist OIDC user?', detail: `${user.userId} cannot sign in again until removed from the blacklist.`, destructive: true, action: () => identityApi.deleteUser(user.userId, true) }); setOpenUserMenu(null); }}>
+                                    <DropdownItem icon={<TrashIcon />} onClick={() => { requestConfirmation({ title: 'Delete and blacklist OIDC user?', detail: `${user.userId} cannot sign in again until removed from the blacklist.`, destructive: true, action: () => identityApi.deleteUser(user.userId, true) }); setOpenUserMenu(null); }}>
                                       Delete &amp; blacklist
                                     </DropdownItem>
                                   </DropdownList>
@@ -521,7 +601,7 @@ export function IdentityManagement() {
                             <Tr key={block.id}>
                               <Td><strong>{block.username || block.subject}</strong><div className="identity-management__meta">{block.email || block.subject}</div></Td>
                               <Td>{block.provider}</Td>
-                              <Td><Button variant="secondary" onClick={() => setPending({ title: 'Remove identity from blacklist?', detail: block.username || block.subject, action: () => identityApi.unblock(block.id) })}>Unblock</Button></Td>
+                              <Td><Button variant="secondary" onClick={() => requestConfirmation({ title: 'Remove identity from blacklist?', detail: block.username || block.subject, action: () => identityApi.unblock(block.id) })}>Unblock</Button></Td>
                             </Tr>
                           ))}</Tbody>
                         </Table>
@@ -565,7 +645,7 @@ export function IdentityManagement() {
             <FormGroup label="Admin client secret (leave blank to keep)" fieldId="identity-admin-secret"><TextInput id="identity-admin-secret" type="password" value={providerForm.adminClientSecret ?? ''} onChange={(_, value) => setField('adminClientSecret', value)} /></FormGroup>
             {editingProvider?.hasAdminClientSecret && <Button variant="secondary" onClick={() => {
               setProviderForm(null);
-              setPending({
+              requestConfirmation({
                 title: 'Remove group directory credentials?',
                 detail: 'Remote group browsing will be unavailable until new service credentials are configured.',
                 destructive: true,
@@ -576,6 +656,32 @@ export function IdentityManagement() {
                 },
               });
             }}>Remove group directory credentials</Button>}
+            <Title headingLevel="h4" size="md" className="identity-management__form-section">Connection security</Title>
+            <FormGroup label={editingProvider?.hasCACert ? 'Additional trusted CA (leave blank to keep current)' : 'Additional trusted CA certificate (PEM)'} fieldId="identity-ca-cert">
+              <TextArea
+                id="identity-ca-cert"
+                value={providerForm.caCert ?? ''}
+                resizeOrientation="vertical"
+                rows={6}
+                onChange={(_, value) => {
+                  setField('caCert', value);
+                  if (value.trim()) setField('clearCACert', false);
+                }}
+              />
+            </FormGroup>
+            {editingProvider?.hasCACert && <Button variant="secondary" onClick={() => setField('clearCACert', !providerForm.clearCACert)}>
+              {providerForm.clearCACert ? 'Keep configured CA certificate' : 'Remove configured CA certificate'}
+            </Button>}
+            <Switch
+              id="identity-skip-tls-verify"
+              label="Skip TLS certificate verification"
+              labelOff="Verify TLS certificates"
+              isChecked={providerForm.skipTLSVerify ?? false}
+              onChange={(_, value) => setField('skipTLSVerify', value)}
+            />
+            {providerForm.skipTLSVerify && <Alert variant="warning" title="TLS verification is disabled" isInline>
+              Connections to this provider will accept untrusted certificates. Use this only on a network you trust.
+            </Alert>}
             <Switch id="identity-enabled" label="Enabled" labelOff="Disabled" isChecked={providerForm.enabled} onChange={(_, value) => setField('enabled', value)} />
           </>}
           <div className="identity-management__form-actions">
@@ -600,9 +706,9 @@ export function IdentityManagement() {
         </Form>}
       </FormModal>
 
-      <Modal variant={ModalVariant.small} title={pending?.title ?? 'Confirm identity action'} isOpen={pending !== null} onClose={() => setPending(null)} actions={[
+      <Modal variant={ModalVariant.small} title={pending?.title ?? 'Confirm identity action'} isOpen={pending !== null} showClose={!busy} onClose={closeConfirmation} actions={[
         <Button key="confirm" variant={pending?.destructive ? 'danger' : 'primary'} isDisabled={busy} onClick={() => void confirmAction()}>Confirm</Button>,
-        <Button key="cancel" variant="link" onClick={() => setPending(null)}>Cancel</Button>,
+        <Button key="cancel" variant="link" isDisabled={busy} onClick={closeConfirmation}>Cancel</Button>,
       ]}>{pending?.detail}</Modal>
     </Card>
   );

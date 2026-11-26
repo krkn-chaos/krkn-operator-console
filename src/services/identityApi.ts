@@ -23,6 +23,8 @@ export interface IdentityProvider {
   source: string;
   hasClientSecret: boolean;
   hasAdminClientSecret: boolean;
+  hasCACert?: boolean;
+  skipTLSVerify?: boolean;
 }
 
 export interface IdentityProviderInput {
@@ -35,6 +37,8 @@ export interface IdentityProviderInput {
   redirectUrl: string;
   adminClientId?: string;
   adminClientSecret?: string;
+  caCert?: string;
+  skipTLSVerify?: boolean;
   enabled: boolean;
 }
 
@@ -87,6 +91,10 @@ class IdentityApi extends BaseApiClient {
 
   async updateProvider(id: string, input: Partial<Omit<IdentityProviderInput, 'id' | 'type'>>): Promise<IdentityProvider> {
     return this.fetchJson(`/identity-providers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) });
+  }
+
+  async deleteProvider(id: string): Promise<void> {
+    await this.fetchNoContent(`/identity-providers/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   async groups(providerId: string, search = '', first = 0, max = 50): Promise<RemoteGroupPage> {
