@@ -600,9 +600,9 @@
     "semantic_hash": ""
   },
   "src/components/KrknAI/KrknAIPage.test.tsx": {
-    "mtime": 1795693573.7572486,
-    "seen": 1795700652.346897,
-    "ast_hash": "f6f8d74972e376f4de00c13cbcb448af",
+    "mtime": 1795709002.3038898,
+    "seen": 1795709014.938997,
+    "ast_hash": "6a1a837324ec4ce051a250d109806d12",
     "semantic_hash": ""
   },
   "src/components/KrknAI/KrknAIPage.tsx": {
