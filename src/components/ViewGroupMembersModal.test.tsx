@@ -3,10 +3,12 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ViewGroupMembersModal } from './ViewGroupMembersModal';
 import { groupsApi } from '../services/groupsApi';
-import type { GroupMemberDetails } from '../types/api';
+import { robotsApi } from '../services/robotsApi';
+import type { GroupMemberDetails, ListRobotsResponse } from '../types/api';
 
 // Mock the services and hooks
 vi.mock('../services/groupsApi');
+vi.mock('../services/robotsApi');
 vi.mock('../hooks', () => ({
   useNotifications: () => ({
     showSuccess: vi.fn(),
@@ -36,8 +38,16 @@ describe('ViewGroupMembersModal', () => {
     onClose: vi.fn(),
   };
 
+  const mockRobotsResponse = (robots: ListRobotsResponse['robots']): ListRobotsResponse => ({
+    robots,
+    total: robots.length,
+    mcpEnabled: true,
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: no robots anywhere
+    vi.mocked(robotsApi.listRobots).mockResolvedValue(mockRobotsResponse([]));
   });
 
   it('should display loading spinner initially', () => {
@@ -164,6 +174,77 @@ describe('ViewGroupMembersModal', () => {
     await waitFor(() => {
       expect(screen.getByText(/Add Members to test-group/i)).toBeInTheDocument();
     });
+  });
+
+  it('should show robot account members in a read-only section', async () => {
+    vi.mocked(groupsApi.listGroupMembers).mockResolvedValue(mockMembers);
+    vi.mocked(robotsApi.listRobots).mockResolvedValue(
+      mockRobotsResponse([
+        {
+          name: 'ci-runner',
+          description: 'CI pipeline robot',
+          disabled: false,
+          groups: ['test-group', 'other-group'],
+          tokenId: 'token-1',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+        {
+          name: 'disabled-bot',
+          description: 'Retired robot',
+          disabled: true,
+          groups: ['test-group'],
+          tokenId: '',
+          createdAt: '2026-01-02T00:00:00Z',
+        },
+        {
+          name: 'other-robot',
+          description: 'Member of another group',
+          disabled: false,
+          groups: ['other-group'],
+          tokenId: 'token-3',
+          createdAt: '2026-01-03T00:00:00Z',
+        },
+      ])
+    );
+
+    render(<ViewGroupMembersModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Robot accounts (2)')).toBeInTheDocument();
+    });
+
+    // Both robots in this group are shown with their status
+    expect(screen.getByText('ci-runner')).toBeInTheDocument();
+    expect(screen.getByText('disabled-bot')).toBeInTheDocument();
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
+
+    // Robots from other groups are not shown
+    expect(screen.queryByText('other-robot')).not.toBeInTheDocument();
+
+    // Read-only: management note is displayed
+    expect(
+      screen.getByText(/Manage robot membership in Settings → MCP Robots/i)
+    ).toBeInTheDocument();
+
+    // No remove buttons next to robot entries (only the two human members have them)
+    expect(screen.getAllByRole('button', { name: /Remove/i }).length).toBe(2);
+  });
+
+  it('should hide the robot accounts section when the robots API returns 404 (old operator)', async () => {
+    vi.mocked(groupsApi.listGroupMembers).mockResolvedValue(mockMembers);
+    const notFound = new Error('Not Found') as Error & { status: number };
+    notFound.status = 404;
+    vi.mocked(robotsApi.listRobots).mockRejectedValue(notFound);
+
+    render(<ViewGroupMembersModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Robot accounts/i)).not.toBeInTheDocument();
+    expect(robotsApi.listRobots).toHaveBeenCalledTimes(1);
   });
 
   it('should call onClose when Close button is clicked', async () => {
