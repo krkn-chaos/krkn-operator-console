@@ -114,6 +114,24 @@
   border: 1px solid var(--pf-v5-global--BorderColor--100);
 }
 
+.jobs-list-runs .jobs-list-header {
+  background: var(--pf-v5-global--BackgroundColor--200);
+  color: var(--pf-v5-global--Color--100);
+  font-weight: 600;
+}
+
+.jobs-list-runs .jobs-list-header .pf-v5-c-data-list__item-content {
+  align-items: center;
+}
+
+.jobs-list-runs .jobs-list-header .pf-v5-c-data-list__cell {
+  padding-block: var(--pf-v5-global--spacer--sm);
+}
+
+.jobs-list-header-action {
+  visibility: hidden;
+}
+
 .jobs-list-runs.pf-m-grid-none .pf-v5-c-data-list__item-content > .jobs-list-summary-cell--status {
   flex: 0 1 clamp(11rem, 12%, 13rem);
   min-width: 0;
