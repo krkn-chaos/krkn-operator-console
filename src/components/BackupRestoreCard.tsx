@@ -13,6 +13,7 @@ import {
   Spinner,
   Split,
   SplitItem,
+  TextInput,
 } from '@patternfly/react-core';
 import { DownloadIcon, UploadIcon } from '@patternfly/react-icons';
 import { useNotifications } from '../hooks/useNotifications';
@@ -29,8 +30,9 @@ function formatBytes(bytes: number): string {
 
 /**
  * Admin-only card for downloading and uploading operator configuration backups.
- * Backup creates and downloads a tar.gz archive directly.
- * Restore accepts a file upload, enabling cross-cluster migration.
+ * Backup creates and downloads an archive directly or through a presigned URL.
+ * Restore accepts a file upload or a remote HTTPS/S3 source, enabling
+ * cross-cluster migration without exposing S3 credentials to the browser.
  *
  * @example
  * ```tsx
@@ -42,8 +44,13 @@ export function BackupRestoreCard() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [restoreRemoteSource, setRestoreRemoteSource] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [restoreStatus, setRestoreStatus] = useState<RestoreResponse | null>(null);
+  const [backupPassphrase, setBackupPassphrase] = useState('');
+  const [backupPassphraseConfirm, setBackupPassphraseConfirm] = useState('');
+  const [restorePassphrase, setRestorePassphrase] = useState('');
+  const [restorePassphraseConfirm, setRestorePassphraseConfirm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollAbortRef = useRef<AbortController | null>(null);
 
@@ -56,8 +63,9 @@ export function BackupRestoreCard() {
   const handleDownloadBackup = async () => {
     setIsDownloading(true);
     try {
-      await backupRestoreApi.downloadBackup();
-      showSuccess('Backup Downloaded', 'Backup archive saved to your downloads folder.');
+      await backupRestoreApi.downloadBackup(backupPassphrase || undefined);
+      const suffix = backupPassphrase ? ' (encrypted)' : '';
+      showSuccess('Backup Downloaded', `Backup archive${suffix} saved to your downloads folder. This archive contains sensitive data — store it securely.`);
     } catch (error) {
       showError(
         'Backup Failed',
@@ -71,10 +79,22 @@ export function BackupRestoreCard() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
+    if (file) setRestoreRemoteSource('');
+  };
+
+  const handleRemoteSourceChange = (value: string) => {
+    setRestoreRemoteSource(value);
+    if (value.trim()) {
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleOpenRestoreModal = () => {
     setSelectedFile(null);
+    setRestoreRemoteSource('');
+    setRestorePassphrase('');
+    setRestorePassphraseConfirm('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -117,12 +137,16 @@ export function BackupRestoreCard() {
   );
 
   const handleRestoreConfirm = async () => {
-    if (!selectedFile) return;
+    const remoteSource = restoreRemoteSource.trim();
+    if (!selectedFile && !remoteSource) return;
     setIsUploading(true);
     try {
-      const response = await backupRestoreApi.uploadRestore(selectedFile);
+      const response = selectedFile
+        ? await backupRestoreApi.uploadRestore(selectedFile, restorePassphrase || undefined)
+        : await backupRestoreApi.restoreFromURL(remoteSource, restorePassphrase || undefined);
       setIsRestoreModalOpen(false);
       setSelectedFile(null);
+      setRestoreRemoteSource('');
       setRestoreStatus(response);
       showSuccess(
         'Restore Started',
@@ -133,7 +157,7 @@ export function BackupRestoreCard() {
     } catch (error) {
       showError(
         'Restore Failed',
-        error instanceof Error ? error.message : 'Failed to upload backup'
+        error instanceof Error ? error.message : 'Failed to start restore'
       );
     } finally {
       setIsUploading(false);
@@ -162,6 +186,40 @@ export function BackupRestoreCard() {
             </FlexItem>
 
             <FlexItem>
+              <label htmlFor="backup-passphrase" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                Encrypt backup (optional)
+              </label>
+              <TextInput
+                id="backup-passphrase"
+                type="password"
+                placeholder="Passphrase"
+                value={backupPassphrase}
+                onChange={(_event, value) => setBackupPassphrase(value)}
+                isDisabled={isDownloading || isUploading}
+                style={{ maxWidth: '300px' }}
+              />
+              {backupPassphrase && (
+                <>
+                  <TextInput
+                    id="backup-passphrase-confirm"
+                    type="password"
+                    placeholder="Confirm passphrase"
+                    value={backupPassphraseConfirm}
+                    onChange={(_event, value) => setBackupPassphraseConfirm(value)}
+                    isDisabled={isDownloading || isUploading}
+                    validated={backupPassphraseConfirm && backupPassphrase !== backupPassphraseConfirm ? 'error' : 'default'}
+                    style={{ maxWidth: '300px', marginTop: '0.5rem' }}
+                  />
+                  {backupPassphraseConfirm && backupPassphrase !== backupPassphraseConfirm && (
+                    <small style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'block', marginTop: '0.25rem' }}>
+                      Passphrases do not match
+                    </small>
+                  )}
+                </>
+              )}
+            </FlexItem>
+
+            <FlexItem>
               <Split hasGutter>
                 <SplitItem>
                   <Button
@@ -169,9 +227,9 @@ export function BackupRestoreCard() {
                     icon={<DownloadIcon />}
                     onClick={handleDownloadBackup}
                     isLoading={isDownloading}
-                    isDisabled={isUploading}
+                    isDisabled={isUploading || (!!backupPassphrase && backupPassphrase !== backupPassphraseConfirm)}
                   >
-                    Download Backup
+                    {backupPassphrase ? 'Download Encrypted Backup' : 'Download Backup'}
                   </Button>
                 </SplitItem>
                 <SplitItem>
@@ -215,7 +273,7 @@ export function BackupRestoreCard() {
             variant="danger"
             onClick={handleRestoreConfirm}
             isLoading={isUploading}
-            isDisabled={!selectedFile}
+            isDisabled={(!selectedFile && !restoreRemoteSource.trim()) || (!!restorePassphrase && restorePassphrase !== restorePassphraseConfirm)}
           >
             Upload &amp; Restore
           </Button>,
@@ -237,14 +295,30 @@ export function BackupRestoreCard() {
             </Alert>
           </FlexItem>
           <FlexItem>
+            <label htmlFor="restore-remote-source" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Remote backup URL or S3 URI (optional)
+            </label>
+            <TextInput
+              id="restore-remote-source"
+              type="text"
+              placeholder="https://... or s3://bucket/key"
+              value={restoreRemoteSource}
+              onChange={(_event, value) => handleRemoteSourceChange(value)}
+              isDisabled={isUploading}
+            />
+            <small style={{ display: 'block', marginTop: '0.5rem' }}>
+              Use either a remote source or a local archive file. S3 restore uses the operator&apos;s configured bucket and credentials.
+            </small>
+          </FlexItem>
+          <FlexItem>
             <label htmlFor="restore-file" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              Select Backup Archive
+              Or select a local backup archive
             </label>
             <input
               id="restore-file"
               ref={fileInputRef}
               type="file"
-              accept=".tar.gz,.gz"
+              accept=".tar.gz,.tar.gz.enc"
               onChange={handleFileChange}
               disabled={isUploading}
               data-testid="restore-file-input"
@@ -253,6 +327,38 @@ export function BackupRestoreCard() {
               <small style={{ display: 'block', marginTop: '0.5rem', color: 'var(--pf-v5-global--Color--200)' }}>
                 Selected: {selectedFile.name} ({formatBytes(selectedFile.size)})
               </small>
+            )}
+          </FlexItem>
+          <FlexItem>
+            <label htmlFor="restore-passphrase" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Passphrase (required for encrypted archives)
+            </label>
+            <TextInput
+              id="restore-passphrase"
+              type="password"
+              placeholder="Passphrase"
+              value={restorePassphrase}
+              onChange={(_event, value) => setRestorePassphrase(value)}
+              isDisabled={isUploading}
+            />
+            {restorePassphrase && (
+              <>
+                <TextInput
+                  id="restore-passphrase-confirm"
+                  type="password"
+                  placeholder="Confirm passphrase"
+                  value={restorePassphraseConfirm}
+                  onChange={(_event, value) => setRestorePassphraseConfirm(value)}
+                  isDisabled={isUploading}
+                  validated={restorePassphraseConfirm && restorePassphrase !== restorePassphraseConfirm ? 'error' : 'default'}
+                  style={{ marginTop: '0.5rem' }}
+                />
+                {restorePassphraseConfirm && restorePassphrase !== restorePassphraseConfirm && (
+                  <small style={{ color: 'var(--pf-v5-global--danger-color--100)', display: 'block', marginTop: '0.25rem' }}>
+                    Passphrases do not match
+                  </small>
+                )}
+              </>
             )}
           </FlexItem>
         </Flex>
