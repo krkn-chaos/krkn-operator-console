@@ -94,7 +94,7 @@ class IdentityApi extends BaseApiClient {
   }
 
   async deleteProvider(id: string): Promise<void> {
-    await this.fetchJson(`/identity-providers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await this.fetchNoContent(`/identity-providers/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   async groups(providerId: string, search = '', first = 0, max = 50): Promise<RemoteGroupPage> {

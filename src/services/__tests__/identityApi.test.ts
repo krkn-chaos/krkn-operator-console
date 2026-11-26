@@ -53,6 +53,19 @@ describe('identityApi', () => {
     expect(fetchSpy.mock.calls[1][1]?.body).toBe(JSON.stringify({ adminClientId: '', adminClientSecret: '' }));
   });
 
+  it('accepts the empty 204 response when deleting a provider', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(identityApi.deleteProvider('corp/keycloak')).resolves.toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/identity-providers/corp%2Fkeycloak', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  it('reports provider delete failures using the API error response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ message: 'Provider cleanup failed' }, 500));
+
+    await expect(identityApi.deleteProvider('corp')).rejects.toThrow('Provider cleanup failed');
+  });
+
   it('reports a rejected unblock instead of silently succeeding', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ message: 'Forbidden' }, 403));
     await expect(identityApi.unblock('blocked')).rejects.toThrow('HTTP 403');

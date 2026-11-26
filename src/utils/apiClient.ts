@@ -119,15 +119,26 @@ export class BaseApiClient {
     const response = await authenticatedFetch(fullUrl, options);
 
     if (!response.ok) {
-      let message = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const error = await response.json();
-        if (error.message) message = error.message;
-      } catch { /* use default message */ }
-      throw createApiError(message, response.status, response.statusText);
+      await this.throwApiError(response);
     }
 
     return response.json();
+  }
+
+  /** Fetch an endpoint whose successful response has no JSON body, such as HTTP 204. */
+  protected async fetchNoContent(url: string, options: RequestInit = {}): Promise<void> {
+    const fullUrl = `${this.baseUrl}${url}`;
+    const response = await authenticatedFetch(fullUrl, options);
+    if (!response.ok) await this.throwApiError(response);
+  }
+
+  private async throwApiError(response: Response): Promise<never> {
+    let message = `HTTP ${response.status}: ${response.statusText}`;
+    try {
+      const error = await response.json();
+      if (error.message) message = error.message;
+    } catch { /* use default message */ }
+    throw createApiError(message, response.status, response.statusText);
   }
 
   /**
