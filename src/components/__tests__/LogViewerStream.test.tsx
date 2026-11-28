@@ -19,6 +19,8 @@ const connectionUrls: string[] = [];
 let latestClient: { close: (code?: number, reason?: string) => void } | undefined;
 let dropped = false;
 let podGone = false;
+// A pod that has not written any log line yet.
+let quiet = false;
 
 const server = setupServer(
   logStream.addEventListener('connection', ({ client }) => {
@@ -27,6 +29,9 @@ const server = setupServer(
     latestClient = client;
     if (podGone) {
       client.send('ERROR: Pod no longer exists');
+      return;
+    }
+    if (quiet) {
       return;
     }
     podLog.forEach((line) => client.send(line));
@@ -66,6 +71,7 @@ describe('LogViewer log stream', () => {
     latestClient = undefined;
     dropped = false;
     podGone = false;
+    quiet = false;
     server.resetHandlers();
   });
 
@@ -123,6 +129,33 @@ describe('LogViewer log stream', () => {
     await settle();
 
     expectEachLineOnce([...podLog, 'line-final']);
+  });
+
+  it('says it is connected while a pod has no log lines yet', async () => {
+    quiet = true;
+    renderStrict(<LogViewer {...props} jobId="job-quiet" status="Running" />);
+    await settle();
+
+    expect(screen.queryByText('Connecting to log stream...')).not.toBeInTheDocument();
+    expect(screen.getByText('Connected. Waiting for log output...')).toBeInTheDocument();
+  });
+
+  it('stops saying it is reconnecting when a quiet stream reconnects', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    quiet = true;
+    renderStrict(<LogViewer {...props} jobId="job-quiet-drop" status="Running" />);
+    await settle();
+
+    await act(async () => {
+      latestClient?.close(4000, 'Connection lost');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.getByText('Reconnecting to log stream...')).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(2000));
+    await settle();
+
+    expect(screen.queryByText('Reconnecting to log stream...')).not.toBeInTheDocument();
+    expect(screen.getByText('Connected. Waiting for log output...')).toBeInTheDocument();
   });
 
   it('keeps the log and shows the error when the finished job has no pod left', async () => {

@@ -8,6 +8,10 @@ import { websocketService } from '../services/websocketService';
 import { LogTerminal } from './LogTerminal';
 import type { ConnectionState, RawMessageHandler } from '../types/websocket';
 
+const CONNECTING_MESSAGE = 'Connecting to log stream...';
+const RECONNECTING_MESSAGE = 'Reconnecting to log stream...';
+const WAITING_MESSAGE = 'Connected. Waiting for log output...';
+
 interface LogViewerProps {
   scenarioRunName: string;
   jobId: string;
@@ -41,7 +45,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
       setLogs(['Waiting for pod to start...']);
     } else if (!isTerminal) {
       isFirstMessageRef.current = true;
-      setLogs(['Connecting to log stream...']);
+      setLogs([CONNECTING_MESSAGE]);
     }
   }, [isPending, isTerminal]);
 
@@ -87,8 +91,15 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
   const handleConnectionState = useCallback((state: ConnectionState) => {
     if (state === 'connected') {
       isFirstMessageRef.current = true;
+      // A pod with no log lines yet sends nothing, so stop saying the stream
+      // is connecting. The first line still replaces this message.
+      setLogs(prev => (
+        prev.length === 1 && (prev[0] === CONNECTING_MESSAGE || prev[0] === RECONNECTING_MESSAGE)
+          ? [WAITING_MESSAGE]
+          : prev
+      ));
     } else if (state === 'reconnecting') {
-      setLogs(['Reconnecting to log stream...']);
+      setLogs([RECONNECTING_MESSAGE]);
     }
   }, []);
 
