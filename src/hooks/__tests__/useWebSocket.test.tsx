@@ -116,6 +116,31 @@ describe('useWebSocket', () => {
     expect(result.current.connectionState).toBe('connected');
   });
 
+  it('should call the latest onStateChange option synchronously and unregister it on unmount', () => {
+    let capturedHandler: ((state: ConnectionState) => void) | null = null;
+    mockOnStateChange.mockImplementation((_id: string, handler: (state: ConnectionState) => void) => {
+      capturedHandler = handler;
+    });
+    const firstCallback = vi.fn();
+    const latestCallback = vi.fn();
+
+    const { rerender, unmount } = renderHook(
+      ({ onStateChange }) => useWebSocket('test-state-callback', 'ws://localhost/test', undefined, { onStateChange }),
+      { initialProps: { onStateChange: firstCallback } },
+    );
+    rerender({ onStateChange: latestCallback });
+
+    act(() => {
+      capturedHandler?.('connected');
+      // Checked before act flushes React: the callback must not wait for a render.
+      expect(latestCallback).toHaveBeenCalledWith('connected');
+    });
+    expect(firstCallback).not.toHaveBeenCalled();
+
+    unmount();
+    expect(mockOffStateChange).toHaveBeenCalledWith('test-state-callback', capturedHandler);
+  });
+
   it('should provide stable subscribe/unsubscribe callbacks', () => {
     const { result } = renderHook(() =>
       useWebSocket('test-callbacks', 'ws://localhost/test')

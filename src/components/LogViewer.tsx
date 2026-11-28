@@ -6,7 +6,11 @@ import { krknAiApi } from '../services/krknAiApi';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { websocketService } from '../services/websocketService';
 import { LogTerminal } from './LogTerminal';
-import type { RawMessageHandler } from '../types/websocket';
+import type { ConnectionState, RawMessageHandler } from '../types/websocket';
+
+const CONNECTING_MESSAGE = 'Connecting to log stream...';
+const RECONNECTING_MESSAGE = 'Reconnecting to log stream...';
+const WAITING_MESSAGE = 'Connected. Waiting for log output...';
 
 interface LogViewerProps {
   scenarioRunName: string;
@@ -26,7 +30,6 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const isFirstMessageRef = useRef<boolean>(true);
-  const hasConnectedRef = useRef(false);
 
   const isPending = status === 'Pending';
   const isTerminal = ['Succeeded', 'Failed', 'MaxRetriesExceeded', 'Stopped', 'Cancelled'].includes(status);
@@ -42,7 +45,7 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
       setLogs(['Waiting for pod to start...']);
     } else if (!isTerminal) {
       isFirstMessageRef.current = true;
-      setLogs(['Connecting to log stream...']);
+      setLogs([CONNECTING_MESSAGE]);
     }
   }, [isPending, isTerminal]);
 
@@ -69,35 +72,42 @@ export function LogViewer({ scenarioRunName, jobId, clusterName: _clusterName, p
       return;
     }
 
-    setLogs(prev => {
-      if (isFirstMessageRef.current && prev[0] === 'Connecting to log stream...') {
-        isFirstMessageRef.current = false;
-        return [data];
-      }
-      return [...prev, data];
-    });
-  }, []);
-
-  const { connectionState } = useWebSocket(connectionId, wsUrl, handleRawMessage, {
-    disabled: isPending || archivedLogsAvailable,
-    subscriptionMode: false,
-  });
-
-  useEffect(() => {
-    if (connectionState === 'reconnecting' ||
-      (connectionState === 'connecting' && hasConnectedRef.current)) {
-      isFirstMessageRef.current = true;
-      setLogs(['Reconnecting to log stream...']);
+    // Every log connection streams the pod log from its first line, so the
+    // first line of a connection replaces what is shown. Check the flag here,
+    // not in a state updater, which React may call twice.
+    if (isFirstMessageRef.current) {
+      isFirstMessageRef.current = false;
+      setLogs([data]);
       return;
     }
-    if (connectionState === 'connected') {
-      if (hasConnectedRef.current) {
-        isFirstMessageRef.current = true;
-        setLogs([]);
-      }
-      hasConnectedRef.current = true;
+    setLogs(prev => [...prev, data]);
+  }, []);
+
+  // Every connection, including the one opened when the job finishes (the URL
+  // drops follow=true) and a reconnect after a drop, streams the pod log from
+  // its first line. The service reports these states before that connection's
+  // first message, so reset here rather than in an effect, which can run after
+  // the first lines have arrived.
+  const handleConnectionState = useCallback((state: ConnectionState) => {
+    if (state === 'connected') {
+      isFirstMessageRef.current = true;
+      // A pod with no log lines yet sends nothing, so stop saying the stream
+      // is connecting. The first line still replaces this message.
+      setLogs(prev => (
+        prev.length === 1 && (prev[0] === CONNECTING_MESSAGE || prev[0] === RECONNECTING_MESSAGE)
+          ? [WAITING_MESSAGE]
+          : prev
+      ));
+    } else if (state === 'reconnecting') {
+      setLogs([RECONNECTING_MESSAGE]);
     }
-  }, [connectionState]);
+  }, []);
+
+  useWebSocket(connectionId, wsUrl, handleRawMessage, {
+    disabled: isPending || archivedLogsAvailable,
+    subscriptionMode: false,
+    onStateChange: handleConnectionState,
+  });
 
 
   const triggerDownload = (content: string, filename: string, mimeType: string) => {

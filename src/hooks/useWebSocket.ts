@@ -11,6 +11,12 @@ interface UseWebSocketOptions {
   disabled?: boolean;
   /** Use raw message handler instead of parsed ServerMessage (for stream mode like logs) */
   subscriptionMode?: boolean;
+  /**
+   * Called synchronously on each connection state change. 'connected' arrives
+   * before the new connection's first message, so per-connection state can be
+   * reset here without racing React's next render.
+   */
+  onStateChange?: (state: ConnectionState) => void;
 }
 
 interface UseWebSocketReturn {
@@ -37,6 +43,8 @@ export function useWebSocket(
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+  const onStateChangeRef = useRef(options?.onStateChange);
+  onStateChangeRef.current = options?.onStateChange;
 
   // Stable wrapper that delegates to the latest onMessage ref
   const stableMessageHandler = useRef<MessageHandler | RawMessageHandler | null>(null);
@@ -44,8 +52,12 @@ export function useWebSocket(
   useEffect(() => {
     if (disabled) return;
 
+    const handleStateChange = (state: ConnectionState) => {
+      setConnectionState(state);
+      onStateChangeRef.current?.(state);
+    };
     websocketService.connect(connectionId, url, { subscriptionMode });
-    websocketService.onStateChange(connectionId, setConnectionState);
+    websocketService.onStateChange(connectionId, handleStateChange);
 
     // Set initial state
     setConnectionState(websocketService.getState(connectionId));
@@ -68,7 +80,7 @@ export function useWebSocket(
     }
 
     return () => {
-      websocketService.offStateChange(connectionId, setConnectionState);
+      websocketService.offStateChange(connectionId, handleStateChange);
       if (stableMessageHandler.current) {
         if (subscriptionMode) {
           websocketService.offMessage(connectionId, stableMessageHandler.current as MessageHandler);
